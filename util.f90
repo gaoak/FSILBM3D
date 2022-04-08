@@ -1,7 +1,7 @@
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-!	 
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!     
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��    
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfoTitl()
     USE simParam
@@ -71,7 +71,7 @@
         write(111,*)'variables= "t"  "MaMax"  '
         close(111)
 
-		open(111,file='./DatInfo/MaxValBody.plt')
+        open(111,file='./DatInfo/MaxValBody.plt')
         write(111,*)'variables= "t"  "xyzMax" "velMax" "accMax"  '
         close(111)
 
@@ -81,14 +81,14 @@
 
         open(111,file='./DatInfo/Energy.plt')
         write(111,*)'variables= "t","Es","Eb","Ep","Ek","Ew","Et"'
-	    close(111)
+        close(111)
 
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-!	 
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��     
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!     
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��     
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfo()
     USE simParam
@@ -180,13 +180,13 @@
         velocity(1:3)=0.0d0
         Pressure=0.0d0
 
-	    do	x=xbgn,xend
-        do	y=ybgn,yend
-        do	z=zbgn,zend
+        do    x=xbgn,xend
+        do    y=ybgn,yend
+        do    z=zbgn,zend
             weightm=(dx(x)-dabs(xGrid(x)-SampFlowPint(i,1)))*(dy(y)-dabs(yGrid(y)-SampFlowPint(i,2)))*(dz(z)-dabs(zGrid(z)-SampFlowPint(i,3)))
             velocity(1:3)=velocity(1:3)+uuu(z,y,x,1:3)*weightm/(dx(x)*dy(y)*dz(z))
             Pressure=Pressure+prs(z,y,x)*weightm/(dx(x)*dy(y)*dz(z))
-	    enddo
+        enddo
         enddo
         enddo
 
@@ -202,8 +202,8 @@
         Pay=sum(extful(1:nND,2)*velful(1:nND,2))/Pref
         Paz=sum(extful(1:nND,3)*velful(1:nND,3))/Pref
         Paero=Pax+Pay+Paz
-		!write(*,*)'Pt:',Paero
-		!write(*,*)'Pr:',(sum(extful(1:nND,4)*velful(1:nND,4))+sum(extful(1:nND,5)*velful(1:nND,5))+sum(extful(1:nND,6)*velful(1:nND,6)))/Pref
+        !write(*,*)'Pt:',Paero
+        !write(*,*)'Pr:',(sum(extful(1:nND,4)*velful(1:nND,4))+sum(extful(1:nND,5)*velful(1:nND,5))+sum(extful(1:nND,6)*velful(1:nND,6)))/Pref
         Pix=-sum(mssful(1:nND,1)*accful(1:nND,1)*velful(1:nND,1))/Pref
         Piy=-sum(mssful(1:nND,2)*accful(1:nND,2)*velful(1:nND,2))/Pref
         Piz=-sum(mssful(1:nND,3)*accful(1:nND,3)*velful(1:nND,3))/Pref
@@ -226,10 +226,10 @@
         write(111,'(2D20.10)')time/Tref,MaMax             
         close(111)
 
-		open(111,file='./DatInfo/MaxValBody.plt',position='append')
+        open(111,file='./DatInfo/MaxValBody.plt',position='append')
         write(111,'(4D20.10)')time/Tref,maxval(dsqrt(xyzful(1:nND,1)**2+xyzful(1:nND,2)**2+xyzful(1:nND,3)**2))/Lref, &
-										maxval(dsqrt(velful(1:nND,1)**2+velful(1:nND,2)**2+velful(1:nND,3)**2))/Uref, &
-										maxval(dsqrt(accful(1:nND,1)**2+accful(1:nND,2)**2+accful(1:nND,3)**2))/Aref
+                                        maxval(dsqrt(velful(1:nND,1)**2+velful(1:nND,2)**2+velful(1:nND,3)**2))/Uref, &
+                                        maxval(dsqrt(accful(1:nND,1)**2+accful(1:nND,2)**2+accful(1:nND,3)**2))/Aref
         close(111)
 
         !�������
@@ -239,9 +239,9 @@
         close(111)
         
         call strain_energy_D(  strainEnergy,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3),&
-								 ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
+                                 ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
                                  nND,nEL,nMT &
-							   )
+                               )
         EEE(1)=sum(strainEnergy(1:nEL,1))
         EEE(2)=sum(strainEnergy(1:nEL,2))
         Es=EEE(1)/Eref
@@ -249,9 +249,9 @@
         Ep=Es+Eb
         Ew=Ew+Paero*timeOutInfo
         Ek=0.5*sum(mssful(1:nND,1:6)*velful(1:nND,1:6)*velful(1:nND,1:6))/Eref
-		
-		!write(*,*)'Ekt:', 0.5*sum(mssful(1:nND,1:3)*velful(1:nND,1:3)*velful(1:nND,1:3))/Eref
-		!write(*,*)'Ekr:', 0.5*sum(mssful(1:nND,4:6)*velful(1:nND,4:6)*velful(1:nND,4:6))/Eref
+        
+        !write(*,*)'Ekt:', 0.5*sum(mssful(1:nND,1:3)*velful(1:nND,1:3)*velful(1:nND,1:3))/Eref
+        !write(*,*)'Ekr:', 0.5*sum(mssful(1:nND,4:6)*velful(1:nND,4:6)*velful(1:nND,4:6))/Eref
 
         Et=Ek+Ep
         open(111,file='./DatInfo/Energy.plt', position='append')
@@ -269,10 +269,10 @@
 
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-!	 
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��       
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!     
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��       
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE movGrid(dim,direction)
     USE simParam
@@ -282,38 +282,38 @@
     if    (dim==1)then      !x
         if(direction<0)       then      !move to -x
             fIn(:,:,2:xDim,:)=fIn(:,:,1:xDim-1,:)
-	        xGrid(:)=xGrid(:)-dx
+            xGrid(:)=xGrid(:)-dx
         elseif(direction>0)    then     !move to +x
             fIn(:,:,1:xDim-1,:)=fIn(:,:,2:xDim,:)
-	        xGrid(:)=xGrid(:)+dx
+            xGrid(:)=xGrid(:)+dx
         else
         endif
     elseif(dim==2)then      !y
         if(direction<0)        then     !move to -y
             fIn(:,2:yDim,:,:)=fIn(:,1:yDim-1,:,:)
-	        yGrid(:)=yGrid(:)-dy
+            yGrid(:)=yGrid(:)-dy
         elseif(direction>0)    then     !move to +y
             fIn(:,1:yDim-1,:,:)=fIn(:,2:yDim,:,:)
-	        yGrid(:)=yGrid(:)+dy
+            yGrid(:)=yGrid(:)+dy
         else
         endif
     elseif(dim==3)then      !z
         if(direction<0)        then     !move to -z
             fIn(2:zDim,:,:,:)=fIn(1:zDim-1,:,:,:)
-	        zGrid(:)=zGrid(:)-dz
+            zGrid(:)=zGrid(:)-dz
         elseif(direction>0)    then     !move to +z
             fIn(1:zDim-1,:,:,:)=fIn(2:zDim,:,:,:)
-	        zGrid(:)=zGrid(:)+dz
+            zGrid(:)=zGrid(:)+dz
         else
         endif
     else
     endif
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
 !
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��	        
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine  cptMove(move,xB,xG,d)
     implicit none
@@ -330,10 +330,10 @@
     enddo
     end subroutine
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
 !
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��	        
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref)
     implicit none
@@ -348,8 +348,8 @@
     end subroutine
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine cptArea(areaElem,nND,nEL,ele,xyzful)
     implicit none
@@ -399,10 +399,10 @@
 
     enddo
     endsubroutine
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
 !
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��	        
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine AoAtoTTT(AoA,TTT)
     implicit none
@@ -475,19 +475,19 @@
     end subroutine
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   write  string to unit=idfile  in binary format
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine dumpstring(instring,idfile)
-	implicit none
+    implicit none
     character(40) instring
     integer:: nascii,ii,len,idfile
 !
     len=LEN_TRIM(instring)
 
-    do	ii=1,len
-	    nascii=ICHAR(instring(ii:ii))
-		write(idfile) nascii
+    do    ii=1,len
+        nascii=ICHAR(instring(ii:ii))
+        write(idfile) nascii
     enddo
 
     write(idfile) 0
@@ -495,10 +495,10 @@
     return
     endsubroutine dumpstring
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
 !
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��	        
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine  initDisturb()
     USE simParam
@@ -517,10 +517,10 @@
 
     end 
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
 !
-!	copyright@ RuNanHua 
-!	��Ȩ���У������ϣ��й��ƴ������ѧϵ��	        
+!    copyright@ RuNanHua 
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine  forcDisturb()
     USE simParam
@@ -528,24 +528,24 @@
     integer:: x, y, z,xbgn,xend,ybgn,yend,zbgn,zend
     real(8):: rx,ry,rz,Phi
     
-    xbgn	= minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)-3
-	xend	= minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)+4
-	ybgn	= minloc(dabs(posiForcDist(2)-yGrid(1:yDim)),1)-3
-	yend	= minloc(dabs(posiForcDist(2)-yGrid(1:yDim)),1)+4
-	zbgn	= minloc(dabs(posiForcDist(3)-zGrid(1:zDim)),1)-3
-	zend	= minloc(dabs(posiForcDist(3)-zGrid(1:zDim)),1)+4
-	do	x=xbgn,xend
-	do	y=ybgn,yend
-	do	z=zbgn,zend
-		rx=(posiForcDist(1)-xGrid(x))/dx(x)
-		ry=(posiForcDist(2)-yGrid(y))/dy(y)
-		rz=(posiForcDist(3)-zGrid(z))/dz(z)
+    xbgn    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)-3
+    xend    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)+4
+    ybgn    = minloc(dabs(posiForcDist(2)-yGrid(1:yDim)),1)-3
+    yend    = minloc(dabs(posiForcDist(2)-yGrid(1:yDim)),1)+4
+    zbgn    = minloc(dabs(posiForcDist(3)-zGrid(1:zDim)),1)-3
+    zend    = minloc(dabs(posiForcDist(3)-zGrid(1:zDim)),1)+4
+    do    x=xbgn,xend
+    do    y=ybgn,yend
+    do    z=zbgn,zend
+        rx=(posiForcDist(1)-xGrid(x))/dx(x)
+        ry=(posiForcDist(2)-yGrid(y))/dy(y)
+        rz=(posiForcDist(3)-zGrid(z))/dz(z)
 
-		force(z,y,x,1)=force(z,y,x,1)+AmplforcDist(1)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
+        force(z,y,x,1)=force(z,y,x,1)+AmplforcDist(1)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
         force(z,y,x,2)=force(z,y,x,2)+AmplforcDist(2)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
         force(z,y,x,3)=force(z,y,x,3)+AmplforcDist(3)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
-	enddo
-	enddo
-	enddo 
+    enddo
+    enddo
+    enddo 
     end 
 

@@ -1,8 +1,7 @@
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   固体结构有限元子程序
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Finite element method for solid structure
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
     SUBROUTINE solver(  jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,  &
                         triad_nn,triad_ee,triad_e0,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ,nMT,nBD,nSTF,NewmarkGamma,NewmarkBeta,dtol,iterMax)
     implicit none
@@ -25,20 +24,20 @@
     integer:: i,j,iND,iEQ,iter,iterMax,iloc,ierror,maxramp,iModify
 !   -----------------------------------------------------------------------------------------------
 !   the generalized a method by Hua, Ru-Nan  not debug!!!!
-	RhoInf=1.0d0
-	AlphaM=0.0d0 !(2.0d0*RhoInf-1.0d0)/(RhoInf+1.0d0)
-	AlphaF=0.0d0 !RhoInf/(RhoInf+1.0d0)
+    RhoInf=1.0d0
+    AlphaM=0.0d0 !(2.0d0*RhoInf-1.0d0)/(RhoInf+1.0d0)
+    AlphaF=0.0d0 !RhoInf/(RhoInf+1.0d0)
 
-	!NewmarkGamma=0.5d0-AlphaM+AlphaF
-	!NewmarkBeta=(1.0d0-AlphaM+AlphaF)**2/4.0d0
+    !NewmarkGamma=0.5d0-AlphaM+AlphaF
+    !NewmarkBeta=(1.0d0-AlphaM+AlphaF)**2/4.0d0
 
 
     a0 = (1.0d0-AlphaM)/(NewmarkBeta*deltat*deltat)   
     a2 = (1.0d0-AlphaM)/(NewmarkBeta*deltat)
     a3 = (1.0d0-AlphaM)/(NewmarkBeta*2.0d0) - 1.0d0
 
-	ak = 1.0d0-AlphaF
-	a1 = ak*NewmarkGamma/(NewmarkBeta*deltat)
+    ak = 1.0d0-AlphaF
+    a1 = ak*NewmarkGamma/(NewmarkBeta*deltat)
     a4 = ak*NewmarkGamma/NewmarkBeta - 1.0d0
     a5 = ak*(NewmarkGamma/NewmarkBeta - 2.0d0)*0.5d0*deltat
 
@@ -59,7 +58,7 @@
     enddo
 
     dspO(1:nEQ) = dsp(1:nEQ)
-	velO(1:nEQ) = vel(1:nEQ)
+    velO(1:nEQ) = vel(1:nEQ)
     accO(1:nEQ) = acc(1:nEQ)
 !   ------------------------------------------------------------------------------
     iter=0
@@ -67,42 +66,42 @@
     do while(dnorm >= dtol .and. iter<= iterMax )
 !   ------------------------------------------------------------------------------
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	    forces from body stresses
-	    call body_stress_D( lodInte,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
-							ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, nND,nEL,nEQ,nMT,geoFRM,geoPLT &
+!        forces from body stresses
+        call body_stress_D( lodInte,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
+                            ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, nND,nEL,nEQ,nMT,geoFRM,geoPLT &
                           )
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
-		call formstif_s(stfElas,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
+        call formstif_s(stfElas,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
                         prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF)
-		call formgeom_s(stfGeom,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
-					    prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF,geoFRM,geoPLT)
-		stfMatr(1:nSTF)     = stfElas(1:nSTF)+ gamma*stfGeom(1:nSTF)
-		stfEffe(1:nSTF)     = ak*stfMatr(1:nSTF)
-		stfEffe(nloc(1:nEQ))= stfEffe(nloc(1:nEQ)) + a0*mss(1:nEQ) + a1*dampM*mss(1:nEQ)
-		stfEffe(1:nSTF)     = stfEffe(1:nSTF)+                     + a1*dampK*stfElas(1:nSTF)
+        call formgeom_s(stfGeom,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
+                        prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF,geoFRM,geoPLT)
+        stfMatr(1:nSTF)     = stfElas(1:nSTF)+ gamma*stfGeom(1:nSTF)
+        stfEffe(1:nSTF)     = ak*stfMatr(1:nSTF)
+        stfEffe(nloc(1:nEQ))= stfEffe(nloc(1:nEQ)) + a0*mss(1:nEQ) + a1*dampM*mss(1:nEQ)
+        stfEffe(1:nSTF)     = stfEffe(1:nSTF)+                     + a1*dampK*stfElas(1:nSTF)
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
-		lodEffe(1:nEQ)=+lodExte(1:nEQ)															&			!外力
-		               -lodInte(1:nEQ)															&			!内力
-					   -(a0*(dsp(1:nEQ)-dspO(1:nEQ))-a2*vel(1:nEQ)-a3*acc(1:nEQ))*mss(1:nEQ)	&			!惯性力
-                       -(a1*(dsp(1:nEQ)-dspO(1:nEQ))-a4*vel(1:nEQ)-a5*acc(1:nEQ))*mss(1:nEQ)*dampM			!质量比例阻尼力
+        lodEffe(1:nEQ)=+lodExte(1:nEQ)                                                            &            !external force
+                       -lodInte(1:nEQ)                                                            &            !internal force
+                       -(a0*(dsp(1:nEQ)-dspO(1:nEQ))-a2*vel(1:nEQ)-a3*acc(1:nEQ))*mss(1:nEQ)    &            !inertial force
+                       -(a1*(dsp(1:nEQ)-dspO(1:nEQ))-a4*vel(1:nEQ)-a5*acc(1:nEQ))*mss(1:nEQ)*dampM            !mass-ratio dumping force
 
-		if	(dabs(dampK) > 0.0) then  !
-			wk1(1:nEQ)= a1*(dsp(1:nEQ)-dspO(1:nEQ)) -a4*vel(1:nEQ) -a5*acc(1:nEQ)
-			call AxBCOL(stfElas,nSTF,wk1,wk2,nEQ,nBD,nprof,nprof2,nloc)
-			lodEffe(1:nEQ) = lodEffe(1:nEQ) - dampK*wk2(1:nEQ)												!刚度比例阻尼力
-		endif
+        if    (dabs(dampK) > 0.0) then  !
+            wk1(1:nEQ)= a1*(dsp(1:nEQ)-dspO(1:nEQ)) -a4*vel(1:nEQ) -a5*acc(1:nEQ)
+            call AxBCOL(stfElas,nSTF,wk1,wk2,nEQ,nBD,nprof,nprof2,nloc)
+            lodEffe(1:nEQ) = lodEffe(1:nEQ) - dampK*wk2(1:nEQ)                                                !stiffness-ratio dumping force
+        endif
 
-		if	(dabs(AlphaF) > 0.0) then !
-			wk1(1:nEQ)= (dsp(1:nEQ)-dspO(1:nEQ))
-			call AxBCOL(stfElas+gamma*stfGeom,nSTF,wk1,wk2,nEQ,nBD,nprof,nprof2,nloc)
-			lodEffe(1:nEQ) = lodEffe(1:nEQ) - AlphaF*wk2(1:nEQ)
-		endif
+        if    (dabs(AlphaF) > 0.0) then !
+            wk1(1:nEQ)= (dsp(1:nEQ)-dspO(1:nEQ))
+            call AxBCOL(stfElas+gamma*stfGeom,nSTF,wk1,wk2,nEQ,nBD,nprof,nprof2,nloc)
+            lodEffe(1:nEQ) = lodEffe(1:nEQ) - AlphaF*wk2(1:nEQ)
+        endif
 
 !       -------------------------------------------------------------------
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!		加载边界条件           
+!       loading boundary conditions
         do  iND=1,nND
         do  j=1  ,6
             if(jBC(iND,j)>0)then
@@ -119,26 +118,26 @@
                            
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
-!		求解方程
-		call uduCOL_D(stfEffe,nSTF,nEQ,nBD,ierror,nprof,nloc)
-		if	(ierror.eq.0) then
-	        write(*,*)'@@ ERROR: zero diagonal term !!!'
-			return
-		endif
-		call bakCOL_D(stfEffe,nSTF,lodEffe,nEQ,nBD,du,ierror,nprof,nprof2,nloc)
+!       solve equation
+        call uduCOL_D(stfEffe,nSTF,nEQ,nBD,ierror,nprof,nloc)
+        if    (ierror.eq.0) then
+            write(*,*)'@@ ERROR: zero diagonal term !!!'
+            return
+        endif
+        call bakCOL_D(stfEffe,nSTF,lodEffe,nEQ,nBD,du,ierror,nprof,nprof2,nloc)
 !       -------------------------------------------------------------------
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if	(iter <= maxramp) then
-			zi=2.0**(iter)
-			z0=2.0**(maxramp)
-			beta=zi/z0*beta0
-		else
-			beta=1.0d0*beta0
-		endif
+        if    (iter <= maxramp) then
+            zi=2.0**(iter)
+            z0=2.0**(maxramp)
+            beta=zi/z0*beta0
+        else
+            beta=1.0d0*beta0
+        endif
 
         ddu(1:nEQ)= beta*du(1:nEQ)
-		dsp(1:nEQ)= dsp(1:nEQ) + ddu(1:nEQ)
-		
+        dsp(1:nEQ)= dsp(1:nEQ) + ddu(1:nEQ)
+        
 
         do  i=1,nND
             dspful(i,1:6)=dsp((i-1)*6+1:(i-1)*6+6)
@@ -146,18 +145,18 @@
 
         xyzful(1:nND,1:6)=xyzful0(1:nND,1:6)+dspful(1:nND,1:6)
 
-		call update_triad_D(ele,ddu,triad_nn,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ)
+        call update_triad_D(ele,ddu,triad_nn,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ)
 
-		call make_triad_ee(ele,xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3),triad_ee,triad_n1,triad_n2,triad_n3,nND,nEL)
+        call make_triad_ee(ele,xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3),triad_ee,triad_n1,triad_n2,triad_n3,nND,nEL)
 
 !       -------------------------------------------------------------------
-!		test for convergence
+!        test for convergence
         !if(iter==0)dsumd=dsqrt(sum((du(1:nEQ)*beta)**2))
         if(iter==0)dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
-		
-		dsumz=dsqrt(sum(dsp(1:nEQ)**2))
-		!if (dsumz < dtol/10.0) dsumz=dtol/10.0
-		!dnorm=dsumd/dsumz
+        
+        dsumz=dsqrt(sum(dsp(1:nEQ)**2))
+        !if (dsumz < dtol/10.0) dsumz=dtol/10.0
+        !dnorm=dsumd/dsumz
 
         !dnorm=dabs(maxval((du(1:nEQ)*beta)**2))
         if(iter==0)then
@@ -171,7 +170,7 @@
         write(*,*)'iter=',iter,'dnorm=',dnorm 
     enddo
 
-	write(*,'(A,I5,A,D20.10)')' iterFEM=',iter,' dmaxFEM   =',dnorm
+    write(*,'(A,I5,A,D20.10)')' iterFEM=',iter,' dmaxFEM   =',dnorm
 
 
     acc(1:nEQ)  = 1.0d0/(NewmarkBeta*deltat)*( (dsp(1:nEQ)-dspO(1:nEQ))/deltat -velO(1:nEQ) ) - (1.0d0/(NewmarkBeta*2.0d0) - 1.0d0)*accO(1:nEQ)
@@ -188,11 +187,10 @@
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
+!    copyright@ RuNanHua
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   READ structural DaTafile
-    subroutine readdt(jBC,ele,nloc,nprof,nprof2,xyzful0,prop,nND,nEL,nEQ,nMT,nBD,nSTF,idat)
+    subroutine read_structural_datafile(jBC,ele,nloc,nprof,nprof2,xyzful0,prop,nND,nEL,nEQ,nMT,nBD,nSTF,idat)
     implicit none
     integer:: nND,nEL,nEQ,nMT,nBD,nSTF,idat
     integer:: ele(nEL,5),jBC(nND,6),nloc(nND*6),nprof(nND*6),nprof2(nND*6)
@@ -203,9 +201,9 @@
 !   -----------------------------------------------------------------------------------------------
 !   READ  node
     read(idat,*)  nND
-    do	i= 1, nND
-		read(idat,*) node,xyzful0(node,1),xyzful0(node,2),xyzful0(node,3)
-	enddo
+    do    i= 1, nND
+        read(idat,*) node,xyzful0(node,1),xyzful0(node,2),xyzful0(node,3)
+    enddo
     read(idat,'(1a50)') endin  
 !   -----------------------------------------------------------------------------------------------
 !   READ elem data
@@ -216,27 +214,27 @@
     read(idat,'(1a50)') endin
 
 !   -----------------------------------------------------------------------------------------------
-!	READ  bcs  default is 0=free
-	jBC(1:nND,1:6) = 0
+!    READ  bcs  default is 0=free
+    jBC(1:nND,1:6) = 0
     read(idat,*)  nbc
     do  i=1,nbc
-		read(idat,*)node,jBC(node,1),jBC(node,2),jBC(node,3), &
+        read(idat,*)node,jBC(node,1),jBC(node,2),jBC(node,3), &
                          jBC(node,4),jBC(node,5),jBC(node,6)   
        
-	enddo
+    enddo
     read(idat,'(1a50)') endin  
 !   -----------------------------------------------------------------------------------------------
 !   READ element material properties
     read(idat,*) nMT
-    do	i= 1, nMT
+    do    i= 1, nMT
         read(idat,*) nmp,prop(nmp,1:8)
-	enddo
+    enddo
     read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 
     nEQ=nND*6
 
-	call maxbnd(ele,nprof,nND,nEL,nEQ,nBD)
+    call max_band_width(ele,nprof,nND,nEL,nEQ,nBD)
 
 !   nprof2
     do i=1,nEQ
@@ -254,24 +252,23 @@
     enddo
 
     nloc(1)=1
-    do	i=1,nEQ-1
-		nloc(i+1) = nloc(i) + nprof(i)
+    do    i=1,nEQ-1
+        nloc(i+1) = nloc(i) + nprof(i)
     enddo
     nSTF=nloc(nEQ)+nprof(nEQ)
 
     !write(*,'(3(A,1x,I8,2x))')'nND=',nND,'nEL=',nEL,'nEQ=',nEQ
     !write(*,'(3(A,1x,I8,2x))')'nMT=',nMT,'nBD=',nBD,'nSTF=',nSTF
     return
-	end
+    end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   MAX BaNDwidth calculation
-    subroutine maxbnd(ele,nprof,nND,nEL,nEQ,nBD)
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!   MAX Band Width calculation
+    subroutine max_band_width(ele,nprof,nND,nEL,nEQ,nBD)
     implicit none
     integer:: nBD,nEQ,nEL,nND
     integer:: ele(nEL,5),nprof(nEQ) 
@@ -315,11 +312,10 @@
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE write_coord(xyzful,velful,accful,ele,time,nND,nEL)
     implicit none
     integer:: nND,nEL
@@ -331,24 +327,24 @@
     integer:: i,j,ireduc
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName
-	!==================================================================================================		
-	integer::	nv
+    !==================================================================================================        
+    integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=6
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",	&
-						varname(numVar)=['x','y','z','u','v','w'] 
-	!==================================================================================================
+    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
+                        varname(numVar)=['x','y','z','u','v','w'] 
+    !==================================================================================================
 
     write(fileName,'(F7.3)') time
     fileName = adjustr(fileName)
-	DO  I=1,nameLen
-		if(fileName(i:i)==' ')fileName(i:i)='0'
-	END DO
+    DO  I=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    END DO
 
     OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='BINARY')
 
 !   I. The header section.
-!   =============================================		
+!   =============================================        
     write(idfile) "#!TDV101"    
     write(idfile) 1
     call dumpstring(title,idfile)
@@ -359,41 +355,40 @@
 !   ---------------------------------------------
 !   zone head for ZONE1
 !   ---------------------------------------------
-	write(idfile) ZONEMARKER	 		 
-	call dumpstring(zonename,idfile)
-	write(idfile) -1,2,1,0,0,nND,nEL,0,0,0,0
+    write(idfile) ZONEMARKER              
+    call dumpstring(zonename,idfile)
+    write(idfile) -1,2,1,0,0,nND,nEL,0,0,0,0
 
 !   =============================================
     write(idfile) EOHMARKER
 !   =============================================
 !   II. Data section
 !   =============================================
-	write(idfile) Zonemarker
+    write(idfile) Zonemarker
     do  nv=1,numVar
-		write(idfile) 1                                 
-	enddo
-	write(idfile) 0,-1
-	do	i=1,nND
+        write(idfile) 1                                 
+    enddo
+    write(idfile) 0,-1
+    do    i=1,nND
         write(idfile)   real(xyzful(i,1:3)),real(velful(i,1:3))                            
     enddo
-    do	i=1,nEL
+    do    i=1,nEL
         write(idfile) ele(i,1),ele(i,2),ele(i,3)
     enddo
     close(idfile)
     ENDSUBROUTINE write_coord
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   set angle of initial triads
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    set angle of initial triads
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE init_triad_D(ele,xord0,yord0,zord0,triad_nn,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,nND,nEL)
-	implicit none
+    implicit none
     integer:: nND,nEL         
     integer:: ele(nEL,5)
     real(8):: xord0(nND),yord0(nND),zord0(nND)
     real(8):: triad_nn(3,3,nND),triad_ee(3,3,nEL),triad_e0(3,3,nEL)
-	real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL),triad_n3(3,3,nEL)
+    real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL),triad_n3(3,3,nEL)
 !
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,dx,dy,dz,xl0
     real(8):: xll1,xmm1,xnn1, xll2,xmm2,xnn2, xll3,xmm3,xnn3
@@ -413,21 +408,21 @@
         triad_nn(2,2,n)=1.0
         triad_nn(3,3,n)=1.0
 
-	enddo
+    enddo
 !
 !   For each element, calculate the current orientation triad
     do  n=1,nEL
 
-		i1  = ele(n,1)
+        i1  = ele(n,1)
         j1  = ele(n,2)
         k1  = ele(n,3)
         nELt= ele(n,4)
 !
-        if	(nELt == 2) then
+        if    (nELt == 2) then
 !           frame
             dx = xord0(j1) - xord0(i1)
             dy = yord0(j1) - yord0(i1)
-			dz = zord0(j1) - zord0(i1)
+            dz = zord0(j1) - zord0(i1)
             xl0=dsqrt(dx*dx+dy*dy+dz*dz)
             xll1=dx/xl0
             xmm1=dy/xl0
@@ -437,14 +432,14 @@
             triad_n1(2,1,n)=xmm1
             triad_n1(3,1,n)=xnn1
 
-			if	(dd .lt. 0.001) then
+            if    (dd .lt. 0.001) then
                 triad_n1(1,2,n)=0.0
                 triad_n1(2,2,n)=1.0
                 triad_n1(3,2,n)=0.0
                 triad_n1(1,3,n)=-xnn1
                 triad_n1(2,3,n)=0.00
                 triad_n1(3,3,n)=0.00
-			else
+            else
                 triad_n1(1,2,n)=-xmm1/dd
                 triad_n1(2,2,n)=+xll1/dd
                 triad_n1(3,2,n)=0.0
@@ -452,14 +447,14 @@
                 triad_n1(1,3,n)=-xll1*xnn1/dd
                 triad_n1(2,3,n)=-xmm1*xnn1/dd                                    
                 triad_n1(3,3,n)= dd 
-			endif
-!			all element triads have same initial orientation
-			triad_n2(1:3,1:3,n)=triad_n1(1:3,1:3,n)
+            endif
+!            all element triads have same initial orientation
+            triad_n2(1:3,1:3,n)=triad_n1(1:3,1:3,n)
             triad_ee(1:3,1:3,n)=triad_n1(1:3,1:3,n)
             triad_e0(1:3,1:3,n)=triad_n1(1:3,1:3,n)
-		elseif (nELt == 3) then
+        elseif (nELt == 3) then
 !           plate
-			x1=xord0(i1)
+            x1=xord0(i1)
             x2=xord0(j1)
             x3=xord0(k1)
             y1=yord0(i1)
@@ -476,29 +471,29 @@
             xll1=dx/xl0
             xmm1=dy/xl0
             xnn1=dz/xl0
-			!tengent1 vector (one edge) (Hua)
+            !tengent1 vector (one edge) (Hua)
             triad_n1(1,1,n)=xll1
             triad_n1(2,1,n)=xmm1
             triad_n1(3,1,n)=xnn1
 !
-!			determine vector area
-			axy =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.
+!            determine vector area
+            axy =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.
             ayz =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.
             azx =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.
             area=dsqrt( axy*axy + ayz*ayz + azx*azx)
             xll3=ayz/area
             xmm3=azx/area
             xnn3=axy/area
-			!normal vector	(Hua)
+            !normal vector    (Hua)
             triad_n1(1,3,n)=xll3
-			triad_n1(2,3,n)=xmm3
+            triad_n1(2,3,n)=xmm3
             triad_n1(3,3,n)=xnn3
 
-			!cross product			
+            !cross product            
             xll2=xmm3*xnn1 - xnn3*xmm1
             xmm2=xnn3*xll1 - xll3*xnn1
             xnn2=xll3*xmm1 - xmm3*xll1
-			!tengent2 vector (Hua)
+            !tengent2 vector (Hua)
             triad_n1(1,2,n)=xll2
             triad_n1(2,2,n)=xmm2
             triad_n1(3,2,n)=xnn2
@@ -512,20 +507,19 @@
         else
             write(*,*)'not this nELt:',nELt
             stop
-		endif
-	enddo
+        endif
+    enddo
 
     return
     ENDSUBROUTINE init_triad_D
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   update angle of  triads
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）	
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    update angle of  triads
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE update_triad_D(ele,ddut,triad_nn,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ)
-	implicit none
+    implicit none
     integer:: nND,nEL,nEQ         
     integer:: ele(nEL,5)
     real(8):: ddut(nEQ)
@@ -535,24 +529,24 @@
     real(8):: dtx1,dty1,dtz1
     integer:: i,j,k,m,n,i1,j1,k1,node,jdof,ireduc,nELt
 
-    do	i=1,nND*6
+    do    i=1,nND*6
         node=(i+5)/6
         jdof=i-(node-1)*6
         ireduc=i
-		ddutful(node,jdof)=ddut(ireduc)
-	enddo
+        ddutful(node,jdof)=ddut(ireduc)
+    enddo
 !
 !   For each node, set the triad_nn = [R]triad_nn
-	do	n=1,nND
+    do    n=1,nND
         dtx1=ddutful(n,4)
         dty1=ddutful(n,5)
         dtz1=ddutful(n,6)
         call finite_rot(dtx1,dty1,dtz1,rr)
         triad_nn(1:3,1:3,n)=matmul(rr(1:3,1:3),triad_nn(1:3,1:3,n))
-	enddo
+    enddo
 
 !   For each element, calculate the current orientation triad
-	do  n=1,nEL
+    do  n=1,nEL
         i1  = ele(n,1)
         j1  = ele(n,2)
         k1  = ele(n,3)
@@ -570,32 +564,31 @@
         call finite_rot(dtx1,dty1,dtz1,rr)
         triad_n2(1:3,1:3,n)=matmul(rr(1:3,1:3),triad_n2(1:3,1:3,n))
 !
-		if (nELt == 2) then
+        if (nELt == 2) then
 !           frame
         elseif (nELt == 3) then
-!			plate
+!            plate
 !           n3 node
-			dtx1=ddutful(k1,4)
+            dtx1=ddutful(k1,4)
             dty1=ddutful(k1,5)
             dtz1=ddutful(k1,6)
             call finite_rot(dtx1,dty1,dtz1,rr)
             triad_n3(1:3,1:3,n)=matmul(rr(1:3,1:3),triad_n3(1:3,1:3,n))
-		else
+        else
             write(*,*)'not this nELt:',nELt
             stop
         endif
-	enddo
+    enddo
 
     return
-	ENDSUBROUTINE update_triad_D
+    ENDSUBROUTINE update_triad_D
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   get orientation of element
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）	
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    get orientation of element
+!    copyright@ RuNanHua 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE make_triad_ee(ele,xord,yord,zord,triad_ee,triad_n1,triad_n2,triad_n3,nND,nEL)
-	implicit none
+    implicit none
     integer:: nND,nEL
     integer:: ele(nEL,5)
     real(8):: xord(nND), yord(nND), zord(nND)
@@ -617,14 +610,14 @@
 !
 
 !   For each element, calculate the current orientation triad
-    do	n=1,nEL
+    do    n=1,nEL
         i1  = ele(n,1)
         j1  = ele(n,2)
         k1  = ele(n,3)
         nELt= ele(n,4)
 !
-		if	(nELt == 2) then
-!			frame
+        if    (nELt == 2) then
+!            frame
             dx = xord(j1) - xord(i1)
             dy = yord(j1) - yord(i1)
             dz = zord(j1) - zord(i1)
@@ -633,18 +626,18 @@
             xmm=dy/xl0
             xnn=dz/xl0
             dd =dsqrt(xll*xll+xmm*xmm)
-            do	i=1,3
-            do	j=1,3
-				triad_ee(i,j,n)=0.0
+            do    i=1,3
+            do    j=1,3
+                triad_ee(i,j,n)=0.0
             enddo
             enddo
             triad_ee(1,1,n)=xll
             triad_ee(2,1,n)=xmm
             triad_ee(3,1,n)=xnn
 !
-!			get angle between two triads
-            do	i=1,3
-            do	j=1,3
+!            get angle between two triads
+            do    i=1,3
+            do    j=1,3
                 triad_11(i,j)=triad_n1(i,j,n)
                 triad_22(i,j)=triad_n2(i,j,n)
             enddo
@@ -662,16 +655,16 @@
 !           vectors e2 e3
             r2e1 = 0.0
             r3e1 = 0.0
-            do	k=1,3
+            do    k=1,3
                 r2e1 = r2e1 + triad_aa(k,2)*triad_ee(k,1,n)
                 r3e1 = r3e1 + triad_aa(k,3)*triad_ee(k,1,n)
             enddo
-            do	j=1,3
+            do    j=1,3
                 triad_ee(j,2,n)=triad_aa(j,2) - r2e1*(triad_aa(j,1)+triad_ee(j,1,n))/2.0
                 triad_ee(j,3,n)=triad_aa(j,3) - r3e1*(triad_aa(j,1)+triad_ee(j,1,n))/2.0
             enddo
 !
-		elseif (nELt == 3) then
+        elseif (nELt == 3) then
 !           plate
             x1=xord(i1)
             x2=xord(j1)
@@ -690,10 +683,10 @@
             xmm1=dy/xl0
             xnn1=dz/xl0
             triad_ee(1,1,n)=xll1
-			triad_ee(2,1,n)=xmm1
+            triad_ee(2,1,n)=xmm1
             triad_ee(3,1,n)=xnn1
 !
-!			determine vector area
+!            determine vector area
             axy =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.
             ayz =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.
             azx =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.
@@ -714,22 +707,21 @@
             triad_ee(2,2,n)=xmm2
             triad_ee(3,2,n)=xnn2
 !
-		else
+        else
             write(*,*)'not this nELt:',nELt
             stop
         endif
-	enddo
+    enddo
 !   end of loop over elements
     return
     ENDSUBROUTINE make_triad_ee
 
 !
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
-	SUBROUTINE finite_rot(t1,t2,t3,rr)
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+    SUBROUTINE finite_rot(t1,t2,t3,rr)
     implicit none
     real(8):: rr(3,3),rr1(3,3),rr2(3,3),rr3(3,3)
     real(8):: t1,t2,t3,tt,ss,cc,c1,c2
@@ -757,7 +749,7 @@
     rr2(2,2)=0.0
     rr2(2,3)=-t1
     rr2(3,1)=-t2
-	rr2(3,2)= t1
+    rr2(3,2)= t1
     rr2(3,3)=0
 !
     rr3(1,1)=-t3*t3-t2*t2
@@ -770,10 +762,10 @@
     rr3(3,2)= t2*t3
     rr3(3,3)=-t2*t2-t1*t1
 !
-    do	i=1,3
-    do	j=1,3
-		if	(tt .lt. 1.0e-10) then
-			c1=1.0
+    do    i=1,3
+    do    j=1,3
+        if    (tt .lt. 1.0e-10) then
+            c1=1.0
 !!!!        c2=1.0
             c2=0.5
         else
@@ -788,11 +780,10 @@
     ENDSUBROUTINE finite_rot
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   GET ANGLE of between TRIADs
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    GET ANGLE of between TRIADs
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE get_angle_triad(triad_n1,triad_n2,tx,ty,tz)
     implicit none
     real(8):: triad_n1(3,3),triad_n2(3,3)
@@ -801,11 +792,11 @@
     integer:: i,j,k
 !
 !   get angle between two triads
-    do	i=1,3
-    do	j=1,3
-		rr(i,j)=0.0
-        do	k=1,3
-			rr(i,j)=rr(i,j) + triad_n2(i,k)*triad_n1(j,k)
+    do    i=1,3
+    do    j=1,3
+        rr(i,j)=0.0
+        do    k=1,3
+            rr(i,j)=rr(i,j) + triad_n2(i,k)*triad_n1(j,k)
         enddo
     enddo
     enddo
@@ -832,11 +823,10 @@
     return
     ENDSUBROUTINE get_angle_triad
 !
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE global_to_local(triad,tx,ty,tz,tx2,ty2,tz2)
     implicit none
     real(8):: triad(3,3)
@@ -847,15 +837,14 @@
     return
     ENDSUBROUTINE global_to_local
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   Nodal loads due to body stresses
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE body_stress_D(	gforce,xord0,yord0,zord0,xord,yord,zord, &
-								ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Nodal loads due to body stresses
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE body_stress_D(    gforce,xord0,yord0,zord0,xord,yord,zord, &
+                                ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
                                 nND,nEL,nEQ,nMT,geoFRM,geoPLT &
-							)
+                            )
     implicit none
     integer:: nMT,nEL,nND,nEQ
     integer:: ele(nEL,5)
@@ -894,28 +883,28 @@
 
 !    pi=4.0*datan(1.0d0)
 
-	gforce(1:nEQ)=0.0
+    gforce(1:nEQ)=0.0
   
     !rewind(igeoFRM)
     !rewind(igeoPLT)
 
 
 !   For each element, calculate the nodal forces
-    do	n=1,nEL
+    do    n=1,nEL
 
-		i1  = ele(n,1)
+        i1  = ele(n,1)
         j1  = ele(n,2)
         k1  = ele(n,3)        
-		nELt= ele(n,4)
+        nELt= ele(n,4)
         mat = ele(n,5)
-        if	( nELt == 2) then
+        if    ( nELt == 2) then
 !           frame
             e0  =prop(mat,1)
             g0  =prop(mat,2)
             a0  =prop(mat,3)
             r0  =prop(mat,4)
             b0  =prop(mat,5)
-			zix0=prop(mat,6)
+            zix0=prop(mat,6)
             ziy0=prop(mat,7)
             ziz0=prop(mat,8)
 
@@ -929,16 +918,16 @@
             dv = (yord(j1)-yord0(j1))-(yord(i1)-yord0(i1))
             dw = (zord(j1)-zord0(j1))-(zord(i1)-zord0(i1))
 
-			dx = dx0 + du
+            dx = dx0 + du
             dy = dy0 + dv
             dz = dz0 + dw
             xl =dsqrt(dx*dx+dy*dy+dz*dz)
 !
             dl = ( (2*dx0+du)*du +(2*dy0+dv)*dv +(2*dz0+dw)*dw )/ (xl+xl0)
 !           get twisting angles
-            do	i=1,3
-		    do	j=1,3
-			    triad_00(i,j)=triad_ee(i,j,n)
+            do    i=1,3
+            do    j=1,3
+                triad_00(i,j)=triad_ee(i,j,n)
                 triad_11(i,j)=triad_ee(i,j,n)
                 triad_22(i,j)=triad_n1(i,j,n)
             enddo
@@ -946,16 +935,16 @@
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
 !
-            do	i=1,3
-			do	j=1,3
-				triad_11(i,j)=triad_ee(i,j,n)
-				triad_22(i,j)=triad_n2(i,j,n)
+            do    i=1,3
+            do    j=1,3
+                triad_11(i,j)=triad_ee(i,j,n)
+                triad_22(i,j)=triad_n2(i,j,n)
             enddo
             enddo
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
 
-!			non-zero ty1 tz1 u2 tx2 ty2 tz2
+!            non-zero ty1 tz1 u2 tx2 ty2 tz2
             ub(1)=0.0
             ub(2)=0.0
             ub(3)=0.0
@@ -973,29 +962,29 @@
 !
 !           get current stiffness in local coords. use L0
 
-			call elmstfFRM_D(xl0,zix0,ziy0,ziz0,a0,e0,g0,ekb12,nELt )
+            call elmstfFRM_D(xl0,zix0,ziy0,ziz0,a0,e0,g0,ekb12,nELt )
 !
 !           compute axial force
             fxx=dl*e0*a0/xl0
 !           save local force for geo stiff
             !write(igeoFRM,'(D25.15)') fxx
-			geoFRM(n)=fxx
+            geoFRM(n)=fxx
 !           nodal forces in local coords
 !           {F}=[k]{u}
             forceb(1:12) =matmul(ekb12(1:12,1:12),ub(1:12))
-			forceb(13:18)=0.0
+            forceb(13:18)=0.0
 
 !           transform to global
             do  i=1,3
             do  j=1,3
                 rr(i,j)=triad_ee(i,j,n)
             enddo
-			enddo
-			do  i=1,18
+            enddo
+            do  i=1,18
                 force(i)=0.0
             enddo
-            do	i=1,3
-            do	k=1,3
+            do    i=1,3
+            do    k=1,3
                 force(0+i) = force(0+i) + rr(i,k)*forceb(0+k)
                 force(3+i) = force(3+i) + rr(i,k)*forceb(3+k)
                 force(6+i) = force(6+i) + rr(i,k)*forceb(6+k)
@@ -1005,7 +994,7 @@
 
             call assembFOR(nEQ,nND,gforce,force,i1,j1,k1)
 !
-		elseif (nELt == 3) then
+        elseif (nELt == 3) then
 !           plate
             e0=prop(mat,1)
             g0=prop(mat,2)
@@ -1025,15 +1014,15 @@
             xyz013(3) = zord0(k1)-zord0(i1)
 !
 !           use element triad to rotate to local x=[Rt]x
-            do	i=1,3
-			do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 rr(i,j)=triad_e0(i,j,n)
-			enddo
             enddo
-            do	i=1,3
+            enddo
+            do    i=1,3
                 xyzb012(i)=0.0
                 xyzb013(i)=0.0
-                do	k=1,3
+                do    k=1,3
                     xyzb012(i) = xyzb012(i) + rr(k,i)*xyz012(k)
                     xyzb013(i) = xyzb013(i) + rr(k,i)*xyz013(k)
                 enddo
@@ -1057,16 +1046,16 @@
             xyz13(3) = zord(k1)-zord0(i1)
 !
 !           use element triad to rotate to local x=[Rt]x
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 rr(i,j)=triad_ee(i,j,n)
             enddo
             enddo
-            do	i=1,3
+            do    i=1,3
                 xyzb11(i)=0.0
                 xyzb12(i)=0.0
                 xyzb13(i)=0.0
-                do	k=1,3
+                do    k=1,3
                     xyzb11(i) = xyzb11(i) + rr(k,i)*xyz11(k)
                     xyzb12(i) = xyzb12(i) + rr(k,i)*xyz12(k)
                     xyzb13(i) = xyzb13(i) + rr(k,i)*xyz13(k)
@@ -1081,8 +1070,8 @@
             yb3=xyzb13(2)
 
 !           get angles ref to orig from triads
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
 !2001!!!        triad_00(i,j)=triad_e0(i,j,n)
                 triad_00(i,j)=triad_ee(i,j,n)
                 triad_11(i,j)=triad_ee(i,j,n)
@@ -1093,8 +1082,8 @@
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
 
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 triad_11(i,j)=triad_ee(i,j,n)
                 triad_22(i,j)=triad_n2(i,j,n)
             enddo
@@ -1103,8 +1092,8 @@
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
 
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 triad_11(i,j)=triad_ee(i,j,n)
                 triad_22(i,j)=triad_n3(i,j,n)
             enddo
@@ -1120,8 +1109,8 @@
             ub(4)=tx1
             ub(5)=ty1
             ub(6)=tz1
-			ub(7)=xb2-xb02
-			ub(8)=yb2-yb02
+            ub(7)=xb2-xb02
+            ub(8)=yb2-yb02
             ub(9)=0.0
             ub(10)=tx2
             ub(11)=ty2
@@ -1130,70 +1119,69 @@
             ub(14)=yb3-yb03
             ub(15)=0.0
             ub(16)=tx3
-			ub(17)=ty3
+            ub(17)=ty3
             ub(18)=tz3
 
 !           get forces
-            do	k=1,18
-				force(k)=0.0
+            do    k=1,18
+                force(k)=0.0
             enddo
 !           Calculate LOCAL stiffness, use orig coords
-			do	i=1,18
-            do	j=1,18
-				ekb(i,j)=0.0
+            do    i=1,18
+            do    j=1,18
+                ekb(i,j)=0.0
             enddo
             enddo
 
 
-!		    membrane
+!            membrane
             alpha=zia0
             beta =zib0
             call elmstfMRT_D(e0,g0,t0,pl0,alpha,beta,xb01,xb02,xb03,yb01,yb02,yb03,ekb,ek9)
 
 !           flexure
-			call elmstfDKT_D(e0,g0,t0,zip0, xb01,xb02,xb03,yb01,yb02,yb03,ekb,ek9)
+            call elmstfDKT_D(e0,g0,t0,zip0, xb01,xb02,xb03,yb01,yb02,yb03,ekb,ek9)
 
-!			nodal forces in local coords
+!            nodal forces in local coords
 !           {F}=[k]{u}
             forceb(1:18) =matmul(ekb(1:18,1:18),ub(1:18))
 !           save local force for geo stiff           
-		    !write(igeoPLT,'(9(D25.15,1x))') forceb(1),forceb(2),forceb(3),forceb(7),forceb(8),forceb(9),forceb(13),forceb(14),forceb(15)
-			geoPLT(1:9,n)=[forceb(1),forceb(2),forceb(3),forceb(7),forceb(8),forceb(9),forceb(13),forceb(14),forceb(15)]
+            !write(igeoPLT,'(9(D25.15,1x))') forceb(1),forceb(2),forceb(3),forceb(7),forceb(8),forceb(9),forceb(13),forceb(14),forceb(15)
+            geoPLT(1:9,n)=[forceb(1),forceb(2),forceb(3),forceb(7),forceb(8),forceb(9),forceb(13),forceb(14),forceb(15)]
 !           transform to global
-			rr(1:3,1:3)=triad_ee(1:3,1:3,n)
+            rr(1:3,1:3)=triad_ee(1:3,1:3,n)
 
-			force(1:18)=0
+            force(1:18)=0
 
-            do	i=1,3
-            do	k=1,3
-				force(0+i) = force(0+i) + rr(i,k)*forceb(0+k)
+            do    i=1,3
+            do    k=1,3
+                force(0+i) = force(0+i) + rr(i,k)*forceb(0+k)
                 force(3+i) = force(3+i) + rr(i,k)*forceb(3+k)
                 force(6+i) = force(6+i) + rr(i,k)*forceb(6+k)
                 force(9+i) = force(9+i) + rr(i,k)*forceb(9+k)
                 force(12+i)= force(12+i)+ rr(i,k)*forceb(12+k)
                 force(15+i)= force(15+i)+ rr(i,k)*forceb(15+k)
             enddo
-			enddo
+            enddo
 
-			call assembFOR(nEQ,nND,gforce,force,i1,j1,k1)
+            call assembFOR(nEQ,nND,gforce,force,i1,j1,k1)
 
-		else
+        else
             write(*,*)'not this nELt:',nELt
             stop
         endif
 
-	enddo
+    enddo
     
     return
     ENDSUBROUTINE body_stress_D
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   FORM MASS matrix: only lumped
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    FORM MASS matrix: only lumped
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,alphaf,alpham,alphap)
-	implicit none                  
+    implicit none                  
     integer:: nND,nEL,nEQ,nMT
     integer:: ele(nEL,5)
     real(8):: prop(nMT,10)
@@ -1206,7 +1194,7 @@
     real(8):: a0,r0,b0,zix0,ziy0,ziz0,dx,dy,dz,xl,xll,xmm,xnn,tt0,rh0,dxb,dyb,dzb
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,axy,ayz,azx,area,xb1,yb1,zb1,xb2,yb2,zb2,xb3,yb3,zb3
 
-    !转动惯性因子大小
+    !rotational inertial factors
     real(8):: alphaf,alpham,alphap
 
 !   zero array before assembling
@@ -1236,13 +1224,13 @@
             xnn=dz/xl
             call elmmasFRM_D(r0,a0,xl,zix0,em12,alphaf)
             call trans3d_D(xll,xmm,xnn,em12,b0)
-			em(1:18,1:18)=0.0
+            em(1:18,1:18)=0.0
             em(1:12,1:12)=em12(1:12,1:12)
             call assembLUM(nND,nEQ,mss,em,i1,j1,k1)
 
-		elseif(nELt == 3) then
-			tt0=prop(mat,3)
-			rh0=prop(mat,4)
+        elseif(nELt == 3) then
+            tt0=prop(mat,3)
+            rh0=prop(mat,4)
             x1=xord(i1)
             x2=xord(j1)
             x3=xord(k1)
@@ -1260,7 +1248,7 @@
             area=dsqrt( axy*axy + ayz*ayz + azx*azx)
             xll=ayz/area
             xmm=azx/area
-			xnn=axy/area
+            xnn=axy/area
 !
 !           transform element coords to local X-Y
             xb1=x1
@@ -1276,7 +1264,7 @@
             zb3=z1+dzb
 
 !           Calculate the mass matrix and assemble
-			emb(1:18,1:18)=0.0        
+            emb(1:18,1:18)=0.0        
             call elmmasCST_D(rh0,area,tt0,emb)
             call elmmasMRT_D(rh0,area,tt0,emb,alpham)
             call elmmasPLT_D(rh0,area,tt0,emb,alphap)
@@ -1284,21 +1272,20 @@
             call rotate_D(xll,xmm,xnn,emb,em)
             call assembLUM(nND,nEQ,mss,em,i1,j1,k1)
 
-		else
+        else
             write(*,*)'not this nELt:',nELt
             stop
         endif
-	enddo    
+    enddo    
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   FORM STIFfness matrix  [K]
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    FORM STIFfness matrix  [K]
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine formstif_s(stf,ele,xord0,yord0,zord0,xord,yord,zord,prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF)
-	implicit none
+    implicit none
     integer:: nND,nEL,nEQ,nMT,nSTF  
     integer:: ele(nEL,5),nprof(nEQ), nloc(nEQ) 
     real(8):: prop(nMT,10)
@@ -1321,14 +1308,14 @@
     stf(1:nSTF)=0.0
 
 !   form each element matrix, and assemble
-    do	n=1,nEL
-		i1  = ele(n,1)
+    do    n=1,nEL
+        i1  = ele(n,1)
         j1  = ele(n,2)
         k1  = ele(n,3)       
         nELt= ele(n,4)
         mat = ele(n,5)
 !
-        if	(nELt == 2) then
+        if    (nELt == 2) then
 !           frame
 !           material props not change
             e0=prop(mat,1)
@@ -1363,15 +1350,15 @@
 
             ek(1:18,1:18)=0.0
 
-            do	j=1,12
-            do	k=1,12
-				ek(j,k)=ek12(j,k)
+            do    j=1,12
+            do    k=1,12
+                ek(j,k)=ek12(j,k)
             enddo
             enddo
 
-			call assembCOL(nSTF,nND,nEQ,stf,ek,i1,j1,k1,nloc)
+            call assembCOL(nSTF,nND,nEQ,stf,ek,i1,j1,k1,nloc)
 !
-		elseif (nELt == 3) then
+        elseif (nELt == 3) then
             e0=prop(mat,1)
             g0=prop(mat,2)
             t0=prop(mat,3)
@@ -1392,7 +1379,7 @@
             z3=zord0(k1)
 !
 !           use element triad to rotate coords to local x=Rtx
-			rr(1:3,1:3)=triad_e0(1:3,1:3,n)
+            rr(1:3,1:3)=triad_e0(1:3,1:3,n)
 
             xyz12(1)=x2-x1
             xyz12(2)=y2-y1
@@ -1400,14 +1387,14 @@
             xyz13(1)=x3-x1
             xyz13(2)=y3-y1
             xyz13(3)=z3-z1
-            do	i=1,3
-				xyzb12(i)=0.0
+            do    i=1,3
+                xyzb12(i)=0.0
                 xyzb13(i)=0.0
-                do	k=1,3
+                do    k=1,3
                     xyzb12(i)=xyzb12(i)+rr(k,i)*xyz12(k)
                     xyzb13(i)=xyzb13(i)+rr(k,i)*xyz13(k)
                 enddo
-			enddo
+            enddo
 
             xb1=0.0
             yb1=0.0
@@ -1422,25 +1409,24 @@
             beta =zib0
             call elmstfMRT_D(e0,g0,t0,pl0,alpha,beta,xb1,xb2,xb3,yb1,yb2,yb3,ekb,ek9)
             call elmstfDKT_D(e0,g0,t0,zip0,xb1,xb2,xb3,yb1,yb2,yb3,ekb,ek9)
-			rr(1:3,1:3)=triad_ee(1:3,1:3,n)
+            rr(1:3,1:3)=triad_ee(1:3,1:3,n)
             call rot_mat_LG(rr,ekb,ek)
             call assembCOL(nSTF,nND,nEQ,stf,ek,i1,j1,k1,nloc)
-		else
+        else
             write(*,*)'not this nELt:',nELt
             stop
         endif
-	enddo
+    enddo
 
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   FORM GEOMetric stiffness matrices  [KGx],[KGy],[KGxy]
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    FORM GEOMetric stiffness matrices  [KGx],[KGy],[KGxy]
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine formgeom_s(geo,ele,xord0,yord0,zord0,xord,yord,zord,prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF,geoFRM,geoPLT)
-	implicit none
+    implicit none
     integer:: nND,nEL,nEQ,nMT,nSTF
     integer:: ele(nEL,5),nprof(nEQ), nloc(nEQ)
     real(8):: prop(nMT,10),geoFRM(nEL),geoPLT(1:9,nEL)
@@ -1469,7 +1455,7 @@
     !rewind(igeoFRM)
     !rewind(igeoPLT)
 
-	do	n=1,nEL
+    do    n=1,nEL
         i1  = ele(n,1)
         j1  = ele(n,2)
         k1  = ele(n,3)       
@@ -1499,7 +1485,7 @@
 !
 !           Calculate the stiffness matrix and assemble
             !read(igeoFRM,*) sxx
-			sxx=geoFRM(n)
+            sxx=geoFRM(n)
             s=sxx
             xl9= xl0
             call elmgeomFRM_D(xl9,eg12,s)
@@ -1610,10 +1596,10 @@
 
 
             !read(igeoPLT,*) forceb(1:9)
-			forceb(1:9)=geoPLT(1:9,n)
+            forceb(1:9)=geoPLT(1:9,n)
             call elmgeomCST_s(x1,x2,x3,y1,y2,y3,x0b1,x0b2,x0b3,y0b1,y0b2,y0b3, &
-									xb1,xb2,xb3,yb1,yb2,yb3,zb1,zb2,zb3, &
-									t0,eg6,egm,forceb,triad_11,triad_22,x10,y10)
+                                    xb1,xb2,xb3,yb1,yb2,yb3,zb1,zb2,zb3, &
+                                    t0,eg6,egm,forceb,triad_11,triad_22,x10,y10)
 
             call assembCOL(nSTF,nND,nEQ,geo,egm,i1,j1,k1,nloc)
 
@@ -1626,18 +1612,17 @@
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent MASs matrix for the FRaMe
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent MASs matrix for the FRaMe
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmmasFRM_D(rho,area,length,zix,em,alphaf)
     implicit none
     real(8):: rho, area, length,zix
     real(8):: em(12,12)
     real(8):: alphaf,roal
 
-	em(1:12,1:12) = 0.0
+    em(1:12,1:12) = 0.0
     roal = rho*area*length/2.0
     em(1,1)     = roal
     em(2,2)     = roal
@@ -1654,14 +1639,13 @@
     return
     end
 !
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ELeMent MASs matrix for Constant Strain Triangle
     subroutine elmmasCST_D(rho, area, th, em)
-	implicit none              
+    implicit none              
     real(8):: rho,area,th,em(18,18)
     real(8):: emb(9,9)   
     real(8):: roat
@@ -1690,10 +1674,10 @@
     inew(8)=14
     inew(9)=15
 
-	do	i=1,9
-		ii=inew(i)
-        do	j=1,9
-			jj=inew(j)
+    do    i=1,9
+        ii=inew(i)
+        do    j=1,9
+            jj=inew(j)
             em(ii,jj) = emb(i,j)
         enddo
     enddo
@@ -1701,14 +1685,13 @@
     return
     end
 !
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent MASs matrix for Moment Rotation Triangle
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent MASs matrix for Moment Rotation Triangle
     subroutine elmmasMRT_D(rho,area,th,em ,alpham)
-	implicit none  
+    implicit none  
     real(8):: alpham,rho,area,th,em(18,18),emb(9,9)
     real(8):: roat,rad,alpha
     integer:: inew(9),i,j,ii,jj
@@ -1743,25 +1726,24 @@
     inew(8)=14
     inew(9)=18
 
-    do	i=1,9
-		ii=inew(i)
-        do	j=1,9
-			jj=inew(j)
-			em(ii,jj) = emb(i,j)
+    do    i=1,9
+        ii=inew(i)
+        do    j=1,9
+            jj=inew(j)
+            em(ii,jj) = emb(i,j)
         enddo
     enddo
 !
     return
     end
 !
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ELeMent MASs matrix for PLaTe: triangle
     subroutine elmmasPLT_D(rho, area, th, em ,alphap)
-	implicit none
+    implicit none
     real(8):: rho, area, th,alphap
     real(8):: em(18,18), emb(9,9)
     integer:: inew(9)
@@ -1777,10 +1759,10 @@
     alpha   = rad*rad/40
     alpha   = alpha*alphap
 
-	emb(1,1) = roat
+    emb(1,1) = roat
     emb(2,2) = roat*alpha
     emb(3,3) = roat*alpha
-	emb(4,4) = roat
+    emb(4,4) = roat
     emb(5,5) = roat*alpha
     emb(6,6) = roat*alpha
     emb(7,7) = roat
@@ -1788,8 +1770,8 @@
     emb(9,9) = roat*alpha
 
 !   assign to full element matrix
-	inew(1)=3
-	inew(2)=4
+    inew(1)=3
+    inew(2)=4
     inew(3)=5
     inew(4)=9
     inew(5)=10
@@ -1797,22 +1779,21 @@
     inew(7)=15
     inew(8)=16
     inew(9)=17
-    do	i=1,9
-		ii=inew(i)
-        do	j=1,9
-			jj=inew(j)
+    do    i=1,9
+        ii=inew(i)
+        do    j=1,9
+            jj=inew(j)
             em(ii,jj) = emb(i,j)
         enddo
-	enddo
+    enddo
 !
 !
     return
     end
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent STiFfness for Discrete Kirchhoff Triangle: CMP pp332
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent STiFfness for Discrete Kirchhoff Triangle: CMP pp332
+!    copyright@ RuNanHua 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfDKT_D(e0,g0,tt0,zip0,x1,x2,x3,y1,y2,y3,ek,ekb)
     implicit none
     real(8):: e0,g0,tt0,zip0,x1,x2,x3,y1,y2,y3
@@ -1862,10 +1843,10 @@
             do  k2=1,3
                 jj=(j-1)*3+k2
                 dd(ii,jj)=d(i,j)*px(k1,k2)
-			enddo
-		enddo
-	enddo
-	enddo
+            enddo
+        enddo
+    enddo
+    enddo
 !
     do  i=1,3
         als(i)  = b(i)*b(i)+c(i)*c(i)
@@ -1946,18 +1927,18 @@
     enddo
     enddo
 !
-	do  L=1,9
+    do  L=1,9
     do  j=L,9
         sum = 0.0
-		do  k=1,9
-			sum = sum  + qq(k,L)*gg(k,j)
-		enddo
+        do  k=1,9
+            sum = sum  + qq(k,L)*gg(k,j)
+        enddo
         ekb(L,j)=sum
         ekb(j,L)=sum
-	enddo
-	enddo
+    enddo
+    enddo
 
-!	assign to full element matrix[18X18]
+!    assign to full element matrix[18X18]
     inew(1)=3
     inew(2)=4
     inew(3)=5
@@ -1967,22 +1948,21 @@
     inew(7)=15
     inew(8)=16
     inew(9)=17
-    do	i=1,9
+    do    i=1,9
         ii=inew(i)
-        do	j=1,9
-			jj=inew(j)
-			ek(ii,jj) = ekb(i,j)
+        do    j=1,9
+            jj=inew(j)
+            ek(ii,jj) = ekb(i,j)
         enddo
     enddo
 
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent STiFfness for Constant Strain Triangle
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent STiFfness for Constant Strain Triangle
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfCST_D(e0,g0,tt0,pl0,x1,x2,x3,y1,y2,y3,ek,ek9)
     implicit none
     integer:: inew(9)
@@ -2070,12 +2050,11 @@
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent STiFfness for FRaMe
-!   calculates the element stiffness matrices.
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent STiFfness for FRaMe
+!    calculates the element stiffness matrices.
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfFRM_D(length, ix, iy, iz,area, emod, gmod, ek ,nELt)
     implicit none
     real(8):: area, length, ix, iy, iz, emod, gmod
@@ -2132,19 +2111,18 @@
 !
 !   impose the symmetry
     do  i= 1, 12
-	do  j= i, 12
-		ek(j,i) = ek(i,j)
-	enddo
-	enddo
+    do  j= i, 12
+        ek(j,i) = ek(i,j)
+    enddo
+    enddo
 !
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent STiFFness for Membrane with Rotation Triangle
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent STiFFness for Membrane with Rotation Triangle
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfMRT_D(e0,g0,tt0,pl0,alpha0,beta0,x1,x2,x3,y1,y2,y3,ek,ekb)
     implicit none
     real(8):: e0,g0,tt0,pl0,alpha0,beta0,x1,x2,x3,y1,y2,y3
@@ -2188,7 +2166,7 @@
     m=9
     call sm3mb_D(xt,yt,dmt,alpha,f,lst,ekb)
 !
-    if	(beta .gt. 0.0) then
+    if    (beta .gt. 0.0) then
         fbeta=f*beta
         call sm3mh_D(xt,yt,dmt,fbeta,lst,ekb)
     endif
@@ -2203,23 +2181,22 @@
     inew(7)=13
     inew(8)=14
     inew(9)=18
-    do	i=1,9
-		ii=inew(i)
-        do	j=1,9
-			jj=inew(j)
+    do    i=1,9
+        ii=inew(i)
+        do    j=1,9
+            jj=inew(j)
             ek(ii,jj) = ekb(i,j)
-		enddo
+        enddo
     enddo
 !
 !
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent GEOMetric stiffness for Constant Strain Triangle
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent GEOMetric stiffness for Constant Strain Triangle
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmgeomCST_s(x1,x2,x3,y1,y2,y3,x0b1,x0b2,x0b3,y0b1,y0b2,y0b3,xb1,xb2,xb3,yb1,yb2,yb3,zb1,zb2,zb3, &
                             tt0,ekg6,ekg18,forceb,triad_11,triad_22,x10,y10)
     implicit none    
@@ -2273,9 +2250,9 @@
     vv02t(2,9)=-2*b3
     vv02t(3,7)=-  c3
     vv02t(3,8)=   b3
-    do	i=1,3
-	do	j=1,9
-		vv02(j,i) = vv02t(i,j)
+    do    i=1,3
+    do    j=1,9
+        vv02(j,i) = vv02t(i,j)
     enddo
     enddo
 !
@@ -2407,9 +2384,9 @@
     inew(7)=13
     inew(8)=14
     inew(9)=15
-    do	i=1,9
-		ii=inew(i)
-        do	j=1,9
+    do    i=1,9
+        ii=inew(i)
+        do    j=1,9
             jj=inew(j)
             skb18(ii,jj) = sk1(i,j) + sk2(i,j) + sk3(i,j)
         enddo
@@ -2420,11 +2397,10 @@
     return
     end
 !
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ELeMent GEOMetric stiffness matrix for a FRaMe
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ELeMent GEOMetric stiffness matrix for a FRaMe
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmgeomFRM_D(length,eg,s)
     implicit none
     real(8):: length,eg(12,12),s
@@ -2475,24 +2451,23 @@
     do  i= 1, 12
     do  j= i, 12
         eg(j,i) = eg(i,j)
-	enddo
-	enddo
-!
-!   check diagonal terms
-    do	i=1,12
-		if (abs(eg(i,i)) .lt. 1.0e-12) eg(i,i)=1.0e-12
+    enddo
     enddo
 !
-	return
+!   check diagonal terms
+    do    i=1,12
+        if (abs(eg(i,i)) .lt. 1.0e-12) eg(i,i)=1.0e-12
+    enddo
+!
+    return
     end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ASSEMBle element matrices in COLumn form
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine assembCOL(nSTF,nND,nEQ,aa,a,i1,j1,k1,nloc)	
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ASSEMBle element matrices in COLumn form
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    subroutine assembCOL(nSTF,nND,nEQ,aa,a,i1,j1,k1,nloc)    
     implicit none
     integer:: nSTF,nND,nEQ            
     real(8):: aa(nSTF),a(18,18)
@@ -2501,7 +2476,7 @@
     integer:: i,j,imax,jmax,ieqn1,ieqn2,jband,iloc    
 !
 !   Set idof to posible DoF number of each nodes
-    if	(j1 .gt. 0  .AND. k1 .gt. 0) then
+    if    (j1 .gt. 0  .AND. k1 .gt. 0) then
         imax=18
         jmax=18
     elseif (j1 .eq. 0  .AND. k1 .eq. 0) then
@@ -2513,14 +2488,14 @@
         idof(i)    = (i1-1)*6 + i
         idof(i+6)  = (j1-1)*6 + i
         idof(i+12) = (k1-1)*6 + i
-	enddo
+    enddo
 !
 !   Store the values for individual array in global array
     do  i= 1, imax
-		ieqn1 = idof(i)
-        do	j= i, jmax
+        ieqn1 = idof(i)
+        do    j= i, jmax
             ieqn2 = idof(j)          
-			if	(ieqn1 .gt. ieqn2) then
+            if    (ieqn1 .gt. ieqn2) then
                     jband= (ieqn1-ieqn2)+1
                     iloc = nloc(ieqn1)
                     aa(iloc +jband-1) = aa(iloc +jband-1) + a(i,j)
@@ -2531,20 +2506,19 @@
                     aa(iloc +jband-1) = aa(iloc +jband-1) + a(i,j)
 !                   aa(ieqn1,jband) = aa(ieqn1,jband) + a(i,j)
             endif
-		enddo
-	enddo
+        enddo
+    enddo
 !
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ASSEMBle LUMped element matrices
     subroutine assembLUM(nND,nEQ,aa,a,i1,j1,k1)
-	implicit none
+    implicit none
     integer:: nND,nEQ
     real(8):: aa(nEQ),a(18,18)          
     integer:: i1,j1,k1     
@@ -2552,55 +2526,53 @@
 !
 !   Set idof to posible DoF number of each nodes
     do  i= 1, 6
-		idof(i)    = (i1-1)*6 + i
-		idof(i+6)  = (j1-1)*6 + i
-		idof(i+12) = (k1-1)*6 + i
-	enddo
+        idof(i)    = (i1-1)*6 + i
+        idof(i+6)  = (j1-1)*6 + i
+        idof(i+12) = (k1-1)*6 + i
+    enddo
 !
 !   Store the values for individual array in global array
     do  i= 1, 18
-		ieqn1 = idof(i)
-		aa(ieqn1) = aa(ieqn1) + a(i,i)
-	enddo
+        ieqn1 = idof(i)
+        aa(ieqn1) = aa(ieqn1) + a(i,i)
+    enddo
 !
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ASSEMBle consistent FORce for pressurized flex plate
     subroutine assembFOR(nEQ,nND, aa, a,i1, j1,k1)
-	implicit none
+    implicit none
     integer:: nEQ,nND   
     real(8):: aa(nEQ  ),a(18)
     integer:: i1,j1,k1
     integer:: idof(18),i,ieqn1
 !
 !   Set idof to posible DoF number of each nodes
-    do	i= 1, 6
+    do    i= 1, 6
         idof(i)    = (i1-1)*6 + i
         idof(i+6)  = (j1-1)*6 + i
         idof(i+12) = (k1-1)*6 + i
-	enddo
+    enddo
 !
 !   Store the values for individual array in global array
     do  i= 1, 18
         ieqn1 = idof(i)
         aa(ieqn1) = aa(ieqn1) + a(i)
-	enddo
+    enddo
 !
     return
     end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   TRANSformation of matrix in 3D. L->G
     subroutine trans3d_D(l,m,n,ek,beta)
     implicit none
@@ -2614,7 +2586,7 @@
     cb=dcos(beta*pi/180)
     d=dsqrt(1.0-n**2)
 !   if (abs(l).ge. 0.995 .and. abs(beta).le. 0.01) return
-	if (abs(n).gt.0.995) then
+    if (abs(n).gt.0.995) then
            r(1,1)  =  0.0
            r(1,2)  =  0.0
            r(1,3)  =  n
@@ -2624,7 +2596,7 @@
            r(3,1)  = -n*cb
            r(3,2)  = -sb
            r(3,3)  =  0.0
-	else
+    else
            r(1,1)  =  l
            r(1,2)  =  m
            r(1,3)  =  n
@@ -2643,48 +2615,47 @@
               r(3,2)  =  -(l*sb+m*n*cb)/d
               r(3,3)  =  d*cb
            endif
-	endif
+    endif
 !
     do  in=1,3
     do  jn=1,3
         rt(jn,in)=r(in,jn)
     enddo
     enddo
-!	take [Rtrans][K][R] using the nature of [R] to speed computation.
-!	k is sectioned off into 3x3s then multiplied [rtrans][k][r]
+!    take [Rtrans][K][R] using the nature of [R] to speed computation.
+!    k is sectioned off into 3x3s then multiplied [rtrans][k][r]
 !
-	do  i=0,3
+    do  i=0,3
     do  j=0,3
-		do	k=1,3
-        do	ii=1,3
-			j1=i*3
-			j2=j*3
-			ktemp(j1+k,j2+ii)=0.0
-			do	 jj=1,3
+        do    k=1,3
+        do    ii=1,3
+            j1=i*3
+            j2=j*3
+            ktemp(j1+k,j2+ii)=0.0
+            do     jj=1,3
             ktemp(j1+k,j2+ii)=ktemp(j1+k,j2+ii)+ek(j1+k,j2+jj)*r(jj,ii)
-			enddo
-		enddo
-		enddo
+            enddo
+        enddo
+        enddo
         do  k=1,3
         do  ii=1,3
-			ek(j1+k,j2+ii)=0.0
-			do  jj=1,3
-				ek(j1+k,j2+ii)=ek(j1+k,j2+ii)+rt(k,jj)*ktemp(j1+jj,j2+ii)
-			enddo
-		enddo
-		enddo
-	enddo
-	enddo
+            ek(j1+k,j2+ii)=0.0
+            do  jj=1,3
+                ek(j1+k,j2+ii)=ek(j1+k,j2+ii)+rt(k,jj)*ktemp(j1+jj,j2+ii)
+            enddo
+        enddo
+        enddo
+    enddo
+    enddo
 
     return
     end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   AxB product for COLumn storage
     subroutine AxBCOL(matrix,nSTF,vecin,vecout, nEQ,nBD,nprof,nprof2,nloc)
     implicit none
@@ -2694,7 +2665,7 @@
     real(8):: val,valmat
     integer:: i,j,io,is,jlim,iloc
 !
-    do	i=1,nEQ
+    do    i=1,nEQ
         jlim=max(1,(i-nprof(i)+1))
         do  j=jlim,i
             is=i
@@ -2716,18 +2687,17 @@
             val = vecin(i+j-1)
             vecout(i)=vecout(i) + val*valmat
         enddo
-	enddo
+    enddo
 
 
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!   makes a 3-D coordinate transformations.
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    makes a 3-D coordinate transformations.
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ROTate VECtor
     subroutine rotvec_D(xll,xmm,xnn,dx,dy,dz,dxb,dyb,dzb)
     implicit none
@@ -2736,8 +2706,8 @@
     real(8):: ddd
 !
     ddd=dsqrt(1.0-xnn**2)
-    if	(abs(xnn) .gt. 0.9999) then
-		r(1,1)  = +xnn
+    if    (abs(xnn) .gt. 0.9999) then
+        r(1,1)  = +xnn
         r(1,2)  = +0.0
         r(1,3)  = -0.0
         r(2,1)  =  -0.0
@@ -2750,12 +2720,12 @@
         dyb = r(2,2)*dy
         dzb = r(3,3)*dz
         return
-	elseif (abs(xll) .gt. 0.9999) then
-		r(1,1)  = +0.0
-		r(1,2)  = +0.0
-		r(1,3)  = -1.0
-		r(2,1)  = -0.0
-		r(2,2)  = +xll
+    elseif (abs(xll) .gt. 0.9999) then
+        r(1,1)  = +0.0
+        r(1,2)  = +0.0
+        r(1,3)  = -1.0
+        r(2,1)  = -0.0
+        r(2,2)  = +xll
         r(2,3)  =  0.0
         r(3,1)  = +xll
         r(3,2)  =  0.0
@@ -2764,8 +2734,8 @@
         dyb = r(2,2)*dy
         dzb = r(3,1)*dx
         return
-	else
-		r(1,1)  = +xll*xnn/ddd
+    else
+        r(1,1)  = +xll*xnn/ddd
         r(1,2)  = +xmm*xnn/ddd
         r(1,3)  = -ddd
         r(2,1)  =  -xmm/ddd
@@ -2774,7 +2744,7 @@
         r(3,1)  =  xll
         r(3,2)  =  xmm
         r(3,3)  =  xnn
-	endif
+    endif
 
     dxb = r(1,1)*dx + r(1,2)*dy + r(1,3)*dz
     dyb = r(2,1)*dx + r(2,2)*dy + r(2,3)*dz
@@ -2783,11 +2753,10 @@
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   ROTate stiffness MATrix Local to Global
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ROTate stiffness MATrix Local to Global
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine rot_mat_LG(rr,ekb,ek)
     implicit none
     real(8):: ek(18,18),ekb(18,18)
@@ -2804,47 +2773,46 @@
     enddo
     enddo
 !
-	do  i=0,5
+    do  i=0,5
     do  j=0,5
         j1=i*3
         j2=j*3
 !
 !       [k][R]
-		do  k=1,3
-			do  ii=1,3
-				ektemp(j1+k,j2+ii)=0.0
-				do  kk=1,3
-					ektemp(j1+k,j2+ii)=ektemp(j1+k,j2+ii)+ekb(j1+k,j2+kk)*rt(kk,ii)
+        do  k=1,3
+            do  ii=1,3
+                ektemp(j1+k,j2+ii)=0.0
+                do  kk=1,3
+                    ektemp(j1+k,j2+ii)=ektemp(j1+k,j2+ii)+ekb(j1+k,j2+kk)*rt(kk,ii)
 
-				enddo
-			enddo
-		enddo
+                enddo
+            enddo
+        enddo
 !
 
 !        [R][k]
-		do  k=1,3
-			do  ii=1,3
-				ek(j1+k,j2+ii)=0.0
-				do  kk=1,3
-					ek(j1+k,j2+ii)=ek(j1+k,j2+ii)+rr(k,kk)*ektemp(j1+kk,j2+ii)
+        do  k=1,3
+            do  ii=1,3
+                ek(j1+k,j2+ii)=0.0
+                do  kk=1,3
+                    ek(j1+k,j2+ii)=ek(j1+k,j2+ii)+rr(k,kk)*ektemp(j1+kk,j2+ii)
 
-				enddo
-			enddo
-		enddo
-	enddo
-	enddo
+                enddo
+            enddo
+        enddo
+    enddo
+    enddo
 !
 
-	return
+    return
     end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ROTATE stiffness matrix
 !   makes a 2-D coordinate transformations.
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine rotate_D(xll,xmm,xnn,ekb,ek)   
     implicit none
     real(8):: xll,xmm,xnn
@@ -2854,15 +2822,15 @@
     integer:: i,j,k,ii,jj,j1,j2,in,jn
 !
     ddd=dsqrt(1.0-xnn**2)
-    if	(abs(xnn) .gt. 0.9999) then
+    if    (abs(xnn) .gt. 0.9999) then
         r(1,1)  = +xnn
         r(1,2)  = +0.0
         r(1,3)  = -0.0
-		r(2,1)  =  -0.0
+        r(2,1)  =  -0.0
         r(2,2)  =   1.0
         r(2,3)  =   0.0
         r(3,1)  =  0.0
-		r(3,2)  =  0.0
+        r(3,2)  =  0.0
         r(3,3)  =  xnn
     elseif (abs(xll) .gt. 0.9999) then
         r(1,1)  = +0.0
@@ -2889,10 +2857,10 @@
 !  take [Rtrans][k][R] using the nature of [R] to speed computation.
 !  [k] is sectioned off into 6 3x3s then multiplied [rtrans][k][r]
 !
-    if	(abs(xnn) .gt. 0.9999) then
-        do	i=0,5
-        do	j=0,5
-			ii=i*3
+    if    (abs(xnn) .gt. 0.9999) then
+        do    i=0,5
+        do    j=0,5
+            ii=i*3
             jj=j*3
             ek(ii+1,jj+1) = ekb(ii+1,jj+1)
             ek(ii+1,jj+2) = ekb(ii+1,jj+2)*r(1,1)
@@ -2905,10 +2873,10 @@
             ek(ii+3,jj+3) = ekb(ii+3,jj+3)
         enddo
         enddo
-		return
-	elseif (abs(xll) .gt. 0.9999) then
-        do	i=0,5
-        do	j=0,5
+        return
+    elseif (abs(xll) .gt. 0.9999) then
+        do    i=0,5
+        do    j=0,5
             ii=i*3
             jj=j*3
             ek(ii+1,jj+1) = ekb(ii+3,jj+3)
@@ -2920,15 +2888,15 @@
             ek(ii+3,jj+1) =-ekb(ii+1,jj+3)*r(2,2)
             ek(ii+3,jj+2) =-ekb(ii+1,jj+2)*r(2,2)
             ek(ii+3,jj+3) = ekb(ii+1,jj+1)
-		enddo
+        enddo
         enddo
         return
-	endif
+    endif
 !
 !   get transpose
-    do	in=1,3
-    do	jn=1,3
-		rt(jn,in)=r(in,jn)
+    do    in=1,3
+    do    jn=1,3
+        rt(jn,in)=r(in,jn)
     enddo
     enddo
 !
@@ -2937,39 +2905,38 @@
         j1=i*3
         j2=j*3
 !
-!		[k][R]
+!        [k][R]
         do  k=1,3
         do  ii=1,3
-			ektemp(j1+k,j2+ii)=0.0
-			do  jj=1,3
-				ektemp(j1+k,j2+ii)=ektemp(j1+k,j2+ii)+ekb(j1+k,j2+jj)*r(jj,ii)
-			enddo
-		enddo
-		enddo
+            ektemp(j1+k,j2+ii)=0.0
+            do  jj=1,3
+                ektemp(j1+k,j2+ii)=ektemp(j1+k,j2+ii)+ekb(j1+k,j2+jj)*r(jj,ii)
+            enddo
+        enddo
+        enddo
 !
 !       [Rtrans][k]
-		do	k=1,3
+        do    k=1,3
         do  ii=1,3
-			ek(j1+k,j2+ii)=0.0
-			do  jj=1,3
-				ek(j1+k,j2+ii)=ek(j1+k,j2+ii) +rt(k,jj)*ektemp(j1+jj,j2+ii)
-			enddo
-		enddo
-		enddo
+            ek(j1+k,j2+ii)=0.0
+            do  jj=1,3
+                ek(j1+k,j2+ii)=ek(j1+k,j2+ii) +rt(k,jj)*ektemp(j1+jj,j2+ii)
+            enddo
+        enddo
+        enddo
 
-	enddo
-	enddo
+    enddo
+    enddo
 !
     return
     end
 
  
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   from Bergan and Felippa, CMAME, 1985
 !   basic stiffness
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine sm3mb_D(x,y,dm,alpha,f,ls,sm)
     implicit none
     real(8):: x(3),y(3),dm(3,3),alpha,f,sm(9,9)
@@ -3019,7 +2986,7 @@
     p(6,3) = y12
     n=6
 !
-	if (alpha .ne. 0.0) then
+    if (alpha .ne. 0.0) then
         p(7,1) = y23 * (y13-y21)*alpha/6.0
         p(7,2) = x32 * (x31-x12)*alpha/6.0
         p(7,3) =       (x31*y13-x12*y21)*alpha/3.0
@@ -3041,34 +3008,33 @@
     d23 = c*dm(2,3)
 
     do  j=1,n
-		l  = ls(j)
+        l  = ls(j)
         s1 = d11*p(j,1) + d12*p(j,2) + d13*p(j,3)
         s2 = d12*p(j,1) + d22*p(j,2) + d23*p(j,3)
         s3 = d13*p(j,1) + d23*p(j,2) + d33*p(j,3)
         do  i=1,j
-			k = ls(i)
+            k = ls(i)
             sm(k,l) = sm(k,l) + (s1*p(i,1) + s2*p(i,2) + s3*p(i,3))
             sm(l,k) = sm(k,l)
-		enddo
-	enddo
+        enddo
+    enddo
 !
     return
     end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
 !   higher stiffness
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine sm3mh_D(x,y,dm,f,ls,sm)
     implicit none
     real(8):: x(3),y(3),dm(3,3),f,sm(9,9)
     integer:: ls(9)
 
     real(8):: xc(3), yc(3), xm(3),ym(3)
-	real(8):: gt(9,9),hh(3,9)
+    real(8):: gt(9,9),hh(3,9)
     real(8):: sqh(3,3), qx(3,3),qy(3,3)
     real(8):: area,area2,c
     real(8):: a1j, a2j, a3j, b1j, b2j,b3j
@@ -3076,7 +3042,7 @@
     real(8):: x0, y0, xi,yi
     real(8):: cj, sj,dl,dx,dy
     real(8):: s1,s2,s3,s4,s5,s6
-	integer:: iperm(9)
+    integer:: iperm(9)
     real(8):: gti(9,9),wk(9,9)
     integer:: i,j,k,l,n
 !
@@ -3121,7 +3087,7 @@
     jxx = -2.0*(xc(1)*xc(2) + xc(2)*xc(3) + xc(3)*xc(1))/3.0
     jxy =      (xc(1)*yc(1) + xc(2)*yc(2) + xc(3)*yc(3))/3.0
     jyy = -2.0*(yc(1)*yc(2) + yc(2)*yc(3) + yc(3)*yc(1))/3.0
-    do	j=1,3
+    do    j=1,3
         dx = xm(j) - xc(j)
         dy = ym(j) - yc(j)
         dl = dsqrt(dx*dx + dy*dy)
@@ -3164,13 +3130,13 @@
             gt(j+6,2*i-1) =    a1j*xi*xi + 2.*a2j*xi*yi + a3j*yi*yi
             gt(j+6,2*i)   =    b1j*xi*xi + 2.*b2j*xi*yi + b3j*yi*yi
             gt(j+6,i+6)   =   -c*(cj*xi+sj*yi)
-		enddo
+        enddo
         do  i=1,j
-			sqh(i,j) = jxx*( qx(i,1)*s1+qx(i,2)*s2+qx(i,3)*s3) &
+            sqh(i,j) = jxx*( qx(i,1)*s1+qx(i,2)*s2+qx(i,3)*s3) &
                      + jxy*( qx(i,1)*s4+qx(i,2)*s5+qx(i,3)*s6+qy(i,1)*s1+qy(i,2)*s2+qy(i,3)*s3) &
                      + jyy*( qy(i,1)*s4+qy(i,2)*s5+qy(i,3)*s6)
-		enddo
-	enddo
+        enddo
+    enddo
 !
 !   Factor G' and backsolve to obtain H
 !   Form physical stiffness and add to incoming SM
@@ -3200,16 +3166,15 @@
         enddo
     enddo
 
-	return
+    return
     end
 
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   UDU decomposition of COLumn profiled system
     subroutine uduCOL_D(a,maxstore,nEQ,nBD,imult,nprof,nloc)
     implicit none
@@ -3220,13 +3185,13 @@
     real(8):: temp,sum
     integer:: i,j,k,j2,j3,im1,jm1,is,io,iloc,jcol,iloci,ilocj,iloc1
 
-    if	(a(1) .eq. 0.0d0) then
-		imult=0
+    if    (a(1) .eq. 0.0d0) then
+        imult=0
         return
     endif
 !
-    if	(nEQ .eq. 1) then
-		imult=1
+    if    (nEQ .eq. 1) then
+        imult=1
         return
     endif
 !
@@ -3234,18 +3199,18 @@
     do  j=2,nEQ
         jm1=j-1
         j2=j-nprof(j)+1
-        if	(j2.lt.1) then
+        if    (j2.lt.1) then
             j2=1
         endif
 !
 !       off-diagonal terms
-        if	(jm1.eq.1) then
-			is=j
+        if    (jm1.eq.1) then
+            is=j
             io=1
             iloc = nloc(is) + io - 1
             sum=a(iloc)
 !           sum=a(j,1)
-		else
+        else
             do  i=j2+1,jm1
                 im1=i-1
                 is=j
@@ -3256,11 +3221,11 @@
 !
                 j3=i-nprof(i)+1
                 jcol=j3
-                if	(j3 .lt. j2) then
-					jcol=j2
+                if    (j3 .lt. j2) then
+                    jcol=j2
                 endif
-!               do	k=j2,im1
-				do  k=jcol,im1
+!               do    k=j2,im1
+                do  k=jcol,im1
                     is=i
                     io=i-k+1
                     iloci = nloc(is) + io - 1
@@ -3270,18 +3235,18 @@
                     sum=sum-a(iloci  )*a(ilocj  )
 !                   sum=sum-a(k,i-k+1)*a(k,j-k+1)
                     imult=imult+1
-				enddo
+                enddo
                 a(iloc   )=sum
 !               a(i,j-i+1)=sum
-			enddo
+            enddo
             is=j
             io=1
             iloc = nloc(is) + io - 1
             sum=a(iloc   )
 !           sum=a(j,1)
-		endif
+        endif
 !
-!		diagonal terms
+!        diagonal terms
         do  k=j2,jm1
             is=j
             io=j-k+1
@@ -3296,28 +3261,27 @@
 !           sum=sum-temp*a(k,j-k+1)
 !           a(k,j-k+1)=temp
             imult=imult+2
-		enddo
+        enddo
 
         if (sum.eq.0.0d0) then
             imult=0
             return
-		endif
+        endif
         is=j
         io=1
         iloc = nloc(is) + io - 1
         a(iloc   ) = sum
 !       a(j,1)=sum
-	enddo
+    enddo
 !
 !
     return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   BAcK solver of COLumn profiled system
     subroutine bakCOL_D(a,maxstore,b,nEQ,nBD,wk,imult,nprof,nprof2,nloc)
     implicit none
@@ -3330,33 +3294,33 @@
 
 !
 !   forward substitutions
-    do	i=1,nEQ
-!		j=i-nBD+1
+    do    i=1,nEQ
+!        j=i-nBD+1
         j=i-nprof(i)+1
-        if	(i.le.nprof(i) ) then
+        if    (i.le.nprof(i) ) then
             j=1
         endif
         jb=i-nBD+1
         jbb=jb
-        if	(i.le.nBD    ) then
+        if    (i.le.nBD    ) then
             jbb=1
         endif
         sum=b(i)
         km1=i-1
-        if	(j.gt.km1) then
+        if    (j.gt.km1) then
             wk(i)=sum
         else
-			do  k=j,km1
+            do  k=j,km1
                 is=i
                 io=i-k+1
                 iloc = nloc(is) + io - 1
                 sum=sum-a(iloc   )*wk(k)
 !               sum=sum-a(k,i-k+1)*wk(k)
                 imult=imult+1
-			enddo
+            enddo
             wk(i)=sum
         endif
-	enddo
+    enddo
 !
 !   middle terms
     do  i=1,nEQ
@@ -3365,24 +3329,24 @@
         iloc = nloc(is) + io - 1
         wk(i)=wk(i)/a(iloc )
 !       wk(i)=wk(i)/a(i,1)
-		imult=imult+1
-	enddo
+        imult=imult+1
+    enddo
 !
 !   backward substitution
     do  i1=1,nEQ
-		i=nEQ-i1+1
+        i=nEQ-i1+1
         j=i+nprof2(i) -1
-        if	(j.gt.nEQ) then
-			j=nEQ
+        if    (j.gt.nEQ) then
+            j=nEQ
         endif
         jb=i+nBD-1
         jbb=jb
-        if	(jb.gt.nEQ) then
+        if    (jb.gt.nEQ) then
             jbb=nEQ
         endif
         sum=wk(i)
         k2=i+1
-        if	(k2.gt.j) then
+        if    (k2.gt.j) then
             wk(i)=sum
         else
             do  k=k2,j
@@ -3395,18 +3359,17 @@
                 imult=imult+1
             enddo
 
-			wk(i)=sum
+            wk(i)=sum
         endif
-	enddo
+    enddo
 !
-	return
+    return
     end
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine ainver(a,n,indx,yn)
     implicit none
     integer:: n
@@ -3415,35 +3378,34 @@
     real(8):: d
     integer:: i,j,np
 
-    do	i = 1,n
-		do	j = 1,n
-			yn(i,j) = 0.0
-		enddo
+    do    i = 1,n
+        do    j = 1,n
+            yn(i,j) = 0.0
+        enddo
         yn(i,i) = 1.0
-	enddo
+    enddo
 !
     np=n
-	call ludcmp(a,n,np,indx,d)
+    call ludcmp(a,n,np,indx,d)
 !
     do  j = 1,n
-		call lubksb(a,n,np,indx,yn(1,j))
-	enddo
+        call lubksb(a,n,np,indx,yn(1,j))
+    enddo
 !
     do  j = 1,n
     do  i = 1,n
-		a(i,j) = yn(i,j)
-	enddo
-	enddo
+        a(i,j) = yn(i,j)
+    enddo
+    enddo
 !
     return
     end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine ludcmp(a,n,np,indx,d)
     implicit none
     integer:: n,np
@@ -3455,68 +3417,67 @@
     integer:: i,j,k,imax
 !
     d = 1.0
-    do	i = 1,n
+    do    i = 1,n
         aamax = 0.0
         do  j = 1,n
             if (abs(a(i,j)) .gt. aamax) aamax = abs(a(i,j))
-		enddo
+        enddo
         if (aamax .eq. 0.0) pause 'Singular Matrix'
         vv(i) = 1.0/aamax
-	enddo
+    enddo
 
     do  j = 1,n
         do  i = 1,j-1
             sum = a(i,j)
             do   k = 1,i-1
                sum = sum - a(i,k)*a(k,j)
-			enddo
+            enddo
             a(i,j) = sum
-		enddo
+        enddo
 
         aamax = 0.0
         do  i = j,n
             sum = a(i,j)
-            do	k = 1,j-1
-				sum = sum - a(i,k)*a(k,j)
-			enddo
+            do    k = 1,j-1
+                sum = sum - a(i,k)*a(k,j)
+            enddo
             a(i,j) = sum
             dum = vv(i)*abs(sum)
             if (dum .ge. aamax) then
                imax = i
                aamax = dum
             endif
-		enddo
+        enddo
 
-        if	(j .ne. imax) then
+        if    (j .ne. imax) then
             do  k = 1,n
-				dum = a(imax,k)
-				a(imax,k) = a(j,k)
-				a(j,k) = dum
-			enddo
+                dum = a(imax,k)
+                a(imax,k) = a(j,k)
+                a(j,k) = dum
+            enddo
             d = -d
             vv(imax) = vv(j)
-		endif
+        endif
 
         indx(j) = imax
         if (a(j,j) .eq. 0.0) a(j,j) = tiny
         if (j .ne. n) then
             dum = 1.0/a(j,j)
-            do	i = j+1,n
-				a(i,j) = a(i,j)*dum
-			enddo
+            do    i = j+1,n
+                a(i,j) = a(i,j)*dum
+            enddo
          endif
 
-	enddo
+    enddo
 !
     return
     end
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine lubksb(a,n,np,indx,b)
     implicit none
     integer:: n,np
@@ -3530,25 +3491,25 @@
         ll = indx(i)
         sum = b(ll)
         b(ll) = b(i)
-        if	(ii .ne. 0) then
+        if    (ii .ne. 0) then
             do  j = ii , i-1
-				sum = sum - a(i,j)*b(j)
-			enddo
-		else if (sum .ne. 0.0) then
-			ii = i
+                sum = sum - a(i,j)*b(j)
+            enddo
+        else if (sum .ne. 0.0) then
+            ii = i
         endif
         b(i) = sum
-	enddo
-	do  i = n,1,-1
-		sum = b(i)
-        if	(i .lt. n) then
+    enddo
+    do  i = n,1,-1
+        sum = b(i)
+        if    (i .lt. n) then
             do  j = i+1,n
-				sum = sum - a(i,j)*b(j)
-			enddo
+                sum = sum - a(i,j)*b(j)
+            enddo
         endif
         b(i) = sum/a(i,i)
-	enddo
+    enddo
     return
-	end
+    end
 
 

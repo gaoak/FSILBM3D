@@ -1,52 +1,51 @@
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	£¨Î»ÒÆ¡¢ËÙ¶È£©µ¯»É ·£·½·¨
-!   µ¥ÔªÖÐÐÄ´¦¼ÆËãÁ¦£¬È»ºó·Ö²¼µ½Èý¸ö½ÚµãÉÏ
-!	copyright@ RuNanHua 
-!	°æÈ¨ËùÓÐ£¬»ªÈçÄÏ£¨ÖÐ¹ú¿Æ´ó½ü´úÁ¦Ñ§Ïµ£©
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	SUBROUTINE cptForcS(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                                xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful)	
-	IMPLICIT NONE
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    (displacement, velocity) spring, penalty method
+!    calculate force at element center, distribute force to three nodes
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                                xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful)    
+    IMPLICIT NONE
     integer:: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM
     real(8):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta
     real(8):: force(zDim,yDim,xDim,1:3),uuu(zDim,yDim,xDim,1:3),den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
     real(8):: xyzful(nND,6),xyzfulIB(nND,6),velful(nND,6),extful(nND,6)
 !==================================================================================================
-	integer:: i,j,k,x,y,z,xbgn,ybgn,zbgn,xend,yend,zend,iEL,nt,iterLBM,iND
-	real(8):: rx,ry,rz,Phi,dmaxLBM,dsum
+    integer:: i,j,k,x,y,z,xbgn,ybgn,zbgn,xend,yend,zend,iEL,nt,iterLBM,iND
+    real(8):: rx,ry,rz,Phi,dmaxLBM,dsum
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
     real(8):: forceTemp(zDim,yDim,xDim,1:3),forceElemTemp(nEL,3)
     real(8):: forceElem(nEL,3),forceNode(nND,3),velfulIB(nND,3)
     real(8):: posElem(nEL,3),posElemIB(nEL,3),velElem(nEL,3),velElemIB(nEL,3),areaElem(nEL)
 !==================================================================================================
-!   ¼ÆËã½ÚµãIBµãËÙ¶ÈºÍÎ»ÖÃ		
-	do  iND=1,nND	
-        xbgn	= minloc(dabs(xyzful(iND,1)-xGrid(1:xDim)),1) -3
-		xend	= minloc(dabs(xyzful(iND,1)-xGrid(1:xDim)),1) +4
-		ybgn	= minloc(dabs(xyzful(iND,2)-yGrid(1:yDim)),1) -3
-		yend	= minloc(dabs(xyzful(iND,2)-yGrid(1:yDim)),1) +4
-		zbgn	= minloc(dabs(xyzful(iND,3)-zGrid(1:zDim)),1) -3
-		zend	= minloc(dabs(xyzful(iND,3)-zGrid(1:zDim)),1) +4
+!   compute velocity and displacement at IB nodes   
+    do  iND=1,nND    
+        xbgn    = minloc(dabs(xyzful(iND,1)-xGrid(1:xDim)),1) -3
+        xend    = minloc(dabs(xyzful(iND,1)-xGrid(1:xDim)),1) +4
+        ybgn    = minloc(dabs(xyzful(iND,2)-yGrid(1:yDim)),1) -3
+        yend    = minloc(dabs(xyzful(iND,2)-yGrid(1:yDim)),1) +4
+        zbgn    = minloc(dabs(xyzful(iND,3)-zGrid(1:zDim)),1) -3
+        zend    = minloc(dabs(xyzful(iND,3)-zGrid(1:zDim)),1) +4
 
-		velfulIB(iND,1:3)=0.0
+        velfulIB(iND,1:3)=0.0
 
-		do	x=xbgn,xend
-		do	y=ybgn,yend
-		do	z=zbgn,zend
-			rx=(xyzful(iND,1)-xGrid(x))/dx(x)
-			ry=(xyzful(iND,2)-yGrid(y))/dy(y)
-			rz=(xyzful(iND,3)-zGrid(z))/dz(z)
-			 
-			velfulIB(iND,1:3)=velfulIB(iND,1:3)+uuu(z,y,x,1:3)*Phi(rx)*Phi(ry)*Phi(rz)
-			 
-		enddo
-		enddo
-		enddo
+        do    x=xbgn,xend
+        do    y=ybgn,yend
+        do    z=zbgn,zend
+            rx=(xyzful(iND,1)-xGrid(x))/dx(x)
+            ry=(xyzful(iND,2)-yGrid(y))/dy(y)
+            rz=(xyzful(iND,3)-zGrid(z))/dz(z)
+             
+            velfulIB(iND,1:3)=velfulIB(iND,1:3)+uuu(z,y,x,1:3)*Phi(rx)*Phi(ry)*Phi(rz)
+             
+        enddo
+        enddo
+        enddo
         xyzfulIB(iND,1:3)=xyzfulIB(iND,1:3)+velfulIB(iND,1:3)*dt
     enddo
 
 !==================================================================================================
-!   ¼ÆËãµ¥ÔªÃæÐÄÎ»ÖÃ¡¢ËÙ¶È¡¢Ãæ»ý
+!   compute displacement, velocity, area at surface element center
     do  iEL=1,nEL
         i=ele(iEL,1)
         j=ele(iEL,2)
@@ -97,7 +96,7 @@
     do  x = 1, xDim
     do  y = 1, yDim
     do  z = 1, zDim
-	    force(z,y,x,1:3)=0.0d0
+        force(z,y,x,1:3)=0.0d0
      enddo
      enddo
      enddo
@@ -108,30 +107,30 @@ iterLBM=0
 !   ***********************************************************************************************
 do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)  
 !   ***********************************************************************************************
-!   ¼ÆËãµ¥ÔªÖÐÐÄIBµãËÙ¶È		
-	do  iEL=1,nEL	
-		xbgn	= minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)-3
-		xend	= minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)+4
-		ybgn	= minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)-3
-		yend	= minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)+4
-		zbgn	= minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)-3
-		zend	= minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)+4
+!   compute the velocity of IB nodes at element center    
+    do  iEL=1,nEL    
+        xbgn    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)-3
+        xend    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)+4
+        ybgn    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)-3
+        yend    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)+4
+        zbgn    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)-3
+        zend    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)+4
 
-		velElemIB(iEL,1:3)=0.0
-		do	x=xbgn,xend
-		do	y=ybgn,yend
-		do	z=zbgn,zend
-			rx=(posElem(iEL,1)-xGrid(x))/dx(x)
-			ry=(posElem(iEL,2)-yGrid(y))/dy(y)
-			rz=(posElem(iEL,3)-zGrid(z))/dz(z)
-			 
-			velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(z,y,x,1:3)*Phi(rx)*Phi(ry)*Phi(rz)			 
-		enddo
-		enddo
-		enddo
+        velElemIB(iEL,1:3)=0.0
+        do    x=xbgn,xend
+        do    y=ybgn,yend
+        do    z=zbgn,zend
+            rx=(posElem(iEL,1)-xGrid(x))/dx(x)
+            ry=(posElem(iEL,2)-yGrid(y))/dy(y)
+            rz=(posElem(iEL,3)-zGrid(z))/dz(z)
+             
+            velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(z,y,x,1:3)*Phi(rx)*Phi(ry)*Phi(rz)             
+        enddo
+        enddo
+        enddo
     enddo
 !   ***********************************************************************************************
-!   ¼ÆËãÏà»¥×÷ÓÃÁ¦
+!   calculate interaction force
     do  iEL=1,nEL
         if(ele(iEL,4)==2)then
             forceElemTemp(iEL,1:3) = 0.0d0
@@ -142,44 +141,44 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
         else
         endif
          
-	enddo
+    enddo
 !   ***********************************************************************************************
-!   ¼ÆËãÅ·À­Ìå»ýÁ¦
+!   calculate Eulerian body force
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
-	do  x = 1, xDim
+    do  x = 1, xDim
     do  y = 1, yDim
     do  z = 1, zDim
-	    forceTemp(z,y,x,1:3)=0.0d0
+        forceTemp(z,y,x,1:3)=0.0d0
      enddo
      enddo
      enddo
     !$OMP END PARALLEL DO
-	do	iEL=1,nEL	
-		xbgn	= minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)-3
-		xend	= minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)+4
-		ybgn	= minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)-3
-		yend	= minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)+4
-		zbgn	= minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)-3
-		zend	= minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)+4
-		do	x=xbgn,xend
-		do	y=ybgn,yend
-		do	z=zbgn,zend
-			rx=(posElem(iEL,1)-xGrid(x))/dx(x)
-			ry=(posElem(iEL,2)-yGrid(y))/dy(y)
-			rz=(posElem(iEL,3)-zGrid(z))/dz(z)
+    do    iEL=1,nEL    
+        xbgn    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)-3
+        xend    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)+4
+        ybgn    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)-3
+        yend    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)+4
+        zbgn    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)-3
+        zend    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)+4
+        do    x=xbgn,xend
+        do    y=ybgn,yend
+        do    z=zbgn,zend
+            rx=(posElem(iEL,1)-xGrid(x))/dx(x)
+            ry=(posElem(iEL,2)-yGrid(y))/dy(y)
+            rz=(posElem(iEL,3)-zGrid(z))/dz(z)
 
-			forceTemp(z,y,x,1:3)=forceTemp(z,y,x,1:3)-forceElemTemp(iEL,1:3)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
+            forceTemp(z,y,x,1:3)=forceTemp(z,y,x,1:3)-forceElemTemp(iEL,1:3)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
  
-		enddo
-		enddo
-		enddo        
-	enddo
+        enddo
+        enddo
+        enddo        
+    enddo
 !   ***********************************************************************************************
-!   ¸üÐÂËÙ¶È    
+!   update velocity
 !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
     do  x = 1, xDim
     do  y = 1, yDim
-	do  z = 1, zDim         
+    do  z = 1, zDim         
         uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5*dt*forceTemp(z,y,x,1:3)/den(z,y,x)
         force(z,y,x,1:3)  =force(z,y,x,1:3)+       forceTemp(z,y,x,1:3)
     enddo
@@ -189,17 +188,17 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
 !    force(1:zDim,1:yDim,1:xDim,1:3)=force(1:zDim,1:yDim,1:xDim,1:3)+forceTemp(1:zDim,1:yDim,1:xDim,1:3)
     forceElem(1:nEL,1:3) = forceElem(1:nEL,1:3)+forceElemTemp(1:nEL,1:3)   
 !   ***********************************************************************************************
-!   ÊÕÁ²ÅÐ¶Ï    
+!   convergence test
     if(iterLBM==0)then
         dsum=0.0
-        do iEL=1,nEL      		
+        do iEL=1,nEL              
         dsum=dsum+dsqrt(sum((velElem(iEL,1:3)-velElemIB(iEL,1:3))**2))
         enddo   
     endif
     dsum=Uref*nEL
     
     dmaxLBM=0.0
-    do iEL=1,nEL      		
+    do iEL=1,nEL              
         dmaxLBM=dmaxLBM+dsqrt(sum((velElem(iEL,1:3)-velElemIB(iEL,1:3))**2))
     enddo
     dmaxLBM=dmaxLBM/dsum
@@ -209,9 +208,9 @@ enddo
 write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
 !**************************************************************************************************
 !**************************************************************************************************
-!   µ¥ÔªÁ¦ ×ª»» ½ÚµãÁ¦
+!   element force to nodal force
     forceNode(1:nND,1:3)=0.0
-    do	iEL=1,nEL
+    do    iEL=1,nEL
         i=ele(iEL,1)
         j=ele(iEL,2)
         k=ele(iEL,3)
@@ -224,16 +223,16 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
     extful(1:nND,1:3) = forceNode(1:nND,1:3)
     extful(1:nND,4:6) = 0.0d0
 
-	END SUBROUTINE
+    END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	¹ÌÌå±íÃæÁ÷ÌåÓ¦Á¦»ý·Ö
-!   Á½²ãÍâ±íÃæµÄÁ÷ÌåÓ¦Á¦
-!	copyright@ RuNanHua 
-!	°æÈ¨ËùÓÐ£¬»ªÈçÄÏ£¨ÖÐ¹ú¿Æ´ó½ü´úÁ¦Ñ§Ïµ£©
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	SUBROUTINE cptStrs(zDim,yDim,xDim,nEL,nND,ele,dh,dx,dy,dz,mu,rr,u,p,xGrid,yGrid,zGrid,xyzful,extful)	
-	IMPLICIT NONE
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+!   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½
+!    copyright@ RuNanHua 
+!    ï¿½ï¿½È¨ï¿½ï¿½ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï£ï¿½ï¿½Ð¹ï¿½ï¿½Æ´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ§Ïµï¿½ï¿½
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE cptStrs(zDim,yDim,xDim,nEL,nND,ele,dh,dx,dy,dz,mu,rr,u,p,xGrid,yGrid,zGrid,xyzful,extful)    
+    IMPLICIT NONE
     integer:: zDim,yDim,xDim,nEL,nND,ele(nEL,5)
     real(8):: dh,dx(xDim),dy(yDim),dz(zDim),mu,rr
     real(8):: u(zDim,yDim,xDim,1:3),p(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
@@ -244,10 +243,10 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
     real(8):: Sxx1,Sxy1,Sxz1,Syy1,Syz1,Szz1,Pre1,Sxx2,Sxy2,Sxz2,Syy2,Syz2,Szz2,Pre2
     real(8):: SxxTemp,SxyTemp,SxzTemp,SyyTemp,SyzTemp,SzzTemp
     integer:: i,j,k,m,nELt,iEL
-	integer:: x,y,z,xbgn,ybgn,zbgn,xend,yend,zend
-	real(8):: weightm,forceElem(nEL,3),forceElemTemp(nEL,3),forceNode(nND,3)
+    integer:: x,y,z,xbgn,ybgn,zbgn,xend,yend,zend
+    real(8):: weightm,forceElem(nEL,3),forceElemTemp(nEL,3),forceNode(nND,3)
 
-!   ·¨ÏòÁ½¸öÎ»ÖÃÆ½¾ù
+!   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½Æ½ï¿½ï¿½
 !
     ll1=0.5*rr*dh
     ll2=1.0*rr*dh
@@ -255,19 +254,19 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
     w1=ll2/(ll2-ll1)
     w2=1.0d0-w1
 !   ***********************************************************************************************
-!   ¼ÆËãµ¥ÔªÁ¦
+!   ï¿½ï¿½ï¿½ãµ¥Ôªï¿½ï¿½
     forceElem(1:nEL,1:3)=0.0d0
-    do	iEL=1,nEL
+    do    iEL=1,nEL
         
         i  = ele(iEL,1)
         j  = ele(iEL,2)
         k  = ele(iEL,3)
         nELt= ele(iEL,4)
 !
-		if	(nELt == 2) then
-!			frame
+        if    (nELt == 2) then
+!            frame
             forceElem(iEL,1:3)=[0.0,0.0,0.0]
-		elseif (nELt == 3) then
+        elseif (nELt == 3) then
 !           plate
             x1=xyzful(i,1)
             x2=xyzful(j,1)
@@ -283,7 +282,7 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
             cy=(y1+y2+y3)/3.0
             cz=(z1+z2+z3)/3.0
 
-!			determine vector area         
+!            determine vector area         
             ax(1) =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0
             ay(1) =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0
             az(1) =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0
@@ -338,9 +337,9 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
                 Syz1=0.d0
                 Pre1=0.d0
 
-	            do	x=xbgn,xend
-                do	y=ybgn,yend
-                do	z=zbgn,zend
+                do    x=xbgn,xend
+                do    y=ybgn,yend
+                do    z=zbgn,zend
 
                 weightm=(dx(x)-dabs(xGrid(x)-px(m)))*(dy(y)-dabs(yGrid(y)-py(m)))*(dz(z)-dabs(zGrid(z)-pz(m)))
 !               stress on the interpolation supported node
@@ -360,7 +359,7 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
                 Syz1=Syz1+SyzTemp*weightm/(dx(x)*dy(y)*dz(z))
                 Pre1=Pre1+p(z,y,x)*weightm/(dx(x)*dy(y)*dz(z))
 
-	            enddo
+                enddo
                 enddo
                 enddo
                 !******************************************
@@ -396,9 +395,9 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
                 Syz2=0.d0
                 Pre2=0.d0
 
-	            do	x=xbgn,xend
-                do	y=ybgn,yend
-                do	z=zbgn,zend
+                do    x=xbgn,xend
+                do    y=ybgn,yend
+                do    z=zbgn,zend
 
                 weightm=(dx(x)-dabs(xGrid(x)-px(m)))*(dy(y)-dabs(yGrid(y)-py(m)))*(dz(z)-dabs(zGrid(z)-pz(m)))
 !               stress on the interpolation supported node
@@ -418,7 +417,7 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
                 Syz2=Syz2+SyzTemp*weightm/(dx(x)*dy(y)*dz(z))
                 Pre2=Pre2+p(z,y,x)*weightm/(dx(x)*dy(y)*dz(z))
 
-	            enddo
+                enddo
                 enddo
                 enddo
                 !******************************************
@@ -429,15 +428,15 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
                 forceElem(iEL,3)=forceElem(iEL,3)-Pre2*az(m)+(w1*Sxz1+w2*Sxz2)*ax(m)+(w1*Syz1+w2*Syz2)*ay(m)+(w1*Szz1+w2*Szz2)*az(m)
             enddo
             
-		else
+        else
             write(*,*)'not this nELt:',nELt
             stop
         endif       
-	enddo
+    enddo
 !   ***********************************************************************************************
-!   ¼ÆËã½ÚµãÁ¦
+!   ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½
     forceNode(1:nND,1:3)=0.0d0
-    do	iEL=1,nEL       
+    do    iEL=1,nEL       
         i  = ele(iEL,1)
         j  = ele(iEL,2)
         k  = ele(iEL,3)
@@ -449,27 +448,26 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
 
     extful(1:nND,1:3) = forceNode(1:nND,1:3)
     extful(1:nND,4:6) = 0.0d0
-	END SUBROUTINE
+    END SUBROUTINE
 
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   Ò»Î¬deltaº¯Êý
-!	copyright@ RuNanHua 
-!	°æÈ¨ËùÓÐ£¬»ªÈçÄÏ£¨ÖÐ¹ú¿Æ´ó½ü´úÁ¦Ñ§Ïµ£©
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	FUNCTION Phi(x)
-	IMPLICIT NONE
-	real(8)::Phi,x,r
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    one dimensional delta function
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    FUNCTION Phi(x)
+    IMPLICIT NONE
+    real(8)::Phi,x,r
 
-	r=dabs(x)
+    r=dabs(x)
 
-	if(r<1.0d0)then
-		Phi=(3.0-2.0*r+dsqrt(1.0+4.0*r-4.0*r*r))/8.0
-	elseif(r<2.0d0)then
-		Phi=(5.0-2.0*r-dsqrt(-7.0+12.0*r-4.0*r*r))/8.0
-	else
-		Phi=0.0d0
-	endif
+    if(r<1.0d0)then
+        Phi=(3.0-2.0*r+dsqrt(1.0+4.0*r-4.0*r*r))/8.0
+    elseif(r<2.0d0)then
+        Phi=(5.0-2.0*r-dsqrt(-7.0+12.0*r-4.0*r*r))/8.0
+    else
+        Phi=0.0d0
+    endif
 
-	ENDFUNCTION
+    ENDFUNCTION

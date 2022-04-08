@@ -1,16 +1,15 @@
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	读取模拟控制参数
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系） 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE redFile()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    read flow parameters
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE read_file()
     USE simParam
     implicit none
     integer:: i
     open(unit=111,file='inFlow.dat') 
     read(111,*)     !======================================
     read(111,*)     npsize
-	read(111,*)     isRelease
+    read(111,*)     isRelease
     read(111,*)     isConCmpt,  iCollidModel
     read(111,*)     iFlapRef ,  iKB
     read(111,*)     timeSimTotl,timeOutTemp
@@ -20,7 +19,7 @@
     read(111,*)     !======================================
     read(111,*)     uuuIn(1:3)
     read(111,*)     denIn     
-    read(111,*)     Re	         
+    read(111,*)     Re             
     read(111,*)     !======================================
     read(111,*)     LBmeshName
     read(111,*)     dt    
@@ -38,11 +37,11 @@
     if(iKB==0) read(111,*)     EmR, tcR  
     if(iKB==1) read(111,*)     KB,    KS
     read(111,*)     !======================================
-	read(111,*)     numsubstep
+    read(111,*)     numsubstep
     read(111,*)     dampK,dampM
-	read(111,*)     NewmarkGamma,NewmarkBeta
-	read(111,*)     alphaf,alpham,alphap
-	read(111,*)     dtolFEM,ntolFEM  
+    read(111,*)     NewmarkGamma,NewmarkBeta
+    read(111,*)     alphaf,alpham,alphap
+    read(111,*)     dtolFEM,ntolFEM  
     read(111,*)     !======================================
     read(111,*)     Freq,   St
     read(111,*)     XYZo(1:3)
@@ -79,18 +78,17 @@
     close(111)
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	分配流体部分数据内存空间
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE memFlow()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    allocate memory for fluid simulation
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE allocate_fluid_memory()
     USE simParam
     implicit none
     integer,parameter::idFile=111
     integer:: x,y,z,temp
      
-!   读入初始网格**********************************************************************************
+!   read initial grid**********************************************************************************
     open(unit=idFile,file=trim(adjustl(LBmeshName)))
     read(idFile,*)xDim
     allocate(xGrid0(xDim),xGrid(xDim),dx(xDim))
@@ -109,12 +107,12 @@
     enddo
     close(idFile)
 
-!   分配流体内存**********************************************************************************
+!   allocate fluid memory**********************************************************************************
     allocate(fIn(zDim,yDim,xDim,0:18),fInTemp(zDim,yDim,xDim))
     allocate(uuu(zDim,yDim,xDim,1:3),force(zDim,yDim,xDim,1:3))
     allocate(den(zDim,yDim,xDim),prs(zDim,yDim,xDim),image(zDim,yDim,xDim))
 
-!   计算网格尺度**********************************************************************************    
+!   calculate grid size**********************************************************************************    
     dx(1)=dabs(xGrid0(2)-xGrid0(1))
     do  x=2,xDim-1
         dx(x)=dabs(0.5*(xGrid0(x)+xGrid0(x+1))-0.5*(xGrid0(x-1)+xGrid0(x)))
@@ -169,12 +167,11 @@
     dh=dxmin
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	分配固体部分数据内存空间
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系） 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE memBody()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Allocate memory for solid simulation
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE allocate_solid_memory()
     USE simParam
     implicit none
     integer:: iND
@@ -197,17 +194,17 @@
     allocate( triad_n1(3,3,nEL),triad_n2(3,3,nEL),triad_n3(3,3,nEL) ) 
             
 !   ===============================================================================================     
-    call readdt(jBC,ele,nloc,nprof,nprof2,xyzful00,prop,nND,nEL,nEQ,nMT,nBD,nSTF,idat)
+    call read_structural_datafile(jBC,ele,nloc,nprof,nprof2,xyzful00,prop,nND,nEL,nEQ,nMT,nBD,nSTF,idat)
     close(idat)
-!	===============================================================================================
-    !计算面积
+!    ===============================================================================================
+    !calculate area
     call cptArea(areaElem00,nND,nEL,ele,xyzful00)
     Asfac=sum(areaElem00(:))
     elmax=maxval(areaElem00(:))
     elmin=minval(areaElem00(:))
     streI(1:nND)=0.0d0
     bendO(1:nND)=0.0d0
-    !计算展向、弦向长度、 展弦比
+    !calculate spanwise length, chord length, aspect ratio
 !    if(iChordDirection==1)then      
 !        Lchod   = maxval(xyzful00(:,1))-minval(xyzful00(:,1))
 !        Lspan   = maxval(xyzful00(:,2))-minval(xyzful00(:,2))
@@ -224,13 +221,13 @@
     Lspan=1.0d0
     AR     = Lspan**2/Asfac
 
-    !计算中心位置，中心节点
+    !calculate central position, central node
     xCT=sum(xyzful00(:,1))/nND
     yCT=sum(xyzful00(:,2))/nND
     zCT=sum(xyzful00(:,3))/nND
 
 
-    !计算前缘中心节点，后援三个节点，及离中心最近的节点
+    !calculate leading-edge central node, three trailing nodes, the nearest neighbouring node
     xl=minval(xyzful00(:,1))
     xr=maxval(xyzful00(:,1))
     yl=minval(xyzful00(:,2))
@@ -309,64 +306,62 @@
         NDhd(3)=400
     endif
 
-!   加载给定边界类型*******************************************************************************
-    do	iND=1,nND
+!   loading boundary type*******************************************************************************
+    do    iND=1,nND
         if(jBC(iND,1)==1)jBC(iND,1:6)=isMotionGiven(1:6)
     enddo
 
     END SUBROUTINE 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	初始化流场
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE intFlow()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    initialize flow field
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE initialize_flow()
     USE simParam
     implicit none
     real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
-	integer:: x, y, z
+    integer:: x, y, z
 
-!   网格坐标***************************************************************************************	 	
+!   grid coordinate***************************************************************************************         
     xGrid(1:xDim)=xGrid0(1:xDim)
     yGrid(1:yDim)=yGrid0(1:yDim)
     zGrid(1:zDim)=zGrid0(1:zDim)
-!   宏观变量***************************************************************************************	
+!   macro quantities***************************************************************************************    
     uuu(1:zDim,1:yDim,1:xDim,1) = uuuIn(1)
     uuu(1:zDim,1:yDim,1:xDim,2) = uuuIn(2)
-	uuu(1:zDim,1:yDim,1:xDim,3) = uuuIn(3)
+    uuu(1:zDim,1:yDim,1:xDim,3) = uuuIn(3)
     den(1:zDim,1:yDim,1:xDim)   = denIn
     prs(1:zDim,1:yDim,1:xDim)   = Cs2*(den(1:zDim,1:yDim,1:xDim)-denIn)
-!   初始扰动***************************************************************************************
+!   initial disturbance***************************************************************************************
     call initDisturb()
-!   分布函数***************************************************************************************
+!   distribution function***************************************************************************************
     do  x = 1, xDim
-	do  y = 1, yDim
-	do  z = 1, zDim
+    do  y = 1, yDim
+    do  z = 1, zDim
         uSqr       = sum(uuu(z,y,x,1:3)**2)
-	    uxyz(0:lbmDim) = uuu(z,y,x,1) * ee(0:lbmDim,1) + uuu(z,y,x,2) * ee(0:lbmDim,2)+uuu(z,y,x,3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuu(z,y,x,1) * ee(0:lbmDim,1) + uuu(z,y,x,2) * ee(0:lbmDim,2)+uuu(z,y,x,3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)= wt(0:lbmDim) * den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
     enddo
     enddo
     enddo
-!   网格类型***************************************************************************************
+!   grid type***************************************************************************************
     image(1:zDim,1:yDim,1:xDim)  = fluid
     image(1:zDim,1:yDim,1     )  = xMinBC
     image(1:zDim,1:yDim,xDim  )  = xMaxBC
     image(1:zDim,     1,1:xDim)  = yMinBC   
     image(1:zDim,  yDim,1:xDim)  = yMaxBC
-	image(1     ,1:yDim,1:xDim)  = zMinBC
+    image(1     ,1:yDim,1:xDim)  = zMinBC
     image(zDim  ,1:yDim,1:xDim)  = zMaxBC
    
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	初始化固体结构
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE intBody()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    initialize solid field
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE initialize_solid()
     USE simParam
     implicit none
     integer:: iND
@@ -388,7 +383,7 @@
 
     xyzful(1:nND,1:6)=xyzful0(1:nND,1:6)     
     velful(1:nND,1:6)=0.0
-        	    
+                
     dspful(1:nND,1:6)=0.0
     accful(1:nND,1:6)=0.0
 
@@ -403,57 +398,56 @@
 
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	根据无量纲参数，设置有量纲的参数
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE cptPara()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    calculate Bolztman parameters from flow parameters
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE calculate_LB_params()
     USE simParam
     implicit none
     integer:: nt
-!   角度变弧度
+!   angle to radian
     AoAo(1:3)   = AoAo(1:3)/180.0*pi
     AoAAmpl(1:3)= AoAAmpl(1:3)/180.0*pi
     AoAPhi(1:3) = AoAPhi(1:3)/180.0*pi
-!   取参考量：长度、速度、时间   
-    Lref	= Lchod
-    if(maxval(dabs(uuuIn(1:3)))>0.0001d0)then !有来流
-        Uref	= maxval(dabs(uuuIn(1:3)))        
+!   reference values: length, velocity, time
+    Lref    = Lchod
+    if(maxval(dabs(uuuIn(1:3)))>0.0001d0)then !with incoming flow
+        Uref    = maxval(dabs(uuuIn(1:3)))        
         if    (MAXVAL(dabs(xyzAmpl(1:3)))>0.0001d0)then
             !Freq    = St*Uref/(2.0*MAXVAL(dabs(xyzAmpl(1:3))))
-            Tref	= 1.0d0/Freq
+            Tref    = 1.0d0/Freq
             St      =  2.0*MAXVAL(dabs(xyzAmpl(1:3)))*Freq/maxval(dabs(uuuIn(1:3))) ! St=2fA/U
-            if(iFlapRef==1) Uref	= Lref*Freq           
+            if(iFlapRef==1) Uref    = Lref*Freq           
         elseif(dabs(MAXVAL(AoAAmpl(1:3)))>0.0001d0)then
-            Tref	= 1.0d0/Freq            
+            Tref    = 1.0d0/Freq            
         else
-            Tref	= Lref/Uref            
+            Tref    = Lref/Uref            
         endif
         g(1:3)=Frod(1:3)*Uref**2/Lref
-    else                                    !无来流        
+    else                                    !without incoming flow
         if    (MAXVAL(dabs(xyzAmpl(1:3)))>0.0001d0)then !heaving 
-        !Uref    = 2.0*pi*MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !最大速度
-        !Uref    = 4.0*   MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !平均速度
-        !Uref    =        MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !平均速度
+        !Uref    = 2.0*pi*MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !maximum velocity
+        !Uref    = 4.0*   MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !mean velocity
+        !Uref    =        MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !mean velocity
         Uref    = Lref*Freq
-        Tref	= 1.0d0/Freq
+        Tref    = 1.0d0/Freq
         St      = 1000.0
         g(1:3)=Frod(1:3)*Uref**2/Lref       
         elseif(MAXVAL(dabs(AoAAmpl(1:3)))>0.0001d0)then !picthing
-        !Uref = 2.0*pi*MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !最大速度
-        Uref  = 4.0*   MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !平均速度
-        !Uref    =     MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !平均速度
-        Tref	= 1.0d0/Freq
+        !Uref = 2.0*pi*MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !maximum velocity
+        Uref  = 4.0*   MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !mean velocity
+        !Uref    =     MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !mean velocity
+        Tref    = 1.0d0/Freq
         St      = 1000.0
         g(1:3)=Frod(1:3)*Uref**2/Lref 
         elseif(maxval(dabs(Frod(1:3)))>0.0001d0)then    !gravity
             Uref=maxval(dabs(Frod(1:3)))
             g(1:3)=(Frod(1:3))**2/(Lref*denR)
-			if(Frod(1)<0.000001d0) g(1)=-g(1)
-			if(Frod(2)<0.000001d0) g(2)=-g(2)
-			if(Frod(3)<0.000001d0) g(3)=-g(3)
-            Tref	= Lref/Uref
+            if(Frod(1)<0.000001d0) g(1)=-g(1)
+            if(Frod(2)<0.000001d0) g(2)=-g(2)
+            if(Frod(3)<0.000001d0) g(3)=-g(3)
+            Tref    = Lref/Uref
         else
             stop 'no flow/moving body/gravity'
         endif
@@ -463,7 +457,7 @@
     2.0*pi*MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq])
     
     
-!   计算粘性 、LBM松弛时间
+!   calculate viscosity, LBM relexation time
     ratio  =  dt/dh
     if(ratio>1.0d0+eps)then
         write(*,*)'dt >  dhmin !!!!!!!!!!'
@@ -471,13 +465,13 @@
         stop
     endif
     
-    !均匀网格且对流长度等于网格长度
+    !for uniform grid, advection length equals grid size
     if(dabs(dt/dh-1.0d0)<eps .and. dabs(dxmax/dh-1.0d0)<eps .and.  dabs(dymax/dh-1.0d0)<eps .and.  dabs(dzmax/dh-1.0d0)<eps)then 
         iStreamModel=1
-		write(*,*)'    uniform grid,STLBM'
+        write(*,*)'    uniform grid,STLBM'
     else
         iStreamModel=2
-	    write(*,*)'non-uniform grid,ISLBM'
+        write(*,*)'non-uniform grid,ISLBM'
     endif
 
 
@@ -485,15 +479,14 @@
     Cs2   =  (1/dsqrt(3.0d0))**2
     nu    =  Uref * Lref/ Re
     Mu    =  nu*denIn
-	tau   =  nu/(dt*Cs2)+0.5d0
+    tau   =  nu/(dt*Cs2)+0.5d0
     Omega =  1.0d0 / tau
-	
-	Aref=Uref/Tref
+    
+    Aref=Uref/Tref
     Fref=0.5*denIn*Uref**2*Asfac
     Eref=denIn*Uref**2*Lref**2*Lref
-    Pref=denIn*Uref**2*Lref**2*Uref  
-!   计算材料参数
-    !计算材料参数
+    Pref=denIn*Uref**2*Lref**2*Uref
+    !calculate material parameters
     nt=ele(1,4)  
     if(iKB==0)then
         prop(1:nMT,1) = EmR*denIn*Uref**2
@@ -528,18 +521,17 @@
         endif
         EmR = prop(nMT,1)/(denIn*Uref**2) 
         tcR = prop(nMT,3)/Lref
-		Lthck=prop(nMT,3)
+        Lthck=prop(nMT,3)
     endif
 
 
     END SUBROUTINE
      
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	计算多松弛碰撞模型的碰撞参数
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE cptMRTM()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    calculate multiple relexasion time model parameters
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE calculate_MRTM_params()
     USE simParam
     implicit none
 !   ===============================================================================================
@@ -547,9 +539,9 @@
     real(8):: M_MRT(0:lbmDim,0:lbmDim),M_MRTI(0:lbmDim,0:lbmDim),M(0:lbmDim,0:lbmDim)  
     real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)   
 !   ======================================================= 
-!   计算MRT变换矩阵
-    DO	I=0,lbmDim
-		M_MRT(0,I)=1
+!   calculate MRTM transformation matrix
+    DO    I=0,lbmDim
+        M_MRT(0,I)=1
         M_MRT(1,I)=19*SUM(ee(I,1:3)**2)-30
         M_MRT(2,I)=(21*SUM(ee(I,1:3)**2)**2-53*SUM(ee(I,1:3)**2)+24)/2.0
 
@@ -574,82 +566,72 @@
         M_MRT(16,I)=(ee(I,2)**2-ee(I,3)**2)*ee(I,1)
         M_MRT(17,I)=(ee(I,3)**2-ee(I,1)**2)*ee(I,2)
         M_MRT(18,I)=(ee(I,1)**2-ee(I,2)**2)*ee(I,3)
-	ENDDO
-!   计算MRT逆变换矩阵
-    M_MRTI=TRANSPOSE(M_MRT)	
+    ENDDO
+!   calculate the inverse matrix
+    M_MRTI=TRANSPOSE(M_MRT)    
     M=MATMUL(M_MRT,M_MRTI)   
-    DO	I=0,lbmDim
+    DO    I=0,lbmDim
         M_MRTI(0:lbmDim,I)=M_MRTI(0:lbmDim,I)/M(I,I)
     ENDDO
 
 !   ----------------------------------------------------------
-    !S(0:lbmDim)=Omega ! 如果S全设置成Omega，恢复SRT
+    !S(0:lbmDim)=Omega ! restore to SRT if S is Omega
     !              0   1  2  3  4  5  6  7  8  9     10  11    12  13    14    15    16  17  18
     S(0:lbmDim)=[  s0,s1,s2,s0,s4,s0,s4,s0,s4,Omega,s10,Omega,s10,Omega,Omega,Omega,s16,s16,s16]
-	!=====================
-!   计算MRT碰撞矩阵
+    !=====================
+!   calculate MRTM collision matrix
     !IM*S*M
-	S_D(0:lbmDim,0:lbmDim)=0.0D0
-	DO	i=0,lbmDim
-		S_D(i,i)=S(i)
-	ENDDO	
-	M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
-	!=====================
-!   计算MRT体力矩阵
-	!IM*(I-0.5D0*S)*M=I-0.5*IM*S*M
-	S_D(0:lbmDim,0:lbmDim)=0.0D0
-	DO	i=0,lbmDim
-		S_D(i,i)=1.0d0
-	ENDDO
-	M_FORCE=S_D-0.5*M_COLLID
+    S_D(0:lbmDim,0:lbmDim)=0.0D0
+    DO    i=0,lbmDim
+        S_D(i,i)=S(i)
+    ENDDO    
+    M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
+    !=====================
+!   calculate MRTM body-force matrix
+    !IM*(I-0.5D0*S)*M=I-0.5*IM*S*M
+    S_D(0:lbmDim,0:lbmDim)=0.0D0
+    DO    i=0,lbmDim
+        S_D(i,i)=1.0d0
+    ENDDO
+    M_FORCE=S_D-0.5*M_COLLID
 
     END SUBROUTINE
 
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	write temp data for continue computation
-!   写续算文件
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	SUBROUTINE wrtCont()
-	USE simParam
-	IMPLICIT NONE
-	open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write check point file for restarting simulation
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE write_checkpoint_file()
+    USE simParam
+    IMPLICIT NONE
+    open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
     write(13) step,time
     write(13) fIn,xGrid,yGrid,zGrid,image
     write(13) IXref,IYref,IZref,NDref 
     write(13) xyzful0,xyzful,xyzfulIB,dspful,velful,accful,extful,mss,mssful,grav
     write(13) triad_nn,triad_ee,triad_e0
     write(13) triad_n1,triad_n2,triad_n3
-	write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew 
+    write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew 
     close(13)
-	ENDSUBROUTINE
+    ENDSUBROUTINE
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	read temp data for continue computation      
-!   读续算文件
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	SUBROUTINE redCont()
-	USE simParam
-	IMPLICIT NONE
-	open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    read check point file for restarting simulation
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE read_checkpoint_file()
+    USE simParam
+    IMPLICIT NONE
+    open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
     read(13) step,time 
     read(13) fIn,xGrid,yGrid,zGrid,image
     read(13) IXref,IYref,IZref,NDref  
     read(13) xyzful0,xyzful,xyzfulIB,dspful,velful,accful,extful,mss,mssful,grav
     read(13) triad_nn,triad_ee,triad_e0
     read(13) triad_n1,triad_n2,triad_n3
-	read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew 
+    read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew 
     close(13)
-	ENDSUBROUTINE
-
-
-
-
-
-
+    ENDSUBROUTINE

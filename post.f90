@@ -1,33 +1,32 @@
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-!	写流场文件，tecplot 二进制格式 
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）        
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!    write field, tecplot binary format
+!    copyright@ RuNanHua       
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE wrtFlow(isT)
+    SUBROUTINE write_flow_field(isT)
     USE simParam
     implicit none
     integer:: x,y,z,i,isT
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName
-	!==================================================================================================		
-	integer::	nv
+    !==================================================================================================        
+    integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=7 
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",	&
+    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=['x','y','z','p','u','v','w']  
 
     write(fileName,'(F10.5)') time/Tref
     fileName = adjustr(fileName)
-	do  i=1,nameLen
-		if(fileName(i:i)==' ')fileName(i:i)='0'
-	enddo
+    do  i=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    enddo
     if(isT==0)then
         open(idfile,file='./DatFlow/Flow.plt',form='BINARY')
     else
         open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='BINARY')
     endif
-	
-	
+    
+    
 !   =============================================================================================
     write(idfile) "#!TDV101"    
     write(idfile) 1
@@ -38,151 +37,151 @@
         call dumpstring(varname(nv),idfile)
     enddo
 !   ===============================================================================================
-	write(idfile) ZONEMARKER	 		 
-	call dumpstring(zonename,idfile)
-	write(idfile) -1,0,1,0,0,zDim-2*numOutput,ydim-2*numOutput,xDim-2*numOutput,0
+    write(idfile) ZONEMARKER              
+    call dumpstring(zonename,idfile)
+    write(idfile) -1,0,1,0,0,zDim-2*numOutput,ydim-2*numOutput,xDim-2*numOutput,0
 
-	write(idfile) ZONEMARKER	 		 
-	call dumpstring(zonename,idfile)
-	write(idfile) -1,2,1,0,0,nND,nEL,0,0,0,0
+    write(idfile) ZONEMARKER              
+    call dumpstring(zonename,idfile)
+    write(idfile) -1,2,1,0,0,nND,nEL,0,0,0,0
 
     write(idfile) EOHMARKER
 
-	write(idfile) ZONEMARKER
-!	variable data format, 1=Float, 2=Double, 3=LongInt, 4=ShortInt, 5=Byte, 6=Bit
+    write(idfile) ZONEMARKER
+!    variable data format, 1=Float, 2=Double, 3=LongInt, 4=ShortInt, 5=Byte, 6=Bit
     do  nv=1,numVar
-		write(idfile) 1                                 
-	enddo
-	write(idfile) 0,-1
+        write(idfile) 1                                 
+    enddo
+    write(idfile) 0,-1
     
     if(isMoveGrid==1 .and. (isMoveOutputX==1 .or. isMoveOutputY==1 .or. isMoveOutputZ==1))then 
 
         if    ((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput
-			write(idfile)real((xGrid(x)-xyzful(NDref,1))/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-					 real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput
+            write(idfile)real((xGrid(x)-xyzful(NDref,1))/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                     real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
         elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput
-			write(idfile)real(xGrid(x)/Lref),real((yGrid(y)-xyzful(NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-					 real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput
+            write(idfile)real(xGrid(x)/Lref),real((yGrid(y)-xyzful(NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                     real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
         elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput
-			write(idfile)real(xGrid(x)/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-					 real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
-		elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput
-			write(idfile)real((xGrid(x)-xyzful(NDref,1))/Lref),real((yGrid(y)-xyzful(NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-					 real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
-		elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput
-			write(idfile)real((xGrid(x)-xyzful(NDref,1))/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-					 real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
-		elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput
-			write(idfile)real(xGrid(x)/Lref),real((yGrid(y)-xyzful(NDref,2))/Lref),real((zGrid(z)-xyzful(NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-					 real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput
+            write(idfile)real(xGrid(x)/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                     real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
+        elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput
+            write(idfile)real((xGrid(x)-xyzful(NDref,1))/Lref),real((yGrid(y)-xyzful(NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                     real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
+        elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput
+            write(idfile)real((xGrid(x)-xyzful(NDref,1))/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                     real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
+        elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput
+            write(idfile)real(xGrid(x)/Lref),real((yGrid(y)-xyzful(NDref,2))/Lref),real((zGrid(z)-xyzful(NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                     real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
         else
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput      
-			write(idfile)real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-						real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput      
+            write(idfile)real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                        real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
         endif
 
     else
-			do	x=1+numOutput, xDim-numOutput
-			do	y=1+numOutput, yDim-numOutput
-			do	z=1+numOutput, zDim-numOutput
-			write(idfile)real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),	&
-						real(uuu(z,y,x,1:3)/Uref)
-			enddo
-			enddo
-			enddo
+            do    x=1+numOutput, xDim-numOutput
+            do    y=1+numOutput, yDim-numOutput
+            do    z=1+numOutput, zDim-numOutput
+            write(idfile)real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),    &
+                        real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
     endif
 
-	write(idfile) ZONEMARKER
+    write(idfile) ZONEMARKER
     do  nv=1,numVar
-		write(idfile) 1                                 
-	enddo
-	write(idfile) 0,-1
+        write(idfile) 1                                 
+    enddo
+    write(idfile) 0,-1
     if(isMoveGrid==1 .and. (isMoveOutputX==1 .or. isMoveOutputY==1 .or. isMoveOutputZ==1)) then
-	    
+        
             if    ((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ/=1 .and. isMoveOutputZ/=1))then
-				do	i=1,nND
-				write(idfile)   real((xyzful(i,1)-xyzful(NDref,1))/Lref),real(xyzful(i,2)/Lref),real(xyzful(i,3)/Lref),real(0.0), &
+                do    i=1,nND
+                write(idfile)   real((xyzful(i,1)-xyzful(NDref,1))/Lref),real(xyzful(i,2)/Lref),real(xyzful(i,3)/Lref),real(0.0), &
                             real(velful(i,1:3)/Uref)
-				enddo
+                enddo
             elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1 .and. isMoveOutputZ/=1))then
-				do	i=1,nND
-				write(idfile)   real(xyzful(i,1)/Lref),real((xyzful(i,2)-xyzful(NDref,2))/Lref),real(xyzful(i,3)/Lref),real(0.0), &
+                do    i=1,nND
+                write(idfile)   real(xyzful(i,1)/Lref),real((xyzful(i,2)-xyzful(NDref,2))/Lref),real(xyzful(i,3)/Lref),real(0.0), &
                             real(velful(i,1:3)/Uref)
-				enddo
+                enddo
             elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
-				do	i=1,nND
-				write(idfile)   real(xyzful(i,1)/Lref),real(xyzful(i,2)/Lref),real((xyzful(i,3)-xyzful(NDref,3))/Lref),real(0.0), &
+                do    i=1,nND
+                write(idfile)   real(xyzful(i,1)/Lref),real(xyzful(i,2)/Lref),real((xyzful(i,3)-xyzful(NDref,3))/Lref),real(0.0), &
                             real(velful(i,1:3)/Uref)
-				enddo
-			elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1 .and. isMoveOutputZ/=1))then
-				do	i=1,nND
-				write(idfile)   real((xyzful(i,1)-xyzful(NDref,1))/Lref),real((xyzful(i,2)-xyzful(NDref,2))/Lref),real(xyzful(i,3)/Lref),real(0.0), &
+                enddo
+            elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1 .and. isMoveOutputZ/=1))then
+                do    i=1,nND
+                write(idfile)   real((xyzful(i,1)-xyzful(NDref,1))/Lref),real((xyzful(i,2)-xyzful(NDref,2))/Lref),real(xyzful(i,3)/Lref),real(0.0), &
                             real(velful(i,1:3)/Uref)
-				enddo
-			elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
-				do	i=1,nND
-				write(idfile)   real((xyzful(i,1)-xyzful(NDref,1))/Lref),real(xyzful(i,2)/Lref),real((xyzful(i,3)-xyzful(NDref,3))/Lref),real(0.0), &
+                enddo
+            elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
+                do    i=1,nND
+                write(idfile)   real((xyzful(i,1)-xyzful(NDref,1))/Lref),real(xyzful(i,2)/Lref),real((xyzful(i,3)-xyzful(NDref,3))/Lref),real(0.0), &
                             real(velful(i,1:3)/Uref)
-				enddo
-			elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
-				do	i=1,nND
-				write(idfile)   real(xyzful(i,1)/Lref),real((xyzful(i,2)-xyzful(NDref,2))/Lref),real((xyzful(i,3)-xyzful(NDref,3))/Lref),real(0.0), &
+                enddo
+            elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
+                do    i=1,nND
+                write(idfile)   real(xyzful(i,1)/Lref),real((xyzful(i,2)-xyzful(NDref,2))/Lref),real((xyzful(i,3)-xyzful(NDref,3))/Lref),real(0.0), &
                             real(velful(i,1:3)/Uref)
-				enddo
+                enddo
             else
-				do	i=1,nND
-				write(idfile)   real(xyzful(i,1:3)/Lref),real(0.0),real(velful(i,1:3)/Uref)                           
-				enddo
+                do    i=1,nND
+                write(idfile)   real(xyzful(i,1:3)/Lref),real(0.0),real(velful(i,1:3)/Uref)                           
+                enddo
             endif                         
 
     else
-			do	i=1,nND
+            do    i=1,nND
             write(idfile)   real(xyzful(i,1:3)/Lref),real(0.0),real(velful(i,1:3)/Uref)                           
-			enddo
+            enddo
     endif
 
-    do	i=1,nEL
+    do    i=1,nEL
         write(idfile) ele(i,1),ele(i,2),ele(i,3)
     enddo
     close(idfile)
@@ -190,12 +189,11 @@
 
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	写固体结构文件，tecplot 二进制格式
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
-    SUBROUTINE wrtBody(xyzful,velful,accful,extful,ele,time,nND,nEL,isIB)
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write structure field, tecplot binary format
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,ele,time,nND,nEL,isIB)
     implicit none
     integer:: nND,nEL,isIB
     real(8):: xyzful(nND,6),velful(nND,6),accful(nND,6),extful(1:nND,1:6) !,streI(1:nND),bendO(1:nND)
@@ -206,19 +204,19 @@
     integer:: i,j,ireduc
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName
-	!==================================================================================================		
-	integer::	nv
+    !==================================================================================================        
+    integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=12
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",	&
-						varname(numVar)=['x','y','z','u','v','w','ax','ay','az','fx','fy','fz'] 
-	!==================================================================================================
+    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
+                        varname(numVar)=['x','y','z','u','v','w','ax','ay','az','fx','fy','fz'] 
+    !==================================================================================================
 
     write(fileName,'(F10.5)') time
     fileName = adjustr(fileName)
-	DO  I=1,nameLen
-		if(fileName(i:i)==' ')fileName(i:i)='0'
-	END DO
+    DO  I=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    END DO
 
     if(isIB==0)then
         OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='BINARY')
@@ -228,7 +226,7 @@
     endif
 
 !   I. The header section.
-!   =============================================		
+!   =============================================        
     write(idfile) "#!TDV101"    
     write(idfile) 1
     call dumpstring(title,idfile)
@@ -239,36 +237,35 @@
 !   ---------------------------------------------
 !   zone head for ZONE1
 !   ---------------------------------------------
-	write(idfile) ZONEMARKER	 		 
-	call dumpstring(zonename,idfile)
-	write(idfile) -1,2,1,0,0,nND,nEL,0,0,0,0
+    write(idfile) ZONEMARKER              
+    call dumpstring(zonename,idfile)
+    write(idfile) -1,2,1,0,0,nND,nEL,0,0,0,0
 
 !   =============================================
     write(idfile) EOHMARKER
 !   =============================================
 !   II. Data section
 !   =============================================
-	write(idfile) Zonemarker
+    write(idfile) Zonemarker
     do  nv=1,numVar
-		write(idfile) 1                                 
-	enddo
-	write(idfile) 0,-1
-	do	i=1,nND
+        write(idfile) 1                                 
+    enddo
+    write(idfile) 0,-1
+    do    i=1,nND
         write(idfile)   real(xyzful(i,1:3)),real(velful(i,1:3)),real(accful(i,1:3)),real(extful(i,1:3)) !,real(streI(i)),real(bendO(i))                                                  
     enddo
-    do	i=1,nEL
+    do    i=1,nEL
         write(idfile) ele(i,1),ele(i,2),ele(i,3)
     enddo
     close(idfile)
 !   =============================================
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-!	 写流场文件（取一个切片），tecplot 二进制格式
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）        
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!    write flow slice, tecplot binary
+!    copyright@ RuNanHua  
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE wrtSlic(xDim,yDim,zDim,XGrid,yGrid,zGrid,Lref,Uref,dIn,p,u,time,islic)
+    SUBROUTINE write_flow_slice(xDim,yDim,zDim,XGrid,yGrid,zGrid,Lref,Uref,dIn,p,u,time,islic)
     implicit none
     integer:: x,y,z,i,isT
     integer:: xDim,yDim,zDim,islic
@@ -276,18 +273,18 @@
     real(8):: XGrid(xDim),yGrid(yDim),zGrid(zDim),p(zDim,yDim,xDim),u(zDim,yDim,xDim,3),time
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName
-	!==================================================================================================		
-	integer::	nv
+    !==================================================================================================        
+    integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=7 
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",	&
+    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=['x','y','z','p','u','v','w']  
 
     write(fileName,'(F10.5)') time
     fileName = adjustr(fileName)
-	do  i=1,nameLen
-		if(fileName(i:i)==' ')fileName(i:i)='0'
-	enddo
+    do  i=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    enddo
     if    (islic==1)then    !yz plane
         open(idfile,file='./DatOthe/SlcX'//trim(fileName)//'.plt') !,form='BINARY')
         write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
@@ -326,25 +323,24 @@
     
 
     END SUBROUTINE
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）  
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE wrtImag()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE write_image()
     USE simParam
     implicit none
     integer:: x,y,z
     !==================================================================================================
-    integer:: iimage		
-	integer:: nv
+    integer:: iimage        
+    integer:: nv
     integer,parameter:: namLen=40,idfile=100,numVar=4
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",	&
-						varname(numVar)=['x','y','z','image'] 
-	!==================================================================================================
+    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
+                        varname(numVar)=['x','y','z','image'] 
+    !==================================================================================================
 !   =============================================================================================
-    open(idfile,file='./DatOthe/Image.plt',form='BINARY')		
+    open(idfile,file='./DatOthe/Image.plt',form='BINARY')        
 !   =============================================================================================
     write(idfile) "#!TDV101"    
     write(idfile) 1
@@ -354,60 +350,59 @@
         call dumpstring(varname(nv),idfile)
     enddo
 !   ===============================================================================================
-	write(idfile) ZONEMARKER	 		 
-	call dumpstring(zonename,idfile)
-	write(idfile) -1,0,1,0,0,zDim,ydim,xDim,0
+    write(idfile) ZONEMARKER              
+    call dumpstring(zonename,idfile)
+    write(idfile) -1,0,1,0,0,zDim,ydim,xDim,0
 !   =============================================
     write(idfile) EOHMARKER
-	write(idfile) ZONEMARKER
+    write(idfile) ZONEMARKER
     do  nv=1,numVar
-		write(idfile) 1                                 
-	enddo
-	write(idfile) 0,-1
-	do	x=1, xDim
-	do	y=1, yDim
-	do	z=1, zDim
-		write(idfile)	real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(image(z,y,x))
-	enddo
-	enddo
-	enddo
+        write(idfile) 1                                 
+    enddo
+    write(idfile) 0,-1
+    do    x=1, xDim
+    do    y=1, yDim
+    do    z=1, zDim
+        write(idfile)    real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(image(z,y,x))
+    enddo
+    enddo
+    enddo
     close(idfile)
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	输出参数，为了检查
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE  wrtPara()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write parameters for checking
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE  write_params()
     USE simParam
     implicit none
     integer:: iMT,i
-	integer,parameter::nameLen=10
+    integer,parameter::nameLen=10
     character (LEN=nameLen):: fileNameR,fileNameM,fileNameS,fileNameK
-	write(fileNameR,'(F10.5)') Re
-	write(fileNameM,'(F10.5)') DenR
-	write(fileNameK,'(F10.5)') KB
-	write(fileNameS,'(F10.5)') KS
+    write(fileNameR,'(F10.5)') Re
+    write(fileNameM,'(F10.5)') DenR
+    write(fileNameK,'(F10.5)') KB
+    write(fileNameS,'(F10.5)') KS
 
     fileNameR = adjustr(fileNameR)
-	do  i=1,nameLen
-		if(fileNameR(i:i)==' ')fileNameR(i:i)='0'
-	enddo
-	fileNameM = adjustr(fileNameM)
-	do  i=1,nameLen
-		if(fileNameM(i:i)==' ')fileNameM(i:i)='0'
-	enddo
-	fileNameS = adjustr(fileNameS)
-	do  i=1,nameLen
-		if(fileNameS(i:i)==' ')fileNameS(i:i)='0'
-	enddo
-	fileNameK = adjustr(fileNameK)
-	do  i=1,nameLen
-		if(fileNameK(i:i)==' ')fileNameK(i:i)='0'
-	enddo
-	open(111,file='./R'//trim(fileNameR)//'M'//trim(fileNameM)//'S'//trim(fileNameS)//'K'//trim(fileNameK))
-	close(111)
+    do  i=1,nameLen
+        if(fileNameR(i:i)==' ')fileNameR(i:i)='0'
+    enddo
+    fileNameM = adjustr(fileNameM)
+    do  i=1,nameLen
+        if(fileNameM(i:i)==' ')fileNameM(i:i)='0'
+    enddo
+    fileNameS = adjustr(fileNameS)
+    do  i=1,nameLen
+        if(fileNameS(i:i)==' ')fileNameS(i:i)='0'
+    enddo
+    fileNameK = adjustr(fileNameK)
+    do  i=1,nameLen
+        if(fileNameK(i:i)==' ')fileNameK(i:i)='0'
+    enddo
+    open(111,file='./R'//trim(fileNameR)//'M'//trim(fileNameM)//'S'//trim(fileNameS)//'K'//trim(fileNameK))
+    close(111)
 
         open(111,file='./Check.dat')
         write(111,'(A      )')'===================================='
@@ -441,8 +436,8 @@
         write(111,'(A,F20.10)')'Re   =',Re  
         write(111,'(A,F20.10)')'KB   =',KB
         write(111,'(A,F20.10)')'KS   =',KS
-		write(111,'(A,F20.10)')'EmR  =',EmR
-		write(111,'(A,F20.10)')'tcR  =',tcR        
+        write(111,'(A,F20.10)')'EmR  =',EmR
+        write(111,'(A,F20.10)')'tcR  =',tcR        
         write(111,'(A,F20.10)')'denR =',denR
         write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3)))
         write(111,'(A,F20.10)')'AR   =',AR
@@ -455,10 +450,10 @@
         write(111,'(A,F20.10)')'Lref =',Lref
         write(111,'(A,F20.10)')'Uref =',Uref
         write(111,'(A,F20.10)')'Tref =',Tref
-		write(111,'(A,F20.10)')'Pref =',Pref
-		write(111,'(A,F20.10)')'Eref =',Eref
-		write(111,'(A,F20.10)')'Fref =',Fref
-		write(111,'(A,F20.10)')'Aref =',Aref
+        write(111,'(A,F20.10)')'Pref =',Pref
+        write(111,'(A,F20.10)')'Eref =',Eref
+        write(111,'(A,F20.10)')'Fref =',Fref
+        write(111,'(A,F20.10)')'Aref =',Aref
         write(111,'(A,F20.10)')'mxMa =',uMax/dsqrt(Cs2)
         write(111,'(A,F20.10)')'St   =',St
         write(111,'(A,F20.10)')'Nu   =',Nu
@@ -488,15 +483,14 @@
 
 
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   compute strain energy
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    compute strain energy
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE strain_energy_D(  strainEnergy, xord0,yord0,zord0,xord,yord,zord, &
-								 ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
+                                 ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
                                  nND,nEL,nMT &
-							   )
+                               )
     implicit none
     integer:: nMT,nEL,nND
     integer:: ele(nEL,5)
@@ -525,21 +519,21 @@
     integer:: i,j,k,n,i1,j1,k1,mat,nELt
 
 !   For each element, calculate the nodal forces
-    do	n=1,nEL
+    do    n=1,nEL
 
-		i1  = ele(n,1)
+        i1  = ele(n,1)
         j1  = ele(n,2)
         k1  = ele(n,3)        
-		nELt= ele(n,4)
+        nELt= ele(n,4)
         mat = ele(n,5)
-        if	( nELt == 2) then
+        if    ( nELt == 2) then
 !           frame
             e0  =prop(mat,1)
             g0  =prop(mat,2)
             a0  =prop(mat,3)
             r0  =prop(mat,4)
             b0  =prop(mat,5)
-			zix0=prop(mat,6)
+            zix0=prop(mat,6)
             ziy0=prop(mat,7)
             ziz0=prop(mat,8)
 
@@ -553,16 +547,16 @@
             dv = (yord(j1)-yord0(j1))-(yord(i1)-yord0(i1))
             dw = (zord(j1)-zord0(j1))-(zord(i1)-zord0(i1))
 
-			dx = dx0 + du
+            dx = dx0 + du
             dy = dy0 + dv
             dz = dz0 + dw
             xl =dsqrt(dx*dx+dy*dy+dz*dz)
 !
             dl = ( (2*dx0+du)*du +(2*dy0+dv)*dv +(2*dz0+dw)*dw )/ (xl+xl0)
 !           get twisting angles
-            do	i=1,3
-		    do	j=1,3
-			    triad_00(i,j)=triad_ee(i,j,n)
+            do    i=1,3
+            do    j=1,3
+                triad_00(i,j)=triad_ee(i,j,n)
                 triad_11(i,j)=triad_ee(i,j,n)
                 triad_22(i,j)=triad_n1(i,j,n)
             enddo
@@ -570,16 +564,16 @@
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
 !
-            do	i=1,3
-			do	j=1,3
-				triad_11(i,j)=triad_ee(i,j,n)
-				triad_22(i,j)=triad_n2(i,j,n)
+            do    i=1,3
+            do    j=1,3
+                triad_11(i,j)=triad_ee(i,j,n)
+                triad_22(i,j)=triad_n2(i,j,n)
             enddo
             enddo
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
 
-!			non-zero ty1 tz1 u2 tx2 ty2 tz2
+!            non-zero ty1 tz1 u2 tx2 ty2 tz2
             ub(1)=0.0
             ub(2)=0.0
             ub(3)=0.0
@@ -598,7 +592,7 @@
 !
 !           get current stiffness in local coords. use L0
 
-			call elmstfFRM_D(xl0,zix0,ziy0,ziz0,a0,e0,g0,ekb12,nELt )
+            call elmstfFRM_D(xl0,zix0,ziy0,ziz0,a0,e0,g0,ekb12,nELt )
 
             ekb12Strech(1:12,1:12)=0.0d0
             ekb12Strech(1,1)=ekb12(1,1)
@@ -616,7 +610,7 @@
             strainEnergy(n,1)=0.5*sum(matmul(ekb12Strech(1:12,1:12),ub(1:12))*ub(1:12))
             strainEnergy(n,2)=0.5*sum(matmul(ekb12BendTor(1:12,1:12),ub(1:12))*ub(1:12))
 
-		elseif (nELt == 3) then
+        elseif (nELt == 3) then
 !           plate
             e0=prop(mat,1)
             g0=prop(mat,2)
@@ -636,15 +630,15 @@
             xyz013(3) = zord0(k1)-zord0(i1)
 !
 !           use element triad to rotate to local x=[Rt]x
-            do	i=1,3
-			do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 rr(i,j)=triad_e0(i,j,n)
-			enddo
             enddo
-            do	i=1,3
+            enddo
+            do    i=1,3
                 xyzb012(i)=0.0
                 xyzb013(i)=0.0
-                do	k=1,3
+                do    k=1,3
                     xyzb012(i) = xyzb012(i) + rr(k,i)*xyz012(k)
                     xyzb013(i) = xyzb013(i) + rr(k,i)*xyz013(k)
                 enddo
@@ -668,16 +662,16 @@
             xyz13(3) = zord(k1)-zord0(i1)
 !
 !           use element triad to rotate to local x=[Rt]x
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 rr(i,j)=triad_ee(i,j,n)
             enddo
             enddo
-            do	i=1,3
+            do    i=1,3
                 xyzb11(i)=0.0
                 xyzb12(i)=0.0
                 xyzb13(i)=0.0
-                do	k=1,3
+                do    k=1,3
                     xyzb11(i) = xyzb11(i) + rr(k,i)*xyz11(k)
                     xyzb12(i) = xyzb12(i) + rr(k,i)*xyz12(k)
                     xyzb13(i) = xyzb13(i) + rr(k,i)*xyz13(k)
@@ -692,8 +686,8 @@
             yb3=xyzb13(2)
 
 !           get angles ref to orig from triads
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
 !2001!!!        triad_00(i,j)=triad_e0(i,j,n)
                 triad_00(i,j)=triad_ee(i,j,n)
                 triad_11(i,j)=triad_ee(i,j,n)
@@ -704,8 +698,8 @@
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
 
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 triad_11(i,j)=triad_ee(i,j,n)
                 triad_22(i,j)=triad_n2(i,j,n)
             enddo
@@ -714,8 +708,8 @@
             call get_angle_triad(triad_11,triad_22,tx,ty,tz)
             call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
 
-            do	i=1,3
-            do	j=1,3
+            do    i=1,3
+            do    j=1,3
                 triad_11(i,j)=triad_ee(i,j,n)
                 triad_22(i,j)=triad_n3(i,j,n)
             enddo
@@ -732,8 +726,8 @@
             ub(5)=ty1
             ub(6)=tz1
 
-			ub(7)=xb2-xb02
-			ub(8)=yb2-yb02
+            ub(7)=xb2-xb02
+            ub(8)=yb2-yb02
             ub(9)=0.0
             ub(10)=tx2
             ub(11)=ty2
@@ -743,29 +737,29 @@
             ub(14)=yb3-yb03
             ub(15)=0.0
             ub(16)=tx3
-			ub(17)=ty3
+            ub(17)=ty3
             ub(18)=tz3
 
 !           Calculate LOCAL stiffness, use orig coords
-!		    membrane
+!            membrane
             ekbInplane(1:18,1:18)=0.0
             alpha=zia0
             beta =zib0
             call elmstfMRT_D(e0,g0,t0,pl0,alpha,beta,xb01,xb02,xb03,yb01,yb02,yb03,ekbInplane,ek9)
 !           flexure
             ekbOutplane(1:18,1:18)=0.0
-			call elmstfDKT_D(e0,g0,t0,zip0,          xb01,xb02,xb03,yb01,yb02,yb03,ekbOutplane,ek9)
+            call elmstfDKT_D(e0,g0,t0,zip0,          xb01,xb02,xb03,yb01,yb02,yb03,ekbOutplane,ek9)
 
             ekb=ekbInplane+ekbOutplane
 
             strainEnergy(n,1)=0.5*sum(matmul(ekbInplane(1:18,1:18),ub(1:18))*ub(1:18))
             strainEnergy(n,2)=0.5*sum(matmul(ekbOutplane(1:18,1:18),ub(1:18))*ub(1:18))
-		else
+        else
             write(*,*)'not this nELt:',nELt
             stop
         endif
 
-	enddo
+    enddo
 
 
     

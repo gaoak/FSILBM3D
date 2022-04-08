@@ -1,62 +1,60 @@
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	计算宏观量：密度和速度
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）  
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE cptMacr()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Calculate macro quantities
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE calculate_macro_quantities()
     USE simParam
     implicit none
-	integer::x,y,z,ig
+    integer::x,y,z,ig
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z) 
     do  x = 1, xDim
     do  y = 1, yDim
-	do  z = 1, zDim
+    do  z = 1, zDim
         den(z,y,x  )  = SUM(fIn(z,y,x,0:lbmDim)) 
         uuu(z,y,x,1)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))/den(z,y,x)
         uuu(z,y,x,2)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))/den(z,y,x)
-	    uuu(z,y,x,3)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))/den(z,y,x)	
+        uuu(z,y,x,3)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))/den(z,y,x)    
         prs(z,y,x)   = Cs2*(den(z,y,x)-denIn)
-	enddo
+    enddo
     enddo
     enddo
     !$OMP END PARALLEL DO
     !prs(1:zDim,1:yDim,1:xDim)   = Cs2*(den(1:zDim,1:yDim,1:xDim)-denIn)
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	collision step SRT or MRT
-!   碰撞模型：单松弛或多松弛
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	SUBROUTINE collide()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    collision step SRT or MRT
+!    collision model: single relexation time or multiple relexation time
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE collision_step()
     USE simParam
     implicit none 
     real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),m(0:lbmDim),mEq(0:lbmDim),Flb(0:lbmDim)
     integer:: x,y,z
 
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb)
-    do	x = 1, xDim
-    do	y = 1, yDim
-    do	z = 1, zDim
+    do    x = 1, xDim
+    do    y = 1, yDim
+    do    z = 1, zDim
         uSqr           = sum(uuu(z,y,x,1:3)**2)
-		uxyz(0:lbmDim) = uuu(z,y,x,1) * ee(0:lbmDim,1) + uuu(z,y,x,2) * ee(0:lbmDim,2)+uuu(z,y,x,3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuu(z,y,x,1) * ee(0:lbmDim,1) + uuu(z,y,x,2) * ee(0:lbmDim,2)+uuu(z,y,x,3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         Flb(0:lbmDim)  = dt*wt(0:lbmDim)*( &
                           (3.0*(ee(0:lbmDim,1)-uuu(z,y,x,1))+9.0*(ee(0:lbmDim,1)*uuu(z,y,x,1)+ee(0:lbmDim,2)*uuu(z,y,x,2)+ee(0:lbmDim,3)*uuu(z,y,x,3))*ee(0:lbmDim,1))*force(z,y,x,1) &
-						 +(3.0*(ee(0:lbmDim,2)-uuu(z,y,x,2))+9.0*(ee(0:lbmDim,1)*uuu(z,y,x,1)+ee(0:lbmDim,2)*uuu(z,y,x,2)+ee(0:lbmDim,3)*uuu(z,y,x,3))*ee(0:lbmDim,2))*force(z,y,x,2) &
+                         +(3.0*(ee(0:lbmDim,2)-uuu(z,y,x,2))+9.0*(ee(0:lbmDim,1)*uuu(z,y,x,1)+ee(0:lbmDim,2)*uuu(z,y,x,2)+ee(0:lbmDim,3)*uuu(z,y,x,3))*ee(0:lbmDim,2))*force(z,y,x,2) &
                          +(3.0*(ee(0:lbmDim,3)-uuu(z,y,x,3))+9.0*(ee(0:lbmDim,1)*uuu(z,y,x,1)+ee(0:lbmDim,2)*uuu(z,y,x,2)+ee(0:lbmDim,3)*uuu(z,y,x,3))*ee(0:lbmDim,3))*force(z,y,x,3) &
-						                 )
+                                         )
 
         if    (iCollidModel==1)then
-        !本空间单松弛碰撞
-		fIn(z,y,x,0:lbmDim) = fIn(z,y,x,0:lbmDim) + Omega * (fEq(0:lbmDim)-fIn(z,y,x,0:lbmDim))+(1.0-0.5*Omega)*Flb(0:lbmDim)
+        !SRT collision
+        fIn(z,y,x,0:lbmDim) = fIn(z,y,x,0:lbmDim) + Omega * (fEq(0:lbmDim)-fIn(z,y,x,0:lbmDim))+(1.0-0.5*Omega)*Flb(0:lbmDim)
         elseif(iCollidModel==2)then
-        !矩空间多松弛碰撞
+        !MRT collision
         fIn(z,y,x,0:lbmDim)=fIn(z,y,x,0:lbmDim)+MATMUL( M_COLLID(0:lbmDim,0:lbmDim), fEq(0:lbmDim)-fIn(z,y,x,0:lbmDim) ) &
                                                +MATMUL( M_FORCE(0:lbmDim,0:lbmDim),Flb(0:lbmDim))
         else
-            write(*,*)' Collide Model is not defined'
+            write(*,*)' collision_step Model is not defined'
         endif
     enddo
     enddo
@@ -64,12 +62,11 @@
     !$OMP END PARALLEL DO
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!	对流模型：均匀网格的正常对流和非均匀网格的插值对流 
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）   
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE streams()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Advection model: uniform grid advection, interpolation on the non-uniform grid
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE streaming_step()
     USE simParam
     implicit none
     integer:: x,y,z,i,k
@@ -82,7 +79,7 @@
     strmDir(0:lbmDim,3)=-ee(0:lbmDim,1)
 
 !============================================
-    if    (iStreamModel==1) then   !对流
+    if    (iStreamModel==1) then   !Advection
 !============================================
         do  i=0,lbmDim
         do  k=1,3
@@ -92,7 +89,7 @@
         enddo
         enddo
 !============================================
-    elseif(iStreamModel==2)then    !插值
+    elseif(iStreamModel==2)then    !Interpolation
 !============================================
          
         do  i=1,lbmDim
@@ -101,7 +98,7 @@
         do  x=2,xDim-1
         do  y=2,yDim-1
         do  z=2,zDim-1
-            !设置逻辑判断
+            !set logical flag
             upwind = (x>=3).and.(x<=xDim-2).and.(y>=3).and.(y<=yDim-2) .and. (z>=3) .and. (z<=zDim-2)                    
             center = (x>=2).and.(x<=xDim-1).and.(y>=2).and.(y<=yDim-1) .and. (z>=2) .and. (z<=zDim-1) .and. (.not.upwind) 
             outer  = .not.(upwind .or. center)
@@ -109,8 +106,8 @@
         !******************************************************************
         !******************************************************************
         if(upwind) then      
-            !二阶迎风插值
-            !二阶迎风插值系数
+            !2nd-order upwind interpolation
+            !2nd-order upwind interpolation coefficient
             if(ee(i,1)/=0 )then
             upxc0  = (xGrid(x)-ratio*dh*ee(i,1)-xGrid(x-ee(i,1)))*(xGrid(x)-ratio*dh*ee(i,1)-xGrid(x-2*ee(i,1)))/((xGrid(x          )-xGrid(x-ee(i,1)))*(xGrid(x          )-xGrid(x-2*ee(i,1))))
             upxcm  = (xGrid(x)-ratio*dh*ee(i,1)-xGrid(x        ))*(xGrid(x)-ratio*dh*ee(i,1)-xGrid(x-2*ee(i,1)))/((xGrid(x-  ee(i,1))-xGrid(x        ))*(xGrid(x-  ee(i,1))-xGrid(x-2*ee(i,1))))
@@ -157,8 +154,8 @@
         !******************************************************************
         !******************************************************************
         if(center)then 
-            !二阶中心插值
-            !二阶中心插值系数
+            !2nd-order central difference
+            !2n-order central difference coefficient
             if(ee(i,1)/=0)then
             cnxcm = (xGrid(x)-ratio*dh*ee(i,1)-xGrid(x        ))*(xGrid(x)-ratio*dh*ee(i,1)-xGrid(x+ee(i,1)))/((xGrid(x-ee(i,1))-xGrid(x        ))*(xGrid(x-ee(i,1))-xGrid(x+ee(i,1))))
             cnxc0 = (xGrid(x)-ratio*dh*ee(i,1)-xGrid(x-ee(i,1)))*(xGrid(x)-ratio*dh*ee(i,1)-xGrid(x+ee(i,1)))/((xGrid(x        )-xGrid(x-ee(i,1)))*(xGrid(x        )-xGrid(x+ee(i,1))))
@@ -219,13 +216,12 @@
 !============================================
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   far field boundary set	 
-!   设置远场边界条件，全部设置为平衡函数
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系） 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE setBund()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    far field boundary set     
+!    set all far-field boundary conditions as equilibrium function
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE set_equilibrium_farfld_BC()
     USE simParam
     implicit none
     integer:: i,k
@@ -239,16 +235,16 @@
     do  x=1,xDim 
     do  y=1,yDim 
     do  z=1,zDim 
-        !设置逻辑判断
+        !set logical flag
         upwind = (x>=3).and.(x<=xDim-2).and.(y>=3).and.(y<=yDim-2) .and. (z>=3) .and. (z<=zDim-2)                    
         center = (x>=2).and.(x<=xDim-1).and.(y>=2).and.(y<=yDim-1) .and. (z>=2) .and. (z<=zDim-1) .and. (.not.upwind) 
         outer  = .not.(upwind .or. center)
         if(iBC==1)then
-            if	  ( outer  ) then               !最外一层            
+            if      ( outer  ) then               !outer most layer
             fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
             endif
         elseif(iBC==2)then
-            if	  ( outer .or. center ) then    !最外两层
+            if      ( outer .or. center ) then    !second outer-most layer
             fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
             endif
         else
@@ -262,13 +258,12 @@
     !$OMP END PARALLEL DO     
     END SUBROUTINE
 
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   far field boundary set	 
-!   设置远场边界条件，各种条件
-!	copyright@ RuNanHua 
-!	版权所有，华如南（中国科大近代力学系）
-!	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE setBund2()
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    far field boundary set     
+!    set far-field boundary conditions, other types
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE set_other_farfld_BCs()
     USE simParam
     implicit none
     integer:: i,k
@@ -276,28 +271,28 @@
     real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim)
     real(8):: uSqri,uxyzi(0:lbmDim),fEqi(0:lbmDim)
     real(8):: fTmp(0:lbmDim)   
-!	---------------------------------------
-!	---------------------------------------
+!    ---------------------------------------
+!    ---------------------------------------
 
     !=======x-direction
     if(xMinBC==DirecletUP)then
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  y = 1, yDim
-	    do  z = 1, zDim
-		fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
+        do  z = 1, zDim
+        fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(xMinBC==DirecletUU)then
         do  y = 1, yDim
-	    do  z = 1, zDim
+        do  z = 1, zDim
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         uSqri           = sum(uuu(z,y,2,1:3)**2)
-		uxyzi(0:lbmDim) = uuu(z,y,2,1) * ee(0:lbmDim,1) + uuu(z,y,2,2) * ee(0:lbmDim,2)+uuu(z,y,2,3) * ee(0:lbmDim,3)
+        uxyzi(0:lbmDim) = uuu(z,y,2,1) * ee(0:lbmDim,1) + uuu(z,y,2,2) * ee(0:lbmDim,2)+uuu(z,y,2,3) * ee(0:lbmDim,3)
         fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         fIn(z,y,1,[1,7,9,11,13]) =fEq([1,7,9,11,13])+ (fIn(z,y,2,[1,7,9,11,13])-fEqi([1,7,9,11,13]))
@@ -311,10 +306,10 @@
         ! no need set
     elseif(xMinBC==wall) then
         do  y = 1, yDim
-	    do  z = 1, zDim
-			fTmp([1,7,9,11,13]) = fIn(z,y,1,oppo([1,7,9,11,13]))
-			fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
-		enddo
+        do  z = 1, zDim
+            fTmp([1,7,9,11,13]) = fIn(z,y,1,oppo([1,7,9,11,13]))
+            fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+        enddo
         enddo
     else
         stop 'no define BC'
@@ -322,22 +317,22 @@
 
     if(xMaxBC==DirecletUP)then
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  y = 1, yDim
-	    do  z = 1, zDim
-		fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
+        do  z = 1, zDim
+        fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(xMaxBC==DirecletUU)then
         do  y = 1, yDim
-	    do  z = 1, zDim
+        do  z = 1, zDim
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         uSqri           = sum(uuu(z,y,xDim-1,1:3)**2)
-		uxyzi(0:lbmDim) = uuu(z,y,xDim-1,1) * ee(0:lbmDim,1) + uuu(z,y,xDim-1,2) * ee(0:lbmDim,2)+uuu(z,y,xDim-1,3) * ee(0:lbmDim,3)
+        uxyzi(0:lbmDim) = uuu(z,y,xDim-1,1) * ee(0:lbmDim,1) + uuu(z,y,xDim-1,2) * ee(0:lbmDim,2)+uuu(z,y,xDim-1,3) * ee(0:lbmDim,3)
         fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         fIn(z,y,xDim,[2,8,10,12,14]) =fEq([2,8,10,12,14])+ (fIn(z,y,xDim-1,[2,8,10,12,14])-fEqi([2,8,10,12,14]))
@@ -351,10 +346,10 @@
         ! no need set
     elseif(xMaxBC==wall) then
         do  y = 1, yDim
-	    do  z = 1, zDim
-			fTmp([2,8,10,12,14]) = fIn(z,y,xDim,oppo([2,8,10,12,14]))
-			fIn(z,y,xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
-		enddo
+        do  z = 1, zDim
+            fTmp([2,8,10,12,14]) = fIn(z,y,xDim,oppo([2,8,10,12,14]))
+            fIn(z,y,xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
+        enddo
         enddo
     else
         stop 'no define BC'
@@ -363,22 +358,22 @@
     !=======y-direction
     if(yMinBC==DirecletUP)then
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  x = 1, xDim
-	    do  z = 1, zDim
-		fIn(z,1,x,0:lbmDim)   = fEq(0:lbmDim)
+        do  z = 1, zDim
+        fIn(z,1,x,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(yMinBC==DirecletUU)then
         do  x = 1, xDim
-	    do  z = 1, zDim
+        do  z = 1, zDim
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,2,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         uSqri           = sum(uuu(z,2,x,1:3)**2)
-		uxyzi(0:lbmDim) = uuu(z,2,x,1) * ee(0:lbmDim,1) + uuu(z,2,x,2) * ee(0:lbmDim,2)+uuu(z,2,x,3) * ee(0:lbmDim,3)
+        uxyzi(0:lbmDim) = uuu(z,2,x,1) * ee(0:lbmDim,1) + uuu(z,2,x,2) * ee(0:lbmDim,2)+uuu(z,2,x,3) * ee(0:lbmDim,3)
         fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,2,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         fIn(z,1,x,[3,7,8,15,17]) =fEq([3,7,8,15,17])+ (fIn(z,2,x,[3,7,8,15,17])-fEqi([3,7,8,15,17]))
@@ -392,10 +387,10 @@
         ! no need set
     elseif(yMinBC==wall) then
         do  x = 1, xDim
-	    do  z = 1, zDim
-			fTmp([3,7,8,15,17]) = fIn(z,1,x,oppo([3,7,8,15,17]))
-			fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
-		enddo
+        do  z = 1, zDim
+            fTmp([3,7,8,15,17]) = fIn(z,1,x,oppo([3,7,8,15,17]))
+            fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
+        enddo
         enddo
     else
         stop 'no define BC'
@@ -403,22 +398,22 @@
 
     if(yMaxBC==DirecletUP)then
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  x = 1, xDim
-	    do  z = 1, zDim
-		fIn(z,yDim,x,0:lbmDim)   = fEq(0:lbmDim)
+        do  z = 1, zDim
+        fIn(z,yDim,x,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(yMaxBC==DirecletUU)then
         do  x = 1, xDim
-	    do  z = 1, zDim
+        do  z = 1, zDim
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,yDim-1,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         uSqri           = sum(uuu(z,yDim-1,x,1:3)**2)
-		uxyzi(0:lbmDim) = uuu(z,yDim-1,x,1) * ee(0:lbmDim,1) + uuu(z,yDim-1,x,2) * ee(0:lbmDim,2)+uuu(z,yDim-1,x,3) * ee(0:lbmDim,3)
+        uxyzi(0:lbmDim) = uuu(z,yDim-1,x,1) * ee(0:lbmDim,1) + uuu(z,yDim-1,x,2) * ee(0:lbmDim,2)+uuu(z,yDim-1,x,3) * ee(0:lbmDim,3)
         fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,yDim-1,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         fIn(z,yDim,x,[4,9,10,16,18]) =fEq([4,9,10,16,18])+ (fIn(z,yDim-1,x,[4,9,10,16,18])-fEqi([4,9,10,16,18]))
@@ -432,10 +427,10 @@
         ! no need set
     elseif(yMaxBC==wall) then
         do  x = 1, xDim
-	    do  z = 1, zDim
-			fTmp([4,9,10,16,18]) = fIn(z,yDim,x,oppo([4,9,10,16,18]))
-			fIn(z,yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
-		enddo
+        do  z = 1, zDim
+            fTmp([4,9,10,16,18]) = fIn(z,yDim,x,oppo([4,9,10,16,18]))
+            fIn(z,yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
+        enddo
         enddo
     else
         stop 'no define BC'
@@ -444,22 +439,22 @@
     !=======z-direction
     if(zMinBC==DirecletUP)then
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  x = 1, xDim
-	    do  y = 1, yDim
-		fIn(1,y,x,0:lbmDim)   = fEq(0:lbmDim)
+        do  y = 1, yDim
+        fIn(1,y,x,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(zMinBC==DirecletUU)then
         do  x = 1, xDim
-	    do  y = 1, yDim
+        do  y = 1, yDim
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * den(2,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         uSqri           = sum(uuu(2,y,x,1:3)**2)
-		uxyzi(0:lbmDim) = uuu(2,y,x,1) * ee(0:lbmDim,1) + uuu(2,y,x,2) * ee(0:lbmDim,2)+uuu(2,y,x,3) * ee(0:lbmDim,3)
+        uxyzi(0:lbmDim) = uuu(2,y,x,1) * ee(0:lbmDim,1) + uuu(2,y,x,2) * ee(0:lbmDim,2)+uuu(2,y,x,3) * ee(0:lbmDim,3)
         fEqi(0:lbmDim)  = wt(0:lbmDim) * den(1,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         fIn(1,y,x,[5,11,12,15,16]) =fEq([5,11,12,15,16])+ (fIn(2,y,x,[5,11,12,15,16])-fEqi([5,11,12,15,16]))
@@ -473,10 +468,10 @@
         ! no need set
     elseif(zMinBC==wall) then
         do  x = 1, xDim
-	    do  y = 1, yDim
-			fTmp([5,11,12,15,16]) = fIn(1,y,x,oppo([5,11,12,15,16]))
-			fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
-		enddo
+        do  y = 1, yDim
+            fTmp([5,11,12,15,16]) = fIn(1,y,x,oppo([5,11,12,15,16]))
+            fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
+        enddo
         enddo
     else
         stop 'no define BC'
@@ -484,22 +479,22 @@
 
     if(zMaxBC==DirecletUP)then
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  x = 1, xDim
-	    do  y = 1, yDim
-		fIn(zDim,y,x,0:lbmDim)   = fEq(0:lbmDim)
+        do  y = 1, yDim
+        fIn(zDim,y,x,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(zMaxBC==DirecletUU)then
         do  x = 1, xDim
-	    do  y = 1, yDim
+        do  y = 1, yDim
         uSqr           = sum(uuuIn(1:3)**2)
-		uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
+        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * den(zDim-1,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         uSqri           = sum(uuu(zDim-1,y,x,1:3)**2)
-		uxyzi(0:lbmDim) = uuu(zDim-1,y,x,1) * ee(0:lbmDim,1) + uuu(zDim-1,y,x,2) * ee(0:lbmDim,2)+uuu(zDim-1,y,x,3) * ee(0:lbmDim,3)
+        uxyzi(0:lbmDim) = uuu(zDim-1,y,x,1) * ee(0:lbmDim,1) + uuu(zDim-1,y,x,2) * ee(0:lbmDim,2)+uuu(zDim-1,y,x,3) * ee(0:lbmDim,3)
         fEqi(0:lbmDim)  = wt(0:lbmDim) * den(zDim-1,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
         fIn(zDim,y,x,[6,13,14,17,18]) =fEq([6,13,14,17,18])+ (fIn(zDim-1,y,x,[6,13,14,17,18])-fEqi([6,13,14,17,18]))
@@ -513,10 +508,10 @@
         ! no need set
     elseif(zMaxBC==wall) then
         do  x = 1, xDim
-	    do  y = 1, yDim
-			fTmp([6,13,14,17,18]) = fIn(zDim,y,x,oppo([6,13,14,17,18]))
-			fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
-		enddo
+        do  y = 1, yDim
+            fTmp([6,13,14,17,18]) = fIn(zDim,y,x,oppo([6,13,14,17,18]))
+            fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
+        enddo
         enddo
     else
         stop 'no define BC'
