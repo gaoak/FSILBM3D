@@ -1,2 +1,6 @@
 *.mod
 *.o
+*.dat
+*.plt
+*.00000
+IBLBMSolver

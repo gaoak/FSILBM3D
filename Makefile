@@ -28,11 +28,11 @@ FC = mpif90
 #FFLAGS = -O3 -funroll-loops -floop-optimize -g -Warray-bounds -fcray-pointer -x f95-cpp-input
 ifeq ($(BUILD),debug)
 FFLAGS = -cpp -g3 -Og
-FFLAGS += -ffpe-trap=invalid,zero -fcheck=bounds
+FFLAGS += -ffpe-trap=invalid,zero -fcheck=bounds -fopenmp
 else
 FFLAGS = -cpp -O3 -funroll-loops -floop-optimize -g
 endif
-FFLAGS += -Warray-bounds -fcray-pointer -fbacktrace -ffree-line-length-none
+FFLAGS += -Warray-bounds -fcray-pointer -fbacktrace -ffree-line-length-none -fopenmp
 ifeq "$(shell expr `gfortran -dumpversion | cut -f1 -d.` \>= 10)" "1"
 FFLAGS += -fallow-argument-mismatch
 endif
@@ -94,9 +94,9 @@ endif
 #-----------------------------------------------------------------------
 # Normally no need to change anything below
 
-all: LIBBMSolver
+all: IBLBMSolver
 
-LIBBMSolver : $(OBJ)
+IBLBMSolver : $(OBJ)
 	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(LIBFFT) $(LIBIO)
 
 
