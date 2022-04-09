@@ -21,9 +21,9 @@
         if(fileName(i:i)==' ')fileName(i:i)='0'
     enddo
     if(isT==0)then
-        open(idfile,file='./DatFlow/Flow.plt',form='BINARY')
+        open(idfile,file='./DatFlow/Flow.plt',form='unformatted')
     else
-        open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='BINARY')
+        open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted')
     endif
     
     
@@ -209,7 +209,7 @@
     integer,parameter:: namLen=40,idfile=100,numVar=12
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=['x','y','z','u','v','w','ax','ay','az','fx','fy','fz'] 
+                        varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz'] 
     !==================================================================================================
 
     write(fileName,'(F10.5)') time
@@ -219,9 +219,9 @@
     END DO
 
     if(isIB==0)then
-        OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='BINARY')
+        OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='unformatted')
     elseif(isIB==1)then
-        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(filename)//'.plt',form='BINARY')
+        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(filename)//'.plt',form='unformatted')
     else
     endif
 
@@ -337,10 +337,10 @@
     integer,parameter:: namLen=40,idfile=100,numVar=4
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=['x','y','z','image'] 
+                        varname(numVar)=[character(namLen)::'x','y','z','image'] 
     !==================================================================================================
 !   =============================================================================================
-    open(idfile,file='./DatOthe/Image.plt',form='BINARY')        
+    open(idfile,file='./DatOthe/Image.plt',form='unformatted')        
 !   =============================================================================================
     write(idfile) "#!TDV101"    
     write(idfile) 1
