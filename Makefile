@@ -45,12 +45,11 @@ FFLAGS = -eF -g -O3 -N 1023
 endif
 
 
-MODDIR = ./mod
 SRCDIR = ./src
 
 ### List of files for the main code
 OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
-SRC = $(SRCDIR)/*.f90
+SRC = $(SRCDIR)/Modules.f90 $(SRCDIR)/LatticeBoltzmannSolver.f90 $(SRCDIR)/PostProcessing.f90 $(SRCDIR)/StructureSolver.f90 $(SRCDIR)/initialization.f90  $(SRCDIR)/interaction.f90 $(SRCDIR)/main.f90  $(SRCDIR)/util.f90
 OBJ = $(SRC:%.f90=%.o)
 
 #######FFT settings##########
