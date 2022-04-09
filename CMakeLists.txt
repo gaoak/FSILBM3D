@@ -1,11 +1,9 @@
 cmake_minimum_required(VERSION 3.0.2)                        
 cmake_policy(SET CMP0048 NEW)
 
-project(xcompact3d LANGUAGES Fortran)
+project(IBLBM LANGUAGES Fortran)
 
-set(AUTHOR "Stefano Rolfo;Charles Moulinec")
-set(AUTHOR_DETAILS "stefano.rolfo@stfc.ac.uk;charles.moulinec@stfc.ac.uk")
-set(DESCRIPTION "Building xcompact3d using cmake")
+set(DESCRIPTION "Building 3D IB-LBM code using cmake")
 
 message(STATUS "building ${PROJECT_NAME}")
 

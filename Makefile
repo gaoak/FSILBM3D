@@ -46,17 +46,12 @@ endif
 
 
 MODDIR = ./mod
-DECOMPDIR = ./decomp2d
 SRCDIR = ./src
-TURBDIR = ./src
 
 ### List of files for the main code
-SRCDECOMP = $(DECOMPDIR)/decomp_2d.f90 $(DECOMPDIR)/glassman.f90 $(DECOMPDIR)/fft_$(FFT).f90 $(DECOMPDIR)/io.f90
 OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
-SRC = $(SRCDIR)/module_param.f90 $(SRCDIR)/variables.f90 $(SRCDIR)/poisson.f90 $(SRCDIR)/derive.f90 $(SRCDIR)/implicit.f90 $(SRCDIR)/schemes.f90 $(SRCDIR)/parameters.f90 $(SRCDIR)/*.f90
+SRC = $(SRCDIR)/*.f90
 OBJ = $(SRC:%.f90=%.o)
-SRC = $(SRCDIR)/module_param.f90 $(SRCDIR)/variables.f90 $(SRCDIR)/BC-dbg-schemes.f90 $(SRCDIR)/poisson.f90 $(SRCDIR)/ibm.f90 $(SRCDIR)/derive.f90 $(SRCDIR)/implicit.f90 $(SRCDIR)/schemes.f90 $(SRCDIR)/forces.f90 $(SRCDIR)/probes.f90 $(SRCDIR)/navier.f90 $(SRCDIR)/tools.f90 $(SRCDIR)/visu.f90 $(SRCDIR)/BC-TBL.f90 $(SRCDIR)/BC-ABL.f90 $(SRCDIR)/les_models.f90 $(SRCDIR)/BC-Lock-exchange.f90 $(SRCDIR)/time_integrators.f90 $(SRCDIR)/filters.f90 $(SRCDIR)/parameters.f90 $(SRCDIR)/BC-User.f90 $(SRCDIR)/BC-TGV.f90 $(SRCDIR)/BC-Channel-flow.f90 $(SRCDIR)/BC-Periodic-hill.f90 $(SRCDIR)/BC-Cylinder.f90 $(SRCDIR)/BC-Mixing-layer.f90 $(SRCDIR)/BC-Jet.f90 $(SRCDIR)/BC-Sandbox.f90 $(SRCDIR)/BC-Uniform.f90 $(TURBDIR)/constants.f90 $(TURBDIR)/acl_utils.f90 $(TURBDIR)/airfoils.f90 $(TURBDIR)/dynstall.f90 $(TURBDIR)/dynstall_legacy.f90 $(TURBDIR)/acl_elem.f90 $(TURBDIR)/acl_controller.f90 $(TURBDIR)/acl_turb.f90 $(TURBDIR)/acl_out.f90 $(TURBDIR)/acl_farm_controller.f90 $(TURBDIR)/acl_model.f90 $(TURBDIR)/acl_source.f90 $(TURBDIR)/adm.f90 $(TURBDIR)/turbine.f90 $(SRCDIR)/statistics.f90 $(SRCDIR)/case.f90 $(SRCDIR)/transeq.f90 $(SRCDIR)/genepsi3d.f90 $(SRCDIR)/xcompact3d.f90
-
 
 #######FFT settings##########
 ifeq ($(FFT),fftw3)
@@ -75,7 +70,6 @@ else ifeq ($(FFT),generic)
   INC:=
   LIBFFT=
 else ifeq ($(FFT),mkl)
-  SRCDECOMP := $(DECOMPDIR)/mkl_dfti.f90 $(SRCDECOMP)
   LIBFFT=-Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_sequential.a $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread
 	INC=-I$(MKLROOT)/include
 else ifeq ($(FFT),ffte)
@@ -84,7 +78,7 @@ else ifeq ($(FFT),ffte)
 endif
 
 #######OPTIONS settings###########
-OPT := -I$(SRCDIR) -I$(DECOMPDIR) $(FFLAGS)
+OPT := -I$(SRCDIR) $(FFLAGS)
 LINKOPT := $(FFLAGS)
 
 LIBIO :=
@@ -101,15 +95,10 @@ endif
 #-----------------------------------------------------------------------
 # Normally no need to change anything below
 
-all: xcompact3d
+all: LIBBMSolver
 
-xcompact3d : $(OBJDECOMP) $(OBJ)
+LIBBMSolver : $(OBJ)
 	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(LIBFFT) $(LIBIO)
-
-$(OBJDECOMP):$(DECOMPDIR)%.o : $(DECOMPDIR)%.f90
-	$(FC) $(FFLAGS) $(OPT) $(DEFS) $(DEFS2) $(INC) -c $<
-	mv $(@F) ${DECOMPDIR}
-	#mv *.mod ${DECOMPDIR}
 
 
 $(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
@@ -130,9 +119,8 @@ post:
 
 
 clean:
-	rm -f $(DECOMPDIR)/*.o $(DECOMPDIR)/*.mod $(DECOMPDIR)/*.smod
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.mod $(SRCDIR)/*.smod
-	rm -f *.o *.mod *.smod xcompact3d
+	rm -f *.o *.mod *.smod LIBBMSolver
 
 .PHONY: cleanall
 cleanall: clean
