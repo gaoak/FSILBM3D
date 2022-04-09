@@ -79,7 +79,7 @@
         stfMatr(1:nSTF)     = stfElas(1:nSTF)+ gamma*stfGeom(1:nSTF)
         stfEffe(1:nSTF)     = ak*stfMatr(1:nSTF)
         stfEffe(nloc(1:nEQ))= stfEffe(nloc(1:nEQ)) + a0*mss(1:nEQ) + a1*dampM*mss(1:nEQ)
-        stfEffe(1:nSTF)     = stfEffe(1:nSTF)+                     + a1*dampK*stfElas(1:nSTF)
+        stfEffe(1:nSTF)     = stfEffe(1:nSTF)                     + a1*dampK*stfElas(1:nSTF)
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
         lodEffe(1:nEQ)=+lodExte(1:nEQ)                                                            &            !external force
@@ -341,7 +341,7 @@
         if(fileName(i:i)==' ')fileName(i:i)='0'
     END DO
 
-    OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='BINARY')
+    OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='unformatted')
 
 !   I. The header section.
 !   =============================================        
