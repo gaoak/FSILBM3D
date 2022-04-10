@@ -340,7 +340,7 @@
                         varname(numVar)=[character(namLen)::'x','y','z','image'] 
     !==================================================================================================
 !   =============================================================================================
-    open(idfile,file='./DatOthe/Image.plt',form='unformatted')        
+    open(idfile,file='./DatOthe/Image.plt',form='unformatted',access='stream')        
 !   =============================================================================================
     write(idfile) "#!TDV101"    
     write(idfile) 1
