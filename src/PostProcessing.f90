@@ -21,16 +21,15 @@
         if(fileName(i:i)==' ')fileName(i:i)='0'
     enddo
     if(isT==0)then
-        open(idfile,file='./DatFlow/Flow.plt',form='unformatted')
+        open(idfile,file='./DatFlow/Flow.plt',form='unformatted',access='stream')
     else
-        open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted')
+        open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
     endif
     
     
 !   =============================================================================================
-    write(idfile) "#!TDV112"
+    write(idfile) "#!TDV101"    
     write(idfile) 1
-    write(idfile) 0
     call dumpstring(title,idfile)
 
     write(idfile) numVar
