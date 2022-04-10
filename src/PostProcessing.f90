@@ -219,9 +219,9 @@
     END DO
 
     if(isIB==0)then
-        OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='unformatted')
+        OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='unformatted',access='stream')
     elseif(isIB==1)then
-        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(filename)//'.plt',form='unformatted')
+        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(filename)//'.plt',form='unformatted',access='stream')
     else
     endif
 
