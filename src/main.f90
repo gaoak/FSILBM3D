@@ -208,7 +208,7 @@
             !loading vector
             lodful(1:nND,1:6) = extful(1:nND,1:6)+grav(1:nND,1:6)
             !-----------------------------------------
-            CALL solver( jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodful,subdeltat,dampK,dampM,  &
+            CALL structure_solver( jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodful,subdeltat,dampK,dampM,  &
                         triad_nn,triad_ee,triad_e0,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ,nMT,nBD,nSTF,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM)
             !----------------------------------------------------------------------
             call date_and_time(VALUES=values1)
