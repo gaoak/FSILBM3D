@@ -227,31 +227,32 @@
     integer:: i,k
     integer:: x, y, z,ig
     logical:: upwind,center,outer
-    real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim)
-    uSqr           = sum(uuuIn(1:3)**2)
-    uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
-    fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,upwind,center,outer)
+    real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim), vel(1:SpcDim)
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,upwind,center,outer,vel)
     do  x=1,xDim 
     do  y=1,yDim 
     do  z=1,zDim 
         !set logical flag
-        upwind = (x>=3).and.(x<=xDim-2).and.(y>=3).and.(y<=yDim-2) .and. (z>=3) .and. (z<=zDim-2)                    
-        center = (x>=2).and.(x<=xDim-1).and.(y>=2).and.(y<=yDim-1) .and. (z>=2) .and. (z<=zDim-1) .and. (.not.upwind) 
-        outer  = .not.(upwind .or. center)
         if(iBC==1)then
             if      ( outer  ) then               !outer most layer
+            call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+            uSqr           = sum(vel(1:3)**2)
+            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
             fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
             endif
         elseif(iBC==2)then
             if      ( outer .or. center ) then    !second outer-most layer
+            call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+            uSqr           = sum(vel(1:3)**2)
+            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
             fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
             endif
         else
             write(*,*)'BC is not defined!'
             stop
         endif
-
     enddo
     enddo
     enddo  
@@ -270,32 +271,34 @@
     integer:: x, y, z,ig
     real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim)
     real(8):: uSqri,uxyzi(0:lbmDim),fEqi(0:lbmDim)
-    real(8):: fTmp(0:lbmDim)   
+    real(8):: fTmp(0:lbmDim), vel(1:SpcDim)   
 !    ---------------------------------------
 !    ---------------------------------------
 
     !=======x-direction
     if(xMinBC==DirecletUP)then
-        uSqr           = sum(uuuIn(1:3)**2)
-        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
-        fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  y = 1, yDim
         do  z = 1, zDim
-        fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
+            call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)  
+            uSqr           = sum(vel(1:3)**2)
+            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)  
+            fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(xMinBC==DirecletUU)then
         do  y = 1, yDim
         do  z = 1, zDim
-        uSqr           = sum(uuuIn(1:3)**2)
-        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
-        fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+            call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)  
+            uSqr           = sum(vel(1:3)**2)
+            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
-        uSqri           = sum(uuu(z,y,2,1:3)**2)
-        uxyzi(0:lbmDim) = uuu(z,y,2,1) * ee(0:lbmDim,1) + uuu(z,y,2,2) * ee(0:lbmDim,2)+uuu(z,y,2,3) * ee(0:lbmDim,3)
-        fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+            uSqri           = sum(uuu(z,y,2,1:3)**2)
+            uxyzi(0:lbmDim) = uuu(z,y,2,1) * ee(0:lbmDim,1) + uuu(z,y,2,2) * ee(0:lbmDim,2)+uuu(z,y,2,3) * ee(0:lbmDim,3)
+            fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
-        fIn(z,y,1,[1,7,9,11,13]) =fEq([1,7,9,11,13])+ (fIn(z,y,2,[1,7,9,11,13])-fEqi([1,7,9,11,13]))
+            fIn(z,y,1,[1,7,9,11,13]) =fEq([1,7,9,11,13])+ (fIn(z,y,2,[1,7,9,11,13])-fEqi([1,7,9,11,13]))
         enddo
         enddo
     elseif(xMinBC==Advection1)then
@@ -316,26 +319,28 @@
     endif
 
     if(xMaxBC==DirecletUP)then
-        uSqr           = sum(uuuIn(1:3)**2)
-        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
-        fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
         do  y = 1, yDim
         do  z = 1, zDim
-        fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
+            call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            uSqr           = sum(vel(1:3)**2)
+            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+            fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
     elseif(xMaxBC==DirecletUU)then
         do  y = 1, yDim
         do  z = 1, zDim
-        uSqr           = sum(uuuIn(1:3)**2)
-        uxyz(0:lbmDim) = uuuIn(1) * ee(0:lbmDim,1) + uuuIn(2) * ee(0:lbmDim,2)+uuuIn(3) * ee(0:lbmDim,3)
-        fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+            call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            uSqr           = sum(vel(1:3)**2)
+            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
-        uSqri           = sum(uuu(z,y,xDim-1,1:3)**2)
-        uxyzi(0:lbmDim) = uuu(z,y,xDim-1,1) * ee(0:lbmDim,1) + uuu(z,y,xDim-1,2) * ee(0:lbmDim,2)+uuu(z,y,xDim-1,3) * ee(0:lbmDim,3)
-        fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+            uSqri           = sum(uuu(z,y,xDim-1,1:3)**2)
+            uxyzi(0:lbmDim) = uuu(z,y,xDim-1,1) * ee(0:lbmDim,1) + uuu(z,y,xDim-1,2) * ee(0:lbmDim,2)+uuu(z,y,xDim-1,3) * ee(0:lbmDim,3)
+            fEqi(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
 
-        fIn(z,y,xDim,[2,8,10,12,14]) =fEq([2,8,10,12,14])+ (fIn(z,y,xDim-1,[2,8,10,12,14])-fEqi([2,8,10,12,14]))
+            fIn(z,y,xDim,[2,8,10,12,14]) =fEq([2,8,10,12,14])+ (fIn(z,y,xDim-1,[2,8,10,12,14])-fEqi([2,8,10,12,14]))
         enddo
         enddo
     elseif(xMaxBC==Advection1)then
@@ -473,6 +478,18 @@
             fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
         enddo
         enddo
+    elseif(zMinBC==movingWall) then
+        do  x = 1, xDim
+        do  y = 1, yDim
+            call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(1),vel)
+            fTmp(5) = fIn(1,y,x,oppo(5)) + 2.0 * wt(5) * denIn * (ee(5,1) * vel(1) + ee(5,2) * vel(2) + ee(5,3) * vel(3)) * 3.0
+            fTmp(11) = fIn(1,y,x,oppo(11)) + 2.0 * wt(11) * denIn * (ee(11,1) * vel(1) + ee(11,2) * vel(2) + ee(11,3) * vel(3)) * 3.0
+            fTmp(12) = fIn(1,y,x,oppo(12)) + 2.0 * wt(12) * denIn * (ee(12,1) * vel(1) + ee(12,2) * vel(2) + ee(12,3) * vel(3)) * 3.0
+            fTmp(15) = fIn(1,y,x,oppo(15)) + 2.0 * wt(15) * denIn * (ee(15,1) * vel(1) + ee(15,2) * vel(2) + ee(15,3) * vel(3)) * 3.0
+            fTmp(16) = fIn(1,y,x,oppo(16)) + 2.0 * wt(16) * denIn * (ee(16,1) * vel(1) + ee(16,2) * vel(2) + ee(16,3) * vel(3)) * 3.0
+            fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
+        enddo
+        enddo
     else
         stop 'no define BC'
     endif
@@ -510,6 +527,18 @@
         do  x = 1, xDim
         do  y = 1, yDim
             fTmp([6,13,14,17,18]) = fIn(zDim,y,x,oppo([6,13,14,17,18]))
+            fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
+        enddo
+        enddo
+    elseif(zMaxBC==movingWall) then
+        do  x = 1, xDim
+        do  y = 1, yDim
+            call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(zDim),vel)
+            fTmp(6) = fIn(zDim,y,x,oppo(6)) + 2.0 * wt(6) * denIn * (ee(6,1) * vel(1) + ee(6,2) * vel(2) + ee(6,3) * vel(3)) * 3.0
+            fTmp(13) = fIn(zDim,y,x,oppo(13)) + 2.0 * wt(13) * denIn * (ee(13,1) * vel(1) + ee(13,2) * vel(2) + ee(13,3) * vel(3)) * 3.0
+            fTmp(14) = fIn(zDim,y,x,oppo(14)) + 2.0 * wt(14) * denIn * (ee(14,1) * vel(1) + ee(14,2) * vel(2) + ee(14,3) * vel(3)) * 3.0
+            fTmp(17) = fIn(zDim,y,x,oppo(17)) + 2.0 * wt(17) * denIn * (ee(17,1) * vel(1) + ee(17,2) * vel(2) + ee(17,3) * vel(3)) * 3.0
+            fTmp(18) = fIn(zDim,y,x,oppo(18)) + 2.0 * wt(18) * denIn * (ee(18,1) * vel(1) + ee(18,2) * vel(2) + ee(18,3) * vel(3)) * 3.0
             fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
         enddo
         enddo

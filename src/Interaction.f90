@@ -1,4 +1,70 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Calculate the repulsive force between solids
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE cptForceR(nFish,dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful)
+    implicit none
+    integer:: nFish
+    real(8):: dxmin,dymin,dzmin
+    integer:: nEL_max,nND_max,nND(1:nFish),nEL(1:nFish)
+    real(8):: ele(1:nFish,1:nEL_max,1:5),xyzful(1:nFish,1:nND_max,1:6),repful(1:nFish,1:nND_max,1:6)
+    !local 
+    integer:: iND,jND,iFish,jFish
+    real(8):: delta_h,Phi,r(1:3),ds(1:3)
+    real(8):: minx,miny,maxx,maxy,minz,maxz
+    real(8):: xmin(1:nFish),xmax(1:nFish),ymin(1:nFish),ymax(1:nFish),zmin(1:nFish),zmax(1:nFish)
+
+    repful(:,:,:)=0.d0
+    ds(1)=dxmin
+    ds(2)=dymin
+    ds(3)=dzmin
+    
+    do iFish=1,nFish
+        xmin(iFish) = minval(xyzful(iFish,1:nND(iFish),1))-dxmin*3.d0
+        xmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),1))+dxmin*3.d0
+        ymin(iFish) = minval(xyzful(iFish,1:nND(iFish),2))-dymin*3.d0
+        ymax(iFish) = maxval(xyzful(iFish,1:nND(iFish),2))+dymin*3.d0
+        zmin(iFish) = minval(xyzful(iFish,1:nND(iFish),3))-dzmin*3.d0
+        zmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),3))+dzmin*3.d0   
+    enddo
+
+    do iFish=2,nFish
+        do jFish=iFish+1,nFish
+            minx = max(xmin(iFish),xmin(jFish))
+            miny = max(ymin(iFish),ymin(jFish))
+            minz = max(zmin(iFish),zmin(jFish))
+            maxx = min(xmax(iFish),xmax(jFish))
+            maxy = min(ymax(iFish),ymax(jFish))
+            maxz = min(zmax(iFish),zmax(jFish))
+            if((minx > maxx).or.(miny > maxy).or.(minz > maxz)) then
+                cycle
+            endif
+            ! overlapping regin [minx, maxx] X [miny, maxy] X [minz, maxz]
+            do iND=1,nND(iFish)
+                if ( (minx>xyzful(iFish,iND,1)) .or. (xyzful(iFish,iND,1)>maxx)  &
+                .or. (miny>xyzful(iFish,iND,2)) .or. (xyzful(iFish,iND,2)>maxy)  &
+                .or. (minz>xyzful(iFish,iND,3)) .or. (xyzful(iFish,iND,3)>maxz)) then
+                    cycle !point iND not in the overpalling region
+                endif
+                do jND=1,nND(jFish)
+                    if ( (minx>xyzful(jFish,jND,1)) .or. (xyzful(jFish,jND,1)>maxx)  &
+                    .or. (miny>xyzful(jFish,jND,2)) .or. (xyzful(jFish,jND,2)>maxy)  &
+                    .or. (minz>xyzful(jFish,jND,3)) .or. (xyzful(jFish,jND,3)>maxz)) then
+                        cycle !point jND not in the overpalling region
+                    endif
+                    r(1)=(xyzful(iFish,iND,1)-xyzful(jFish,jND,1))/dxmin
+                    r(2)=(xyzful(iFish,iND,2)-xyzful(jFish,jND,2))/dymin
+                    r(3)=(xyzful(iFish,iND,3)-xyzful(jFish,jND,3))/dzmin
+                    delta_h=Phi(r(1))*Phi(r(2))*Phi(r(3))/dxmin/dymin/dzmin/sqrt(r(1)*r(1)+r(2)*r(2)+r(3)*r(3))
+                    repful(iFish,iND,1:3)=repful(iFish,iND,1:3) + delta_h*r(1:3)*ds(1:3) ! force
+                    repful(jFish,jND,1:3)=repful(jFish,jND,1:3) - delta_h*r(1:3)*ds(1:3) ! reaction force
+                enddo !jND=1,nND(jFish)
+            enddo !iND=1,nND(iFish)
+        enddo !jFish=iFish+1,nFish
+    enddo !iFish=1,nFish
+
+    END SUBROUTINE
+
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    (displacement, velocity) spring, penalty method
 !    calculate force at element center, distribute force to three nodes
 !    copyright@ RuNanHua
@@ -149,9 +215,9 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     do  y = 1, yDim
     do  z = 1, zDim
         forceTemp(z,y,x,1:3)=0.0d0
-     enddo
-     enddo
-     enddo
+    enddo
+    enddo
+    enddo
     !$OMP END PARALLEL DO
     do    iEL=1,nEL    
         xbgn    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)-3
@@ -180,7 +246,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     do  y = 1, yDim
     do  z = 1, zDim         
         uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5*dt*forceTemp(z,y,x,1:3)/den(z,y,x)
-        force(z,y,x,1:3)  =force(z,y,x,1:3)+       forceTemp(z,y,x,1:3)
+        force(z,y,x,1:3) = force(z,y,x,1:3) + forceTemp(z,y,x,1:3)
     enddo
     enddo
     enddo
@@ -205,7 +271,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     iterLBM=iterLBM+1
 !   ***********************************************************************************************
 enddo 
-write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
+!write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
 !**************************************************************************************************
 !**************************************************************************************************
 !   element force to nodal force
@@ -469,5 +535,4 @@ write(*,'(A,I5,A,D20.10)')' iterLBM=',iterLBM,' dmaxLBM   =',dmaxLBM
     else
         Phi=0.0d0
     endif
-
     ENDFUNCTION
