@@ -1,11 +1,27 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Finite element method for solid structure
-!    copyright@ RuNanHua
+!    FEM code for structure
+!    input variables (at time t):
+!    xyzful0 (const), xyzful, coordinates
+!    velful, velocity
+!    accful, acceleration
+!    lodExteful, externel force
+!
+!    output variables (at time t+dt):
+!    velful
+!    accful
+!
+!    cached variables:
+!    dspful displacement at t+dt
+!
+!    workspace variables:
+!
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-    SUBROUTINE structure_solver(  jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,  &
-                        triad_nn,triad_ee,triad_e0,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ,nMT,nBD,nSTF,NewmarkGamma,NewmarkBeta,dtol,iterMax)
+    SUBROUTINE solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,     &
+                      triad_nn,triad_ee,triad_e0,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ,nMT,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
+                      dtol,iterMax,nFish,iFish,FishInfo)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nBD,nSTF
+    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,iFish,nFish
     integer:: jBC(nND,6),ele(nEL,5),nloc(nEQ),nprof(nEQ),nprof2(nEQ)
     real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(nMT,10)
     real(8):: mss(nEQ),dspful(nND,6),velful(nND,6),accful(nND,6),lodExteful(nND,6),deltat
@@ -14,40 +30,34 @@
     real(8):: triad_nn(3,3,nND),triad_ee(3,3,nEL),triad_e0(3,3,nEL)
     real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL),triad_n3(3,3,nEL)
 !   ----------------------------------------------------------------------------------------------
-    real(8):: du(nEQ),ddu(nEQ),lodEffe(nEQ),lodInte(nEQ),lodExte(nEQ),dsp(nEQ),vel(nEQ),acc(nEQ),dspO(nEQ),velO(nEQ),accO(nEQ)
-    real(8):: stfEffe(nSTF),stfMatr(nSTF),stfElas(nSTF),stfGeom(nSTF)      
-    real(8):: wk1(nEQ),wk2(nEQ) 
-    real(8):: NewmarkGamma,NewmarkBeta,AlphaM,AlphaF,RhoInf
-    real(8):: ak,a0,a1,a2,a3,a4,a5
+    real(8):: dspt(nEQ),du(nEQ),ddu(nEQ),lodEffe(nEQ),lodInte(nEQ),lodExte(nEQ),dsp(nEQ),vel(nEQ),acc(nEQ)
+    real(8):: stfEffe(maxstiff),stfElas(maxstiff),stfGeom(maxstiff)      
+    real(8):: wk1(nEQ),wk2(nEQ),velO(nEQ),accO(nEQ) 
+    real(8):: Newmarkdelta,Newmarkalpha
+    real(8):: a0,a1,a2,a3,a4,a5,a6,a7
     real(8):: beta0,beta,gamma,zi,z0
-    real(8):: dsumd,dsumz,dtol,dnorm,geoFRM(nEL),geoPLT(1:9,nEL)
+    real(8):: dsumd,dsumz,dtol,dnorm,geoFRM(nEL),geoPLT(1:9,nEL),FishInfo(1:nFish,1:3)
     integer:: i,j,iND,iEQ,iter,iterMax,iloc,ierror,maxramp,iModify
 !   -----------------------------------------------------------------------------------------------
-!   the generalized a method by Hua, Ru-Nan  not debug!!!!
-    RhoInf=1.0d0
-    AlphaM=0.0d0 !(2.0d0*RhoInf-1.0d0)/(RhoInf+1.0d0)
-    AlphaF=0.0d0 !RhoInf/(RhoInf+1.0d0)
-
-    !NewmarkGamma=0.5d0-AlphaM+AlphaF
-    !NewmarkBeta=(1.0d0-AlphaM+AlphaF)**2/4.0d0
-
-
-    a0 = (1.0d0-AlphaM)/(NewmarkBeta*deltat*deltat)   
-    a2 = (1.0d0-AlphaM)/(NewmarkBeta*deltat)
-    a3 = (1.0d0-AlphaM)/(NewmarkBeta*2.0d0) - 1.0d0
-
-    ak = 1.0d0-AlphaF
-    a1 = ak*NewmarkGamma/(NewmarkBeta*deltat)
-    a4 = ak*NewmarkGamma/NewmarkBeta - 1.0d0
-    a5 = ak*(NewmarkGamma/NewmarkBeta - 2.0d0)*0.5d0*deltat
-
-
+    a0 = 1.0d0/(Newmarkalpha*deltat*deltat)
+    a1 = Newmarkdelta/(Newmarkalpha*deltat)
+    a2 = 1.0d0/(Newmarkalpha*deltat)
+    a3 = 1.0d0/(Newmarkalpha*2.0d0) - 1.0d0
+    a4 = Newmarkdelta/Newmarkalpha - 1.0d0
+    a5 = (Newmarkdelta/Newmarkalpha - 2.0d0)*0.5d0*deltat
+    a6 = (1.0d0 - Newmarkdelta)*deltat
+    a7 = Newmarkdelta*deltat
 
     beta0 =1.0
     gamma =1.0
     maxramp =0
 
     iModify = 1
+
+    !igeoFRM=27
+    !igeoPLT=28
+    !open(unit=igeoFRM,file='geoFRM.tmp')   
+    !open(unit=igeoPLT,file='geoPLT.tmp')
 
 !   ***********************************************************************************************
     do  i=1,nND
@@ -57,9 +67,7 @@
         lodExte((i-1)*6+1:(i-1)*6+6)=lodExteful(i,1:6)        
     enddo
 
-    dspO(1:nEQ) = dsp(1:nEQ)
-    velO(1:nEQ) = vel(1:nEQ)
-    accO(1:nEQ) = acc(1:nEQ)
+    dspt(1:nEQ)=dsp(1:nEQ) ! displacement at time t
 !   ------------------------------------------------------------------------------
     iter=0
     dnorm=1.0
@@ -68,40 +76,54 @@
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !        forces from body stresses
         call body_stress_D( lodInte,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
-                            ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, nND,nEL,nEQ,nMT,geoFRM,geoPLT &
+                            ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn,    &
+                            nND,nEL,nEQ,nMT,geoFRM,geoPLT &
                           )
+
+        do    i= 1, nEQ
+            lodEffe(i)=lodExte(i)-lodInte(i)+(a0*(dspt(i)-dsp(i))+a2*vel(i)+a3*acc(i))*mss(i)   &
+                                            +(a1*(dspt(i)-dsp(i))+a4*vel(i)+a5*acc(i))*dampM*mss(i)
+        enddo
+
+
+        if    (dampK > 0.0) then
+            do    i= 1, nEQ
+                wk1(i)= a1*(dspt(i)-dsp(i)) +a4*vel(i) +a5*acc(i)
+            enddo
+
+            call AxBCOL(stfElas,maxstiff,wk1,wk2,nEQ,nBD,nprof,nprof2,nloc)
+
+            do    i= 1, nEQ
+                lodEffe(i) = lodEffe(i) + dampK*wk2(i)
+            enddo
+        endif
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
         call formstif_s(stfElas,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
-                        prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF)
+                        prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,maxstiff)
+
         call formgeom_s(stfGeom,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
-                        prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF,geoFRM,geoPLT)
-        stfMatr(1:nSTF)     = stfElas(1:nSTF)+ gamma*stfGeom(1:nSTF)
-        stfEffe(1:nSTF)     = ak*stfMatr(1:nSTF)
-        stfEffe(nloc(1:nEQ))= stfEffe(nloc(1:nEQ)) + a0*mss(1:nEQ) + a1*dampM*mss(1:nEQ)
-        stfEffe(1:nSTF)     = stfEffe(1:nSTF)                     + a1*dampK*stfElas(1:nSTF)
-!       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!       -------------------------------------------------------------------
-        lodEffe(1:nEQ)=+lodExte(1:nEQ)                                                            &            !external force
-                       -lodInte(1:nEQ)                                                            &            !internal force
-                       -(a0*(dsp(1:nEQ)-dspO(1:nEQ))-a2*vel(1:nEQ)-a3*acc(1:nEQ))*mss(1:nEQ)    &            !inertial force
-                       -(a1*(dsp(1:nEQ)-dspO(1:nEQ))-a4*vel(1:nEQ)-a5*acc(1:nEQ))*mss(1:nEQ)*dampM            !mass-ratio dumping force
+                        prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,maxstiff,geoFRM,geoPLT)
+!
+        do  i= 1, nEQ
+            iloc=nloc(i)
+            do    j= 1, nprof(i)
+                stfEffe(iloc+j-1)=stfElas(iloc+j-1)+ gamma*stfGeom(iloc+j-1)
+            enddo
+            stfEffe(iloc) = stfEffe(iloc) + a0*mss(i) + a1*dampM*mss(i)
+        enddo
 
-        if    (dabs(dampK) > 0.0) then  !
-            wk1(1:nEQ)= a1*(dsp(1:nEQ)-dspO(1:nEQ)) -a4*vel(1:nEQ) -a5*acc(1:nEQ)
-            call AxBCOL(stfElas,nSTF,wk1,wk2,nEQ,nBD,nprof,nprof2,nloc)
-            lodEffe(1:nEQ) = lodEffe(1:nEQ) - dampK*wk2(1:nEQ)                                                !stiffness-ratio dumping force
+        if    (dampK .gt. 0.0) then
+            do    i= 1, nEQ
+                iloc=nloc(i)
+                do    j= 1, nprof(i)
+                    stfEffe(iloc+j-1) = stfEffe(iloc+j-1) + a1*dampK*stfElas(iloc+j-1)
+                enddo
+            enddo
         endif
-
-        if    (dabs(AlphaF) > 0.0) then !
-            wk1(1:nEQ)= (dsp(1:nEQ)-dspO(1:nEQ))
-            call AxBCOL(stfElas+gamma*stfGeom,nSTF,wk1,wk2,nEQ,nBD,nprof,nprof2,nloc)
-            lodEffe(1:nEQ) = lodEffe(1:nEQ) - AlphaF*wk2(1:nEQ)
-        endif
-
 !       -------------------------------------------------------------------
-!       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!       loading boundary conditions
+!       apply boundary conditions
+!       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!           
         do  iND=1,nND
         do  j=1  ,6
             if(jBC(iND,j)>0)then
@@ -118,15 +140,14 @@
                            
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
-!       solve equation
-        call uduCOL_D(stfEffe,nSTF,nEQ,nBD,ierror,nprof,nloc)
+
+        call uduCOL_D(stfEffe,maxstiff,nEQ,nBD,ierror, nprof,nloc)
         if    (ierror.eq.0) then
             write(*,*)'@@ ERROR: zero diagonal term !!!'
             return
         endif
-        call bakCOL_D(stfEffe,nSTF,lodEffe,nEQ,nBD,du,ierror,nprof,nprof2,nloc)
+        call bakCOL_D(stfEffe,maxstiff,lodEffe,nEQ,nBD,du,ierror,nprof,nprof2,nloc)
 !       -------------------------------------------------------------------
-!       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if    (iter <= maxramp) then
             zi=2.0**(iter)
             z0=2.0**(maxramp)
@@ -152,30 +173,37 @@
 !       -------------------------------------------------------------------
 !        test for convergence
         !if(iter==0)dsumd=dsqrt(sum((du(1:nEQ)*beta)**2))
-        if(iter==0)dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
+        !if(iter==0)dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
         
-        dsumz=dsqrt(sum(dsp(1:nEQ)**2))
+        !dsumd=dsqrt(sum((du(1:nEQ)*beta)**2))
+        !dsumz=dsqrt(sum(dsp(1:nEQ)**2))
         !if (dsumz < dtol/10.0) dsumz=dtol/10.0
         !dnorm=dsumd/dsumz
 
-        !dnorm=dabs(maxval((du(1:nEQ)*beta)**2))
-        if(iter==0)then
-            dnorm=1.0
-        else
-            dnorm=dabs(maxval((du(1:nEQ)*beta)**2))/dsumd
-        endif
+        dnorm=dabs(maxval((du(1:nEQ)*beta)**2))
+
+        !if(iter==0)then
+        !    dnorm=1.0
+        !else
+        !    dnorm=dabs(maxval((du(1:nEQ)*beta)**2))/dsumd
+        !endif
 
         iter=iter+1
-        if(iter>=100) write(*,*)'iter=',iter,'dnorm=',dnorm
-        write(*,*)'iter=',iter,'dnorm=',dnorm 
+        !if(iter>=100) write(*,*)'iter=',iter,'dnorm=',dnorm
+                       
     enddo
 
-    write(*,'(A,I5,A,D20.10)')' iterFEM=',iter,' dmaxFEM   =',dnorm
+    !if(iter>=100) write(*,'(A,I5,A,E20.10)')' iterFEM=',iter,' dmaxFEM   =',dnorm
 
+    FishInfo(iFish,1)=iFish
+    FishInfo(iFish,2)=iter
+    FishInfo(iFish,3)=dnorm
 
-    acc(1:nEQ)  = 1.0d0/(NewmarkBeta*deltat)*( (dsp(1:nEQ)-dspO(1:nEQ))/deltat -velO(1:nEQ) ) - (1.0d0/(NewmarkBeta*2.0d0) - 1.0d0)*accO(1:nEQ)
+    velO(1:nEQ) = vel(1:nEQ)
+    accO(1:nEQ) = acc(1:nEQ)
 
-    vel(1:nEQ)  = velO(1:nEQ) + ((1.0d0 - NewmarkGamma)*accO(1:nEQ) +NewmarkGamma*acc(1:nEQ))*deltat
+    acc(1:nEQ)  = a0*(dsp(1:nEQ) - dspt(1:nEQ)) -a2*velO(1:nEQ) - a3*accO(1:nEQ)
+    vel(1:nEQ)  = velO(1:nEQ) + a6*accO(1:nEQ) + a7*acc(1:nEQ)
 
     do  i=1,nND
         velful(i,1:6)=vel((i-1)*6+1:(i-1)*6+6)
@@ -187,12 +215,12 @@
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   READ structural DaTafile
-    subroutine read_structural_datafile(jBC,ele,nloc,nprof,nprof2,xyzful0,prop,nND,nEL,nEQ,nMT,nBD,nSTF,idat)
+    subroutine readdt(jBC,ele,nloc,nprof,nprof2,xyzful0,prop,nND,nEL,nEQ,nMT,nBD,maxstiff,idat)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nBD,nSTF,idat
+    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,idat
     integer:: ele(nEL,5),jBC(nND,6),nloc(nND*6),nprof(nND*6),nprof2(nND*6)
     real(8):: xyzful0(nND,6),prop(nMT,10)
 !   ---------------------------------------------------------------------------
@@ -207,6 +235,7 @@
     read(idat,'(1a50)') endin  
 !   -----------------------------------------------------------------------------------------------
 !   READ elem data
+    ! element number, node left, node right, node right, element type, material property index
     read(idat,*) nEL
     do  i= 1, nEL
         read(idat,*) j,ele(j,1:5)
@@ -225,6 +254,8 @@
     read(idat,'(1a50)') endin  
 !   -----------------------------------------------------------------------------------------------
 !   READ element material properties
+    ! can have nMT types of material
+    ! property data will be overwritten if isKB = 0 or 1
     read(idat,*) nMT
     do    i= 1, nMT
         read(idat,*) nmp,prop(nmp,1:8)
@@ -234,7 +265,7 @@
 
     nEQ=nND*6
 
-    call max_band_width(ele,nprof,nND,nEL,nEQ,nBD)
+    call maxbnd(ele,nprof,nND,nEL,nEQ,nBD)
 
 !   nprof2
     do i=1,nEQ
@@ -255,20 +286,20 @@
     do    i=1,nEQ-1
         nloc(i+1) = nloc(i) + nprof(i)
     enddo
-    nSTF=nloc(nEQ)+nprof(nEQ)
+    maxstiff=nloc(nEQ)+nprof(nEQ)
 
     !write(*,'(3(A,1x,I8,2x))')'nND=',nND,'nEL=',nEL,'nEQ=',nEQ
-    !write(*,'(3(A,1x,I8,2x))')'nMT=',nMT,'nBD=',nBD,'nSTF=',nSTF
+    !write(*,'(3(A,1x,I8,2x))')'nMT=',nMT,'nBD=',nBD,'maxstiff=',maxstiff
     return
     end
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   MAX Band Width calculation
-    subroutine max_band_width(ele,nprof,nND,nEL,nEQ,nBD)
+!   MAX BaNDwidth calculation
+    subroutine maxbnd(ele,nprof,nND,nEL,nEQ,nBD)
     implicit none
     integer:: nBD,nEQ,nEL,nND
     integer:: ele(nEL,5),nprof(nEQ) 
@@ -314,7 +345,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    
-!    copyright@ RuNanHua
+!    Runan Hua, Oct. 2010
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE write_coord(xyzful,velful,accful,ele,time,nND,nEL)
     implicit none
@@ -332,7 +363,7 @@
     integer,parameter:: namLen=40,idfile=100,numVar=6
     real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=['x','y','z','u','v','w'] 
+                        varname(numVar)=['x','y','z','u','v','w']
     !==================================================================================================
 
     write(fileName,'(F7.3)') time
@@ -341,7 +372,7 @@
         if(fileName(i:i)==' ')fileName(i:i)='0'
     END DO
 
-    OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='unformatted')
+    OPEN(idfile,FILE='./DatBody/Body'//trim(filename)//'.plt',form='unformatted',access='stream')
 
 !   I. The header section.
 !   =============================================        
@@ -379,8 +410,7 @@
     ENDSUBROUTINE write_coord
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    set angle of initial triads
-!    copyright@ RuNanHua
+!   set angle of initial triads
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE init_triad_D(ele,xord0,yord0,zord0,triad_nn,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,nND,nEL)
     implicit none
@@ -515,8 +545,8 @@
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    update angle of  triads
-!    copyright@ RuNanHua
+!   update angle of  triads
+!    
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE update_triad_D(ele,ddut,triad_nn,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ)
     implicit none
@@ -584,8 +614,8 @@
     ENDSUBROUTINE update_triad_D
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    get orientation of element
-!    copyright@ RuNanHua 
+!   get orientation of element
+!    
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE make_triad_ee(ele,xord,yord,zord,triad_ee,triad_n1,triad_n2,triad_n3,nND,nEL)
     implicit none
@@ -719,7 +749,7 @@
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE finite_rot(t1,t2,t3,rr)
     implicit none
@@ -781,8 +811,8 @@
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    GET ANGLE of between TRIADs
-!    copyright@ RuNanHua
+!   GET ANGLE of between TRIADs
+!    pass
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE get_angle_triad(triad_n1,triad_n2,tx,ty,tz)
     implicit none
@@ -825,7 +855,7 @@
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     SUBROUTINE global_to_local(triad,tx,ty,tz,tx2,ty2,tz2)
     implicit none
@@ -838,8 +868,8 @@
     ENDSUBROUTINE global_to_local
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Nodal loads due to body stresses
-!    copyright@ RuNanHua
+!   Nodal loads due to body stresses
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE body_stress_D(    gforce,xord0,yord0,zord0,xord,yord,zord, &
                                 ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
@@ -967,7 +997,7 @@
 !           compute axial force
             fxx=dl*e0*a0/xl0
 !           save local force for geo stiff
-            !write(igeoFRM,'(D25.15)') fxx
+            !write(igeoFRM,'(E25.15)') fxx
             geoFRM(n)=fxx
 !           nodal forces in local coords
 !           {F}=[k]{u}
@@ -1146,7 +1176,7 @@
 !           {F}=[k]{u}
             forceb(1:18) =matmul(ekb(1:18,1:18),ub(1:18))
 !           save local force for geo stiff           
-            !write(igeoPLT,'(9(D25.15,1x))') forceb(1),forceb(2),forceb(3),forceb(7),forceb(8),forceb(9),forceb(13),forceb(14),forceb(15)
+            !write(igeoPLT,'(9(E25.15,1x))') forceb(1),forceb(2),forceb(3),forceb(7),forceb(8),forceb(9),forceb(13),forceb(14),forceb(15)
             geoPLT(1:9,n)=[forceb(1),forceb(2),forceb(3),forceb(7),forceb(8),forceb(9),forceb(13),forceb(14),forceb(15)]
 !           transform to global
             rr(1:3,1:3)=triad_ee(1:3,1:3,n)
@@ -1177,8 +1207,8 @@
     ENDSUBROUTINE body_stress_D
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    FORM MASS matrix: only lumped
-!    copyright@ RuNanHua
+!   FORM MASS matrix: only lumped
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,alphaf,alpham,alphap)
     implicit none                  
@@ -1194,7 +1224,7 @@
     real(8):: a0,r0,b0,zix0,ziy0,ziz0,dx,dy,dz,xl,xll,xmm,xnn,tt0,rh0,dxb,dyb,dzb
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,axy,ayz,azx,area,xb1,yb1,zb1,xb2,yb2,zb2,xb3,yb3,zb3
 
-    !rotational inertial factors
+    !ת���������Ӵ�С
     real(8):: alphaf,alpham,alphap
 
 !   zero array before assembling
@@ -1206,7 +1236,7 @@
         i1  = ele(i,1)
         j1  = ele(i,2)
         k1  = ele(i,3)        
-        nELt= ele(i,4)
+        nELt= ele(i,4) ! element type, 2 line segment
         mat = ele(i,5)
         if (nELt == 2) then
             a0=prop(mat,3)
@@ -1281,17 +1311,17 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    FORM STIFfness matrix  [K]
-!    copyright@ RuNanHua
+!   FORM STIFfness matrix  [K]
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine formstif_s(stf,ele,xord0,yord0,zord0,xord,yord,zord,prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF)
+    subroutine formstif_s(stf,ele,xord0,yord0,zord0,xord,yord,zord,prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,maxstiff)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nSTF  
+    integer:: nND,nEL,nEQ,nMT,maxstiff  
     integer:: ele(nEL,5),nprof(nEQ), nloc(nEQ) 
     real(8):: prop(nMT,10)
     real(8):: xord0(nND), yord0(nND),zord0(nND)
     real(8):: xord(nND), yord(nND),zord(nND)
-    real(8):: stf(nSTF)
+    real(8):: stf(maxstiff)
     real(8):: ek(18,18), ekb(18,18),ek12(12,12),ek9(9,9)
       
     real(8):: triad_e0(3,3,nEL),triad_ee(3,3,nEL),rr(3,3)
@@ -1305,7 +1335,7 @@
     real(8):: temp
 
 !   initialize [K]  to zero
-    stf(1:nSTF)=0.0
+    stf(1:maxstiff)=0.0
 
 !   form each element matrix, and assemble
     do    n=1,nEL
@@ -1356,7 +1386,7 @@
             enddo
             enddo
 
-            call assembCOL(nSTF,nND,nEQ,stf,ek,i1,j1,k1,nloc)
+            call assembCOL(maxstiff,nND,nEQ,stf,ek,i1,j1,k1,nloc)
 !
         elseif (nELt == 3) then
             e0=prop(mat,1)
@@ -1411,7 +1441,7 @@
             call elmstfDKT_D(e0,g0,t0,zip0,xb1,xb2,xb3,yb1,yb2,yb3,ekb,ek9)
             rr(1:3,1:3)=triad_ee(1:3,1:3,n)
             call rot_mat_LG(rr,ekb,ek)
-            call assembCOL(nSTF,nND,nEQ,stf,ek,i1,j1,k1,nloc)
+            call assembCOL(maxstiff,nND,nEQ,stf,ek,i1,j1,k1,nloc)
         else
             write(*,*)'not this nELt:',nELt
             stop
@@ -1422,12 +1452,12 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    FORM GEOMetric stiffness matrices  [KGx],[KGy],[KGxy]
-!    copyright@ RuNanHua
+!   FORM GEOMetric stiffness matrices  [KGx],[KGy],[KGxy]
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine formgeom_s(geo,ele,xord0,yord0,zord0,xord,yord,zord,prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,nSTF,geoFRM,geoPLT)
+    subroutine formgeom_s(geo,ele,xord0,yord0,zord0,xord,yord,zord,prop,nprof,nloc,triad_e0,triad_ee,nND,nEL,nEQ,nMT,maxstiff,geoFRM,geoPLT)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nSTF
+    integer:: nND,nEL,nEQ,nMT,maxstiff
     integer:: ele(nEL,5),nprof(nEQ), nloc(nEQ)
     real(8):: prop(nMT,10),geoFRM(nEL),geoPLT(1:9,nEL)
     real(8):: eg12(12,12),eg(18,18)
@@ -1435,7 +1465,7 @@
     real(8):: xord0(nND), yord0(nND),zord0(nND)
     real(8):: xord(nND), yord(nND),zord(nND)
 
-    real(8):: geo(nSTF),egm(18,18),eg6(6,6)
+    real(8):: geo(maxstiff),egm(18,18),eg6(6,6)
     real(8):: x0b1,x0b2,x0b3,y0b1,y0b2,y0b3
     real(8):: xb1,xb2,xb3,yb1,yb2,yb3,zb1,zb2,zb3
     real(8):: x1,x2,x3,y1,y2,y3,x10,y10,z10
@@ -1450,7 +1480,7 @@
     real(8):: t0,e0,g0,a0,b0,dx,dy,dz,xl0,xl,xll,xmm,xnn,sxx,s,xl9,z1,z2,z3,x01,y01,z01,forceb(9)
 
 !   initialize [G] to zero
-    geo(1:nSTF)=0.0
+    geo(1:maxstiff)=0.0
 
     !rewind(igeoFRM)
     !rewind(igeoPLT)
@@ -1495,7 +1525,7 @@
 !           expand to [18x18]
             eg(1:18,1:18)=0.0
             eg(1:12,1:12)=eg12(1:12,1:12)
-            call assembCOL(nSTF,nND,nEQ,geo,eg ,i1,j1,k1,nloc)
+            call assembCOL(maxstiff,nND,nEQ,geo,eg ,i1,j1,k1,nloc)
 
         elseif (nELt == 3) then
 !           use element triad to rotate coords to local x=Rtx
@@ -1601,7 +1631,7 @@
                                     xb1,xb2,xb3,yb1,yb2,yb3,zb1,zb2,zb3, &
                                     t0,eg6,egm,forceb,triad_11,triad_22,x10,y10)
 
-            call assembCOL(nSTF,nND,nEQ,geo,egm,i1,j1,k1,nloc)
+            call assembCOL(maxstiff,nND,nEQ,geo,egm,i1,j1,k1,nloc)
 
         else
             write(*,*)'not this nELt:',nELt
@@ -1613,8 +1643,8 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent MASs matrix for the FRaMe
-!    copyright@ RuNanHua
+!   ELeMent MASs matrix for the FRaMe
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmmasFRM_D(rho,area,length,zix,em,alphaf)
     implicit none
@@ -1641,7 +1671,7 @@
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ELeMent MASs matrix for Constant Strain Triangle
     subroutine elmmasCST_D(rho, area, th, em)
@@ -1687,9 +1717,9 @@
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent MASs matrix for Moment Rotation Triangle
+!   ELeMent MASs matrix for Moment Rotation Triangle
     subroutine elmmasMRT_D(rho,area,th,em ,alpham)
     implicit none  
     real(8):: alpham,rho,area,th,em(18,18),emb(9,9)
@@ -1739,7 +1769,7 @@
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ELeMent MASs matrix for PLaTe: triangle
     subroutine elmmasPLT_D(rho, area, th, em ,alphap)
@@ -1791,8 +1821,8 @@
     return
     end
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent STiFfness for Discrete Kirchhoff Triangle: CMP pp332
-!    copyright@ RuNanHua 
+!   ELeMent STiFfness for Discrete Kirchhoff Triangle: CMP pp332
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfDKT_D(e0,g0,tt0,zip0,x1,x2,x3,y1,y2,y3,ek,ekb)
     implicit none
@@ -1960,8 +1990,8 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent STiFfness for Constant Strain Triangle
-!    copyright@ RuNanHua
+!   ELeMent STiFfness for Constant Strain Triangle
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfCST_D(e0,g0,tt0,pl0,x1,x2,x3,y1,y2,y3,ek,ek9)
     implicit none
@@ -2051,9 +2081,8 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent STiFfness for FRaMe
-!    calculates the element stiffness matrices.
-!    copyright@ RuNanHua
+!   ELeMent STiFfness for FRaMe
+!   calculates the element stiffness matrices.
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfFRM_D(length, ix, iy, iz,area, emod, gmod, ek ,nELt)
     implicit none
@@ -2120,8 +2149,8 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent STiFFness for Membrane with Rotation Triangle
-!    copyright@ RuNanHua
+!   ELeMent STiFFness for Membrane with Rotation Triangle
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmstfMRT_D(e0,g0,tt0,pl0,alpha0,beta0,x1,x2,x3,y1,y2,y3,ek,ekb)
     implicit none
@@ -2194,8 +2223,8 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent GEOMetric stiffness for Constant Strain Triangle
-!    copyright@ RuNanHua
+!   ELeMent GEOMetric stiffness for Constant Strain Triangle
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmgeomCST_s(x1,x2,x3,y1,y2,y3,x0b1,x0b2,x0b3,y0b1,y0b2,y0b3,xb1,xb2,xb3,yb1,yb2,yb3,zb1,zb2,zb3, &
                             tt0,ekg6,ekg18,forceb,triad_11,triad_22,x10,y10)
@@ -2398,8 +2427,8 @@
     end
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ELeMent GEOMetric stiffness matrix for a FRaMe
-!    copyright@ RuNanHua
+!   ELeMent GEOMetric stiffness matrix for a FRaMe
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine elmgeomFRM_D(length,eg,s)
     implicit none
@@ -2464,13 +2493,13 @@
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ASSEMBle element matrices in COLumn form
-!    copyright@ RuNanHua
+!   ASSEMBle element matrices in COLumn form
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine assembCOL(nSTF,nND,nEQ,aa,a,i1,j1,k1,nloc)    
+    subroutine assembCOL(maxstiff,nND,nEQ,aa,a,i1,j1,k1,nloc)    
     implicit none
-    integer:: nSTF,nND,nEQ            
-    real(8):: aa(nSTF),a(18,18)
+    integer:: maxstiff,nND,nEQ            
+    real(8):: aa(maxstiff),a(18,18)
     integer:: idof(18)
     integer:: i1,j1,k1,nloc(nEQ)
     integer:: i,j,imax,jmax,ieqn1,ieqn2,jband,iloc    
@@ -2514,7 +2543,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ASSEMBle LUMped element matrices
     subroutine assembLUM(nND,nEQ,aa,a,i1,j1,k1)
@@ -2542,7 +2571,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ASSEMBle consistent FORce for pressurized flex plate
     subroutine assembFOR(nEQ,nND, aa, a,i1, j1,k1)
@@ -2571,7 +2600,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   TRANSformation of matrix in 3D. L->G
     subroutine trans3d_D(l,m,n,ek,beta)
@@ -2654,14 +2683,14 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   AxB product for COLumn storage
-    subroutine AxBCOL(matrix,nSTF,vecin,vecout, nEQ,nBD,nprof,nprof2,nloc)
+    subroutine AxBCOL(matrix,maxstiff,vecin,vecout, nEQ,nBD,nprof,nprof2,nloc)
     implicit none
-    integer:: nSTF,nEQ,nBD
+    integer:: maxstiff,nEQ,nBD
     integer:: nprof(nEQ),nprof2(nEQ),nloc(nEQ)
-    real(8):: vecout(nEQ),matrix(nSTF),vecin(nEQ)
+    real(8):: vecout(nEQ),matrix(maxstiff),vecin(nEQ)
     real(8):: val,valmat
     integer:: i,j,io,is,jlim,iloc
 !
@@ -2695,8 +2724,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    makes a 3-D coordinate transformations.
-!    copyright@ RuNanHua
+!   makes a 3-D coordinate transformations.
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ROTate VECtor
     subroutine rotvec_D(xll,xmm,xnn,dx,dy,dz,dxb,dyb,dzb)
@@ -2754,8 +2782,8 @@
     end
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    ROTate stiffness MATrix Local to Global
-!    copyright@ RuNanHua
+!   ROTate stiffness MATrix Local to Global
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine rot_mat_LG(rr,ekb,ek)
     implicit none
@@ -2811,7 +2839,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ROTATE stiffness matrix
 !   makes a 2-D coordinate transformations.
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine rotate_D(xll,xmm,xnn,ekb,ek)   
     implicit none
@@ -2935,7 +2962,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   from Bergan and Felippa, CMAME, 1985
 !   basic stiffness
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine sm3mb_D(x,y,dm,alpha,f,ls,sm)
     implicit none
@@ -3026,7 +3052,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
 !   higher stiffness
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine sm3mh_D(x,y,dm,f,ls,sm)
     implicit none
@@ -3173,7 +3198,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   UDU decomposition of COLumn profiled system
     subroutine uduCOL_D(a,maxstore,nEQ,nBD,imult,nprof,nloc)
@@ -3280,7 +3305,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   BAcK solver of COLumn profiled system
     subroutine bakCOL_D(a,maxstore,b,nEQ,nBD,wk,imult,nprof,nprof2,nloc)
@@ -3368,7 +3393,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine ainver(a,n,indx,yn)
     implicit none
@@ -3404,7 +3429,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine ludcmp(a,n,np,indx,d)
     implicit none
@@ -3422,7 +3447,8 @@
         do  j = 1,n
             if (abs(a(i,j)) .gt. aamax) aamax = abs(a(i,j))
         enddo
-        if (aamax .eq. 0.0) pause 'Singular Matrix'
+        !if (aamax .eq. 0.0) pause 'Singular Matrix'
+        if (aamax .eq. 0.0) stop 'Singular Matrix In StructureSolver.f90'
         vv(i) = 1.0/aamax
     enddo
 
@@ -3476,7 +3502,7 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   
-!    copyright@ RuNanHua
+!
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine lubksb(a,n,np,indx,b)
     implicit none

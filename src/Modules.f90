@@ -1,106 +1,115 @@
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Lattice Boltzman model module
-!    copyright@ RuNanHua
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    
+!  
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     MODULE LBModel
-!    D3Q19model*************************************************************************************
-    INTEGER, PARAMETER:: SpcDim = 3, LBMDim = 18
+!    D2Q9model
+    integer, parameter:: SpcDim = 2, LBMDim=8 
 !   Directions*************************************************************************************
-    integer, parameter:: ee(0:lbmDim,1:3)=reshape([&
-                                        !0  1  2     3    4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
-                                         0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0, &
-                                         0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1, &
-                                         0, 0, 0, 0, 0, 1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 1, 1,-1,-1  &
-                                                 ],[lbmDim+1,SpcDim])   
+    integer, parameter:: ee(0:LBMDim,1:SpcDim)  = reshape(  [&
+                                          !0  1  2  3  4  5  6  7  8
+                                           0, 1, 0,-1, 0, 1,-1,-1, 1,&
+                                           0, 0, 1, 0,-1, 1, 1,-1,-1 ],[LBMDim+1,SpcDim])
 !    Opposite directions****************************************************************************
-    integer, parameter:: oppo(0:lbmDim)=[0, 2, 1, 4, 3, 6, 5,10, 9, 8, 7,14,13,12,11,18,17,16,15]
+    integer, parameter:: oppo(0:LBMDim) = [0, 3, 4, 1, 2, 7, 8, 5, 6]
 !    Weights****************************************************************************************
-    real(8), parameter:: wt(0:lbmDim) = [& 
-       1.0d0/3.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0, &
-                   1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0, &
-                   1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0  ]  
+    real(8), parameter:: wt(0:LBMDim) = [&
+                                4.0d0/ 9.0d0,1.0d0/ 9.0d0,1.0d0/ 9.0d0,1.0d0/ 9.0d0,1.0d0/ 9.0d0, &
+                                             1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0  ]
 !   MRT model Matrix*******************************************************************************
     real(8)::M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim)
-    !real(8),parameter::s0=1.0d0,s1=1.0d0,s2=1.0d0,s4=1.0d0,s10=1.0d0,s16=1.0d0
-    real(8), parameter::s0=1.0d0,s1=1.19d0,s2=1.4d0,s4=1.2d0,s10=1.4d0,s16=1.98d0
-!   ***********************************************************************************************
-    END MODULE LBModel
+    !real(8),parameter::s0=1.00d0,s1=1.00d0,s2=1.40d0,s4=1.00d0
+    !real(8),parameter::s0=1.00d0,s1=1.63d0,s2=1.14d0,s4=1.92d0
+    real(8), parameter::s0=1.00d0,s1=1.40d0,s2=1.40d0,s4=1.20d0
+    END MODULE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Fluid structure interaction module
-!    copyright@ RuNanHua
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    
+!  
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     MODULE simParam
     USE LBModel
-    integer:: npsize
-    real(8), parameter:: Pi=3.141592653589793d0,eps=1.0d-5
-!   ***********************************************************************************************
-    integer, parameter:: fluid = 0, wall = 200  
+    integer:: npsize 
+!    ***********************************************************************************************
+    real(8), parameter:: pi=3.141592653589793d0, eps=1.0d-5
+!    ***********************************************************************************************
+    integer, parameter:: fluid = 0, wall = 200, MovingWall=201
     integer, parameter:: DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304
-                        !given balance function   unbalanced extrapolation     1st order extrapolate         2nd order extrapolate       periodic
+                        !given equilibrium function, non-equilibrium extrapolation, first order extrapolation, second order extrapolation, periodic
 !   ***********************************************************************************************
 !   ***********************************************************************************************
-    integer:: step
-    real(8):: time
-
-    integer:: isConCmpt,iCollidModel,iStreamModel,iBodyModel,iForce2Body,iFlapRef,iKB,isRelease
-    integer:: iChordDirection,move(1:SpcDim),numOutput
-    integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
-    integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
-    integer, allocatable:: SampBodyNode(:)
+    integer:: isConCmpt, isMoveGrid, isMoveOutput, RefVelocity, RefLength, isKB, isRelease, isVelInit
+    integer:: iMoveDim, iCollidModel, iStreamModel, iForce2Flow, iForce2Body, move(1:SpcDim)
+    integer:: IXref, IYref, IZref, ntolLBM, ntolFEM,  numsubstep, numSampFlow,numSampBody
+    real(8):: Xref,  Yref,  Zref,  dtolLBM, dtolFEM, subdeltat
+    integer, allocatable:: SampBodyNode(:,:)
     real(8), allocatable:: SampFlowPint(:,:)
-    real(8):: Xref,Yref,Zref
-    real(8):: timeSimTotl,timeOutTemp,timeOutBody,timeOutFlow,timeOutInfo,timeOutFlBg,timeOutFlEd
-    real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFEM,dtolFSI,subdeltat
-    real(8):: uuuIn(1:SpcDim),denIn,g(1:SpcDim)
-    real(8):: AmplInitDist(1:SpcDim),waveInitDist,AmplforcDist(1:SpcDim),FreqforcDist
-    real(8):: posiForcDist(1:SpcDim),begForcDist,endForcDist
-    real(8):: Re,St,AR,tcR,denR,KB,KS,EmR,psR,Frod(1:SpcDim)
-    real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
-    real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Lspan,Asfac
+    integer:: Step 
+    real(8):: time, Tref, Uref, Aref, Lref, Fref, Eref, Pref, Lthck, Lleng, Palpha, Pbeta,Pramp, uMax
+    real(8), allocatable:: Lchod(:)   !The distance between the two farthest points on the body
+    real(8):: timeSimTotl, timeOutTemp, timeOutBody, timeOutFlow, timeOutInfo, timeOutFlBg, timeOutFlEd
+    real(8):: uIn(1:SpcDim), denIn, g(1:3),AmplInitDist(1:SpcDim),AmplTranDist(1:SpcDim),FreqInitDist(1:SpcDim)
+    real(8):: Re, St, Frod(1:3)
+    real(8), allocatable::denR(:), tcR(:), EmR(:), psR(:), KB(:), KS(:)
+    real(8):: dampK,dampM,Newmarkdelta,Newmarkalpha,alphaf,alpham,alphap
+
     real(8):: UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
-
-    real(8):: upxc0, upxcm, upxcmm
-    real(8):: upyc0, upycm, upycmm
-    real(8):: upzc0, upzcm, upzcmm
-    real(8):: cnxc0, cnxcm, cnxcp
-    real(8):: cnyc0, cnycm, cnycp
-    real(8):: cnzc0, cnzcm, cnzcp
-
-!   ***********************************************************************************************
-    character (LEN=40):: LBmeshName 
-    integer:: xDim,yDim,zDim
-    integer:: xMinBC,xMaxBC,yMinBC,yMaxBC,zMinBC,zMaxBC,iBC
-    real(8):: dh,dt,ratio,dxmin,dymin,dzmin,dxmax,dymax,dzmax,elmax,elmin
-    real(8):: cptxMin,cptxMax,cptyMin,cptyMax,cptzMin,cptzMax
-    real(8):: Omega,tau,Cs2,nu,Mu
-    integer, allocatable:: image(:,:,:)
-    real(8), allocatable:: dx(:), dy(:), dz(:) 
-    real(8), allocatable:: xGrid0(:), yGrid0(:), zGrid0(:), xGrid(:), yGrid(:), zGrid(:)
-    real(8), allocatable:: fIn(:,:,:,:), fInTemp(:,:,:)
-    real(8), allocatable:: uuu(:,:,:,:), force(:,:,:,:), den(:,:,:), prs(:,:,:)
-    
+!    ***********************************************************************************************
+    character (LEN=40):: LBmeshName
+    integer:: boundaryConditions(1:4),MovingKind1,MovingKind2,VelocityKind
+    real(8):: VelocityAmp,VelocityFreq,MovingVel1,MovingVel2,MovingFreq1,MovingFreq2,shearRateIn(1:SpcDim),ParabolicParameter(1:2)
+    integer:: xDim, yDim
+    integer:: xMinBC,xMaxBC,yMinBC,yMaxBC,iBC
+    real(8):: dh, dt, ratio
+    real(8):: dxmin,dymin,dxmax,dymax,cptxmin,cptxmax,cptymin,cptymax
+    real(8):: Cs2, Nu, Mu, Tau, Omega
+    real(8):: upxc0, upxcm, upxcmm, upyc0, upycm, upycmm
+    real(8):: cnxcm, cnxc0, cnxcp,  cnycm, cnyc0, cnycp
+    integer, allocatable:: image(:,:)
+    real(8), allocatable:: xGrid(:), yGrid(:), xGrid0(:), yGrid0(:), dx(:), dy(:)
+    real(8), allocatable:: fIn(:,:,:), fInTemp(:,:)
+    real(8), allocatable:: uuu(:,:,:), force(:,:,:), den(:,:), prs(:,:), vor(:,:)    
+     
+       
+!    ***********************************************************************************************
 !   *********************************************************************************************** 
 !   *********************************************************************************************** 
-    integer, parameter:: idat=12, DOFDim=6
-    character (LEN=40):: FEmeshName
+    integer, parameter:: idat=12, DOFDim=6  ! Data reading format; Number of body freedom degrees 
+    character(LEN=40), allocatable:: FEmeshName(:)
 !   ***********************************************************************************************     
     real(8):: deltaT,Freq
-    real(8):: XYZ(1:SpcDim),XYZo(1:SpcDim),XYZAmpl(1:SpcDim),XYZPhi(1:SpcDim),XYZd(1:SpcDim),UVW(1:SpcDim)
-    real(8):: AoA(1:SpcDim),AoAo(1:SpcDim),AoAAmpl(1:SpcDim),AoAPhi(1:SpcDim),AoAd(1:SpcDim),WWW1(1:SpcDim),WWW2(1:SpcDim),WWW3(1:SpcDim)
-    real(8):: TTT00(1:3,1:3),TTT0(1:3,1:3),TTTnow(1:3,1:3),TTTnxt(1:3,1:3)
+    real(8), allocatable:: waittingTime(:,:)      !Dimensionless number for Platehead's waitting time at wave crest and wave trough (t/T)
+    real(8), allocatable:: XYZ(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),XYZd(:,:),UVW(:,:)
+    real(8), allocatable:: AoA(:,:),AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:),AoAd(:,:),WWW1(:,:),WWW2(:,:),WWW3(:,:)
+    real(8), allocatable:: TTT00(:,:,:),TTT0(:,:,:),TTTnow(:,:,:),TTTnxt(:,:,:)
 !   ***********************************************************************************************
-    integer:: nND,nEL,nEQ,nMT,nBD,nSTF 
-    integer:: NDtl(1:5),NDhd(1:3),NDref,NDct,isMotionGiven(1:DOFDim)
+    integer:: nFish
+    integer:: nND_max,nEL_max,nMT_max,nEQ_max
+    ! nND(1:nFish), number of nodes in each fish
+    ! nEL(1:nFish), number of elements in each fish
+    ! nMT(1:nFish), 1 for 2D
+    integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),maxstiff(:)
+    integer, allocatable:: isMotionGiven(:,:),iBodyModel(:)
+    integer:: NDref 
 !   ===============================================================================================
-    integer, allocatable:: ele(:,:),nloc(:),nprof(:),nprof2(:),jBC(:,:) 
-    real(8), allocatable:: xyzful00(:,:),mssful(:,:),vBC(:,:),mss(:),prop(:,:),areaElem00(:),areaElem(:)
-    real(8), allocatable:: lodful(:,:),extful(:,:),extful1(:,:),extful2(:,:),grav(:,:),streI(:),bendO(:)
+    integer:: nEL_all, nND_all
+    integer,allocatable:: ele_all(:,:)
+    real(8),allocatable:: xyzful_all(:,:),velful_all(:,:),xyzfulIB_all(:,:),extful_all(:,:)
+!   ===============================================================================================    
+    integer, allocatable:: ele(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:),jBC(:,:,:)
+    ! xyzful00(1:nFish, nND(fish), 1:6) coordinates of nodes in each fish from the input file, only (1:2) are used
+    real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),mss(:,:),prop(:,:,:)
+    real(8), allocatable:: lodful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:),repful(:,:,:)
 
-    real(8), allocatable:: xyzful0(:,:),xyzfulnxt(:,:),dspful(:,:),accful(:,:)
-    real(8), allocatable:: xyzful(:,:),xyzfulIB(:,:),velful(:,:)
-    real(8), allocatable:: triad_nn(:,:,:),triad_ee(:,:,:),triad_e0(:,:,:)
-    real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
-!   ***********************************************************************************************   
-    END MODULE simParam
+    ! xyzful0, the initial coordinate of body nodes. Translation and rotation are applied
+    real(8), allocatable:: xyzful0(:,:,:),xyzfulnxt(:,:,:),dspful(:,:,:),accful(:,:,:)
+    ! xyzful the current coordinates of nodes in each fish
+    ! velful the current velocity of nodes in each fish
+    ! xyzfulIB the virtual IB nodes
+    real(8), allocatable:: xyzful(:,:,:),xyzfulIB(:,:,:),velful(:,:,:)
+    
+    real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
+    real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
+!    ***********************************************************************************************
 
+    END MODULE
