@@ -154,20 +154,23 @@
 !       -------------------------------------------------------------------
 !        test for convergence
         !if(iter==0)dsumd=dsqrt(sum((du(1:nEQ)*beta)**2))
-        if(iter==0)dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
+        !if(iter==0)dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
         
-        dsumz=dsqrt(sum(dsp(1:nEQ)**2))
+        !dsumz=dsqrt(sum(dsp(1:nEQ)**2))
         !if (dsumz < dtol/10.0) dsumz=dtol/10.0
         !dnorm=dsumd/dsumz
 
         !dnorm=dabs(maxval((du(1:nEQ)*beta)**2))
-        if(iter==0)then
-            dnorm=1.0
-        else
-            dnorm=dabs(maxval((du(1:nEQ)*beta)**2))/dsumd
-        endif
+        !if(iter==0)then
+        !    dnorm=1.0
+        !else
+        !    dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
+        !    dnorm=dabs(maxval((du(1:nEQ)*beta)**2))/dsumd
+        !endif
 
-        iter=iter+1
+         dnorm=sqrt(maxval((du(1:nEQ)*beta)**2))
+
+        iter  = iter+1
         !if(iter>=100) write(*,*)'iter=',iter,'dnorm=',dnorm
         !write(*,*)'iter=',iter,'dnorm=',dnorm 
     enddo

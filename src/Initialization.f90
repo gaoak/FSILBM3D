@@ -303,15 +303,15 @@
 !    package
     do iFish=1,nFish
         if(iFish.eq.1)then
-           do iEL=1,nEL(iFish)
-              ele_all(iEL,1:3)=ele(iFish,iEL,1:3) 
-              ele_all(iEL,4:5)=ele(iFish,iEL,4:5) 
-           enddo
+            do iEL=1,nEL(iFish)
+                ele_all(iEL,1:3)=ele(iFish,iEL,1:3) 
+                ele_all(iEL,4:5)=ele(iFish,iEL,4:5) 
+            enddo
         else
-        do iEL=1,nEL(iFish)
-            ele_all(iEL+sum(nEL(1:iFish-1)),1:3)=ele(iFish,iEL,1:3)+sum(nND(1:iFish-1))
-            ele_all(iEL+sum(nEL(1:iFish-1)),4:5)=ele(iFish,iEL,4:5) 
-        enddo 
+            do iEL=1,nEL(iFish)
+                ele_all(iEL+sum(nEL(1:iFish-1)),1:3)=ele(iFish,iEL,1:3)+sum(nND(1:iFish-1))
+                ele_all(iEL+sum(nEL(1:iFish-1)),4:5)=ele(iFish,iEL,4:5) 
+            enddo 
         endif
     enddo  
 !   ===============================================================================================
@@ -531,12 +531,14 @@
 
         XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq*time+XYZPhi(iFish,1:3))
         AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq*time+AoAPhi(iFish,1:3))
+
         call AoAtoTTT(AoA(iFish,1:3),TTT0(iFish,1:3,1:3))
         call AoAtoTTT(AoA(iFish,1:3),TTTnow(iFish,1:3,1:3))
         call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnow(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
-        do  iND=1,nND(iFish)
-                xyzful0(iFish,iND,1:3)=matmul(TTT0(iFish,1:3,1:3),xyzful00(iFish,iND,1:3))+XYZ(iFish,1:3)
-                xyzful0(iFish,iND,4:6)=AoAd(iFish,1:3)
+
+        do iND=1,nND(iFish)
+            xyzful0(iFish,iND,1:3)=matmul(TTT0(iFish,1:3,1:3),xyzful00(iFish,iND,1:3))+XYZ(iFish,1:3)
+            xyzful0(iFish,iND,4:6)=AoAd(iFish,1:3)
         enddo
 
         xyzful(iFish,1:nND(iFish),1:6)=xyzful0(iFish,1:nND(iFish),1:6)     
@@ -548,22 +550,25 @@
         xyzfulIB(iFish,1:nND(iFish),1:6)=xyzful(iFish,1:nND(iFish),1:6)
 
         do iND=1,nND(iFish)
-            xyzful_all(iND+iCount,1:6)=xyzful(iFish,iND,1:6)
-            velful_all(iND+iCount,1:6)=velful(iFish,iND,1:6)
-            xyzfulIB_all(iND+iCount,1:6)=xyzfulIB(iFish,iND,1:6)
-            extful1_all(iND+iCount,1:6)=0.d0
-            extful2_all(iND+iCount,1:6)=0.d0
+            xyzful_all(iND+iCount,1:6)   =xyzful(iFish,iND,1:6)
+            velful_all(iND+iCount,1:6)   =velful(iFish,iND,1:6)
+            xyzfulIB_all(iND+iCount,1:6) =xyzfulIB(iFish,iND,1:6)
+            extful1_all(iND+iCount,1:6)  =0.d0
+            extful2_all(iND+iCount,1:6)  =0.d0
         enddo
 
         CALL formmass_D(ele(iFish,1:nEL(iFish),1:5),xyzful0(iFish,1:nND(iFish),1),xyzful0(iFish,1:nND(iFish),2),xyzful0(iFish,1:nND(iFish),3), &
                         prop(iFish,1:nMT(iFish),1:10),mss(iFish,1:nND(iFish)*6),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf,alpham,alphap) 
-        do  iND = 1, nND(iFish)
-            mssful(iFish,iND,1:6)=mss(iFish,(iND-1)*6+1:(iND-1)*6+6)
-            grav(iFish,iND,1:6) = mssful(iFish,iND,1:6)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+        
+        do iND = 1, nND(iFish)
+            mssful(iFish,iND,1:6)= mss(iFish,(iND-1)*6+1:(iND-1)*6+6)
+            grav(iFish,iND,1:6)  = mssful(iFish,iND,1:6)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
         enddo
+
         CALL init_triad_D(ele(iFish,1:nEL(iFish),1:5),xyzful(iFish,1:nND(iFish),1),xyzful(iFish,1:nND(iFish),2),xyzful(iFish,1:nND(iFish),3), &
-                        triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)),triad_n3(iFish,1:3,1:3,1:nEL(iFish)), &
-                        triad_ee(iFish,1:3,1:3,1:nEL(iFish)),triad_e0(iFish,1:3,1:3,1:nEL(iFish)),nND(iFish),nEL(iFish)) 
+                          triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)),triad_n3(iFish,1:3,1:3,1:nEL(iFish)), &
+                          triad_ee(iFish,1:3,1:3,1:nEL(iFish)),triad_e0(iFish,1:3,1:3,1:nEL(iFish)),nND(iFish),nEL(iFish)) 
+        
         iCount = iCount + nND(iFish)
     enddo
     END SUBROUTINE

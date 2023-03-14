@@ -134,11 +134,11 @@
 
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z) 
         do x=1,xDim
-        do y=1,yDim
-        do z=1,zDim
-            force(z,y,x,1:3) = 0.d0
-        enddo
-        enddo
+            do y=1,yDim
+                do z=1,zDim
+                    force(z,y,x,1:3) = 0.d0
+                enddo
+            enddo
         enddo
         !$OMP END PARALLEL DO
 
@@ -146,19 +146,19 @@
         do iFish=1,nFish
         if(iFish.eq.1)then
             do iND=1,nND(iFish)
-               xyzful_all(iND,1:6)  =  xyzful(iFish,iND,1:6)
-               velful_all(iND,1:6)  =  velful(iFish,iND,1:6)
-               xyzfulIB_all(iND,1:6) = xyzfulIB(iFish,iND,1:6)
+               xyzful_all(iND,1:6)   =  xyzful(iFish,iND,1:6)
+               velful_all(iND,1:6)   =  velful(iFish,iND,1:6)
+               xyzfulIB_all(iND,1:6) =  xyzfulIB(iFish,iND,1:6)
                extful1_all(iND,1:6)  =  extful(iFish,iND,1:6)
                extful2_all(iND,1:6)  =  extful(iFish,iND,1:6)
             enddo
         elseif(iFish.ge.2)then
             do iND=1,nND(iFish)
-               xyzful_all(iND+ sum(nND(1:iFish-1)),1:6)  =  xyzful(iFish,iND,1:6)
-               velful_all(iND+ sum(nND(1:iFish-1)),1:6)  =  velful(iFish,iND,1:6)
-               xyzfulIB_all(iND+ sum(nND(1:iFish-1)),1:6) = xyzfulIB(iFish,iND,1:6)
-               extful1_all(iND+ sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
-               extful2_all(iND+ sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
+               xyzful_all(iND+sum(nND(1:iFish-1)),1:6)   =  xyzful(iFish,iND,1:6)
+               velful_all(iND+sum(nND(1:iFish-1)),1:6)   =  velful(iFish,iND,1:6)
+               xyzfulIB_all(iND+sum(nND(1:iFish-1)),1:6) =  xyzfulIB(iFish,iND,1:6)
+               extful1_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
+               extful2_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
             enddo
         endif    
 
@@ -168,7 +168,7 @@
         CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all)
         elseif(iForce2Body==2)then   !stress force
-        CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful,extful2_all)
+        CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful2_all)
         else
              stop 'no define force to body ' 
         endif 
@@ -204,17 +204,29 @@
         call date_and_time(VALUES=values1)
         write(*,*)'time for collision: ',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
         !exert force to solid, two types of force: penalty and fluid stress
-        if    (iForce2Body==1)then   !Same force as flow
+        if (iForce2Body==1)then   !Same force as flow
             do iFish=1,nFish
-            do iND=1,nND(iFish)
-            extful(iFish,iND,1:6) = extful1_all(iND,1:6) 
-            enddo
+            if(iFish.eq.1)then
+                do iND=1,nND(iFish)
+                extful(iFish,iND,1:6) = extful1_all(iND,1:6)
+                enddo
+            else
+                do iND=1,nND(iFish)
+                extful(iFish,iND,1:6) = extful1_all(iND+sum(nND(1:iFish-1)),1:6) 
+                enddo
+            endif
             enddo
         elseif(iForce2Body==2)then   !stress force
             do iFish=1,nFish
-            do iND=1,nND(iFish)
-            extful(iFish,iND,1:6) = extful2_all(iND,1:6) 
-            enddo
+            if(iFish.eq.1)then
+                do iND=1,nND(iFish)
+                extful(iFish,iND,1:6) = extful2_all(iND,1:6)
+                enddo
+            else
+                do iND=1,nND(iFish)
+                extful(iFish,iND,1:6) = extful2_all(iND+sum(nND(1:iFish-1)),1:6) 
+                enddo
+            endif
             enddo
         else
              stop 'no define force to body ' 
@@ -226,7 +238,7 @@
         if(isRelease/=1)write(*,'(A)')' ----------------------solid solver----------------------'
         subdeltat=deltat/numsubstep
         do isubstep=1,numsubstep
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iFish,iND)
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND)
         do iFish=1,nFish
         if(iBodyModel(iFish)==1)then     ! rigid body
             !======================================================
