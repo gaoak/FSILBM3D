@@ -59,6 +59,7 @@
 !    ===============================================================================================
     if(step==0)    CALL wrtInfoTitl()
 !    ===============================================================================================
+    CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_field(1)
     CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,0)
@@ -126,6 +127,7 @@
             write(*,*)'no such type LBMBC'
         endif
         !******************************************************************************************        
+        CALL updateVolumForc()
         CALL calculate_macro_quantities()
         !******************************************************************************************
         !******************************************************************************************
@@ -172,6 +174,9 @@
         else
              stop 'no define force to body ' 
         endif 
+
+        !compute volume force exerted on fluids
+        CALL addVolumForc()
 
         ! unpackage  
         do iFish=1,nFish

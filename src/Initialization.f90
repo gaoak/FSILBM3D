@@ -27,6 +27,17 @@
     read(111,*)     uuuIn(1:3)
     read(111,*)     shearRateIn(1:3)     
     read(111,*)     boundaryConditions(1:6)
+    read(111,*)     VelocityKind
+    if(VelocityKind==2) then
+        VelocityAmp = shearRateIn(1)
+        VelocityFreq = shearRateIn(2)
+        VelocityPhi = shearRateIn(3)
+    endif
+    read(111,*)     MovingKind1,MovingVel1,MovingFreq1
+    read(111,*)     MovingKind2,MovingVel2,MovingFreq2
+    read(111,*)     !====================================== 
+    read(111,*)     VolumeForceIn(1:SpcDim)
+    read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
     read(111,*)     !======================================
     read(111,*)     Re     
     read(111,*)     dt      
@@ -485,7 +496,12 @@
     do  x = 1, xDim
     do  y = 1, yDim
     do  z = 1, zDim
-        call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(z), vel)
+        if(VelocityKind==0) then
+            call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(z), vel)
+        elseif(VelocityKind==2) then
+            call evaluateOscillatoryVelocity(vel)
+        endif
+        
         uuu(z, y, x, 1) = vel(1)
         uuu(z, y, x, 2) = vel(2)
         uuu(z, y, x, 3) = vel(3)
@@ -607,7 +623,9 @@
     elseif(RefVelocity==2) then
         Uref = dabs(uuuIn(3))
     elseif(RefVelocity==3) then
-        Uref = dsqrt(uuuIn(1)**2 + uuuIn(2)**2 + uuuIn(3)**2)  
+        Uref = dsqrt(uuuIn(1)**2 + uuuIn(2)**2 + uuuIn(3)**2)
+    elseif(RefVelocity==4) then
+        Uref = dabs(VelocityAmp)  !Velocity Amplitude 
     elseif(RefVelocity==10) then
         Uref = Lref * MAXVAL(Freq(1:nFish))
     elseif(RefVelocity==11) then

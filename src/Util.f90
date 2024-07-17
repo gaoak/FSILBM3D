@@ -597,3 +597,32 @@
     vel(2) = uuuIn(2)
     vel(3) = uuuIn(3)
     END SUBROUTINE
+
+    SUBROUTINE evaluateOscillatoryVelocity(vel)
+        USE simParam
+        real(8):: vel(1:SpcDim)
+        vel(1) = uuuIn(1) + VelocityAmp * dcos(2*pi*VelocityFreq*time + VelocityPhi/180.0*pi)
+        vel(2) = uuuIn(2)
+        vel(3) = uuuIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE updateVolumForc()
+        USE simParam
+        implicit none
+        VolumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2.d0 * pi * VolumeForceFreq * time + VolumeForcePhi/180.0*pi)
+        VolumeForce(2) = VolumeForceIn(2)
+        VolumeForce(3) = VolumeForceIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE addVolumForc()
+        USE simParam
+        implicit none
+        integer:: x
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
+        do x=1,xDim
+            force(:,:,x,1) = force(:,:,x,1) + VolumeForce(1)
+            force(:,:,x,2) = force(:,:,x,2) + VolumeForce(2)
+            force(:,:,x,3) = force(:,:,x,3) + VolumeForce(3)
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE

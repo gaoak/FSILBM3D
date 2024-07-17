@@ -11,9 +11,9 @@
     do  y = 1, yDim
     do  z = 1, zDim
         den(z,y,x  )  = SUM(fIn(z,y,x,0:lbmDim)) 
-        uuu(z,y,x,1)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))/den(z,y,x)
-        uuu(z,y,x,2)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))/den(z,y,x)
-        uuu(z,y,x,3)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))/den(z,y,x)    
+        uuu(z,y,x,1)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*VolumeForce(1)*dt)/den(z,y,x)
+        uuu(z,y,x,2)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*VolumeForce(2)*dt)/den(z,y,x)
+        uuu(z,y,x,3)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*VolumeForce(3)*dt)/den(z,y,x)    
         prs(z,y,x)   = Cs2*(den(z,y,x)-denIn)
     enddo
     enddo
@@ -350,7 +350,11 @@
         !set logical flag
         if(iBC==1)then
             if      ( outer  ) then               !outer most layer
-            call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -358,7 +362,11 @@
             endif
         elseif(iBC==2)then
             if      ( outer .or. center ) then    !second outer-most layer
-            call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -394,7 +402,11 @@
     if(xMinBC==DirecletUP)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)  
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)  
@@ -404,7 +416,11 @@
     elseif(xMinBC==DirecletUU)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)  
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -436,7 +452,11 @@
     if(xMaxBC==DirecletUP)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -446,7 +466,11 @@
     elseif(xMaxBC==DirecletUU)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -596,7 +620,21 @@
     elseif(zMinBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim
-            call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(1),vel)
+            if(MovingKind1==0) then
+                if(VelocityKind==0) then
+                    call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(1),vel)
+                elseif(VelocityKind==2) then
+                    call evaluateOscillatoryVelocity(vel)
+                endif
+            elseif(MovingKind1==1) then
+                vel(1)=MovingVel1
+                vel(2)=0.0d0
+                vel(3)=0.0d0
+            elseif(MovingKind1==2) then
+                vel(1)=MovingVel1 * dcos(2*pi*MovingFreq1*time)
+                vel(2)=0.0d0
+                vel(3)=0.0d0             
+            endif
             fTmp(5) = fIn(1,y,x,oppo(5)) + 2.0 * wt(5) * denIn * (ee(5,1) * vel(1) + ee(5,2) * vel(2) + ee(5,3) * vel(3)) * 3.0
             fTmp(11) = fIn(1,y,x,oppo(11)) + 2.0 * wt(11) * denIn * (ee(11,1) * vel(1) + ee(11,2) * vel(2) + ee(11,3) * vel(3)) * 3.0
             fTmp(12) = fIn(1,y,x,oppo(12)) + 2.0 * wt(12) * denIn * (ee(12,1) * vel(1) + ee(12,2) * vel(2) + ee(12,3) * vel(3)) * 3.0
@@ -648,7 +686,21 @@
     elseif(zMaxBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim
-            call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(zDim),vel)
+            if(MovingKind2==0) then
+                if(VelocityKind==0) then
+                    call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(zDim),vel)
+                elseif(VelocityKind==2) then
+                    call evaluateOscillatoryVelocity(vel)
+                endif
+            elseif(MovingKind2==1) then
+                vel(1)=MovingVel2
+                vel(2)=0.0d0
+                vel(3)=0.0d0
+            elseif(MovingKind2==2) then
+                vel(1)=MovingVel2 * dcos(2*pi*MovingFreq2*time)
+                vel(2)=0.0d0
+                vel(3)=0.0d0
+            endif
             fTmp(6) = fIn(zDim,y,x,oppo(6)) + 2.0 * wt(6) * denIn * (ee(6,1) * vel(1) + ee(6,2) * vel(2) + ee(6,3) * vel(3)) * 3.0
             fTmp(13) = fIn(zDim,y,x,oppo(13)) + 2.0 * wt(13) * denIn * (ee(13,1) * vel(1) + ee(13,2) * vel(2) + ee(13,3) * vel(3)) * 3.0
             fTmp(14) = fIn(zDim,y,x,oppo(14)) + 2.0 * wt(14) * denIn * (ee(14,1) * vel(1) + ee(14,2) * vel(2) + ee(14,3) * vel(3)) * 3.0

@@ -47,7 +47,9 @@
     integer:: iChordDirection,move(1:SpcDim),numOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
     integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
-    integer:: boundaryConditions(1:6)
+    integer:: boundaryConditions(1:6),MovingKind1,MovingKind2,VelocityKind
+    real(8):: VelocityAmp,VelocityFreq,VelocityPhi,MovingVel1,MovingVel2,MovingFreq1,MovingFreq2
+    real(8):: VolumeForce(1:SpcDim),VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpcDim)
     integer, allocatable:: SampBodyNode(:,:), iBodyModel(:)
     real(8), allocatable:: SampFlowPint(:,:)
     real(8):: Xref,Yref,Zref
