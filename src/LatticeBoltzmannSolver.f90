@@ -62,6 +62,127 @@
     !$OMP END PARALLEL DO
     END SUBROUTINE
 
+    !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
+    !0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0
+    !0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1
+    !0, 0, 0, 0, 0, 1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 1, 1,-1,-1
+    SUBROUTINE streams()
+        USE simParam
+        implicit none
+        integer:: i
+        integer:: strmDir(0:lbmDim,1:3)
+
+        !stream direction
+        strmDir(0:lbmDim,1)=-ee(0:lbmDim,3)
+        strmDir(0:lbmDim,2)=-ee(0:lbmDim,2)
+        strmDir(0:lbmDim,3)=-ee(0:lbmDim,1)
+
+        do  i=0,lbmDim
+            call swapzy(fIn, strmDir(i,3), strmDir(i,2), i, zDim, yDim, xDim, lbmDim)
+            call swapx(fIn, strmDir(i,1), i, zDim, yDim, xDim, lbmDim)
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE swapzy(f, dz, dy, i, zDim, yDim, xDim, lbmDim)
+        implicit none
+        integer, intent(in):: dz, dy, i, zDim, yDim, xDim, lbmDim
+        real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+        integer:: z, y, x
+        real(8):: temp, tmpz(1:zDim)
+
+        if(dz.eq.0 .and. dy.eq.0) return
+
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp,tmpz)
+        do  x = 1, xDim
+            if(dz.eq.1) then
+                do y=1, yDim
+                    temp = f(zDim, y, x, i)
+                    do z=zDim, 2, -1
+                        f(z,y,x, i)=f(z-1,y,x, i)
+                    enddo
+                    f(1,y,x,i) = temp
+                enddo
+            elseif(dz.eq.-1) then
+                do y=1, yDim
+                    temp = f(1, y, x, i)
+                    do z=1, zDim-1
+                        f(z,y,x, i)=f(z+1,y,x, i)
+                    enddo
+                    f(zDim,y,x,i) = temp
+                enddo
+            endif
+            if(dy.eq.1) then
+                tmpz = f(:, yDim, x, i)
+                do y=yDim, 2, -1
+                    f(:,y,x, i)=f(:,y-1,x, i)
+                enddo
+                f(:,1,x,i) = tmpz
+            elseif(dy.eq.-1) then
+                tmpz = f(:, 1, x, i)
+                do y=1, yDim-1
+                    f(:,y,x, i)=f(:,y+1,x, i)
+                enddo
+                f(:,yDim,x,i) = tmpz
+            endif
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    SUBROUTINE swapx(f, dx, i, zDim, yDim, xDim, lbmDim)
+        USE PartitionXDim
+        implicit none
+        integer, intent(in):: dx, i, zDim, yDim, xDim, lbmDim
+        real(8), intent(inout):: f(1:zDim, 1:yDim,1:xDim,0:lbmDim)
+        integer:: p
+
+        if(dx.eq.0) return
+
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
+        do  p = 1,npsize_copy
+            if(dx .eq. -1) then
+                call swapxwAtom(f, edge(:,:,p), eid(p), i, zDim, yDim, xDim, lbmDim, parindex(p), parindex(p+1)-1)
+            elseif(dx.eq.1) then
+                call swapxeAtom(f, edge(:,:,p), eid(p), i, zDim, yDim, xDim, lbmDim, parindex(p), parindex(p+1)-1)
+            endif
+        enddo
+        !$OMP END PARALLEL DO
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
+        do  p = 1,npsize_copy
+            f(:,:,eid(p),i) = edge(:,:,p)
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    SUBROUTINE swapxeAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
+        implicit none
+        real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+        real(8), intent(out):: edge(1:zDim,1:yDim)
+        integer, intent(out):: eid
+        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
+        integer:: x
+        eid = xend+1
+        if(eid .eq. xDim+1) eid = 1
+        edge = f(:,:,xend,i)
+        do  x = xend,xbgn+1,-1
+            f(:,:,x,i) = f(:,:,x-1,i)
+        enddo
+    endsubroutine
+
+    SUBROUTINE swapxwAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
+        implicit none
+        real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+        real(8), intent(out):: edge(1:zDim,1:yDim)
+        integer, intent(out):: eid
+        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
+        integer:: x
+        eid = xbgn-1
+        if(eid .eq. 0) eid = xDim
+        edge = f(:,:,xbgn,i)
+        do  x = xbgn, xend-1
+            f(:,:,x,i) = f(:,:,x+1,i)
+        enddo
+    endsubroutine
+
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    Advection model: uniform grid advection, interpolation on the non-uniform grid
 !    copyright@ RuNanHua
@@ -79,15 +200,9 @@
     strmDir(0:lbmDim,3)=-ee(0:lbmDim,1)
 
 !============================================
-    if    (iStreamModel==1) then   !Advection
+    if    (iStreamModel==1) then   !Advection uniform grid
 !============================================
-        do  i=0,lbmDim
-        do  k=1,3
-            if(strmDir(i,k)/=0)then
-                fIn(1:zDim,1:yDim,1:xDim, i)=cshift(fIn(1:zDim,1:yDim,1:xDim, i),shift=strmDir(i,k),dim=k)
-            endif
-        enddo
-        enddo
+        call streams()
 !============================================
     elseif(iStreamModel==2)then    !Interpolation
 !============================================

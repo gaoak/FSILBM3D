@@ -3,4 +3,5 @@
 *.dat
 *.plt
 *.00000
+build*
 IBLBMSolver

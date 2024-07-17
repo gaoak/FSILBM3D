@@ -546,5 +546,25 @@
     enddo
     enddo
     enddo 
-    end 
+    end
 
+    SUBROUTINE OMPPartition(xDim, np, partition, parindex)
+        implicit none
+        integer:: np, xDim
+        integer:: partition(1:np), parindex(1:np+1)
+        integer:: psize, p, residual
+        psize = xDim/np
+        residual = xDim - psize * np
+        parindex(1) = 1
+        parindex(np+1) = xDim + 1
+        do p=1,np
+            if (p .gt. np-residual) then
+                partition(p) = psize + 1
+            else
+                partition(p) = psize
+            endif
+            if (p .gt. 1) then
+                parindex(p) = parindex(p-1) + partition(p-1)
+            endif
+        enddo
+    endsubroutine

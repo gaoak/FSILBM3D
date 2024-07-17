@@ -84,9 +84,10 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE allocate_fluid_memory()
     USE simParam
+    USE PartitionXDim
     implicit none
     integer,parameter::idFile=111
-    integer:: x,y,z,temp
+    integer:: x,y,z,temp,allocatemsg
      
 !   read initial grid**********************************************************************************
     open(unit=idFile,file=trim(adjustl(LBmeshName)))
@@ -165,6 +166,15 @@
     stop
     endif
     dh=dxmin
+
+    !!!!!!!!!!!!! mannual partition in x-direction
+    npsize_copy = npsize
+    xDim_copy = xDim
+    allocate(partition(1:npsize),parindex(1:npsize+1),eid(1:npsize), STAT=allocatemsg)
+    if(allocatemsg .ne. 0) write(*, *) 'Allocation of partition in swapx failed'
+    allocate(edge(1:zDim,1:yDim, 1:npsize), STAT=allocatemsg)
+    if(allocatemsg .ne. 0) write(*, *) 'Allocation of edge in swapx failed'
+    call OMPPartition(xDim_copy, npsize_copy, partition, parindex)
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
