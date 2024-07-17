@@ -155,10 +155,10 @@
 
     SUBROUTINE swapxeAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
         implicit none
+        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
         real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
         real(8), intent(out):: edge(1:zDim,1:yDim)
         integer, intent(out):: eid
-        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
         integer:: x
         eid = xend+1
         if(eid .eq. xDim+1) eid = 1
@@ -170,10 +170,10 @@
 
     SUBROUTINE swapxwAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
         implicit none
+        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
         real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
         real(8), intent(out):: edge(1:zDim,1:yDim)
         integer, intent(out):: eid
-        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
         integer:: x
         eid = xbgn-1
         if(eid .eq. 0) eid = xDim

@@ -3422,7 +3422,7 @@
         do  j = 1,n
             if (abs(a(i,j)) .gt. aamax) aamax = abs(a(i,j))
         enddo
-        if (aamax .eq. 0.0) pause 'Singular Matrix'
+        if (aamax .eq. 0.0) stop
         vv(i) = 1.0/aamax
     enddo
 

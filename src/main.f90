@@ -270,7 +270,6 @@
         !******************************************************************************************
         call date_and_time(VALUES=values_e)
         write(*,*)'time for total:',(values_e(6)*60.+values_e(7)*1.+values_e(8)*0.001)-(values_s(6)*60.+values_s(7)*1.+values_s(8)*0.001)
-    enddo  
-    pause 'stop'
+    enddo
     END PROGRAM main
 
