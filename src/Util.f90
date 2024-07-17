@@ -5,83 +5,96 @@
     SUBROUTINE wrtInfoTitl()
     USE simParam
     implicit none
-    integer::   i
+    integer:: i,iFish
     integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName
+    character (LEN=nameLen):: fileName,Nodename
 
-        open(111,file='./DatInfo/ForceStress.plt')
+    do iFish=1,nFish
+
+        write(fileName,'(I4)') iFish
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+             if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+
+        if    (iForce2Body==1)then   !Same force as flow
+        open(111,file='./DatInfo/ForceDirect'//trim(filename)//'.plt')
         write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
         close(111)
-        open(111,file='./DatInfo/ForceDirect.plt')
+        elseif(iForce2Body==2)then   !stress force
+        open(111,file='./DatInfo/ForceStress'//trim(filename)//'.plt')
         write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
         close(111)
+        endif
 
-    do  i=1,5
-        write(fileName,'(I4.4)') NDtl(i)
-        open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-    enddo 
-    do  i=1,3   
-        write(fileName,'(I4.4)') NDhd(i)
-        open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-    enddo
+        do  i=1,5
+            write(Nodename,'(I4.4)') NDtl(iFish,i)
+            open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt')
+            write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
+            close(111)
+        enddo 
+        do  i=1,3   
+            write(Nodename,'(I4.4)') NDhd(iFish,i)
+            open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt')
+            write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
+            close(111)
+        enddo
 
-        open(111,file='./DatInfo/SampBodyCentP.plt')
+        open(111,file='./DatInfo/SampBodyCentP'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
-        open(111,file='./DatInfo/SampBodyCentM.plt')
+        open(111,file='./DatInfo/SampBodyCentM'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
 
-        open(111,file='./DatInfo/SampBodyAngular1.plt')
+        open(111,file='./DatInfo/SampBodyAngular1_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
         close(111)
-        open(111,file='./DatInfo/SampBodyAngular2.plt')
+        open(111,file='./DatInfo/SampBodyAngular2_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
         close(111)
-        open(111,file='./DatInfo/SampBodyAngular3.plt')
+        open(111,file='./DatInfo/SampBodyAngular3_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
         close(111)
-    do  i=1,numSampBody
-        write(fileName,'(I4.4)') SampBodyNode(i)
-        open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-    enddo
-    do  i=1,numSampFlow
-        write(fileName,'(I4.4)') i
-        open(111,file='./DatInfo/SampFlowPint'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "p" "u"  "v"  "w" '
-        close(111)
-    enddo
 
-        open(111,file='./DatInfo/Power.plt')
+        do  i=1,numSampBody
+            write(Nodename,'(I4.4)') SampBodyNode(iFish,i)
+            open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
+            write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
+            close(111)
+        enddo
+
+        open(111,file='./DatInfo/Power'//trim(fileName)//'.plt')
         write(111,*)'variables= "t" "Ptot" "Paero" "Piner" "Pax" "Pay" "Paz" "Pix" "Piy" "Piz"'
         close(111)
 
-        open(111,file='./DatInfo/Converg.plt')
-        write(111,*)'variables= "t"  "Convergence"  '
-        close(111)
-
-        open(111,file='./DatInfo/MaMax.plt')
-        write(111,*)'variables= "t"  "MaMax"  '
-        close(111)
-
-        open(111,file='./DatInfo/MaxValBody.plt')
-        write(111,*)'variables= "t"  "xyzMax" "velMax" "accMax"  '
-        close(111)
-
-        open(111,file='./DatInfo/Area.plt')
+        open(111,file='./DatInfo/Area'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "Area"  '
         close(111)
 
-        open(111,file='./DatInfo/Energy.plt')
+        open(111,file='./DatInfo/Energy'//trim(fileName)//'.plt')
         write(111,*)'variables= "t","Es","Eb","Ep","Ek","Ew","Et"'
         close(111)
+    enddo
 
+    open(111,file='./DatInfo/MaxValBody.plt')
+    write(111,*)'variables= "t"  "xyzMax" "velMax" "accMax"  '
+    close(111)
+
+    open(111,file='./DatInfo/MaMax.plt')
+    write(111,*)'variables= "t"  "MaMax"  '
+    close(111)
+
+    open(111,file='./DatInfo/Converg.plt')
+    write(111,*)'variables= "t"  "Convergence"  '
+    close(111)
+
+    do  i=1,numSampFlow
+        write(Nodename,'(I4.4)') i
+        open(111,file='./DatInfo/SampFlowPint'//trim(Nodename)//'.plt')
+        write(111,*)'variables= "t"  "p" "u"  "v"  "w" '
+        close(111)
+    enddo
     END SUBROUTINE
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
@@ -92,69 +105,145 @@
     SUBROUTINE wrtInfo()
     USE simParam
     implicit none
-    real(8):: EEE(2),strainEnergy(nEL,2)
-    integer:: i,j,k,nt,iEL,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend
+    integer:: i,j,k,nt,iEL,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend,iFish
+    real(8):: EEE(2),strainEnergy(nFish,nEL_max,2)
     real(8):: convergence,MaMax,weightm,velocity(1:3),Pressure
     real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
     integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName
+    character (LEN=nameLen):: fileName,Nodename
 
-        open(111,file='./DatInfo/ForceDirect.plt',position='append')
-        write(111,'(4D20.10)')time/Tref,sum(extful1(1:nND,1:3),1)/Fref
-                                        
+    do iFish=1,nFish
+
+        write(fileName,'(I4)') iFish
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+             if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo  
+
+        if    (iForce2Body==1)then   !Same force as flow
+        open(111,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
+        write(111,'(4D20.10)')time/Tref,sum(extful(iFish,1:nND(iFish),1:3),1)/Fref                            
         close(111)
-
-        open(111,file='./DatInfo/ForceStress.plt',position='append')
-        write(111,'(4D20.10)')time/Tref,sum(extful2(1:nND,1:3),1)/Fref
-                                        
+        elseif(iForce2Body==2)then   !stress force
+        open(111,file='./DatInfo/ForceStress'//trim(fileName)//'.plt',position='append')
+        write(111,'(4D20.10)')time/Tref,sum(extful(iFish,1:nND(iFish),1:3),1)/Fref                         
         close(111)
-
+        endif  
     !==============================================================================================       
-        !===
-    do  i=1,5
-        write(fileName,'(I4.4)') NDtl(i)
-        open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'.plt',position='append')
-        write(111,'(10D20.10)')time/Tref,xyzful(NDtl(i),1:3)/Lref,velful(NDtl(i),1:3)/Uref,accful(NDtl(i),1:3)/Aref                  
-        close(111)
-    enddo
-        !===
-    do  i=1,3
-        write(fileName,'(I4.4)') NDhd(i)
-        open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'.plt',position='append')
-        write(111,'(10D20.10)')time/Tref,xyzful(NDhd(i),1:3)/Lref,velful(NDhd(i),1:3)/Uref,accful(NDhd(i),1:3)/Aref                     
-        close(111)
-    enddo
-        !===
-        open(111,file='./DatInfo/SampBodyCentP.plt',position='append')
-        write(111,'(10D20.10)')time/Tref,xyzful(NDct,1:3)/Lref,velful(NDct,1:3)/Uref,accful(NDct,1:3)/Aref                     
+        do  i=1,5
+            write(Nodename,'(I4.4)') NDtl(iFish,i)
+            open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
+            write(111,'(10D20.10)')time/Tref,xyzful(iFish,NDtl(iFish,i),1:3)/Lref,velful(iFish,NDtl(iFish,i),1:3)/Uref,accful(iFish,NDtl(iFish,i),1:3)/Aref                  
+            close(111)
+        enddo
+            !===
+        do  i=1,3
+            write(Nodename,'(I4.4)') NDhd(iFish,i)
+            open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
+            write(111,'(10D20.10)')time/Tref,xyzful(iFish,NDhd(iFish,i),1:3)/Lref,velful(iFish,NDhd(iFish,i),1:3)/Uref,accful(iFish,NDhd(iFish,i),1:3)/Aref                     
+            close(111)
+        enddo
+
+        open(111,file='./DatInfo/SampBodyCentP'//trim(fileName)//'.plt',position='append')
+        write(111,'(10D20.10)')time/Tref,xyzful(iFish,NDct,1:3)/Lref,velful(iFish,NDct,1:3)/Uref,accful(iFish,NDct,1:3)/Aref                     
         close(111)
 
-        open(111,file='./DatInfo/SampBodyCentM.plt',position='append')
-        write(111,'(10D20.10)')time/Tref,sum(xyzful(1:nND,1:3)*mssful(1:nND,1:3),1)/sum(mssful(1:nND,1:3),1)/Lref, &                                                                          
-                                         sum(velful(1:nND,1:3)*mssful(1:nND,1:3),1)/sum(mssful(1:nND,1:3),1)/Uref, &
-                                         sum(accful(1:nND,1:3)*mssful(1:nND,1:3),1)/sum(mssful(1:nND,1:3),1)/Aref                                                             
+        open(111,file='./DatInfo/SampBodyCentM'//trim(fileName)//'.plt',position='append')
+        write(111,'(10D20.10)')time/Tref,sum(xyzful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Lref, &                                                                          
+                                         sum(velful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Uref, &
+                                         sum(accful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Aref                                                             
         close(111)
 
-        open(111,file='./DatInfo/SampBodyAngular1.plt',position='append')
-        write(111,'(5D20.10)')time/Tref,datan((xyzful(NDtl(1),3)-xyzful(NDhd(1),3))/(xyzful(NDtl(1),1)-xyzful(NDhd(1),1))),    &
-                                        xyzful(NDtl(1),3)/Lref-xyzful(NDhd(1),3)/Lref,xyzful(NDhd(1),3)/Lref,xyzful(NDtl(1),3)/Lref
+        open(111,file='./DatInfo/SampBodyAngular1_'//trim(fileName)//'.plt',position='append')
+        write(111,'(5D20.10)')time/Tref,datan((xyzful(iFish,NDtl(iFish,1),3)-xyzful(iFish,NDhd(iFish,1),3))/(xyzful(iFish,NDtl(iFish,1),1)-xyzful(iFish,NDhd(iFish,1),1))),    &
+                                        xyzful(iFish,NDtl(iFish,1),3)/Lref-xyzful(iFish,NDhd(iFish,1),3)/Lref,xyzful(iFish,NDhd(iFish,1),3)/Lref,xyzful(iFish,NDtl(iFish,1),3)/Lref
         close(111)
-        open(111,file='./DatInfo/SampBodyAngular2.plt',position='append')
-        write(111,'(5D20.10)')time/Tref,datan((xyzful(NDtl(2),3)-xyzful(NDhd(2),3))/(xyzful(NDtl(2),1)-xyzful(NDhd(2),1))),    &
-                                        xyzful(NDtl(2),3)/Lref-xyzful(NDhd(2),3)/Lref,xyzful(NDhd(2),3)/Lref,xyzful(NDtl(2),3)/Lref
+        open(111,file='./DatInfo/SampBodyAngular2_'//trim(fileName)//'.plt',position='append')
+        write(111,'(5D20.10)')time/Tref,datan((xyzful(iFish,NDtl(iFish,2),3)-xyzful(iFish,NDhd(iFish,2),3))/(xyzful(iFish,NDtl(iFish,2),1)-xyzful(iFish,NDhd(iFish,2),1))),    &
+                                        xyzful(iFish,NDtl(iFish,2),3)/Lref-xyzful(iFish,NDhd(iFish,2),3)/Lref,xyzful(iFish,NDhd(iFish,2),3)/Lref,xyzful(iFish,NDtl(iFish,2),3)/Lref
         close(111)
-        open(111,file='./DatInfo/SampBodyAngular3.plt',position='append')
-        write(111,'(5D20.10)')time/Tref,datan((xyzful(NDtl(3),3)-xyzful(NDhd(3),3))/(xyzful(NDtl(3),1)-xyzful(NDhd(3),1))),    &
-                                        xyzful(NDtl(3),3)/Lref-xyzful(NDhd(3),3)/Lref,xyzful(NDhd(3),3)/Lref,xyzful(NDtl(3),3)/Lref
+        open(111,file='./DatInfo/SampBodyAngular3_'//trim(fileName)//'.plt',position='append')
+        write(111,'(5D20.10)')time/Tref,datan((xyzful(iFish,NDtl(iFish,3),3)-xyzful(iFish,NDhd(iFish,3),3))/(xyzful(iFish,NDtl(iFish,3),1)-xyzful(iFish,NDhd(iFish,3),1))),    &
+                                        xyzful(iFish,NDtl(iFish,3),3)/Lref-xyzful(iFish,NDhd(iFish,3),3)/Lref,xyzful(iFish,NDhd(iFish,3),3)/Lref,xyzful(iFish,NDtl(iFish,3),3)/Lref
         close(111)
-   
-    do  i=1,numSampBody
-        write(fileName,'(I4.4)') SampBodyNode(i)
-        open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'.plt',position='append')
-        write(111,'(10D20.10)')time/Tref, xyzful(SampBodyNode(i),1:3)/Lref,velful(SampBodyNode(i),1:3)/Uref,accful(SampBodyNode(i),1:3)/Aref 
+    
+        do  i=1,numSampBody
+            write(Nodename,'(I4.4)') SampBodyNode(iFish,i)
+            open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
+            write(111,'(10D20.10)')time/Tref, xyzful(iFish,SampBodyNode(iFish,i),1:3)/Lref,velful(iFish,SampBodyNode(iFish,i),1:3)/Uref,accful(iFish,SampBodyNode(iFish,i),1:3)/Aref 
+            close(111)
+        enddo
+        !==============================================================================================  
+
+        Pax=sum(extful(iFish,1:nND(iFish),1)*velful(iFish,1:nND(iFish),1))/Pref
+        Pay=sum(extful(iFish,1:nND(iFish),2)*velful(iFish,1:nND(iFish),2))/Pref
+        Paz=sum(extful(iFish,1:nND(iFish),3)*velful(iFish,1:nND(iFish),3))/Pref
+        Paero=Pax+Pay+Paz
+        !write(*,*)'Pt:',Paero
+        !write(*,*)'Pr:',(sum(extful(1:nND,4)*velful(1:nND,4))+sum(extful(1:nND,5)*velful(1:nND,5))+sum(extful(1:nND,6)*velful(1:nND,6)))/Pref
+        Pix=-sum(mssful(iFish,1:nND(iFish),1)*accful(iFish,1:nND(iFish),1)*velful(iFish,1:nND(iFish),1))/Pref
+        Piy=-sum(mssful(iFish,1:nND(iFish),2)*accful(iFish,1:nND(iFish),2)*velful(iFish,1:nND(iFish),2))/Pref
+        Piz=-sum(mssful(iFish,1:nND(iFish),3)*accful(iFish,1:nND(iFish),3)*velful(iFish,1:nND(iFish),3))/Pref
+        Piner=Pix+Piy+Piz
+        Ptot=Paero+Piner
+        open(111,file='./DatInfo/Power'//trim(fileName)//'.plt',position='append')
+        write(111,'(10D20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz                                                                      
         close(111)
-    enddo
+
+        call cptArea(areaElem(iFish,1:nEL(iFish)),nND(iFish),nEL(iFish),ele(iFish,1:nEL(iFish),1:5),xyzful(iFish,1:nND(iFish),1:6))
+        open(111,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
+        write(111,'(2D20.10)')time/Tref,sum(areaElem(iFish,:))/Asfac
+        close(111)
+        
+        call strain_energy_D(strainEnergy(iFish,1:nEL(iFish),1:2),xyzful0(iFish,1:nND(iFish),1),xyzful0(iFish,1:nND(iFish),2),xyzful0(iFish,1:nND(iFish),3), &
+                                xyzful(iFish,1:nND(iFish),1), xyzful(iFish,1:nND(iFish),2), xyzful(iFish,1:nND(iFish),3),ele(iFish,1:nEL(iFish),1:5), prop(iFish,1:nMT(iFish),1:10), &
+                                triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)),triad_n3(iFish,1:3,1:3,1:nEL(iFish)), &
+                                triad_ee(iFish,1:3,1:3,1:nEL(iFish)),triad_e0(iFish,1:3,1:3,1:nEL(iFish)),triad_nn(iFish,1:3,1:3,1:nND(iFish)), &
+                                nND(iFish),nEL(iFish),nMT(iFish))
+        EEE(1)=sum(strainEnergy(iFish,1:nEL(iFish),1))
+        EEE(2)=sum(strainEnergy(iFish,1:nEL(iFish),2))
+        Es=EEE(1)/Eref
+        Eb=EEE(2)/Eref
+        Ep=Es+Eb
+        Ew=Ew+Paero*timeOutInfo
+        Ek=0.5*sum(mssful(iFish,1:nND(iFish),1:6)*velful(iFish,1:nND(iFish),1:6)*velful(iFish,1:nND(iFish),1:6))/Eref
+        
+        !write(*,*)'Ekt:', 0.5*sum(mssful(1:nND,1:3)*velful(1:nND,1:3)*velful(1:nND,1:3))/Eref
+        !write(*,*)'Ekr:', 0.5*sum(mssful(1:nND,4:6)*velful(1:nND,4:6)*velful(1:nND,4:6))/Eref
+
+        Et=Ek+Ep
+        open(111,file='./DatInfo/Energy'//trim(fileName)//'.plt', position='append')
+        write(111,'(7D20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
+        close(111)
+
+        streI(iFish,1:nND(iFish))=0.0d0
+        bendO(iFish,1:nND(iFish))=0.0d0
+        do  iEL=1,nEL(iFish)
+            streI(iFish,ele(iFish,iEL,1:3))=streI(iFish,ele(iFish,iEL,1:3))+strainEnergy(iFish,iEL,1)/3
+            bendO(iFish,ele(iFish,iEL,1:3))=bendO(iFish,ele(iFish,iEL,1:3))+strainEnergy(iFish,iEL,2)/3           
+        enddo
+
+    enddo !nFish
+
+    UNow=sum(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))
+    convergence=dabs(UNow-UPre)/UNow 
+    UPre=UNow
+    open(111,file='./DatInfo/Converg.plt',position='append')
+    write(111,'(2D20.10)')time/Tref,convergence             
+    close(111)
+
+    MaMax=MaxVal(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))/dsqrt(Cs2)
+    open(111,file='./DatInfo/MaMax.plt',position='append')
+    write(111,'(2D20.10)')time/Tref,MaMax             
+    close(111)
+
+    open(111,file='./DatInfo/MaxValBody.plt',position='append')
+    write(111,'(4D20.10)')time/Tref,maxval(dsqrt(xyzful(1:nFish,1:nND_max,1)**2+xyzful(1:nFish,1:nND_max,2)**2+xyzful(1:nFish,1:nND_max,3)**2))/Lref, &
+                                    maxval(dsqrt(velful(1:nFish,1:nND_max,1)**2+velful(1:nFish,1:nND_max,2)**2+velful(1:nFish,1:nND_max,3)**2))/Uref, &
+                                    maxval(dsqrt(accful(1:nFish,1:nND_max,1)**2+accful(1:nFish,1:nND_max,2)**2+accful(1:nFish,1:nND_max,3)**2))/Aref
+    close(111)
+
     do  i=1,numSampFlow
         x=minloc(dabs(SampFlowPint(i,1)-xGrid(1:xDim)),1)
         if(SampFlowPint(i,1)-xGrid(x)>0.0d0)then
@@ -193,78 +282,7 @@
         open(111,file='./DatInfo/SampFlowPint'//trim(fileName)//'.plt',position='append')
         write(111,'(5D20.10)') time/Tref,  Pressure/(0.5*denIn*Uref**2), velocity(1:3)/Uref
         close(111)
-
     enddo
-    !==============================================================================================  
-
-        Pax=sum(extful(1:nND,1)*velful(1:nND,1))/Pref
-        Pay=sum(extful(1:nND,2)*velful(1:nND,2))/Pref
-        Paz=sum(extful(1:nND,3)*velful(1:nND,3))/Pref
-        Paero=Pax+Pay+Paz
-        !write(*,*)'Pt:',Paero
-        !write(*,*)'Pr:',(sum(extful(1:nND,4)*velful(1:nND,4))+sum(extful(1:nND,5)*velful(1:nND,5))+sum(extful(1:nND,6)*velful(1:nND,6)))/Pref
-        Pix=-sum(mssful(1:nND,1)*accful(1:nND,1)*velful(1:nND,1))/Pref
-        Piy=-sum(mssful(1:nND,2)*accful(1:nND,2)*velful(1:nND,2))/Pref
-        Piz=-sum(mssful(1:nND,3)*accful(1:nND,3)*velful(1:nND,3))/Pref
-        Piner=Pix+Piy+Piz
-        Ptot=Paero+Piner
-        open(111,file='./DatInfo/Power.plt',position='append')
-        write(111,'(10D20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz                                                                      
-        close(111)
-
-
-        UNow=sum(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))
-        convergence=dabs(UNow-UPre)/UNow 
-        UPre=UNow
-        open(111,file='./DatInfo/Converg.plt',position='append')
-        write(111,'(2D20.10)')time/Tref,convergence             
-        close(111)
-
-        MaMax=MaxVal(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))/dsqrt(Cs2)
-        open(111,file='./DatInfo/MaMax.plt',position='append')
-        write(111,'(2D20.10)')time/Tref,MaMax             
-        close(111)
-
-        open(111,file='./DatInfo/MaxValBody.plt',position='append')
-        write(111,'(4D20.10)')time/Tref,maxval(dsqrt(xyzful(1:nND,1)**2+xyzful(1:nND,2)**2+xyzful(1:nND,3)**2))/Lref, &
-                                        maxval(dsqrt(velful(1:nND,1)**2+velful(1:nND,2)**2+velful(1:nND,3)**2))/Uref, &
-                                        maxval(dsqrt(accful(1:nND,1)**2+accful(1:nND,2)**2+accful(1:nND,3)**2))/Aref
-        close(111)
-
-        !�������
-        call cptArea(areaElem,nND,nEL,ele,xyzful)
-        open(111,file='./DatInfo/Area.plt',position='append')
-        write(111,'(2D20.10)')time/Tref,sum(areaElem(:))/Asfac
-        close(111)
-        
-        call strain_energy_D(  strainEnergy,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3),&
-                                 ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
-                                 nND,nEL,nMT &
-                               )
-        EEE(1)=sum(strainEnergy(1:nEL,1))
-        EEE(2)=sum(strainEnergy(1:nEL,2))
-        Es=EEE(1)/Eref
-        Eb=EEE(2)/Eref
-        Ep=Es+Eb
-        Ew=Ew+Paero*timeOutInfo
-        Ek=0.5*sum(mssful(1:nND,1:6)*velful(1:nND,1:6)*velful(1:nND,1:6))/Eref
-        
-        !write(*,*)'Ekt:', 0.5*sum(mssful(1:nND,1:3)*velful(1:nND,1:3)*velful(1:nND,1:3))/Eref
-        !write(*,*)'Ekr:', 0.5*sum(mssful(1:nND,4:6)*velful(1:nND,4:6)*velful(1:nND,4:6))/Eref
-
-        Et=Ek+Ep
-        open(111,file='./DatInfo/Energy.plt', position='append')
-        write(111,'(7D20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
-        close(111)
-
-        streI(1:nND)=0.0d0
-        bendO(1:nND)=0.0d0
-        do  iEL=1,nEL
-            streI(ele(iEL,1:3))=streI(ele(iEL,1:3))+strainEnergy(iEL,1)/3
-            bendO(ele(iEL,1:3))=bendO(ele(iEL,1:3))+strainEnergy(iEL,2)/3           
-        enddo
-
-
 
     END SUBROUTINE
 
@@ -568,3 +586,14 @@
             endif
         enddo
     endsubroutine
+
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!   lxguang 2023.02 Add Shear flow velocity boundary
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE evaluateShearVelocity(x, y, z, vel)
+    USE simParam
+    real(8):: x, y, z, vel(1:SpcDim)
+    vel(1) = uuuIn(1) + z * shearRateIn(1) + y * shearRateIn(2) 
+    vel(2) = uuuIn(2)
+    vel(3) = uuuIn(3)
+    END SUBROUTINE

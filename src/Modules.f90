@@ -35,29 +35,32 @@
     integer:: npsize
     real(8), parameter:: Pi=3.141592653589793d0,eps=1.0d-5
 !   ***********************************************************************************************
-    integer, parameter:: fluid = 0, wall = 200  
+    integer, parameter:: fluid = 0, wall = 200, movingWall=201
     integer, parameter:: DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304
-                        !given balance function   unbalanced extrapolation     1st order extrapolate         2nd order extrapolate       periodic
+                        !given balance function,unbalanced extrapolation,1st order extrapolate,2nd order extrapolate,periodic
 !   ***********************************************************************************************
 !   ***********************************************************************************************
     integer:: step
     real(8):: time
 
-    integer:: isConCmpt,iCollidModel,iStreamModel,iBodyModel,iForce2Body,iFlapRef,iKB,isRelease
+    integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity
     integer:: iChordDirection,move(1:SpcDim),numOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
     integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
-    integer, allocatable:: SampBodyNode(:)
+    integer:: boundaryConditions(1:6)
+    integer, allocatable:: SampBodyNode(:,:), iBodyModel(:)
     real(8), allocatable:: SampFlowPint(:,:)
     real(8):: Xref,Yref,Zref
     real(8):: timeSimTotl,timeOutTemp,timeOutBody,timeOutFlow,timeOutInfo,timeOutFlBg,timeOutFlEd
     real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFEM,dtolFSI,subdeltat
-    real(8):: uuuIn(1:SpcDim),denIn,g(1:SpcDim)
+    real(8):: uuuIn(1:SpcDim),shearRateIn(1:SpcDim),denIn,g(1:SpcDim)
     real(8):: AmplInitDist(1:SpcDim),waveInitDist,AmplforcDist(1:SpcDim),FreqforcDist
     real(8):: posiForcDist(1:SpcDim),begForcDist,endForcDist
-    real(8):: Re,St,AR,tcR,denR,KB,KS,EmR,psR,Frod(1:SpcDim)
+    real(8):: Re,AR,Frod(1:SpcDim)
+    real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
     real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
     real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Lspan,Asfac
+    real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:)
     real(8):: UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
 
     real(8):: upxc0, upxcm, upxcmm
@@ -71,7 +74,8 @@
     character (LEN=40):: LBmeshName 
     integer:: xDim,yDim,zDim
     integer:: xMinBC,xMaxBC,yMinBC,yMaxBC,zMinBC,zMaxBC,iBC
-    real(8):: dh,dt,ratio,dxmin,dymin,dzmin,dxmax,dymax,dzmax,elmax,elmin
+    real(8), allocatable:: elmax(:),elmin(:)
+    real(8):: dh,dt,ratio,dxmin,dymin,dzmin,dxmax,dymax,dzmax
     real(8):: cptxMin,cptxMax,cptyMin,cptyMax,cptzMin,cptzMax
     real(8):: Omega,tau,Cs2,nu,Mu
     integer, allocatable:: image(:,:,:)
@@ -83,24 +87,28 @@
 !   *********************************************************************************************** 
 !   *********************************************************************************************** 
     integer, parameter:: idat=12, DOFDim=6
-    character (LEN=40):: FEmeshName
+    character (LEN=40), allocatable:: FEmeshName(:)
 !   ***********************************************************************************************     
-    real(8):: deltaT,Freq
-    real(8):: XYZ(1:SpcDim),XYZo(1:SpcDim),XYZAmpl(1:SpcDim),XYZPhi(1:SpcDim),XYZd(1:SpcDim),UVW(1:SpcDim)
-    real(8):: AoA(1:SpcDim),AoAo(1:SpcDim),AoAAmpl(1:SpcDim),AoAPhi(1:SpcDim),AoAd(1:SpcDim),WWW1(1:SpcDim),WWW2(1:SpcDim),WWW3(1:SpcDim)
-    real(8):: TTT00(1:3,1:3),TTT0(1:3,1:3),TTTnow(1:3,1:3),TTTnxt(1:3,1:3)
+    real(8):: deltaT
+    real(8), allocatable:: Freq(:)
+    real(8), allocatable:: XYZ(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),XYZd(:,:),UVW(:,:)
+    real(8), allocatable:: AoA(:,:),AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:),AoAd(:,:),WWW1(:,:),WWW2(:,:),WWW3(:,:)
+    real(8), allocatable:: TTT00(:,:,:),TTT0(:,:,:),TTTnow(:,:,:),TTTnxt(:,:,:)
 !   ***********************************************************************************************
-    integer:: nND,nEL,nEQ,nMT,nBD,nSTF 
-    integer:: NDtl(1:5),NDhd(1:3),NDref,NDct,isMotionGiven(1:DOFDim)
+    integer:: nFish,nEL_all,nND_all,nND_max,nEL_max,nMT_max,nEQ_max,NDref
+    integer,allocatable:: ele_all(:,:)
+    integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:) 
+    integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:)
+    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),xyzfulIB_all(:,:),extful1_all(:,:),extful2_all(:,:),isMotionGiven(:,:)
 !   ===============================================================================================
-    integer, allocatable:: ele(:,:),nloc(:),nprof(:),nprof2(:),jBC(:,:) 
-    real(8), allocatable:: xyzful00(:,:),mssful(:,:),vBC(:,:),mss(:),prop(:,:),areaElem00(:),areaElem(:)
-    real(8), allocatable:: lodful(:,:),extful(:,:),extful1(:,:),extful2(:,:),grav(:,:),streI(:),bendO(:)
+    integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
+    real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)
+    real(8), allocatable:: lodful(:,:,:),repful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:),streI(:,:),bendO(:,:)
 
-    real(8), allocatable:: xyzful0(:,:),xyzfulnxt(:,:),dspful(:,:),accful(:,:)
-    real(8), allocatable:: xyzful(:,:),xyzfulIB(:,:),velful(:,:)
-    real(8), allocatable:: triad_nn(:,:,:),triad_ee(:,:,:),triad_e0(:,:,:)
-    real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
+    real(8), allocatable:: xyzful0(:,:,:),xyzfulnxt(:,:,:),dspful(:,:,:),accful(:,:,:)
+    real(8), allocatable:: xyzful(:,:,:),xyzfulIB(:,:,:),velful(:,:,:)
+    real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
+    real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
 !   ***********************************************************************************************   
     END MODULE simParam
 
