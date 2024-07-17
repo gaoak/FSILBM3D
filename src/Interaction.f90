@@ -4,42 +4,40 @@
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                                xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful)    
+                                xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid)    
     IMPLICIT NONE
     integer:: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM
     real(8):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta
     real(8):: force(zDim,yDim,xDim,1:3),uuu(zDim,yDim,xDim,1:3),den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
     real(8):: xyzful(nND,6),xyzfulIB(nND,6),velful(nND,6),extful(nND,6)
+    logical,intent(in):: isUniformGrid(1:3)
 !==================================================================================================
     integer:: i,j,k,x,y,z,xbgn,ybgn,zbgn,xend,yend,zend,iEL,nt,iterLBM,iND
-    real(8):: rx,ry,rz,Phi,dmaxLBM,dsum
+    real(8):: rx,ry,rz,Phi,dmaxLBM,dsum,invdh
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
     real(8):: forceTemp(zDim,yDim,xDim,1:3),forceElemTemp(nEL,3)
     real(8):: forceElem(nEL,3),forceNode(nND,3),velfulIB(nND,3)
     real(8):: posElem(nEL,3),posElemIB(nEL,3),velElem(nEL,3),velElemIB(nEL,3),areaElem(nEL)
 !==================================================================================================
-!   compute velocity and displacement at IB nodes   
-    do  iND=1,nND    
-        xbgn    = minloc(dabs(xyzful(iND,1)-xGrid(1:xDim)),1) -3
-        xend    = minloc(dabs(xyzful(iND,1)-xGrid(1:xDim)),1) +4
-        ybgn    = minloc(dabs(xyzful(iND,2)-yGrid(1:yDim)),1) -3
-        yend    = minloc(dabs(xyzful(iND,2)-yGrid(1:yDim)),1) +4
-        zbgn    = minloc(dabs(xyzful(iND,3)-zGrid(1:zDim)),1) -3
-        zend    = minloc(dabs(xyzful(iND,3)-zGrid(1:zDim)),1) +4
-
+!   compute velocity and displacement at IB nodes
+    invdh = 1.D0/dh;
+    do  iND=1,nND
+        call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
+        call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
+        call my_minloc(xyzful(iND,3), zGrid, zDim, isUniformGrid(3), k)
+        ! xbgn             xxx             xend
+        !   -1   0   1   2  
+        ! interpolate fluid velocity to body nodes
         velfulIB(iND,1:3)=0.0
-
-        do    x=xbgn,xend
-        do    y=ybgn,yend
-        do    z=zbgn,zend
-            rx=(xyzful(iND,1)-xGrid(x))/dx(x)
-            ry=(xyzful(iND,2)-yGrid(y))/dy(y)
-            rz=(xyzful(iND,3)-zGrid(z))/dz(z)
-             
-            velfulIB(iND,1:3)=velfulIB(iND,1:3)+uuu(z,y,x,1:3)*Phi(rx)*Phi(ry)*Phi(rz)
-             
-        enddo
-        enddo
+        do x=-1+i,2+i
+            rx=Phi((xyzful(iND,1)-xGrid(x))*invdh)
+            do y=-1+j,2+j
+                ry=Phi((xyzful(iND,2)-yGrid(y))*invdh)
+                do z=-1+k,2+k
+                    rz=Phi((xyzful(iND,3)-zGrid(z))*invdh)
+                    velfulIB(iND,1:3)=velfulIB(iND,1:3)+uuu(z,y,x,1:3)*rx*ry*rz
+                enddo
+            enddo
         enddo
         xyzfulIB(iND,1:3)=xyzfulIB(iND,1:3)+velfulIB(iND,1:3)*dt
     enddo
@@ -108,25 +106,20 @@ iterLBM=0
 do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)  
 !   ***********************************************************************************************
 !   compute the velocity of IB nodes at element center    
-    do  iEL=1,nEL    
-        xbgn    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)-3
-        xend    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)+4
-        ybgn    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)-3
-        yend    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)+4
-        zbgn    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)-3
-        zend    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)+4
-
+    do  iEL=1,nEL
+        call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
+        call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
+        call my_minloc(posElem(iEL,3), zGrid, zDim, isUniformGrid(3), k)
         velElemIB(iEL,1:3)=0.0
-        do    x=xbgn,xend
-        do    y=ybgn,yend
-        do    z=zbgn,zend
-            rx=(posElem(iEL,1)-xGrid(x))/dx(x)
-            ry=(posElem(iEL,2)-yGrid(y))/dy(y)
-            rz=(posElem(iEL,3)-zGrid(z))/dz(z)
-             
-            velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(z,y,x,1:3)*Phi(rx)*Phi(ry)*Phi(rz)             
-        enddo
-        enddo
+        do x=-1+i,2+i
+            rx=Phi((posElem(iEL,1)-xGrid(x))*invdh)
+            do y=-1+j,2+j
+                ry=Phi((posElem(iEL,2)-yGrid(y))*invdh)
+                do z=-1+k,2+k
+                    rz=Phi((posElem(iEL,3)-zGrid(z))*invdh)
+                    velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(z,y,x,1:3)*rx*ry*rz
+                enddo
+            enddo
         enddo
     enddo
 !   ***********************************************************************************************
@@ -153,25 +146,20 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
      enddo
      enddo
     !$OMP END PARALLEL DO
-    do    iEL=1,nEL    
-        xbgn    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)-3
-        xend    = minloc(dabs(posElem(iEL,1)-xGrid(1:xDim)),1)+4
-        ybgn    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)-3
-        yend    = minloc(dabs(posElem(iEL,2)-yGrid(1:yDim)),1)+4
-        zbgn    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)-3
-        zend    = minloc(dabs(posElem(iEL,3)-zGrid(1:zDim)),1)+4
-        do    x=xbgn,xend
-        do    y=ybgn,yend
-        do    z=zbgn,zend
-            rx=(posElem(iEL,1)-xGrid(x))/dx(x)
-            ry=(posElem(iEL,2)-yGrid(y))/dy(y)
-            rz=(posElem(iEL,3)-zGrid(z))/dz(z)
-
-            forceTemp(z,y,x,1:3)=forceTemp(z,y,x,1:3)-forceElemTemp(iEL,1:3)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
- 
+    do    iEL=1,nEL
+        call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
+        call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
+        call my_minloc(posElem(iEL,3), zGrid, zDim, isUniformGrid(3), k)
+        do x=-1+i,2+i
+            rx=Phi((posElem(iEL,1)-xGrid(x))*invdh)
+            do y=-1+j,2+j
+                ry=Phi((posElem(iEL,2)-yGrid(y))*invdh)
+                do z=-1+k,2+k
+                    rz=Phi((posElem(iEL,3)-zGrid(z))*invdh)
+                    forceTemp(z,y,x,1:3)=forceTemp(z,y,x,1:3)-forceElemTemp(iEL,1:3)*rx*ry*rz*invdh*invdh*invdh
+                enddo
+            enddo
         enddo
-        enddo
-        enddo        
     enddo
 !   ***********************************************************************************************
 !   update velocity

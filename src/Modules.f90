@@ -46,6 +46,7 @@
     integer:: isConCmpt,iCollidModel,iStreamModel,iBodyModel,iForce2Body,iFlapRef,iKB,isRelease
     integer:: iChordDirection,move(1:SpcDim),numOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
+    logical:: isUniformGrid(1:SpcDim)
     integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
     integer, allocatable:: SampBodyNode(:)
     real(8), allocatable:: SampFlowPint(:,:)

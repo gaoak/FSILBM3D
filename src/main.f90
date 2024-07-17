@@ -10,7 +10,7 @@
     use omp_lib
     implicit none
     integer:: iND,isubstep
-    real(8):: temp(3),Pbetatemp
+    real(8):: temp(3),Pbetatemp,CPUtime
     logical alive
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
@@ -77,7 +77,7 @@
         call date_and_time(VALUES=values0)        
         CALL streaming_step()
         call date_and_time(VALUES=values1)
-        write(*,*)'time for streaming_step:',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'time for streaming_step:',CPUtime(values1)-CPUtime(values0)
         !******************************************************************************************
         !DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304,fluid=0, wall=200
         if    (iStreamModel==1)then
@@ -127,17 +127,17 @@
         call date_and_time(VALUES=values0)
         Pbeta=(1.0d0-dexp(-5.0d0/Pramp*time/Tref))*Pbetatemp
         CALL calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                       xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1)
+                       xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1,isUniformGrid)
 !        CALL cptStrs(zDim,yDim,xDim,nEL,nND,ele,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful,extful2)
         call date_and_time(VALUES=values1)
-        write(*,*)'time for IB:',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'time for IB:',CPUtime(values1)-CPUtime(values0)
 
         if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
         
         call date_and_time(VALUES=values0)  
         CALL collision_step()
         call date_and_time(VALUES=values1)
-        write(*,*)'time for collision_step:',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'time for collision_step:',CPUtime(values1)-CPUtime(values0)
         !exert force to solid, two types of force: penalty and fluid stress
 !        if    (iForce2Body==1)then   !Same force as flow
             extful(1:nND,1:6)  = extful1(1:nND,1:6)
@@ -212,7 +212,7 @@
                         triad_nn,triad_ee,triad_e0,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ,nMT,nBD,nSTF,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM)
             !----------------------------------------------------------------------
             call date_and_time(VALUES=values1)
-            write(*,*)'time for FEM:',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+            write(*,*)'time for FEM:',CPUtime(values1)-CPUtime(values0)
         else
             stop 'no define body model'
         endif
@@ -269,8 +269,7 @@
         !******************************************************************************************
         !******************************************************************************************
         call date_and_time(VALUES=values_e)
-        write(*,*)'time for total:',(values_e(6)*60.+values_e(7)*1.+values_e(8)*0.001)-(values_s(6)*60.+values_s(7)*1.+values_s(8)*0.001)
+        write(*,*)'time for total:',CPUtime(values_e)-CPUtime(values_s)
     enddo  
     pause 'stop'
     END PROGRAM main
-

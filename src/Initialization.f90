@@ -466,7 +466,10 @@
     endif
     
     !for uniform grid, advection length equals grid size
-    if(dabs(dt/dh-1.0d0)<eps .and. dabs(dxmax/dh-1.0d0)<eps .and.  dabs(dymax/dh-1.0d0)<eps .and.  dabs(dzmax/dh-1.0d0)<eps)then 
+    isUniformGrid(1) = dabs(dxmax/dh-1.0d0)<eps
+    isUniformGrid(2) = dabs(dymax/dh-1.0d0)<eps
+    isUniformGrid(3) = dabs(dzmax/dh-1.0d0)<eps
+    if(dabs(dt/dh-1.0d0)<eps .and. isUniformGrid(1) .and. isUniformGrid(2) .and. isUniformGrid(3))then 
         iStreamModel=1
         write(*,*)'    uniform grid,STLBM'
     else
