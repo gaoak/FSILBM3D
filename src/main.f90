@@ -133,11 +133,6 @@
         !******************************************************************************************
         call date_and_time(VALUES=values0)
         Pbeta=(1.0d0-dexp(-5.0d0/Pramp*time/Tref))*Pbetatemp
-        CALL calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                       xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1,isUniformGrid)
-!        CALL cptStrs(zDim,yDim,xDim,nEL,nND,ele,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful,extful2)
-        call date_and_time(VALUES=values1)
-        write(*,*)'time for IB:',CPUtime(values1)-CPUtime(values0)
 
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z) 
         do x=1,xDim
@@ -173,7 +168,7 @@
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
         CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                       xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all)
+                       xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all,isUniformGrid)
         elseif(iForce2Body==2)then   !stress force
         CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful2_all)
         else
