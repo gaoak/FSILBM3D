@@ -326,17 +326,36 @@
     SUBROUTINE set_equilibrium_farfld_BC()
     USE simParam
     implicit none
-    integer:: i,k
-    integer:: x, y, z,ig
-    logical:: upwind,center,outer
+    integer:: x, y, z,xl,xr,yl,yr,zl,zr
+    logical:: outer
     real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim), vel(1:SpcDim)
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,upwind,center,outer,vel)
-    do  x=1,xDim 
-    do  y=1,yDim 
+    if(iBC==1)then
+        xl = 1
+        yl = 1
+        zl = 1
+        xr = xDim
+        yr = yDim
+        zr = zDim
+    elseif(iBC==2)then
+        xl = 2
+        yl = 2
+        zl = 2
+        xr = xDim-1
+        yr = yDim-1
+        zr = zDim-1
+    else
+        write(*,*)'BC is not defined!'
+        stop
+    endif
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,outer,vel)
+    do  x=1,xDim
+        outer = x.le.xl .or. x.ge.xr
+    do  y=1,yDim
+        outer = outer .or. y.le.yl .or. y.ge.yr
     do  z=1,zDim 
+        outer = outer .or. z.le.zl .or. z.ge.zr
         !set logical flag
-        if(iBC==1)then
-            if      ( outer  ) then               !outer most layer
+        if (outer) then !outer most layer
             if(VelocityKind==0) then
                 call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
             elseif(VelocityKind==2) then
@@ -346,22 +365,6 @@
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
             fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
-            endif
-        elseif(iBC==2)then
-            if      ( outer .or. center ) then    !second outer-most layer
-            if(VelocityKind==0) then
-                call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
-            elseif(VelocityKind==2) then
-                call evaluateOscillatoryVelocity(vel)
-            endif
-            uSqr           = sum(vel(1:3)**2)
-            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
-            fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
-            endif
-        else
-            write(*,*)'BC is not defined!'
-            stop
         endif
     enddo
     enddo
