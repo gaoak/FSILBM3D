@@ -183,14 +183,8 @@
     SUBROUTINE streaming_step()
     USE simParam
     implicit none
-    integer:: x,y,z,i,k
+    integer:: x,y,z,i
     logical:: upwind,center,outer
-    integer:: strmDir(0:lbmDim,1:3)
-
-    !stream direction
-    strmDir(0:lbmDim,1)=-ee(0:lbmDim,3)
-    strmDir(0:lbmDim,2)=-ee(0:lbmDim,2)
-    strmDir(0:lbmDim,3)=-ee(0:lbmDim,1)
 
 !============================================
     if    (iStreamModel==1) then   !Advection uniform grid

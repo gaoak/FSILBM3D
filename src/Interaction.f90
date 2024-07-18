@@ -3,11 +3,11 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE cptForceR(nFish,dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful)
     implicit none
-    integer:: nFish
+    integer:: nFish,nEL_max,nND_max
     real(8):: dxmin,dymin,dzmin
-    integer:: nEL_max,nND_max,nND(1:nFish),nEL(1:nFish)
-    real(8):: ele(1:nFish,1:nEL_max,1:5),xyzful(1:nFish,1:nND_max,1:6),repful(1:nFish,1:nND_max,1:6)
-    !local 
+    integer:: nND(1:nFish),nEL(1:nFish),ele(1:nFish,1:nEL_max,1:5)
+    real(8):: xyzful(1:nFish,1:nND_max,1:6),repful(1:nFish,1:nND_max,1:6)
+    !local
     integer:: iND,jND,iFish,jFish
     real(8):: delta_h,Phi,r(1:3),ds(1:3)
     real(8):: minx,miny,maxx,maxy,minz,maxz
