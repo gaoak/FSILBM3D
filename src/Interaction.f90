@@ -276,6 +276,204 @@ enddo
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    (displacement, velocity) spring, penalty method
+!    calculate force at element center, distribute force to three nodes
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE calculate_interaction_force_quad(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+        xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,dspan)
+IMPLICIT NONE
+integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM,Nspan
+real(8),intent(in):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta,dspan
+real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+logical,intent(in):: isUniformGrid(1:3)
+real(8),intent(in):: xyzful(nND,6),velful(nND,6)
+real(8),intent(inout)::xyzfulIB(1:Nspan+1,nND,6),uuu(zDim,yDim,xDim,1:3)
+real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
+!==================================================================================================
+integer:: i,j,k,x,y,z,iEL,nt,iterLBM,iND
+real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh
+real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+real(8):: forceTemp(zDim,yDim,xDim,1:3),forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
+real(8):: forceElem(1:Nspan,nEL,3),forceElemTemp(1:Nspan,nEL,3),areaElem(nEL)
+real(8):: posElem(1:Nspan,nEL,3),posElemIB(1:Nspan,nEL,3),velElem(1:Nspan,nEL,3),velElemIB(1:Nspan,nEL,3)
+!==================================================================================================
+!   compute velocity and displacement at IB nodes
+invdh = 1.D0/dh
+do  iND=1,nND
+call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
+call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
+do x=-1+i,2+i
+rx(x-i)=Phi((xyzful(iND,1)-xGrid(x))*invdh)
+enddo
+do y=-1+j,2+j
+ry(y-j)=Phi((xyzful(iND,2)-yGrid(y))*invdh)
+enddo
+do k=1,Nspan+1
+x3 = xyzful(iND,3)+dspan * (k - 1)
+call my_minloc(x3, zGrid, zDim, isUniformGrid(3), k)
+do z=-1+k,2+k
+rz(z-k)=Phi((x3-zGrid(z))*invdh)
+enddo
+! interpolate fluid velocity to body nodes
+velfulIB(k, iND,1:3)=0.0
+do x=-1,2
+do y=-1,2
+do z=-1,2
+velfulIB(k,iND,1:3)=velfulIB(k,iND,1:3)+uuu(z,y,x,1:3)*rx(x)*ry(y)*rz(z)
+enddo
+enddo
+enddo
+xyzfulIB(k,iND,1:3)=xyzfulIB(k,iND,1:3)+velfulIB(k,iND,1:3)*dt
+enddo
+enddo
+
+!==================================================================================================
+!   compute displacement, velocity, area at surface element center
+do  iEL=1,nEL
+i=ele(iEL,1)
+j=ele(iEL,2)
+nt=ele(iEL,4)
+
+x1=xyzful(i,1)
+x2=xyzful(j,1)
+y1=xyzful(i,2)
+y2=xyzful(j,2)
+if(nt/=2) write(*,*) 'only support line segments'
+do k=1,Nspan
+posElem(k,iEL,1)=(x1+x2)*0.5d0
+posElem(k,iEL,2)=(y1+y2)*0.5d0
+posElem(k,iEL,3)=xyzful(i,3) + dspan* (k-0.5)
+velElem(k,iEL,1:2)=(velful(i,1:2)+velful(j,1:2))*0.5d0
+velElem(k,iEL,3)=0.d0
+posElemIB(k,iEL,1:3)=(xyzfulIB(k,i,1:3)+xyzfulIB(k,j,1:3)+xyzfulIB(k+1,i,1:3)+xyzfulIB(k+1,j,1:3))*0.25d0
+enddo
+ax =(x1-x2)
+ay =(y1-y2)
+areaElem(iEL)=dsqrt( ax*ax + ay*ay) * dspan
+enddo
+
+!**************************************************************************************************
+!**************************************************************************************************
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
+do  x = 1, xDim
+force(:,:,x,1:3)=0.0d0
+enddo
+!$OMP END PARALLEL DO
+forceElem(:,1:nEL,1:3)=0.0d0
+dmaxLBM=1.0
+iterLBM=0
+!   ***********************************************************************************************
+do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)  
+!   ***********************************************************************************************
+!   compute the velocity of IB nodes at element center    
+do  iEL=1,nEL
+do k=1,Nspan
+call my_minloc(posElem(k,iEL,1), xGrid, xDim, isUniformGrid(1), i)
+call my_minloc(posElem(k,iEL,2), yGrid, yDim, isUniformGrid(2), j)
+call my_minloc(posElem(k,iEL,3), zGrid, zDim, isUniformGrid(3), k)
+velElemIB(k,iEL,1:3)=0.0
+do x=-1+i,2+i
+rx=Phi((posElem(k,iEL,1)-xGrid(x))*invdh)
+do y=-1+j,2+j
+ry=Phi((posElem(k,iEL,2)-yGrid(y))*invdh)
+do z=-1+k,2+k
+rz=Phi((posElem(k,iEL,3)-zGrid(z))*invdh)
+velElemIB(k,iEL,1:3)=velElemIB(k,iEL,1:3)+uuu(z,y,x,1:3)*rx*ry*rz
+enddo
+enddo
+enddo
+enddo
+enddo
+!   ***********************************************************************************************
+!   calculate interaction force
+do  iEL=1,nEL
+do k=1,Nspan
+forceElemTemp(k,iEL,1:3) = -Palpha*2.0*denIn*(posElem(k,iEL,1:3)-posElemIB(k,iEL,1:3))/dt*areaElem(iEL)*dh  &
+-Pbeta* 2.0*denIn*(velElem(k,iEL,1:3)-velElemIB(k,iEL,1:3))/dt*areaElem(iEL)*dh
+enddo
+enddo
+!   ***********************************************************************************************
+!   calculate Eulerian body force
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
+do  x = 1, xDim
+forceTemp(:,:,x,1:3)=0.0d0
+enddo
+!$OMP END PARALLEL DO
+do iEL=1,nEL
+do k=1,Nspan
+call my_minloc(posElem(k,iEL,1), xGrid, xDim, isUniformGrid(1), i)
+call my_minloc(posElem(k,iEL,2), yGrid, yDim, isUniformGrid(2), j)
+call my_minloc(posElem(k,iEL,3), zGrid, zDim, isUniformGrid(3), k)
+do x=-1+i,2+i
+rx=Phi((posElem(k,iEL,1)-xGrid(x))*invdh)
+do y=-1+j,2+j
+ry=Phi((posElem(k,iEL,2)-yGrid(y))*invdh)
+do z=-1+k,2+k
+rz=Phi((posElem(k,iEL,3)-zGrid(z))*invdh)
+forceTemp(z,y,x,1:3)=forceTemp(z,y,x,1:3)-forceElemTemp(k,iEL,1:3)*rx*ry*rz*invdh*invdh*invdh
+enddo
+enddo
+enddo
+enddo
+enddo
+!   ***********************************************************************************************
+!   update velocity
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
+do  x = 1, xDim
+do  y = 1, yDim
+do  z = 1, zDim         
+uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5*dt*forceTemp(z,y,x,1:3)/den(z,y,x)
+force(z,y,x,1:3) = force(z,y,x,1:3) + forceTemp(z,y,x,1:3)
+enddo
+enddo
+enddo
+!$OMP END PARALLEL DO
+!    force(1:zDim,1:yDim,1:xDim,1:3)=force(1:zDim,1:yDim,1:xDim,1:3)+forceTemp(1:zDim,1:yDim,1:xDim,1:3)
+forceElem(:,1:nEL,1:3) = forceElem(:,1:nEL,1:3)+forceElemTemp(:,1:nEL,1:3)   
+!   ***********************************************************************************************
+!   convergence test
+if(iterLBM==0)then
+dsum=0.0
+do iEL=1,nEL
+do k=1,Nspan
+dsum=dsum+dsqrt(sum((velElem(k,iEL,1:3)-velElemIB(k,iEL,1:3))**2))
+enddo
+enddo   
+endif
+dsum=Uref*nEL
+
+dmaxLBM=0.0
+do iEL=1,nEL
+do k=1,Nspan
+dmaxLBM=dmaxLBM+dsqrt(sum((velElem(k,iEL,1:3)-velElemIB(k,iEL,1:3))**2))
+enddo
+enddo
+dmaxLBM=dmaxLBM/dsum
+iterLBM=iterLBM+1
+!   ***********************************************************************************************
+enddo 
+!write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
+!**************************************************************************************************
+!**************************************************************************************************
+!   element force to nodal force
+forceNode(1:nND,1:3)=0.0
+do    iEL=1,nEL
+do k=1,Nspan
+i=ele(iEL,1)
+j=ele(iEL,2)
+nt=ele(iEL,4)
+forceNode(i,1:3)=forceNode(i,1:3)+forceElem(k,iEl,1:3)*0.5d0
+forceNode(j,1:3)=forceNode(j,1:3)+forceElem(k,iEl,1:3)*0.5d0
+enddo
+enddo
+
+extful(1:nND,1:3) = forceNode(1:nND,1:3)
+extful(1:nND,4:6) = 0.0d0
+
+END SUBROUTINE calculate_interaction_force_quad
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    �����������Ӧ������
 !   ��������������Ӧ��
 !    copyright@ RuNanHua 
@@ -283,7 +481,7 @@ enddo
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE cptStrs(zDim,yDim,xDim,nEL,nND,ele,dh,dx,dy,dz,mu,rr,u,p,xGrid,yGrid,zGrid,xyzful,extful)    
     IMPLICIT NONE
-    integer:: zDim,yDim,xDim,nEL,nND,ele(nEL,5)
+    integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5)
     real(8):: dh,dx(xDim),dy(yDim),dz(zDim),mu,rr
     real(8):: u(zDim,yDim,xDim,1:3),p(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
     real(8):: xyzful(nND,6),extful(nND,6)
@@ -484,7 +682,7 @@ enddo
         endif       
     enddo
 !   ***********************************************************************************************
-!   ����ڵ���
+!   element force to nodal force
     forceNode(1:nND,1:3)=0.0d0
     do    iEL=1,nEL       
         i  = ele(iEL,1)
@@ -505,6 +703,8 @@ enddo
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    one dimensional delta function
 !    copyright@ RuNanHua
+!    xbgn    xxx     xend
+!     -1      0   1   2
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     FUNCTION Phi(x)
     IMPLICIT NONE

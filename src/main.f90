@@ -162,7 +162,7 @@
                extful1_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
                extful2_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
             enddo
-        endif    
+        endif
 
         enddo
         !compute force exerted on fluids
@@ -172,23 +172,23 @@
         elseif(iForce2Body==2)then   !stress force
         CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful2_all)
         else
-             stop 'no define force to body ' 
-        endif 
+             stop 'no define force to body '
+        endif
 
         !compute volume force exerted on fluids
         CALL addVolumForc()
 
-        ! unpackage  
+        ! unpackage
         do iFish=1,nFish
             if(iFish.eq.1)then
                do iND=1,nND(iFish)
-                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND,1:6) 
+                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND,1:6)
                  velful(iFish,iND,1:6)   =  velful_all(iND,1:6)
                  xyzfulIB(iFish,iND,1:6) =  xyzfulIB_all(iND,1:6)
                enddo
             else
                do iND=1,nND(iFish)
-                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND + sum(nND(1:iFish-1)),1:6) 
+                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND + sum(nND(1:iFish-1)),1:6)
                  velful(iFish,iND,1:6)   =  velful_all(iND + sum(nND(1:iFish-1)),1:6)
                  xyzfulIB(iFish,iND,1:6) =  xyzfulIB_all(iND + sum(nND(1:iFish-1)),1:6)
                enddo
@@ -229,13 +229,13 @@
                 enddo
             else
                 do iND=1,nND(iFish)
-                extful(iFish,iND,1:6) = extful2_all(iND+sum(nND(1:iFish-1)),1:6) 
+                extful(iFish,iND,1:6) = extful2_all(iND+sum(nND(1:iFish-1)),1:6)
                 enddo
             endif
             enddo
         else
-             stop 'no define force to body ' 
-        endif                           
+             stop 'no define force to body '
+        endif
         !******************************************************************************************
         !******************************************************************************************
         !******************************************************************************************
@@ -253,7 +253,7 @@
             !translational displacement
             XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
             !rotational displacement
-            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))       
+            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
             call AoAtoTTT(AoA(iFish,1:3),TTTnxt(iFish,1:3,1:3))
             call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnxt(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
             !given displacement
@@ -267,7 +267,7 @@
             UVW(iFish,1:3) =-2.0*pi*Freq(iFish)*XYZAmpl(iFish,1:3)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
             !rotational velocity
             WWW1(iFish,1:3)=-2.0*pi*Freq(iFish)*AoAAmpl(iFish,1:3)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
-            WWW2(iFish,1:3)=[WWW1(iFish,1)*dcos(AoA(iFish,2))+WWW1(iFish,3),    &                       
+            WWW2(iFish,1:3)=[WWW1(iFish,1)*dcos(AoA(iFish,2))+WWW1(iFish,3),    &
                              WWW1(iFish,1)*dsin(AoA(iFish,2))*dsin(AoA(iFish,3))+WWW1(iFish,2)*dcos(AoA(iFish,3)),   &
                              WWW1(iFish,1)*dsin(AoA(iFish,2))*dcos(AoA(iFish,3))-WWW1(iFish,2)*dsin(AoA(iFish,3))    ]
             WWW3(iFish,1:3)=matmul(TTTnxt(iFish,1:3,1:3),WWW2(iFish,1:3))
@@ -280,11 +280,11 @@
                 velful(iFish,iND,4:6)=WWW3(iFish,1:3)
             enddo
             !-------------------------------------------------------
-        elseif(iBodyModel(iFish)==2)then !elastic model     
+        elseif(iBodyModel(iFish)==2)then !elastic model
             !translational displacement
             XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
             !rotational displacement
-            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))        
+            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
             call AoAtoTTT(AoA(iFish,1:3),TTTnxt(iFish,1:3,1:3))
             call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnxt(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
             !given displacement
