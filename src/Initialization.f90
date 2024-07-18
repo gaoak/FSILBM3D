@@ -686,7 +686,7 @@
     !         stop 'no flow/moving body/gravity'
     !     endif
     ! endif
-    uMax = 0.;
+    uMax = 0.
     do iFish=1,nFish
         uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(iFish,1:3)))*Freq, &
             2.0*pi*MAXVAL(dabs(AoAAmpl(iFish,1:3))*[maxval(dabs(xyzful00(iFish,:,2))), &

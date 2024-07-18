@@ -86,13 +86,13 @@
     real(8):: posElem(nEL,3),posElemIB(nEL,3),velElem(nEL,3),velElemIB(nEL,3),areaElem(nEL)
 !==================================================================================================
 !   compute velocity and displacement at IB nodes
-    invdh = 1.D0/dh;
+    invdh = 1.D0/dh
     do  iND=1,nND
         call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
         call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
         call my_minloc(xyzful(iND,3), zGrid, zDim, isUniformGrid(3), k)
         ! xbgn             xxx             xend
-        !   -1   0   1   2  
+        !   -1   0   1   2
         ! interpolate fluid velocity to body nodes
         velfulIB(iND,1:3)=0.0
         do x=-1+i,2+i
@@ -150,8 +150,6 @@
         else
             write(*,*)'cell type is not defined'
         endif
-
-
     enddo
 
 !**************************************************************************************************
@@ -195,11 +193,9 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
             forceElemTemp(iEL,1:3) = 0.0d0
         elseif(ele(iEL,4)==3)then
             forceElemTemp(iEL,1:3) = -Palpha*2.0*denIn*(posElem(iEL,1:3)-posElemIB(iEL,1:3))/dt*areaElem(iEL)*dh  &
-                                     -Pbeta* 2.0*denIn*(velElem(iEL,1:3)-velElemIB(iEL,1:3))/dt*areaElem(iEL)*dh 
-                       
+                                     -Pbeta* 2.0*denIn*(velElem(iEL,1:3)-velElemIB(iEL,1:3))/dt*areaElem(iEL)*dh
         else
         endif
-         
     enddo
 !   ***********************************************************************************************
 !   calculate Eulerian body force
