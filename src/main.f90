@@ -196,13 +196,13 @@
         enddo 
 
         call date_and_time(VALUES=values1)
-        write(*,*)'time for IBM step : ',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'time for IBM step : ',CPUtime(values1)-CPUtime(values0)
         if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
         
         call date_and_time(VALUES=values0)  
         call cptForceR(nFish,dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful)
         call date_and_time(VALUES=values1)
-        write(*,*)'time for Lubforce :',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)        
+        write(*,*)'time for Lubforce :',CPUtime(values1)-CPUtime(values0)
 
         call date_and_time(VALUES=values0)  
         CALL collision_step()
@@ -328,7 +328,7 @@
         endif
         write(*,'(A)')' --------------------------------------------------------'
         call date_and_time(VALUES=values1)
-        write(*,*)'max time for FEM  : ',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'max time for FEM  : ',CPUtime(values1)-CPUtime(values0)
         !******************************************************************************************
         !******************************************************************************************
         !******************************************************************************************
