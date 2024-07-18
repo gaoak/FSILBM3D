@@ -626,3 +626,40 @@
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE
+
+    FUNCTION CPUtime(values)
+        IMPLICIT NONE
+        real(8)::CPUtime
+        integer,dimension(8) :: values
+        CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
+    ENDFUNCTION
+
+    SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
+        implicit none
+        integer:: len, index, count, step, it
+        real(8):: x, array(len)
+        logical:: uniform
+        if (x<array(1) .or. x>array(len)) then
+            write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+            stop
+        endif
+        if (.not.uniform) then
+            index = 1
+            count = len
+            do while(count > 0)
+                step = count / 2 
+                it = index + step
+                if (array(it) < x) then
+                    index = it + 1
+                    count = count - (step + 1)
+                else
+                    count = step
+                endif
+            enddo
+            if (array(index)>x) then
+                index = index - 1
+            endif
+        else
+            index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
+        endif
+    END SUBROUTINE

@@ -46,6 +46,7 @@
     integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity
     integer:: iChordDirection,move(1:SpcDim),numOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
+    logical:: isUniformGrid(1:SpcDim)
     integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
     integer:: boundaryConditions(1:6),MovingKind1,MovingKind2,VelocityKind
     real(8):: VelocityAmp,VelocityFreq,VelocityPhi,MovingVel1,MovingVel2,MovingFreq1,MovingFreq2
