@@ -70,16 +70,9 @@
         USE simParam
         implicit none
         integer:: i
-        integer:: strmDir(0:lbmDim,1:3)
-
-        !stream direction
-        strmDir(0:lbmDim,1)=-ee(0:lbmDim,3)
-        strmDir(0:lbmDim,2)=-ee(0:lbmDim,2)
-        strmDir(0:lbmDim,3)=-ee(0:lbmDim,1)
-
         do  i=0,lbmDim
-            call swapzy(fIn, strmDir(i,3), strmDir(i,2), i, zDim, yDim, xDim, lbmDim)
-            call swapx(fIn, strmDir(i,1), i, zDim, yDim, xDim, lbmDim)
+            call swapzy(fIn, ee(i,3), ee(i,2), i, zDim, yDim, xDim, lbmDim)
+            call swapx(fIn, ee(i,1), i, zDim, yDim, xDim, lbmDim)
         enddo
     END SUBROUTINE
 
