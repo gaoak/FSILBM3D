@@ -120,3 +120,10 @@
         integer, allocatable:: partition(:), parindex(:),eid(:)
         real(8), allocatable:: edge(:,:,:)
     END MODULE
+
+    MODULE Expansion
+        real(8):: HalfExpansionLength
+        integer:: nHalfExpansionSteps,surfacenND,surfacenEL
+        integer, allocatable:: surfaceele(:,:)
+        real(8), allocatable:: surfacexyzful(:,:),surfacevelful(:,:),surfaceextful(:,:)
+    END MODULE

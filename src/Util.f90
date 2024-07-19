@@ -663,3 +663,78 @@
             index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
         endif
     END SUBROUTINE
+
+    SUBROUTINE ExpansionBeam(beamnND,beamxyzful,beamvelful)
+        USE Expansion
+        implicit none
+        integer :: i, j, beamnND
+        real(8) :: beamxyzful(beamnND,6),beamvelful(beamnND,6),invnHalfExpansionSteps
+
+        surfacenND = (2 * nHalfExpansionSteps + 1) * beamnND
+        surfacenEL = 2 * 2 * nHalfExpansionSteps * (beamnND - 1)
+
+        allocate(surfacexyzful(surfacenND, 6))
+        allocate(surfacevelful(surfacenND, 6))
+        allocate(surfaceextful(surfacenND, 6))
+        allocate(surfaceele(surfacenEL, 5))
+
+        surfacexyzful=0.0d0
+        surfacevelful=0.0d0
+        surfaceextful=0.0d0
+        surfaceele=0.0d0
+
+        invnHalfExpansionSteps = 1 / nHalfExpansionSteps
+
+        do i = 1, beamnND
+            do j = -nHalfExpansionSteps, nHalfExpansionSteps
+                surfacexyzful((j + nHalfExpansionSteps) * beamnND + i, 1) = beamxyzful(i, 1)
+                surfacexyzful((j + nHalfExpansionSteps) * beamnND + i, 2) = beamxyzful(i, 2) + j * HalfExpansionLength * invnHalfExpansionSteps
+                surfacexyzful((j + nHalfExpansionSteps) * beamnND + i, 3) = beamxyzful(i, 3)
+            end do
+        end do
+
+        do i = 1, beamnND
+            do j = -nHalfExpansionSteps, nHalfExpansionSteps
+                surfacevelful((j + nHalfExpansionSteps) * beamnND + i, 1) = beamvelful(i, 1)
+                surfacevelful((j + nHalfExpansionSteps) * beamnND + i, 2) = beamvelful(i, 2)
+                surfacevelful((j + nHalfExpansionSteps) * beamnND + i, 3) = beamvelful(i, 3)
+            end do
+        end do
+
+        surfacenEL = 0
+        do j = 0, 2 * nHalfExpansionSteps - 1
+            do i = 1, beamnND - 1
+                surfacenEL = surfacenEL + 1
+                surfaceele(surfacenEL, 1) = j * beamnND + i
+                surfaceele(surfacenEL, 2) = j * beamnND + i + 1
+                surfaceele(surfacenEL, 3) = (j + 1) * beamnND + i
+                surfaceele(surfacenEL, 4) = 3
+                surfaceele(surfacenEL, 5) = 1
+
+                surfacenEL = surfacenEL + 1
+                surfaceele(surfacenEL, 1) = j * beamnND + i + 1
+                surfaceele(surfacenEL, 2) = (j + 1) * beamnND + i + 1
+                surfaceele(surfacenEL, 3) = (j + 1) * beamnND + i
+                surfaceele(surfacenEL, 4) = 3
+                surfaceele(surfacenEL, 5) = 1
+            end do
+        end do
+    END SUBROUTINE
+
+    SUBROUTINE AverageSurfaceForce(beamnND,beamextful)
+        USE Expansion
+        implicit none
+        integer:: i, j, beamnND
+        real(8):: beamextful(beamnND,6),inv
+        beamextful = 0.0d0
+        inv = 1 / (2.0d0 * nHalfExpansionSteps + 1.0d0)
+        do i = 1, beamnND
+            do j = -nHalfExpansionSteps, nHalfExpansionSteps
+                beamextful(i, 1:3) = beamextful(i, 1:3) + surfaceextful((j + nHalfExpansionSteps) * beamnND + i, 1:3) * inv
+            end do
+        end do
+        deallocate(surfacexyzful)
+        deallocate(surfacevelful)
+        deallocate(surfaceextful)
+        deallocate(surfaceele)
+    END SUBROUTINE
