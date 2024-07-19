@@ -8,6 +8,7 @@
     PROGRAM main
     USE simParam
     use omp_lib
+    USE ImmersedBoundary
     implicit none
     integer:: iND,isubstep,iFish,x,y,z
     real(8), allocatable:: FishInfo(:,:)
@@ -148,27 +149,27 @@
         do iFish=1,nFish
         if(iFish.eq.1)then
             do iND=1,nND(iFish)
-               xyzful_all(iND,1:6)   =  xyzful(iFish,iND,1:6)
-               velful_all(iND,1:6)   =  velful(iFish,iND,1:6)
-               xyzfulIB_all(iND,1:6) =  xyzfulIB(iFish,iND,1:6)
-               extful1_all(iND,1:6)  =  extful(iFish,iND,1:6)
-               extful2_all(iND,1:6)  =  extful(iFish,iND,1:6)
+                xyzful_all(iND,1:6)   =  xyzful(iFish,iND,1:6)
+                velful_all(iND,1:6)   =  velful(iFish,iND,1:6)
+                xyzfulIB_all(:,iND,1:6) = xyzfulIB(:,iFish,iND,1:6)
+                extful1_all(iND,1:6)  =  extful(iFish,iND,1:6)
+                extful2_all(iND,1:6)  =  extful(iFish,iND,1:6)
             enddo
         elseif(iFish.ge.2)then
             do iND=1,nND(iFish)
-               xyzful_all(iND+sum(nND(1:iFish-1)),1:6)   =  xyzful(iFish,iND,1:6)
-               velful_all(iND+sum(nND(1:iFish-1)),1:6)   =  velful(iFish,iND,1:6)
-               xyzfulIB_all(iND+sum(nND(1:iFish-1)),1:6) =  xyzfulIB(iFish,iND,1:6)
-               extful1_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
-               extful2_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
+                xyzful_all(iND+sum(nND(1:iFish-1)),1:6)   =  xyzful(iFish,iND,1:6)
+                velful_all(iND+sum(nND(1:iFish-1)),1:6)   =  velful(iFish,iND,1:6)
+                xyzfulIB_all(:,iND+sum(nND(1:iFish-1)),1:6) = xyzfulIB(:,iFish,iND,1:6)
+                extful1_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
+                extful2_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
             enddo
         endif
 
         enddo
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
-        CALL calculate_interaction_force_tri(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                       xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all,isUniformGrid)
+        CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                       xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all,isUniformGrid,Nspan,dspan)
         elseif(iForce2Body==2)then   !stress force
         CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful2_all)
         else
@@ -184,13 +185,13 @@
                do iND=1,nND(iFish)
                  xyzful(iFish,iND,1:6)   =  xyzful_all(iND,1:6)
                  velful(iFish,iND,1:6)   =  velful_all(iND,1:6)
-                 xyzfulIB(iFish,iND,1:6) =  xyzfulIB_all(iND,1:6)
+                 xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND,1:6)
                enddo
             else
                do iND=1,nND(iFish)
                  xyzful(iFish,iND,1:6)   =  xyzful_all(iND + sum(nND(1:iFish-1)),1:6)
                  velful(iFish,iND,1:6)   =  velful_all(iND + sum(nND(1:iFish-1)),1:6)
-                 xyzfulIB(iFish,iND,1:6) =  xyzfulIB_all(iND + sum(nND(1:iFish-1)),1:6)
+                 xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND + sum(nND(1:iFish-1)),1:6)
                enddo
             endif
         enddo 

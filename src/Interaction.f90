@@ -282,6 +282,7 @@ enddo
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 SUBROUTINE calculate_interaction_force_quad(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
     xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,dspan)
+USE, INTRINSIC :: IEEE_ARITHMETIC
 IMPLICIT NONE
 integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM,Nspan
 real(8),intent(in):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta,dspan
@@ -358,13 +359,17 @@ enddo
 !$OMP END PARALLEL DO
 
 !**************************************************************************************************
-!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)  
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
 do x = 1, xDim
     force(:,:,x,1)=0.0d0
 enddo
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
 do x = 1, xDim
     force(:,:,x,2)=0.0d0
 enddo
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
 do x = 1, xDim
     force(:,:,x,3)=0.0d0
 enddo
@@ -458,10 +463,14 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
         uuu(:,:,x,1)  = uuu(:,:,x,1)+0.5*dt*forceTemp(:,:,x,1)/den(:,:,x)
         force(:,:,x,1) = force(:,:,x,1) + forceTemp(:,:,x,1)
     enddo
+    !$OMP END PARALLEL DO
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
     do  x = 1, xDim
         uuu(:,:,x,2)  = uuu(:,:,x,2)+0.5*dt*forceTemp(:,:,x,2)/den(:,:,x)
         force(:,:,x,2) = force(:,:,x,2) + forceTemp(:,:,x,2)
     enddo
+    !$OMP END PARALLEL DO
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
     do  x = 1, xDim
         uuu(:,:,x,3)  = uuu(:,:,x,3)+0.5*dt*forceTemp(:,:,x,3)/den(:,:,x)
         force(:,:,x,3) = force(:,:,x,3) + forceTemp(:,:,x,3)
@@ -783,6 +792,7 @@ END SUBROUTINE calculate_interaction_force_quad
     nND=surfacenND
     ele=surfaceele
     xyzful=surfacexyzful
+    xyzfulIB=surfacexyzful
     velful=surfacevelful
     extful=surfaceextful
 !==================================================================================================
@@ -994,3 +1004,39 @@ enddo
     surfaceextful=extful
     call AverageSurfaceForce(beamnND,beamextful)
     END SUBROUTINE
+    
+subroutine packXYZIB
+    use ImmersedBoundary
+    USE simParam
+    implicit none
+    integer:: iFish, iND
+    do iFish=1,nFish
+        if(iFish.eq.1)then
+            do iND=1,nND(iFish)
+               xyzfulIB_all(:,iND,1:6) =  xyzfulIB(:,iFish,iND,1:6)
+            enddo
+        elseif(iFish.ge.2)then
+            do iND=1,nND(iFish)
+               xyzfulIB_all(:,iND+sum(nND(1:iFish-1)),1:6) =  xyzfulIB(:,iFish,iND,1:6)
+            enddo
+        endif
+    enddo
+end subroutine packXYZIB
+
+subroutine unpackXYZIB
+    use ImmersedBoundary
+    USE simParam
+    implicit none
+    integer:: iFish, iND
+    do iFish=1,nFish
+        if(iFish.eq.1)then
+           do iND=1,nND(iFish)
+             xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND,1:6)
+           enddo
+        else
+           do iND=1,nND(iFish)
+             xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND + sum(nND(1:iFish-1)),1:6)
+           enddo
+        endif
+    enddo 
+end subroutine unpackXYZIB

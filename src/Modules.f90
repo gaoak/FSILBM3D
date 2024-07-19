@@ -102,14 +102,14 @@
     integer,allocatable:: ele_all(:,:)
     integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:) 
     integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:)
-    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),xyzfulIB_all(:,:),extful1_all(:,:),extful2_all(:,:),isMotionGiven(:,:)
+    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful1_all(:,:),extful2_all(:,:),isMotionGiven(:,:)
 !   ===============================================================================================
     integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
     real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)
     real(8), allocatable:: lodful(:,:,:),repful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:),streI(:,:),bendO(:,:)
 
     real(8), allocatable:: xyzful0(:,:,:),xyzfulnxt(:,:,:),dspful(:,:,:),accful(:,:,:)
-    real(8), allocatable:: xyzful(:,:,:),xyzfulIB(:,:,:),velful(:,:,:)
+    real(8), allocatable:: xyzful(:,:,:),velful(:,:,:)
     real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
     real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
 !   ***********************************************************************************************   
@@ -126,4 +126,10 @@
         integer:: nHalfExpansionSteps,surfacenND,surfacenEL
         integer, allocatable:: surfaceele(:,:)
         real(8), allocatable:: surfacexyzful(:,:),surfacevelful(:,:),surfaceextful(:,:)
+    END MODULE
+
+    MODULE ImmersedBoundary
+        integer:: NSpan
+        real(8):: dspan
+        real(8), allocatable:: xyzfulIB_all(:,:,:),xyzfulIB(:,:,:,:)
     END MODULE
