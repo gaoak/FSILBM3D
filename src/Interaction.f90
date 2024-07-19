@@ -994,15 +994,6 @@ enddo
     surfaceextful=extful
     call AverageSurfaceForce(beamnND,beamextful)
     END SUBROUTINE
-
-subroutine initializeXYZIB
-    use ImmersedBoundary
-    USE simParam
-    integer:: Nspanpts
-    implicit none
-    Nspanpts = Nspan + 1
-    allocate(xyzfulIB_all(1:Nspanpts,nND_all,6),xyzfulIB(1:Nspanpts,1:nFish,nND_max,6))
-end subroutine initializeXYZIB
     
 subroutine packXYZIB
     use ImmersedBoundary

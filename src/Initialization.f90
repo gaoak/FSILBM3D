@@ -267,8 +267,9 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE allocate_solid_memory()
     USE simParam
+    USE ImmersedBoundary
     implicit none
-    integer:: iEL,iND,iFish,maxN(1)
+    integer:: iEL,iND,iFish,maxN(1),Nspanpts
     real(8):: xCT,yCT,zCT,xl,xr,yl,yr,zl,zr
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
@@ -288,21 +289,23 @@
     nMT_max=maxval(nMT(:))
     nEQ_max=nND_max*6
     nEQ(:)=nND(:)*6
-    
+
     nEL_all = sum(nEL(:)) 
     nND_all = sum(nND(:))    
 
 !   ===============================================================================================
-    allocate( ele_all(nEL_all,5),xyzful_all(nND_all,6),velful_all(nND_all,6),xyzfulIB_all(nND_all,6),extful1_all(nND_all,6),extful2_all(nND_all,6))
+    allocate( ele_all(nEL_all,5),xyzful_all(nND_all,6),velful_all(nND_all,6),extful1_all(nND_all,6),extful2_all(nND_all,6))
 
     allocate( ele(1:nFish,nEL_max,5),xyzful00(1:nFish,nND_max,6),xyzful0(1:nFish,nND_max,6),mssful(1:nFish,nND_max,6),lodful(1:nFish,nND_max,6), &
               extful(1:nFish,nND_max,6),repful(1:nFish,nND_max,1:6),extful1(1:nFish,nND_max,6),extful2(1:nFish,nND_max,6),nloc(1:nFish,nND_max*6),nprof(1:nFish,nND_max*6), &
               nprof2(1:nFish,nND_max*6),jBC(1:nFish,nND_max,6),streI(1:nFish,nND_max),bendO(1:nFish,nND_max))
     allocate( grav(1:nFish,nND_max,6),vBC(1:nFish,nND_max,6),mss(1:nFish,nND_max*6),prop(1:nFish,nMT_max,10),areaElem00(1:nFish,nEL_max),areaElem(1:nFish,nEL_max))
 
-    allocate( xyzful(1:nFish,nND_max,6),xyzfulIB(1:nFish,nND_max,6),xyzfulnxt(1:nFish,nND_max,6),dspful(1:nFish,nND_max,6),velful(1:nFish,nND_max,6),accful(1:nFish,nND_max,6)) 
+    allocate( xyzful(1:nFish,nND_max,6),xyzfulnxt(1:nFish,nND_max,6),dspful(1:nFish,nND_max,6),velful(1:nFish,nND_max,6),accful(1:nFish,nND_max,6)) 
     allocate( triad_nn(1:nFish,3,3,nND_max),triad_ee(1:nFish,3,3,nEL_max),triad_e0(1:nFish,3,3,nEL_max) )
-    allocate( triad_n1(1:nFish,3,3,nEL_max),triad_n2(1:nFish,3,3,nEL_max),triad_n3(1:nFish,3,3,nEL_max) ) 
+    allocate( triad_n1(1:nFish,3,3,nEL_max),triad_n2(1:nFish,3,3,nEL_max),triad_n3(1:nFish,3,3,nEL_max) )
+    Nspanpts = Nspan + 1
+    allocate(xyzfulIB_all(1:Nspanpts,nND_all,6),xyzfulIB(1:Nspanpts,1:nFish,nND_max,6))
 
     repful(:,:,1:6) =0.d0
     extful1(:,:,1:6)=0.d0
@@ -546,8 +549,9 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE initialize_solid()
     USE simParam
+    USE ImmersedBoundary
     implicit none
-    integer:: iND,iFish,iCount
+    integer:: iND,iFish,iCount,s
     allocate(TTT00(1:nFish,1:3,1:3),TTT0(1:nFish,1:3,1:3),TTTnow(1:nFish,1:3,1:3),TTTnxt(1:nFish,1:3,1:3))
     allocate(XYZ(1:nFish,1:3),XYZd(1:nFish,1:3),UVW(1:nFish,1:3) )
     allocate(AoA(1:nFish,1:3),AoAd(1:nFish,1:3),WWW1(1:nFish,1:3),WWW2(1:nFish,1:3),WWW3(1:nFish,1:3) )
@@ -576,12 +580,16 @@
         dspful(iFish,1:nND(iFish),1:6)=0.0
         accful(iFish,1:nND(iFish),1:6)=0.0
 
-        xyzfulIB(iFish,1:nND(iFish),1:6)=xyzful(iFish,1:nND(iFish),1:6)
+        do s=1,Nspan+1
+            xyzfulIB(s,iFish,1:nND(iFish),1:6)=xyzful(iFish,1:nND(iFish),1:6)
+        enddo
 
         do iND=1,nND(iFish)
             xyzful_all(iND+iCount,1:6)   =xyzful(iFish,iND,1:6)
             velful_all(iND+iCount,1:6)   =velful(iFish,iND,1:6)
-            xyzfulIB_all(iND+iCount,1:6) =xyzfulIB(iFish,iND,1:6)
+            do s=1,Nspan+1
+                xyzfulIB_all(s,iND+iCount,1:6) =xyzfulIB(s,iFish,iND,1:6)
+            enddo
             extful1_all(iND+iCount,1:6)  =0.d0
             extful2_all(iND+iCount,1:6)  =0.d0
         enddo
@@ -850,6 +858,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_checkpoint_file()
     USE simParam
+    USE ImmersedBoundary
     IMPLICIT NONE
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
     write(13) step,time
@@ -869,6 +878,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_checkpoint_file()
     USE simParam
+    USE ImmersedBoundary
     IMPLICIT NONE
     allocate(TTT00(1:nFish,1:3,1:3),TTT0(1:nFish,1:3,1:3),TTTnow(1:nFish,1:3,1:3),TTTnxt(1:nFish,1:3,1:3))
     allocate(XYZ(1:nFish,1:3),XYZd(1:nFish,1:3),UVW(1:nFish,1:3) )
