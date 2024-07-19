@@ -564,8 +564,8 @@
         TTT00(iFish,2,2)=1.0d0
         TTT00(iFish,3,3)=1.0d0
 
-        XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq*time+XYZPhi(iFish,1:3))
-        AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq*time+AoAPhi(iFish,1:3))
+        XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*time+XYZPhi(iFish,1:3))
+        AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*time+AoAPhi(iFish,1:3))
 
         call AoAtoTTT(AoA(iFish,1:3),TTT0(iFish,1:3,1:3))
         call AoAtoTTT(AoA(iFish,1:3),TTTnow(iFish,1:3,1:3))
