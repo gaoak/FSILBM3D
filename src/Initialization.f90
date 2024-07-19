@@ -5,6 +5,7 @@
     SUBROUTINE read_file()
     USE simParam
     USE Expansion
+    USE ImmersedBoundary
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
     integer:: i,iFish,iKind,FishKind,Order0
@@ -41,6 +42,7 @@
     read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
     read(111,*)     !======================================
     read(111,*)     HalfExpansionLength,nHalfExpansionSteps
+    read(111,*)     dspan,Nspan
     read(111,*)     !======================================
     read(111,*)     Re     
     read(111,*)     dt      

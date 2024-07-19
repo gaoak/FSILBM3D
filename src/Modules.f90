@@ -130,5 +130,6 @@
 
     MODULE ImmersedBoundary
         integer:: NSpan
+        real(8):: dspan
         real(8), allocatable:: xyzfulIB_all(:,:,:),xyzfulIB(:,:,:,:)
     END MODULE
