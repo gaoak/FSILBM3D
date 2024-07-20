@@ -121,13 +121,6 @@
         real(8), allocatable:: edge(:,:,:)
     END MODULE
 
-    MODULE Expansion
-        real(8):: HalfExpansionLength
-        integer:: nHalfExpansionSteps,surfacenND,surfacenEL
-        integer, allocatable:: surfaceele(:,:)
-        real(8), allocatable:: surfacexyzful(:,:),surfacevelful(:,:),surfaceextful(:,:)
-    END MODULE
-
     MODULE ImmersedBoundary
         integer:: NSpan
         real(8):: dspan

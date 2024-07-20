@@ -4,7 +4,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_file()
     USE simParam
-    USE Expansion
     USE ImmersedBoundary
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
@@ -41,7 +40,6 @@
     read(111,*)     VolumeForceIn(1:SpcDim)
     read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
     read(111,*)     !======================================
-    read(111,*)     HalfExpansionLength,nHalfExpansionSteps
     read(111,*)     dspan,Nspan
     read(111,*)     !======================================
     read(111,*)     Re     
@@ -509,7 +507,6 @@
         elseif(VelocityKind==2) then
             call evaluateOscillatoryVelocity(vel)
         endif
-        
         uuu(z, y, x, 1) = vel(1)
         uuu(z, y, x, 2) = vel(2)
         uuu(z, y, x, 3) = vel(3)
@@ -584,6 +581,7 @@
 
         do s=1,Nspan+1
             xyzfulIB(s,iFish,1:nND(iFish),1:6)=xyzful(iFish,1:nND(iFish),1:6)
+            xyzfulIB(s,iFish,1:nND(iFish),3)=xyzful(iFish,1:nND(iFish),3)+(s-1)*dspan
         enddo
 
         do iND=1,nND(iFish)

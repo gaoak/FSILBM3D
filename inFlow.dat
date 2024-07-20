@@ -10,18 +10,26 @@
 ===================================================================================================fluid information
  0.000d+0   0.000d+0   0.000d+0              read(111,*)     uuuIn(1:3)
  0.020d+0   0.000d+0   0.000d+0              read(111,*)     shearRateIn(1:3)     
- 300   300   304   304   201   201           read(111,*)     boundaryConditions(1:6) (xmin,xmax,zmin,zmax,ymin,ymax)
+ 300   300   304   304   201   201           read(111,*)     boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 0                                           read(111,*)     VelocityKind
+ 0   0.000D+0   0.000D+0                     read(111,*)     MovingKind1,MovingVel1,MovingFreq1
+ 0   0.000D+0   0.000D+0                  read(111,*)     MovingKind2,MovingVel2,MovingFreq2
+================================================================================================== volume Force
+ 0.000D+0   0.000D+0   0.000D+0              read(111,*)     VolumeForceIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0              read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
+================================================================================================== span information
+ 0.000D+0   0                                read(111,*)     dspan,Nspan
 ===================================================================================================grid information
  1.000D+2                                    read(111,*)     Re    
  0.030D+0                                    read(111,*)     dt        
- 0.000D+0   0.000D+0   0.000D+0              read(111,*)          Frod(1:3)
+ 0.000D+0   0.000D+0   0.000D+0              read(111,*)     Frod(1:3)
 ===================================================================================================far field boundary condition
  2                                           read(111,*)     iBC      1: set 1 layer 2: set 2 layers
  FluidMesh.dat                               read(111,*)     LBmeshName
  1.000d+0                                    read(111,*)     denIn  
  1.000D-2   1                                read(111,*)     dtolLBM,ntolLBM    
 ===================================================================================================solid number
- 16          2                               read(111,*)     nFish,FishKind
+ 16         2                                read(111,*)     nFish,FishKind
  1          1                                read(111,*)     iForce2Body,iChordDirection  using xyz00, possible values 1,2
 ===================================================================================================structure property
  1          1          1                     read(111,*)     FishNum(FishKind),NumX,NumY
