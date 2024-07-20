@@ -7,7 +7,7 @@
     INTEGER, PARAMETER:: SpcDim = 3, LBMDim = 18
 !   Directions*************************************************************************************
     integer, parameter:: ee(0:lbmDim,1:3)=reshape([&
-                                        !0  1  2     3    4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
+                                        !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
                                          0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0, &
                                          0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1, &
                                          0, 0, 0, 0, 0, 1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 1, 1,-1,-1  &
@@ -46,8 +46,11 @@
     integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity
     integer:: iChordDirection,move(1:SpcDim),numOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
+    logical:: isUniformGrid(1:SpcDim)
     integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
-    integer:: boundaryConditions(1:6)
+    integer:: boundaryConditions(1:6),MovingKind1,MovingKind2,VelocityKind
+    real(8):: VelocityAmp,VelocityFreq,VelocityPhi,MovingVel1,MovingVel2,MovingFreq1,MovingFreq2
+    real(8):: VolumeForce(1:SpcDim),VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpcDim)
     integer, allocatable:: SampBodyNode(:,:), iBodyModel(:)
     real(8), allocatable:: SampFlowPint(:,:)
     real(8):: Xref,Yref,Zref
@@ -99,16 +102,27 @@
     integer,allocatable:: ele_all(:,:)
     integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:) 
     integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:)
-    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),xyzfulIB_all(:,:),extful1_all(:,:),extful2_all(:,:),isMotionGiven(:,:)
+    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful1_all(:,:),extful2_all(:,:),isMotionGiven(:,:)
 !   ===============================================================================================
     integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
     real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)
     real(8), allocatable:: lodful(:,:,:),repful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:),streI(:,:),bendO(:,:)
 
     real(8), allocatable:: xyzful0(:,:,:),xyzfulnxt(:,:,:),dspful(:,:,:),accful(:,:,:)
-    real(8), allocatable:: xyzful(:,:,:),xyzfulIB(:,:,:),velful(:,:,:)
+    real(8), allocatable:: xyzful(:,:,:),velful(:,:,:)
     real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
     real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
 !   ***********************************************************************************************   
     END MODULE simParam
 
+    MODULE PartitionXDim
+        integer:: npsize_copy, xDim_copy
+        integer, allocatable:: partition(:), parindex(:),eid(:)
+        real(8), allocatable:: edge(:,:,:)
+    END MODULE
+
+    MODULE ImmersedBoundary
+        integer:: NSpan
+        real(8):: dspan
+        real(8), allocatable:: xyzfulIB_all(:,:,:),xyzfulIB(:,:,:,:)
+    END MODULE

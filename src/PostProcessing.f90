@@ -11,7 +11,7 @@
     !==================================================================================================        
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=7 
-    real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
+    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=['x','y','z','p','u','v','w']  
 
@@ -185,7 +185,7 @@
     SUBROUTINE write_solid_field(nFish,xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max,isIB)
     implicit none
     integer:: nND_max,nEL_max,isIB,nFish
-    integer:: ele(nFish,nEL_max,5),nND(iFish),nEL(iFish)
+    integer:: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
     real(8):: xyzful(nFish,nND_max,6),velful(nFish,nND_max,6),accful(nFish,nND_max,6),extful(nFish,1:nND_max,1:6) !,streI(1:nND),bendO(1:nND)
     real(8):: time
 !   -------------------------------------------------------
@@ -196,7 +196,7 @@
     !==================================================================================================        
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=12
-    real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
+    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz'] 
     !==================================================================================================
@@ -268,7 +268,7 @@
     !==================================================================================================        
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=7 
-    real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
+    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=['x','y','z','p','u','v','w']  
 
@@ -327,7 +327,7 @@
     integer:: iimage        
     integer:: nv
     integer,parameter:: namLen=40,idfile=100,numVar=4
-    real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
+    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=[character(namLen)::'x','y','z','image'] 
     !==================================================================================================

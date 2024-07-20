@@ -11,9 +11,9 @@
     do  y = 1, yDim
     do  z = 1, zDim
         den(z,y,x  )  = SUM(fIn(z,y,x,0:lbmDim)) 
-        uuu(z,y,x,1)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))/den(z,y,x)
-        uuu(z,y,x,2)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))/den(z,y,x)
-        uuu(z,y,x,3)  = SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))/den(z,y,x)    
+        uuu(z,y,x,1)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*VolumeForce(1)*dt)/den(z,y,x)
+        uuu(z,y,x,2)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*VolumeForce(2)*dt)/den(z,y,x)
+        uuu(z,y,x,3)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*VolumeForce(3)*dt)/den(z,y,x)    
         prs(z,y,x)   = Cs2*(den(z,y,x)-denIn)
     enddo
     enddo
@@ -62,6 +62,120 @@
     !$OMP END PARALLEL DO
     END SUBROUTINE
 
+    !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
+    !0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0
+    !0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1
+    !0, 0, 0, 0, 0, 1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 1, 1,-1,-1
+    SUBROUTINE streams()
+        USE simParam
+        implicit none
+        integer:: i
+        do  i=0,lbmDim
+            call swapzy(fIn, ee(i,3), ee(i,2), i, zDim, yDim, xDim, lbmDim)
+            call swapx(fIn, ee(i,1), i, zDim, yDim, xDim, lbmDim)
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE swapzy(f, dz, dy, i, zDim, yDim, xDim, lbmDim)
+        implicit none
+        integer, intent(in):: dz, dy, i, zDim, yDim, xDim, lbmDim
+        real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+        integer:: z, y, x
+        real(8):: temp, tmpz(1:zDim)
+
+        if(dz.eq.0 .and. dy.eq.0) return
+
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp,tmpz)
+        do  x = 1, xDim
+            if(dz.eq.1) then
+                do y=1, yDim
+                    temp = f(zDim, y, x, i)
+                    do z=zDim, 2, -1
+                        f(z,y,x, i)=f(z-1,y,x, i)
+                    enddo
+                    f(1,y,x,i) = temp
+                enddo
+            elseif(dz.eq.-1) then
+                do y=1, yDim
+                    temp = f(1, y, x, i)
+                    do z=1, zDim-1
+                        f(z,y,x, i)=f(z+1,y,x, i)
+                    enddo
+                    f(zDim,y,x,i) = temp
+                enddo
+            endif
+            if(dy.eq.1) then
+                tmpz = f(:, yDim, x, i)
+                do y=yDim, 2, -1
+                    f(:,y,x, i)=f(:,y-1,x, i)
+                enddo
+                f(:,1,x,i) = tmpz
+            elseif(dy.eq.-1) then
+                tmpz = f(:, 1, x, i)
+                do y=1, yDim-1
+                    f(:,y,x, i)=f(:,y+1,x, i)
+                enddo
+                f(:,yDim,x,i) = tmpz
+            endif
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    SUBROUTINE swapx(f, dx, i, zDim, yDim, xDim, lbmDim)
+        USE PartitionXDim
+        implicit none
+        integer, intent(in):: dx, i, zDim, yDim, xDim, lbmDim
+        real(8), intent(inout):: f(1:zDim, 1:yDim,1:xDim,0:lbmDim)
+        integer:: p
+
+        if(dx.eq.0) return
+
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
+        do  p = 1,npsize_copy
+            if(dx .eq. -1) then
+                call swapxwAtom(f, edge(:,:,p), eid(p), i, zDim, yDim, xDim, lbmDim, parindex(p), parindex(p+1)-1)
+            elseif(dx.eq.1) then
+                call swapxeAtom(f, edge(:,:,p), eid(p), i, zDim, yDim, xDim, lbmDim, parindex(p), parindex(p+1)-1)
+            endif
+        enddo
+        !$OMP END PARALLEL DO
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
+        do  p = 1,npsize_copy
+            f(:,:,eid(p),i) = edge(:,:,p)
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    SUBROUTINE swapxeAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
+        implicit none
+        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
+        real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+        real(8), intent(out):: edge(1:zDim,1:yDim)
+        integer, intent(out):: eid
+        integer:: x
+        eid = xend+1
+        if(eid .eq. xDim+1) eid = 1
+        edge = f(:,:,xend,i)
+        do  x = xend,xbgn+1,-1
+            f(:,:,x,i) = f(:,:,x-1,i)
+        enddo
+    endsubroutine
+
+    SUBROUTINE swapxwAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
+        implicit none
+        integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
+        real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+        real(8), intent(out):: edge(1:zDim,1:yDim)
+        integer, intent(out):: eid
+        integer:: x
+        eid = xbgn-1
+        if(eid .eq. 0) eid = xDim
+        edge = f(:,:,xbgn,i)
+        do  x = xbgn, xend-1
+            f(:,:,x,i) = f(:,:,x+1,i)
+        enddo
+    endsubroutine
+
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    Advection model: uniform grid advection, interpolation on the non-uniform grid
 !    copyright@ RuNanHua
@@ -69,25 +183,13 @@
     SUBROUTINE streaming_step()
     USE simParam
     implicit none
-    integer:: x,y,z,i,k
+    integer:: x,y,z,i
     logical:: upwind,center,outer
-    integer:: strmDir(0:lbmDim,1:3)
-
-    !stream direction
-    strmDir(0:lbmDim,1)=-ee(0:lbmDim,3)
-    strmDir(0:lbmDim,2)=-ee(0:lbmDim,2)
-    strmDir(0:lbmDim,3)=-ee(0:lbmDim,1)
 
 !============================================
-    if    (iStreamModel==1) then   !Advection
+    if    (iStreamModel==1) then   !Advection uniform grid
 !============================================
-        do  i=0,lbmDim
-        do  k=1,3
-            if(strmDir(i,k)/=0)then
-                fIn(1:zDim,1:yDim,1:xDim, i)=cshift(fIn(1:zDim,1:yDim,1:xDim, i),shift=strmDir(i,k),dim=k)
-            endif
-        enddo
-        enddo
+        call streams()
 !============================================
     elseif(iStreamModel==2)then    !Interpolation
 !============================================
@@ -224,34 +326,45 @@
     SUBROUTINE set_equilibrium_farfld_BC()
     USE simParam
     implicit none
-    integer:: i,k
-    integer:: x, y, z,ig
-    logical:: upwind,center,outer
+    integer:: x, y, z,xl,xr,yl,yr,zl,zr
+    logical:: outer
     real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim), vel(1:SpcDim)
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,upwind,center,outer,vel)
-    do  x=1,xDim 
-    do  y=1,yDim 
+    if(iBC==1)then
+        xl = 1
+        yl = 1
+        zl = 1
+        xr = xDim
+        yr = yDim
+        zr = zDim
+    elseif(iBC==2)then
+        xl = 2
+        yl = 2
+        zl = 2
+        xr = xDim-1
+        yr = yDim-1
+        zr = zDim-1
+    else
+        write(*,*)'BC is not defined!'
+        stop
+    endif
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,outer,vel)
+    do  x=1,xDim
+        outer = x.le.xl .or. x.ge.xr
+    do  y=1,yDim
+        outer = outer .or. y.le.yl .or. y.ge.yr
     do  z=1,zDim 
+        outer = outer .or. z.le.zl .or. z.ge.zr
         !set logical flag
-        if(iBC==1)then
-            if      ( outer  ) then               !outer most layer
-            call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+        if (outer) then !outer most layer
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
             fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
-            endif
-        elseif(iBC==2)then
-            if      ( outer .or. center ) then    !second outer-most layer
-            call evaluateShearVelocity(xGrid(x), yGrid(y), zGrid(z), vel)
-            uSqr           = sum(vel(1:3)**2)
-            uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
-            fIn(z,y,x,0:lbmDim)= fEq(0:lbmDim)
-            endif
-        else
-            write(*,*)'BC is not defined!'
-            stop
         endif
     enddo
     enddo
@@ -279,7 +392,11 @@
     if(xMinBC==DirecletUP)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)  
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)  
@@ -289,7 +406,11 @@
     elseif(xMinBC==DirecletUU)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)  
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(1), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,2) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -321,7 +442,11 @@
     if(xMaxBC==DirecletUP)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -331,7 +456,11 @@
     elseif(xMaxBC==DirecletUU)then
         do  y = 1, yDim
         do  z = 1, zDim
-            call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(xDim), yGrid(y), zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * den(z,y,xDim-1) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
@@ -481,7 +610,21 @@
     elseif(zMinBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim
-            call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(1),vel)
+            if(MovingKind1==0) then
+                if(VelocityKind==0) then
+                    call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(1),vel)
+                elseif(VelocityKind==2) then
+                    call evaluateOscillatoryVelocity(vel)
+                endif
+            elseif(MovingKind1==1) then
+                vel(1)=MovingVel1
+                vel(2)=0.0d0
+                vel(3)=0.0d0
+            elseif(MovingKind1==2) then
+                vel(1)=MovingVel1 * dcos(2*pi*MovingFreq1*time)
+                vel(2)=0.0d0
+                vel(3)=0.0d0             
+            endif
             fTmp(5) = fIn(1,y,x,oppo(5)) + 2.0 * wt(5) * denIn * (ee(5,1) * vel(1) + ee(5,2) * vel(2) + ee(5,3) * vel(3)) * 3.0
             fTmp(11) = fIn(1,y,x,oppo(11)) + 2.0 * wt(11) * denIn * (ee(11,1) * vel(1) + ee(11,2) * vel(2) + ee(11,3) * vel(3)) * 3.0
             fTmp(12) = fIn(1,y,x,oppo(12)) + 2.0 * wt(12) * denIn * (ee(12,1) * vel(1) + ee(12,2) * vel(2) + ee(12,3) * vel(3)) * 3.0
@@ -533,7 +676,21 @@
     elseif(zMaxBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim
-            call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(zDim),vel)
+            if(MovingKind2==0) then
+                if(VelocityKind==0) then
+                    call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(zDim),vel)
+                elseif(VelocityKind==2) then
+                    call evaluateOscillatoryVelocity(vel)
+                endif
+            elseif(MovingKind2==1) then
+                vel(1)=MovingVel2
+                vel(2)=0.0d0
+                vel(3)=0.0d0
+            elseif(MovingKind2==2) then
+                vel(1)=MovingVel2 * dcos(2*pi*MovingFreq2*time)
+                vel(2)=0.0d0
+                vel(3)=0.0d0
+            endif
             fTmp(6) = fIn(zDim,y,x,oppo(6)) + 2.0 * wt(6) * denIn * (ee(6,1) * vel(1) + ee(6,2) * vel(2) + ee(6,3) * vel(3)) * 3.0
             fTmp(13) = fIn(zDim,y,x,oppo(13)) + 2.0 * wt(13) * denIn * (ee(13,1) * vel(1) + ee(13,2) * vel(2) + ee(13,3) * vel(3)) * 3.0
             fTmp(14) = fIn(zDim,y,x,oppo(14)) + 2.0 * wt(14) * denIn * (ee(14,1) * vel(1) + ee(14,2) * vel(2) + ee(14,3) * vel(3)) * 3.0

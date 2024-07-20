@@ -3,4 +3,8 @@
 *.dat
 *.plt
 *.00000
+combineforcheck
+combineforcheck.f90
+Check.dat
+build*
 IBLBMSolver

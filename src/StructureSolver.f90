@@ -338,7 +338,7 @@
     !==================================================================================================        
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=6
-    real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
+    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=['x','y','z','u','v','w'] 
     !==================================================================================================

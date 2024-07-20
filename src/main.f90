@@ -8,10 +8,11 @@
     PROGRAM main
     USE simParam
     use omp_lib
+    USE ImmersedBoundary
     implicit none
     integer:: iND,isubstep,iFish,x,y,z
     real(8), allocatable:: FishInfo(:,:)
-    real(8):: temp(3),Pbetatemp
+    real(8):: temp(3),Pbetatemp,CPUtime
     logical alive
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
@@ -59,6 +60,7 @@
 !    ===============================================================================================
     if(step==0)    CALL wrtInfoTitl()
 !    ===============================================================================================
+    CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_field(1)
     CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,0)
@@ -81,7 +83,7 @@
         call date_and_time(VALUES=values0)        
         CALL streaming_step()
         call date_and_time(VALUES=values1)
-        write(*,*)'time for streaming:',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'time for streaming_step:',CPUtime(values1)-CPUtime(values0)
         !******************************************************************************************
         !DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304,fluid=0, wall=200, movingWall=201
         if    (iStreamModel==1)then
@@ -126,6 +128,7 @@
             write(*,*)'no such type LBMBC'
         endif
         !******************************************************************************************        
+        CALL updateVolumForc()
         CALL calculate_macro_quantities()
         !******************************************************************************************
         !******************************************************************************************
@@ -146,63 +149,71 @@
         do iFish=1,nFish
         if(iFish.eq.1)then
             do iND=1,nND(iFish)
-               xyzful_all(iND,1:6)   =  xyzful(iFish,iND,1:6)
-               velful_all(iND,1:6)   =  velful(iFish,iND,1:6)
-               xyzfulIB_all(iND,1:6) =  xyzfulIB(iFish,iND,1:6)
-               extful1_all(iND,1:6)  =  extful(iFish,iND,1:6)
-               extful2_all(iND,1:6)  =  extful(iFish,iND,1:6)
+                xyzful_all(iND,1:6)   =  xyzful(iFish,iND,1:6)
+                velful_all(iND,1:6)   =  velful(iFish,iND,1:6)
+                xyzfulIB_all(:,iND,1:6) = xyzfulIB(:,iFish,iND,1:6)
+                extful1_all(iND,1:6)  =  extful(iFish,iND,1:6)
+                extful2_all(iND,1:6)  =  extful(iFish,iND,1:6)
             enddo
         elseif(iFish.ge.2)then
             do iND=1,nND(iFish)
-               xyzful_all(iND+sum(nND(1:iFish-1)),1:6)   =  xyzful(iFish,iND,1:6)
-               velful_all(iND+sum(nND(1:iFish-1)),1:6)   =  velful(iFish,iND,1:6)
-               xyzfulIB_all(iND+sum(nND(1:iFish-1)),1:6) =  xyzfulIB(iFish,iND,1:6)
-               extful1_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
-               extful2_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
+                xyzful_all(iND+sum(nND(1:iFish-1)),1:6)   =  xyzful(iFish,iND,1:6)
+                velful_all(iND+sum(nND(1:iFish-1)),1:6)   =  velful(iFish,iND,1:6)
+                xyzfulIB_all(:,iND+sum(nND(1:iFish-1)),1:6) = xyzfulIB(:,iFish,iND,1:6)
+                extful1_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
+                extful2_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
             enddo
-        endif    
+        endif
 
         enddo
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
-        CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                       xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all)
+            if    (Nspan .eq. 0) then 
+                CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all,isUniformGrid)
+            else
+                CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all,isUniformGrid,Nspan,dspan)
+            endif
         elseif(iForce2Body==2)then   !stress force
         CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful2_all)
         else
-             stop 'no define force to body ' 
-        endif 
+             stop 'no define force to body '
+        endif
 
-        ! unpackage  
+        !compute volume force exerted on fluids
+        CALL addVolumForc()
+
+        ! unpackage
         do iFish=1,nFish
             if(iFish.eq.1)then
                do iND=1,nND(iFish)
-                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND,1:6) 
+                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND,1:6)
                  velful(iFish,iND,1:6)   =  velful_all(iND,1:6)
-                 xyzfulIB(iFish,iND,1:6) =  xyzfulIB_all(iND,1:6)
+                 xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND,1:6)
                enddo
             else
                do iND=1,nND(iFish)
-                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND + sum(nND(1:iFish-1)),1:6) 
+                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND + sum(nND(1:iFish-1)),1:6)
                  velful(iFish,iND,1:6)   =  velful_all(iND + sum(nND(1:iFish-1)),1:6)
-                 xyzfulIB(iFish,iND,1:6) =  xyzfulIB_all(iND + sum(nND(1:iFish-1)),1:6)
+                 xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND + sum(nND(1:iFish-1)),1:6)
                enddo
             endif
         enddo 
 
         call date_and_time(VALUES=values1)
-        write(*,*)'time for IBM step : ',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'time for IBM step : ',CPUtime(values1)-CPUtime(values0)
         if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
         
         call date_and_time(VALUES=values0)  
         call cptForceR(nFish,dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful)
         call date_and_time(VALUES=values1)
-        write(*,*)'time for Lubforce :',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)        
+        write(*,*)'time for Lubforce :',CPUtime(values1)-CPUtime(values0)
 
         call date_and_time(VALUES=values0)  
         CALL collision_step()
         call date_and_time(VALUES=values1)
-        write(*,*)'time for collision: ',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'time for collision_step:',CPUtime(values1)-CPUtime(values0)
         !exert force to solid, two types of force: penalty and fluid stress
         if (iForce2Body==1)then   !Same force as flow
             do iFish=1,nFish
@@ -224,18 +235,19 @@
                 enddo
             else
                 do iND=1,nND(iFish)
-                extful(iFish,iND,1:6) = extful2_all(iND+sum(nND(1:iFish-1)),1:6) 
+                extful(iFish,iND,1:6) = extful2_all(iND+sum(nND(1:iFish-1)),1:6)
                 enddo
             endif
             enddo
         else
-             stop 'no define force to body ' 
-        endif                           
+             stop 'no define force to body '
+        endif
         !******************************************************************************************
         !******************************************************************************************
         !******************************************************************************************
         !solve solid
         if(isRelease/=1)write(*,'(A)')' ----------------------solid solver----------------------'
+        call date_and_time(VALUES=values0)
         subdeltat=deltat/numsubstep
         do isubstep=1,numsubstep
         !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND)
@@ -247,7 +259,7 @@
             !translational displacement
             XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
             !rotational displacement
-            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))       
+            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
             call AoAtoTTT(AoA(iFish,1:3),TTTnxt(iFish,1:3,1:3))
             call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnxt(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
             !given displacement
@@ -261,7 +273,7 @@
             UVW(iFish,1:3) =-2.0*pi*Freq(iFish)*XYZAmpl(iFish,1:3)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
             !rotational velocity
             WWW1(iFish,1:3)=-2.0*pi*Freq(iFish)*AoAAmpl(iFish,1:3)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
-            WWW2(iFish,1:3)=[WWW1(iFish,1)*dcos(AoA(iFish,2))+WWW1(iFish,3),    &                       
+            WWW2(iFish,1:3)=[WWW1(iFish,1)*dcos(AoA(iFish,2))+WWW1(iFish,3),    &
                              WWW1(iFish,1)*dsin(AoA(iFish,2))*dsin(AoA(iFish,3))+WWW1(iFish,2)*dcos(AoA(iFish,3)),   &
                              WWW1(iFish,1)*dsin(AoA(iFish,2))*dcos(AoA(iFish,3))-WWW1(iFish,2)*dsin(AoA(iFish,3))    ]
             WWW3(iFish,1:3)=matmul(TTTnxt(iFish,1:3,1:3),WWW2(iFish,1:3))
@@ -274,12 +286,11 @@
                 velful(iFish,iND,4:6)=WWW3(iFish,1:3)
             enddo
             !-------------------------------------------------------
-        elseif(iBodyModel(iFish)==2)then !elastic model     
-            !translational displacement 
-            call date_and_time(VALUES=values0)              
+        elseif(iBodyModel(iFish)==2)then !elastic model
+            !translational displacement
             XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
             !rotational displacement
-            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))        
+            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
             call AoAtoTTT(AoA(iFish,1:3),TTTnxt(iFish,1:3,1:3))
             call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnxt(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
             !given displacement
@@ -309,6 +320,8 @@
         enddo !do iFish=1,nFish
         !$OMP END PARALLEL DO
         enddo !do isubstep=1,numsubstep
+        call date_and_time(VALUES=values1)
+        write(*,*)'time for FEM:',CPUtime(values1)-CPUtime(values0)
         !----------------------------------------------------------------------
         !******************************************************************************************
         !******************************************************************************************
@@ -321,7 +334,7 @@
         endif
         write(*,'(A)')' --------------------------------------------------------'
         call date_and_time(VALUES=values1)
-        write(*,*)'max time for FEM  : ',(values1(6)*60.+values1(7)*1.+values1(8)*0.001)-(values0(6)*60.+values0(7)*1.+values0(8)*0.001)
+        write(*,*)'max time for FEM  : ',CPUtime(values1)-CPUtime(values0)
         !******************************************************************************************
         !******************************************************************************************
         !******************************************************************************************
@@ -373,8 +386,6 @@
         !******************************************************************************************
         write(*,'(A)')' --------------------------------------------------------'
         call date_and_time(VALUES=values_e)
-        write(*,*)'time for one step :',(values_e(6)*60.+values_e(7)*1.+values_e(8)*0.001)-(values_s(6)*60.+values_s(7)*1.+values_s(8)*0.001)
-    enddo  
-    stop 'stop'
+        write(*,*)'time for total:',CPUtime(values_e)-CPUtime(values_s)
+    enddo
     END PROGRAM main
-

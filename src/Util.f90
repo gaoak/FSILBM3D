@@ -566,6 +566,27 @@
     enddo 
     end
 
+    SUBROUTINE OMPPartition(xDim, np, partition, parindex)
+        implicit none
+        integer:: np, xDim
+        integer:: partition(1:np), parindex(1:np+1)
+        integer:: psize, p, residual
+        psize = xDim/np
+        residual = xDim - psize * np
+        parindex(1) = 1
+        parindex(np+1) = xDim + 1
+        do p=1,np
+            if (p .gt. np-residual) then
+                partition(p) = psize + 1
+            else
+                partition(p) = psize
+            endif
+            if (p .gt. 1) then
+                parindex(p) = parindex(p-1) + partition(p-1)
+            endif
+        enddo
+    endsubroutine
+
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   lxguang 2023.02 Add Shear flow velocity boundary
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -575,4 +596,70 @@
     vel(1) = uuuIn(1) + z * shearRateIn(1) + y * shearRateIn(2) 
     vel(2) = uuuIn(2)
     vel(3) = uuuIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE evaluateOscillatoryVelocity(vel)
+        USE simParam
+        real(8):: vel(1:SpcDim)
+        vel(1) = uuuIn(1) + VelocityAmp * dcos(2*pi*VelocityFreq*time + VelocityPhi/180.0*pi)
+        vel(2) = uuuIn(2)
+        vel(3) = uuuIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE updateVolumForc()
+        USE simParam
+        implicit none
+        VolumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2.d0 * pi * VolumeForceFreq * time + VolumeForcePhi/180.0*pi)
+        VolumeForce(2) = VolumeForceIn(2)
+        VolumeForce(3) = VolumeForceIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE addVolumForc()
+        USE simParam
+        implicit none
+        integer:: x
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
+        do x=1,xDim
+            force(:,:,x,1) = force(:,:,x,1) + VolumeForce(1)
+            force(:,:,x,2) = force(:,:,x,2) + VolumeForce(2)
+            force(:,:,x,3) = force(:,:,x,3) + VolumeForce(3)
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    FUNCTION CPUtime(values)
+        IMPLICIT NONE
+        real(8)::CPUtime
+        integer,dimension(8) :: values
+        CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
+    ENDFUNCTION
+
+    SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
+        implicit none
+        integer:: len, index, count, step, it
+        real(8):: x, array(len)
+        logical:: uniform
+        if (x<array(1) .or. x>array(len)) then
+            write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+            stop
+        endif
+        if (.not.uniform) then
+            index = 1
+            count = len
+            do while(count > 0)
+                step = count / 2 
+                it = index + step
+                if (array(it) < x) then
+                    index = it + 1
+                    count = count - (step + 1)
+                else
+                    count = step
+                endif
+            enddo
+            if (array(index)>x) then
+                index = index - 1
+            endif
+        else
+            index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
+        endif
     END SUBROUTINE
