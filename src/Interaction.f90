@@ -154,15 +154,6 @@
 
 !**************************************************************************************************
 !**************************************************************************************************
-!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
-    do  x = 1, xDim
-    do  y = 1, yDim
-    do  z = 1, zDim
-        force(z,y,x,1:3)=0.0d0
-     enddo
-     enddo
-     enddo
-!$OMP END PARALLEL DO
 forceElem(1:nEL,1:3)=0.0d0
 dmaxLBM=1.0
 iterLBM=0

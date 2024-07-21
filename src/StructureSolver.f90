@@ -168,7 +168,7 @@
         !    dnorm=dabs(maxval((du(1:nEQ)*beta)**2))/dsumd
         !endif
 
-         dnorm=sqrt(maxval((du(1:nEQ)*beta)**2))
+        dnorm=dabs(maxval((du(1:nEQ)*beta)**2))
 
         iter  = iter+1
         !if(iter>=100) write(*,*)'iter=',iter,'dnorm=',dnorm
