@@ -2,10 +2,11 @@
 !    Finite element method for solid structure
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-    SUBROUTINE structure_solver(  jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,  &
-                        triad_nn,triad_ee,triad_e0,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ,nMT,nBD,nSTF,NewmarkGamma,NewmarkBeta,dtol,iterMax)
+    SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,  &
+                                triad_nn,triad_ee,triad_e0,triad_n1,triad_n2,triad_n3,nND,nEL,nEQ,nMT,nBD,nSTF,NewmarkGamma,NewmarkBeta,   &
+                                dtol,iterMax,nFish,iFish,FishInfo)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nBD,nSTF
+    integer:: nND,nEL,nEQ,nMT,nBD,nSTF,iFish,nFish
     integer:: jBC(nND,6),ele(nEL,5),nloc(nEQ),nprof(nEQ),nprof2(nEQ)
     real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(nMT,10)
     real(8):: mss(nEQ),dspful(nND,6),velful(nND,6),accful(nND,6),lodExteful(nND,6),deltat
@@ -20,8 +21,9 @@
     real(8):: NewmarkGamma,NewmarkBeta,AlphaM,AlphaF,RhoInf
     real(8):: ak,a0,a1,a2,a3,a4,a5
     real(8):: beta0,beta,gamma,zi,z0
-    real(8):: dsumd,dsumz,dtol,dnorm,geoFRM(nEL),geoPLT(1:9,nEL)
+    real(8):: dsumd,dsumz,dtol,dnorm,geoFRM(nEL),geoPLT(1:9,nEL),FishInfo(1:nFish,1:3)
     integer:: i,j,iND,iEQ,iter,iterMax,iloc,ierror,maxramp,iModify
+
 !   -----------------------------------------------------------------------------------------------
 !   the generalized a method by Hua, Ru-Nan  not debug!!!!
     RhoInf=1.0d0
@@ -152,25 +154,31 @@
 !       -------------------------------------------------------------------
 !        test for convergence
         !if(iter==0)dsumd=dsqrt(sum((du(1:nEQ)*beta)**2))
-        if(iter==0)dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
+        !if(iter==0)dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
         
-        dsumz=dsqrt(sum(dsp(1:nEQ)**2))
+        !dsumz=dsqrt(sum(dsp(1:nEQ)**2))
         !if (dsumz < dtol/10.0) dsumz=dtol/10.0
         !dnorm=dsumd/dsumz
 
         !dnorm=dabs(maxval((du(1:nEQ)*beta)**2))
-        if(iter==0)then
-            dnorm=1.0
-        else
-            dnorm=dabs(maxval((du(1:nEQ)*beta)**2))/dsumd
-        endif
+        !if(iter==0)then
+        !    dnorm=1.0
+        !else
+        !    dsumd=dabs(maxval((du(1:nEQ)*beta)**2))
+        !    dnorm=dabs(maxval((du(1:nEQ)*beta)**2))/dsumd
+        !endif
 
-        iter=iter+1
-        if(iter>=100) write(*,*)'iter=',iter,'dnorm=',dnorm
-        write(*,*)'iter=',iter,'dnorm=',dnorm 
+        dnorm=dabs(maxval((du(1:nEQ)*beta)**2))
+
+        iter  = iter+1
+        !if(iter>=100) write(*,*)'iter=',iter,'dnorm=',dnorm
+        !write(*,*)'iter=',iter,'dnorm=',dnorm 
     enddo
 
-    write(*,'(A,I5,A,D20.10)')' iterFEM=',iter,' dmaxFEM   =',dnorm
+    FishInfo(iFish,1)=iFish
+    FishInfo(iFish,2)=iter
+    FishInfo(iFish,3)=dnorm
+    !write(*,'(A,I5,A,D20.10)')' iterFEM =',iter,'    dmaxFEM =',dnorm
 
 
     acc(1:nEQ)  = 1.0d0/(NewmarkBeta*deltat)*( (dsp(1:nEQ)-dspO(1:nEQ))/deltat -velO(1:nEQ) ) - (1.0d0/(NewmarkBeta*2.0d0) - 1.0d0)*accO(1:nEQ)
@@ -330,7 +338,7 @@
     !==================================================================================================        
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=6
-    real(4),parameter:: ZONEMARKER=299.0,EOHMARKER =357.0
+    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=['x','y','z','u','v','w'] 
     !==================================================================================================
@@ -3422,7 +3430,7 @@
         do  j = 1,n
             if (abs(a(i,j)) .gt. aamax) aamax = abs(a(i,j))
         enddo
-        if (aamax .eq. 0.0) pause 'Singular Matrix'
+        if (aamax .eq. 0.0) stop 'Singular Matrix'
         vv(i) = 1.0/aamax
     enddo
 
