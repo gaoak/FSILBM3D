@@ -70,17 +70,9 @@
         USE simParam
         implicit none
         integer:: i
-        integer,dimension(8) :: values0,values1
-        real(8):: CPUtime
         do  i=0,lbmDim
-            call date_and_time(VALUES=values0)
             call swapzy(fIn, ee(i,3), ee(i,2), i, zDim, yDim, xDim, lbmDim)
-            call date_and_time(VALUES=values1)
-            write(*,*)'time for swapzy ',i, CPUtime(values1)-CPUtime(values0)
-            call date_and_time(VALUES=values0)
             call swapx(fIn, ee(i,1), i, zDim, yDim, xDim, lbmDim)
-            call date_and_time(VALUES=values1)
-            write(*,*)'time for swapx ',i,CPUtime(values1)-CPUtime(values0)
         enddo
     END SUBROUTINE
 
