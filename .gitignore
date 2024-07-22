@@ -3,8 +3,9 @@
 *.dat
 *.plt
 *.00000
+.*.swp
 combineforcheck
 combineforcheck.f90
 Check.dat
 build*
-IBLBMSolver
+FSILBM3D
