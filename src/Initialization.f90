@@ -15,7 +15,7 @@
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     open(unit=111,file='inFlow.dat') 
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     npsize
     read(111,*)     isRelease
     read(111,*)     isConCmpt,  iCollidModel
@@ -24,7 +24,7 @@
     read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
     read(111,*)     timeOutFlEd,timeOutFlBg
     read(111,*)     Palpha,Pbeta,Pramp 
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     uuuIn(1:3)
     read(111,*)     shearRateIn(1:3)     
     read(111,*)     boundaryConditions(1:6)
@@ -36,32 +36,38 @@
     endif
     read(111,*)     MovingKind1,MovingVel1,MovingFreq1
     read(111,*)     MovingKind2,MovingVel2,MovingFreq2
-    read(111,*)     !====================================== 
+    call readequal(111)
     read(111,*)     VolumeForceIn(1:SpcDim)
     read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     dspan,Nspan
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     Re     
     read(111,*)     dt      
     read(111,*)     Frod(1:3)            !Gravity
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     iBC 
     read(111,*)     LBmeshName
     read(111,*)     denIn   
     read(111,*)     dtolLBM,ntolLBM      !velocity iteration
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     nFish,FishKind
     read(111,*)     iForce2Body,iChordDirection
+    if(nFish.lt.FishKind) then
+        write(*, *) "Fish kind is more than fish number ", FishKind, nFish
+    endif
+    if(nFish.eq.0) iForce2Body = 0
 
-    allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:nFish,1:DOFDim))
-    allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
-    allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
-    FishNum(1)=1
-    FishOrder1=0
-    FishOrder2=0
+    if(nFish>0) then
+        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:nFish,1:DOFDim))
+        allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
+        allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
+        FishNum(1)=1
+        FishOrder1=0
+        FishOrder2=0
+    endif
 
-    read(111,*)     !======================================
+    call readequal(111)
     do iKind=1,FishKind
         read(111,*)     FishNum(iKind+1),NumX(iKind),NumY(iKind)
         read(111,*)     niBodyModel, nFEmeshName
@@ -88,19 +94,21 @@
         enddo
     enddo
 
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     numsubstep
     read(111,*)     dampK,dampM
     read(111,*)     NewmarkGamma,NewmarkBeta
     read(111,*)     alphaf,alpham,alphap
     read(111,*)     dtolFEM,ntolFEM  
-    read(111,*)     !======================================
+    call readequal(111)
 
-    allocate(Freq(1:nFish),St(1:nFish))
-    allocate(XYZo(1:nFish,1:3),XYZAmpl(1:nFish,1:3),XYZPhi(1:nFish,1:3))
-    allocate(AoAo(1:nFish,1:3),AoAAmpl(1:nFish,1:3),AoAPhi(1:nFish,1:3))
-    FishOrder1 =0
-    FishOrder2 =0
+    if(nFish>0) then
+        allocate(Freq(1:nFish),St(1:nFish))
+        allocate(XYZo(1:nFish,1:3),XYZAmpl(1:nFish,1:3),XYZPhi(1:nFish,1:3))
+        allocate(AoAo(1:nFish,1:3),AoAAmpl(1:nFish,1:3),AoAPhi(1:nFish,1:3))
+        FishOrder1 =0
+        FishOrder2 =0
+    endif
 
     do iKind=1,FishKind
         read(111,*)     nFreq, nSt
@@ -130,18 +138,22 @@
             XYZo(iFish,3) = iXYZ(3)
         enddo
     enddo
-    read(111,*)     !======================================
+    call readequal(111)
     read(111,*)     isMoveGrid,      numOutput
     read(111,*)     isMoveDimX,      isMoveOutputX
     read(111,*)     isMoveDimY,      isMoveOutputY
     read(111,*)     isMoveDimZ,      isMoveOutputZ
     read(111,*)     Xref,Yref,Zref
-    read(111,*)     !======================================
+    if(nFish .eq. 0 .and. isMoveGrid .eq. 1) then
+        write(*, *) 'No fish, resetting move grid as false'
+        isMoveGrid = 0
+    endif
+    call readequal(111)
     read(111,*)     waveInitDist,AmplInitDist(1:SpcDim)
     read(111,*)     FreqForcDist,AmplForcDist(1:SpcDim)
     read(111,*)     begForcDist,endForcDist
     read(111,*)     posiForcDist(1:SpcDim)
-    read(111,*)     !======================================
+    call readequal(111)
 
     allocate(SampFlowPint(1:numSampFlow,1:3))
 
@@ -150,16 +162,27 @@
     do i=1,numSampFlow
         read(111,*) SampFlowPint(i,1:3)
     enddo
-    read(111,*)     !======================================
-    read(111,*)     numSampBody
-
-    allocate(SampBodyNode(1:nFish,1:numSampBody))
-    read(111,*)     SampBodyNode(1,1:numSampBody)
-    do iFish=1,nFish
-    SampBodyNode(iFish,1:numSampBody)=SampBodyNode(1,1:numSampBody)
-    enddo
-    read(111,*)     !======================================
+    call readequal(111)
+    if(nFish>0) then
+        read(111,*)     numSampBody
+        allocate(SampBodyNode(1:nFish,1:numSampBody))
+        read(111,*)     SampBodyNode(1,1:numSampBody)
+        do iFish=1,nFish
+        SampBodyNode(iFish,1:numSampBody)=SampBodyNode(1,1:numSampBody)
+        enddo
+    endif
+    call readequal(111)
     close(111)
+    END SUBROUTINE
+
+    SUBROUTINE readequal(ifile)
+        implicit none
+        integer ifile
+        character (40):: linestring
+        linestring = 'null'
+        do while(linestring(1:1)/='=')
+            read(ifile, *) linestring
+        enddo
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -272,6 +295,7 @@
     integer:: iEL,iND,iFish,maxN(1),Nspanpts
     real(8):: xCT,yCT,zCT,xl,xr,yl,yr,zl,zr
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+    if(nFish==0) return
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
 
     write(*,'(A)') '=============================================================================='
@@ -405,75 +429,6 @@
     NDhd(iFish,1)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-         yl)**2),1)
     NDhd(iFish,2)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-0.5*(yl+yr))**2),1)
     NDhd(iFish,3)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-         yr)**2),1)
-
-    ! if(trim(adjustl(FEmeshName))=="fi30.dat")then 
-    !     NDtl(1)=513
-    !     NDtl(2)=221
-    !     NDtl(3)=536
-    !     NDhd(1)=2
-    !     NDhd(2)=108
-    !     NDhd(3)=392
-    ! elseif(trim(adjustl(FEmeshName))=="fi45.dat")then
-    !     NDtl(1)=502
-    !     NDtl(2)=309
-    !     NDtl(3)=530
-    !     NDhd(1)=2
-    !     NDhd(2)=109
-    !     NDhd(3)=417
-    ! elseif(trim(adjustl(FEmeshName))=="fi60.dat")then
-    !     NDtl(1)=472
-    !     NDtl(2)=342
-    !     NDtl(3)=524
-    !     NDhd(1)=2
-    !     NDhd(2)=112
-    !     NDhd(3)=417
-    ! elseif(trim(adjustl(FEmeshName))=="fi75.dat")then
-    !     NDtl(1)=469
-    !     NDtl(2)=445
-    !     NDtl(3)=533
-    !     NDhd(1)=2
-    !     NDhd(2)=110
-    !     NDhd(3)=421
-    ! elseif(trim(adjustl(FEmeshName))=="fi90.dat")then
-    ! NDtl(1)=minloc(dsqrt((xyzful00(1:nND,1)-xr )**2+(xyzful00(1:nND,2)-         yl)**2),1)
-    ! NDtl(2)=minloc(dsqrt((xyzful00(1:nND,1)-xr )**2+(xyzful00(1:nND,2)-0.5*(yl+yr))**2),1)
-    ! NDtl(3)=minloc(dsqrt((xyzful00(1:nND,1)-xr )**2+(xyzful00(1:nND,2)-         yr)**2),1)
-    
-    ! NDtl(4)=minloc(dsqrt((xyzful00(1:nND,1)-0.5*(xl+xr) )**2+(xyzful00(1:nND,2)-yl)**2),1)
-    ! NDtl(5)=minloc(dsqrt((xyzful00(1:nND,1)-0.5*(xl+xr) )**2+(xyzful00(1:nND,2)-yr)**2),1)
-    
-    ! NDhd(1)=minloc(dsqrt((xyzful00(1:nND,1)-xl )**2+(xyzful00(1:nND,2)-         yl)**2),1)
-    ! NDhd(2)=minloc(dsqrt((xyzful00(1:nND,1)-xl )**2+(xyzful00(1:nND,2)-0.5*(yl+yr))**2),1)
-    ! NDhd(3)=minloc(dsqrt((xyzful00(1:nND,1)-xl )**2+(xyzful00(1:nND,2)-         yr)**2),1)
-    ! elseif(trim(adjustl(FEmeshName))=="fi105.dat")then
-    !     NDtl(1)=369
-    !     NDtl(2)=491
-    !     NDtl(3)=530
-    !     NDhd(1)=2
-    !     NDhd(2)=109
-    !     NDhd(3)=425
-    ! elseif(trim(adjustl(FEmeshName))=="fi120.dat")then
-    !     NDtl(1)=330
-    !     NDtl(2)=523
-    !     NDtl(3)=534
-    !     NDhd(1)=2
-    !     NDhd(2)=112
-    !     NDhd(3)=422
-    ! elseif(trim(adjustl(FEmeshName))=="fi135.dat")then
-    !     NDtl(1)=237
-    !     NDtl(2)=528
-    !     NDtl(3)=509
-    !     NDhd(1)=2
-    !     NDhd(2)=109
-    !     NDhd(3)=414
-    ! elseif(trim(adjustl(FEmeshName))=="fi150.dat")then
-    !     NDtl(1)=150
-    !     NDtl(2)=515
-    !     NDtl(3)=441
-    !     NDhd(1)=2
-    !     NDhd(2)=112
-    !     NDhd(3)=400
-    ! endif
     enddo
 !   loading boundary type*******************************************************************************
     do  iFish=1,nFish
@@ -481,7 +436,7 @@
         if(jBC(iFish,iND,1)==1) jBC(iFish,iND,1:6)=isMotionGiven(iFish,1:6)
     enddo
     enddo
-    END SUBROUTINE 
+    END SUBROUTINE allocate_solid_memory
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    initialize flow field
@@ -540,7 +495,7 @@
     image(1     ,1:yDim,1:xDim)  = zMinBC
     image(zDim  ,1:yDim,1:xDim)  = zMaxBC
    
-    END SUBROUTINE
+    END SUBROUTINE initialize_flow
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    initialize solid field
@@ -551,6 +506,7 @@
     USE ImmersedBoundary
     implicit none
     integer:: iND,iFish,iCount,s
+    if(nFish.eq.0) return
     allocate(TTT00(1:nFish,1:3,1:3),TTT0(1:nFish,1:3,1:3),TTTnow(1:nFish,1:3,1:3),TTTnxt(1:nFish,1:3,1:3))
     allocate(XYZ(1:nFish,1:3),XYZd(1:nFish,1:3),UVW(1:nFish,1:3) )
     allocate(AoA(1:nFish,1:3),AoAd(1:nFish,1:3),WWW1(1:nFish,1:3),WWW2(1:nFish,1:3),WWW3(1:nFish,1:3) )
@@ -608,7 +564,7 @@
         
         iCount = iCount + nND(iFish)
     enddo
-    END SUBROUTINE
+    END SUBROUTINE initialize_solid
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    calculate Bolztman parameters from flow parameters
@@ -619,13 +575,12 @@
     implicit none
     integer:: nt(1:nFish),iFish
     real(8):: nUref(1:nFish)
-!   angle to radian
-    AoAo(:,1:3)=AoAo(:,1:3)/180.0*pi
-    AoAAmpl(:,1:3)=AoAAmpl(:,1:3)/180.0*pi
-    AoAPhi(:,1:3)=AoAPhi(:,1:3)/180.0*pi
-    XYZPhi(:,1:3)=XYZPhi(:,1:3)/180.0*pi
 !   reference values: length, velocity, time
-    Lref  = Lchod
+    if(nFish.eq.0) then
+        Lref = 1.d0
+    else
+        Lref  = Lchod
+    endif
 
     if(RefVelocity==0) then
         Uref = dabs(uuuIn(1))
@@ -656,55 +611,18 @@
     Tref = Lref / Uref
     St = Lref * Freq / Uref
     g(1:3)=Frod(1:3) * Uref ** 2/Lref
-
-    ! if(maxval(dabs(uuuIn(1:3)))>0.0001d0)then !with incoming flow
-    !     Uref    = maxval(dabs(uuuIn(1:3)))        
-    !     if    (MAXVAL(dabs(xyzAmpl(1:3)))>0.0001d0)then
-    !         !Freq    = St*Uref/(2.0*MAXVAL(dabs(xyzAmpl(1:3))))
-    !         Tref    = 1.0d0/Freq
-    !         St      =  2.0*MAXVAL(dabs(xyzAmpl(1:3)))*Freq/maxval(dabs(uuuIn(1:3))) ! St=2fA/U
-    !         if(iFlapRef==1) Uref    = Lref*Freq           
-    !     elseif(dabs(MAXVAL(AoAAmpl(1:3)))>0.0001d0)then
-    !         Tref    = 1.0d0/Freq            
-    !     else
-    !         Tref    = Lref/Uref            
-    !     endif
-    !     g(1:3)=Frod(1:3)*Uref**2/Lref
-    ! else                                    !without incoming flow
-    !     if    (MAXVAL(dabs(xyzAmpl(1:3)))>0.0001d0)then !heaving 
-    !     !Uref    = 2.0*pi*MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !maximum velocity
-    !     !Uref    = 4.0*   MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !mean velocity
-    !     !Uref    =        MAXVAL(dabs(xyzAmpl(1:3)))*Freq  !mean velocity
-    !     Uref    = Lref*Freq
-    !     Tref    = 1.0d0/Freq
-    !     St      = 1000.0
-    !     g(1:3)=Frod(1:3)*Uref**2/Lref       
-    !     elseif(MAXVAL(dabs(AoAAmpl(1:3)))>0.0001d0)then !picthing
-    !     !Uref = 2.0*pi*MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !maximum velocity
-    !     Uref  = 4.0*   MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !mean velocity
-    !     !Uref    =     MAXVAL(dabs(AoAAmpl(1:3))*[maxval(dabs(xyzful00(:,2))),maxval(dabs(xyzful00(:,1))),maxval(dabs(xyzful00(:,3)))])*Freq  !mean velocity
-    !     Tref    = 1.0d0/Freq
-    !     St      = 1000.0
-    !     g(1:3)=Frod(1:3)*Uref**2/Lref 
-    !     elseif(maxval(dabs(Frod(1:3)))>0.0001d0)then    !gravity
-    !         Uref=maxval(dabs(Frod(1:3)))
-    !         g(1:3)=(Frod(1:3))**2/(Lref*denR)
-    !         if(Frod(1)<0.000001d0) g(1)=-g(1)
-    !         if(Frod(2)<0.000001d0) g(2)=-g(2)
-    !         if(Frod(3)<0.000001d0) g(3)=-g(3)
-    !         Tref    = Lref/Uref
-    !     else
-    !         stop 'no flow/moving body/gravity'
-    !     endif
-    ! endif
     uMax = 0.
     do iFish=1,nFish
+        ! angle to radian
+        AoAo(iFish,1:3)=AoAo(iFish,1:3)/180.0*pi
+        AoAAmpl(iFish,1:3)=AoAAmpl(iFish,1:3)/180.0*pi
+        AoAPhi(iFish,1:3)=AoAPhi(iFish,1:3)/180.0*pi
+        XYZPhi(iFish,1:3)=XYZPhi(iFish,1:3)/180.0*pi
         uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(iFish,1:3)))*Freq, &
             2.0*pi*MAXVAL(dabs(AoAAmpl(iFish,1:3))*[maxval(dabs(xyzful00(iFish,:,2))), &
             maxval(dabs(xyzful00(iFish,:,1))),maxval(dabs(xyzful00(iFish,:,3)))])*Freq])
     enddo
-    
-    
+
 !   calculate viscosity, LBM relexation time
     ratio  =  dt/dh
     if(ratio>1.0d0+eps)then
@@ -712,7 +630,7 @@
         write(*,*)'dt <= dhmin (we use streching mesh for LBM)'
         stop
     endif
-    
+
     !for uniform grid, advection length equals grid size
     isUniformGrid(1) = dabs(dxmax/dh-1.0d0)<eps
     isUniformGrid(2) = dabs(dymax/dh-1.0d0)<eps
@@ -724,8 +642,6 @@
         iStreamModel=2
         write(*,*)'non-uniform grid,ISLBM'
     endif
-
-
 
     Cs2   =  (1/dsqrt(3.0d0))**2
     nu    =  Uref * Lref/ Re
@@ -739,7 +655,6 @@
     Pref=denIn*Uref**2*Lref**2*Uref
     !calculate material parameters
     do iFish=1,nFish
-
     nt(iFish)=ele(iFish,1,4)  
     if(iKB==0)then
         prop(iFish,1:nMT(iFish),1) = EmR(iFish)*denIn*Uref**2
@@ -778,7 +693,7 @@
     endif
     enddo
 
-    END SUBROUTINE
+    END SUBROUTINE calculate_LB_params
      
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    calculate multiple relexasion time model parameters
@@ -848,7 +763,7 @@
     ENDDO
     M_FORCE=S_D-0.5*M_COLLID
 
-    END SUBROUTINE
+    END SUBROUTINE calculate_MRTM_params
 
 
 
