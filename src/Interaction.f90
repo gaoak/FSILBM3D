@@ -190,7 +190,15 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     enddo
 !   ***********************************************************************************************
 !   calculate Eulerian body force
-        forceTemp=0.0d0
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
+    do  x = 1, xDim
+    do  y = 1, yDim
+    do  z = 1, zDim
+        forceTemp(z,y,x,1:3)=0.0d0
+    enddo
+    enddo
+    enddo
+    !$OMP END PARALLEL DO
     do    iEL=1,nEL
         call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
         call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
