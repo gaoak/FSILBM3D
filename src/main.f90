@@ -380,6 +380,6 @@
         !******************************************************************************************
         write(*,'(A)')' --------------------------------------------------------'
         call date_and_time(VALUES=values_e)
-        write(*,*)'time for total:',CPUtime(values_e)-CPUtime(values_s)
+        write(*,*)'time for one step:',CPUtime(values_e)-CPUtime(values_s)
     enddo
     END PROGRAM main
