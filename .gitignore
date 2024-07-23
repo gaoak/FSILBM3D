@@ -1,6 +1,6 @@
 *.mod
 *.o
-*.dat
+./*.dat
 *.plt
 *.00000
 .*.swp
@@ -10,3 +10,4 @@ Check.dat
 build*
 FSILBM3D
 R0010.00000M00
+!example/*
