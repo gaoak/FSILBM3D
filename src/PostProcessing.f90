@@ -373,9 +373,6 @@
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileNameR,fileNameM,fileNameS,fileNameK
     write(fileNameR,'(F10.5)') Re
-    write(fileNameM,'(F10.5)') DenR(1)
-    write(fileNameK,'(F10.5)') KB(1)
-    write(fileNameS,'(F10.5)') KS(1)
 
     fileNameR = adjustr(fileNameR)
     do  i=1,nameLen

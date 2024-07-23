@@ -22,11 +22,9 @@
     CALL calculate_LB_params()
     CALL write_params()
     CALL calculate_MRTM_params()
-    
+
     allocate(FishInfo(1:nFish,1:3))
 
-    !np=OMP_get_num_procs() 
-    
     call OMP_set_num_threads(npsize)
     write(*,*)'npsize=', npsize
 
@@ -36,7 +34,7 @@
     endif
     Pbetatemp=Pbeta  
     deltat = dt  !set time step of solid deltat the same as fluid time step
-!    ===============================================================================================
+!===============================================================================================
     inquire(file='./DatTemp/conwr.dat', exist=alive)
     if (isConCmpt==1 .and. alive)then
         write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
@@ -51,20 +49,20 @@
         step=0
         CALL initialize_solid() 
         CALL initialize_flow()                  
-!    ===============================================================================================
+!===============================================================================================
         if(ismovegrid==1)then
             iFish = 1
             call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(iFish,1:nND(iFish),1:3),xGrid,yGrid,zGrid,Xref,Yref,Zref)
         endif  
     endif
-!    ===============================================================================================
+!===============================================================================================
     if(step==0)    CALL wrtInfoTitl()
 !    ===============================================================================================
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_field(1)
     CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,0)
-    CALL write_image() 
+    CALL write_image()
 !==================================================================================================
 !==================================================================================================
 !==================================================================================================      
@@ -177,8 +175,6 @@
             endif
         elseif(iForce2Body==2)then   !stress force
         CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful2_all)
-        else
-             stop 'no define force to body '
         endif
 
         !compute volume force exerted on fluids
@@ -239,8 +235,6 @@
                 enddo
             endif
             enddo
-        else
-             stop 'no define force to body '
         endif
         !******************************************************************************************
         !******************************************************************************************
@@ -386,6 +380,6 @@
         !******************************************************************************************
         write(*,'(A)')' --------------------------------------------------------'
         call date_and_time(VALUES=values_e)
-        write(*,*)'time for total:',CPUtime(values_e)-CPUtime(values_s)
+        write(*,*)'time for one step:',CPUtime(values_e)-CPUtime(values_s)
     enddo
     END PROGRAM main
