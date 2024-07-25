@@ -276,10 +276,6 @@ invdh = 1.D0/dh
 do iND=1,nND
     call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
     call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
-    if(i.lt.2 .or. i.gt.xDim-2 .or. j.lt.2 .or. j.gt.yDim-2) then
-        write(*, *) 'Point too close to boundary: ', xyzful(iND,1:3), i, j
-        stop
-    endif
     do x=-1+i,2+i
         rx(x-i)=Phi((xyzful(iND,1)-xGrid(x))*invdh)
     enddo
@@ -365,6 +361,10 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     do  iEL=1,nEL
         call my_minloc(posElem(1,iEL,1), xGrid, xDim, isUniformGrid(1), i)
         call my_minloc(posElem(1,iEL,2), yGrid, yDim, isUniformGrid(2), j)
+        if(i.lt.2 .or. i.gt.xDim-2 .or. j.lt.2 .or. j.gt.yDim-2) then
+            write(*, *) 'Point too close to boundary posElem(1,iEL,1:2): ', posElem(1,iEL,1:2), iEL
+            stop
+        endif
         do x=-1+i,2+i
             rx(x-i)=Phi((posElem(1,iEL,1)-xGrid(x))*invdh)
         enddo
@@ -373,6 +373,10 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
         enddo
         do s=1,Nspan
             call my_minloc(posElem(s,iEL,3), zGrid, zDim, isUniformGrid(3), k)
+            if(k.lt.2 .or. k.gt.zDim-2) then
+                write(*, *) 'Point too close to boundary posElem(s,iEL,3): ', posElem(s,iEL,3), s, iEL
+                stop
+            endif
             do z=-1+k,2+k
                 rz(z-k)=Phi((posElem(s,iEL,3)-zGrid(z))*invdh)
             enddo
