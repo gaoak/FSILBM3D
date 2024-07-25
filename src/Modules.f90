@@ -101,8 +101,8 @@
     integer:: nFish,nEL_all,nND_all,nND_max,nEL_max,nMT_max,nEQ_max,NDref
     integer,allocatable:: ele_all(:,:)
     integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:) 
-    integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:)
-    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful1_all(:,:),extful2_all(:,:),isMotionGiven(:,:)
+    integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:),isMotionGiven(:,:)
+    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful1_all(:,:),extful2_all(:,:)
 !   ===============================================================================================
     integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
     real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)

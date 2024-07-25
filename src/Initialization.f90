@@ -155,10 +155,8 @@
     read(111,*)     posiForcDist(1:SpcDim)
     call readequal(111)
 
-    allocate(SampFlowPint(1:numSampFlow,1:3))
-
     read(111,*)     numSampFlow
-
+    allocate(SampFlowPint(1:numSampFlow,1:3))
     do i=1,numSampFlow
         read(111,*) SampFlowPint(i,1:3)
     enddo
