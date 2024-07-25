@@ -182,9 +182,9 @@
 !    write structure field, tecplot binary format
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
-    SUBROUTINE write_solid_field(nFish,xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max,isIB)
+    SUBROUTINE write_solid_field(nFish,xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max)
     implicit none
-    integer:: nND_max,nEL_max,isIB,nFish
+    integer:: nND_max,nEL_max,nFish
     integer:: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
     real(8):: xyzful(nFish,nND_max,6),velful(nFish,nND_max,6),accful(nFish,nND_max,6),extful(nFish,1:nND_max,1:6) !,streI(1:nND),bendO(1:nND)
     real(8):: time
@@ -209,13 +209,7 @@
 
     do iFish=1,nFish
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        if(isIB==0)then
-            OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
-        elseif(isIB==1)then
-            OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
-        else
-    endif
-
+        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
     !   I. The header section.
     !   =============================================        
         write(idfile) "#!TDV101"    
@@ -253,6 +247,88 @@
 !   =============================================
     END SUBROUTINE
 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write structure field, tecplot binary
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE write_solidIB_field(nFish,xyzfulIB,ele,time,nND,nEL,nND_max,nEL_max,Nspan)
+    implicit none
+    integer,intent(in):: nND_max,nEL_max,nFish,Nspan
+    integer,intent(in):: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
+    real(8),intent(in):: xyzfulIB(1:Nspan+1,nFish,nND_max,6)
+    real(8),intent(in):: time
+    !   -------------------------------------------------------
+    integer:: i,j,ireduc,iFish,Nspanpts,ElmType,off1, off2
+    integer,parameter::nameLen=10
+    character (LEN=nameLen):: fileName,idstr
+    !==================================================================================================
+    integer::    nv
+    integer,parameter:: namLen=40,idfile=100,numVar=3
+    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
+    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
+                        varname(numVar)=[character(namLen)::'x','y','z']
+    !==================================================================================================
+    if(Nspan.eq.0) then
+        Nspanpts = 1
+        ElmType = 2
+    else
+        Nspanpts = Nspan + 1
+        ElmType = 3
+    endif
+    write(fileName,'(F10.5)') time
+    fileName = adjustr(fileName)
+    DO  I=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    END DO
+
+    do iFish=1,nFish
+        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
+        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
+
+        !   I. The header section.
+        !   =============================================
+        write(idfile) "#!TDV101"
+        write(idfile) 1
+        call dumpstring(title,idfile)
+        write(idfile) numVar
+        do  nv=1,numVar
+            call dumpstring(varname(nv),idfile)
+        enddo
+        !   ---------------------------------------------
+        !   zone head for ZONE1
+        !   ---------------------------------------------
+        write(idfile) ZONEMARKER
+        call dumpstring(zonename,idfile)
+        write(idfile) -1,ElmType,1,0,0,nND(iFish),nEL(iFish),0,0,0,0
+        !   =============================================
+        write(idfile) EOHMARKER
+        !   =============================================
+        !   II. Data section
+        !   =============================================
+        write(idfile) ZONEMARKER
+        do  nv=1,numVar
+            write(idfile) 1
+        enddo
+        write(idfile) 0,-1
+        do  i=1,nND(iFish)
+            do j=1,Nspanpts
+                write(idfile)   real(xyzfulIB(j,iFish,i,1:3))
+            enddo
+        enddo
+        do  i=1,nEL(iFish)
+            if(Nspan.eq.0) then
+                write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
+            else
+                do j=1,Nspan
+                    off1 = ele(iFish,i,1) * Nspanpts
+                    off2 = ele(iFish,i,2) * Nspanpts
+                    write(idfile) off1, off1+1, off2+1, off2
+                enddo
+            endif
+        enddo
+        close(idfile)
+    enddo
+    !   =============================================
+    END SUBROUTINE
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
 !   write flow slice, tecplot binary
 !   copyright@ RuNanHua  

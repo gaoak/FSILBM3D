@@ -61,7 +61,7 @@
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_field(1)
-    CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,0)
+    CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
     CALL write_image()
 !==================================================================================================
 !==================================================================================================
@@ -351,9 +351,9 @@
         endif
                           
         if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
-            CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,0)
-            if (dabs(Palpha)>eps) then
-            CALL write_solid_field(nFish,xyzfulIB/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,1)
+            CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
+            if (.true.) then
+            CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
             endif
         endif
 
