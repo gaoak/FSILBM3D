@@ -216,7 +216,7 @@
 !   allocate fluid memory**********************************************************************************
     allocate(fIn(zDim,yDim,xDim,0:18),fInTemp(zDim,yDim,xDim))
     allocate(uuu(zDim,yDim,xDim,1:3),force(zDim,yDim,xDim,1:3))
-    allocate(den(zDim,yDim,xDim),prs(zDim,yDim,xDim),image(zDim,yDim,xDim))
+    allocate(den(zDim,yDim,xDim),prs(zDim,yDim,xDim))
 
 !   calculate grid size**********************************************************************************    
     dx(1)=dabs(xGrid0(2)-xGrid0(1))
@@ -484,15 +484,6 @@
     enddo
     enddo
     enddo
-!   grid type***************************************************************************************
-    image(1:zDim,1:yDim,1:xDim)  = fluid
-    image(1:zDim,1:yDim,1     )  = xMinBC
-    image(1:zDim,1:yDim,xDim  )  = xMaxBC
-    image(1:zDim,     1,1:xDim)  = yMinBC   
-    image(1:zDim,  yDim,1:xDim)  = yMaxBC
-    image(1     ,1:yDim,1:xDim)  = zMinBC
-    image(zDim  ,1:yDim,1:xDim)  = zMaxBC
-   
     END SUBROUTINE initialize_flow
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -775,12 +766,13 @@
     IMPLICIT NONE
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
     write(13) step,time
-    write(13) fIn,xGrid,yGrid,zGrid,image
-    write(13) IXref,IYref,IZref,NDref 
+    write(13) fIn,xGrid,yGrid,zGrid
+    write(13) nFish, nND_max
+    write(13) IXref,IYref,IZref,NDref
     write(13) xyzful0,xyzful,xyzfulIB,dspful,velful,accful,extful,mss,mssful,grav
     write(13) triad_nn,triad_ee,triad_e0
     write(13) triad_n1,triad_n2,triad_n3
-    write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew 
+    write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
     close(13)
     ENDSUBROUTINE
 
@@ -793,16 +785,18 @@
     USE simParam
     USE ImmersedBoundary
     IMPLICIT NONE
-    allocate(TTT00(1:nFish,1:3,1:3),TTT0(1:nFish,1:3,1:3),TTTnow(1:nFish,1:3,1:3),TTTnxt(1:nFish,1:3,1:3))
-    allocate(XYZ(1:nFish,1:3),XYZd(1:nFish,1:3),UVW(1:nFish,1:3) )
-    allocate(AoA(1:nFish,1:3),AoAd(1:nFish,1:3),WWW1(1:nFish,1:3),WWW2(1:nFish,1:3),WWW3(1:nFish,1:3) )
+    integer:: tmpnfish, tmpND_max
+
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
-    read(13) step,time 
-    read(13) fIn,xGrid,yGrid,zGrid,image
-    read(13) IXref,IYref,IZref,NDref  
-    read(13) xyzful0,xyzful,xyzfulIB,dspful,velful,accful,extful,mss,mssful,grav
-    read(13) triad_nn,triad_ee,triad_e0
-    read(13) triad_n1,triad_n2,triad_n3
-    read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew 
+    read(13) step,time
+    read(13) fIn,xGrid,yGrid,zGrid
+    read(13) tmpnfish, tmpND_max
+    if((tmpnfish .eq. nFish) .and. (tmpND_max .eq. nND_max)) then
+        read(13) IXref,IYref,IZref,NDref
+        read(13) xyzful0,xyzful,xyzfulIB,dspful,velful,accful,extful,mss,mssful,grav
+        read(13) triad_nn,triad_ee,triad_e0
+        read(13) triad_n1,triad_n2,triad_n3
+        read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
+    endif
     close(13)
     ENDSUBROUTINE
