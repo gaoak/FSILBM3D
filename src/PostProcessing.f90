@@ -3,17 +3,32 @@
 !    copyright@ RuNanHua       
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_flow_field(isT)
+    USE, INTRINSIC :: IEEE_ARITHMETIC
     USE simParam
     implicit none
     integer:: x,y,z,i,isT,iFish
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName
+    logical:: nanfound
     !==================================================================================================        
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=7 
     integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=['x','y','z','p','u','v','w']  
+                        varname(numVar)=['x','y','z','p','u','v','w']
+    ! check is the velocity finite
+    nanfound = .false.
+    do z=1,zDim
+        do y=1,yDim
+            do x=1,xDim
+                if ((.not. IEEE_IS_FINITE(uuu(z,y,x,1))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,2))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,3)))) then
+                    write(*, *) 'Nan found in uuu', x, y, z
+                    uuu(z,y,x,1:3)=0.99d99
+                    nanfound = .true.
+                endif
+            enddo
+        enddo
+    enddo
 
     write(fileName,'(F10.5)') time/Tref
     fileName = adjustr(fileName)
@@ -176,6 +191,7 @@
         enddo
     enddo
     close(idfile)
+    if(nanfound) stop
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -260,58 +276,36 @@
     integer:: i,j,ireduc,iFish,Nspanpts,ElmType,off1, off2
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
-    !==================================================================================================
-    integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=3
-    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=[character(namLen)::'x','y','z']
-    !==================================================================================================
-    if(Nspan.eq.0) then
-        Nspanpts = 1
-        ElmType = 2
-    else
-        Nspanpts = Nspan + 1
-        ElmType = 3
-    endif
+    !==========================================================================
     write(fileName,'(F10.5)') time
     fileName = adjustr(fileName)
     DO  I=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'
     END DO
-
     do iFish=1,nFish
+        if(Nspan.eq.0) then
+            Nspanpts = 1
+            ElmType = ele(iFish,1,4)
+        else
+            Nspanpts = Nspan + 1
+            ElmType = 4
+        endif
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
-
+        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
         !   I. The header section.
-        !   =============================================
-        write(idfile) "#!TDV101"
-        write(idfile) 1
-        call dumpstring(title,idfile)
-        write(idfile) numVar
-        do  nv=1,numVar
-            call dumpstring(varname(nv),idfile)
-        enddo
-        !   ---------------------------------------------
-        !   zone head for ZONE1
-        !   ---------------------------------------------
-        write(idfile) ZONEMARKER
-        call dumpstring(zonename,idfile)
-        write(idfile) -1,ElmType,1,0,0,nND(iFish),nEL(iFish),0,0,0,0
-        !   =============================================
-        write(idfile) EOHMARKER
-        !   =============================================
-        !   II. Data section
-        !   =============================================
-        write(idfile) ZONEMARKER
-        do  nv=1,numVar
-            write(idfile) 1
-        enddo
-        write(idfile) 0,-1
+        write(idfile, '(A)') 'variables = x, y, z'
+        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan,', DATAPACKING=POINT, ZONETYPE='
+        if(ElmType.eq.2) then
+            write(idfile, '(A)') 'FELINESEG'
+        elseif (ElmType.eq.3) then
+            write(idfile, '(A)') 'FETRIANGLE'
+        elseif(ElmType.eq.4) then
+            write(idfile, '(A)') 'FEQUADRILATERAL'
+        endif
         do  i=1,nND(iFish)
             do j=1,Nspanpts
-                write(idfile)   real(xyzfulIB(j,iFish,i,1:3))
+                write(idfile,*)   xyzfulIB(j,iFish,i,1:3)
             enddo
         enddo
         do  i=1,nEL(iFish)
@@ -319,9 +313,9 @@
                 write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
             else
                 do j=1,Nspan
-                    off1 = ele(iFish,i,1) * Nspanpts
-                    off2 = ele(iFish,i,2) * Nspanpts
-                    write(idfile) off1, off1+1, off2+1, off2
+                    off1 = (ele(iFish,i,1)-1) * Nspanpts + j
+                    off2 = (ele(iFish,i,2)-1) * Nspanpts + j
+                    write(idfile,*) off1, off1+1, off2+1, off2
                 enddo
             endif
         enddo
