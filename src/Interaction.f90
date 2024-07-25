@@ -458,8 +458,8 @@ do iEL=1,nEL
         forceNode(j,1:3)=forceNode(j,1:3)+forceElem(s,iEl,1:3)*0.5d0
     enddo
 enddo
-extful(1:nND,1:3) = forceNode(1:nND,1:3)
-extful(1:nND,4:6) = 0.0d0
+extful(1:nND,1:2) = forceNode(1:nND,1:2)
+extful(1:nND,3:6) = 0.0d0
 
 END SUBROUTINE calculate_interaction_force_quad
 
