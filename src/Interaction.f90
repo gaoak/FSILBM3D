@@ -68,16 +68,18 @@
     SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                                 xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid)    
     IMPLICIT NONE
-    integer:: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM
-    real(8):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta
-    real(8):: force(zDim,yDim,xDim,1:3),uuu(zDim,yDim,xDim,1:3),den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
-    real(8):: xyzful(nND,6),xyzfulIB(nND,6),velful(nND,6),extful(nND,6)
+    integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM
+    real(8),intent(in):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta
+    real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
     logical,intent(in):: isUniformGrid(1:3)
+    real(8),intent(in):: xyzful(nND,6),velful(nND,6)
+    real(8),intent(inout)::xyzfulIB(nND,6),uuu(zDim,yDim,xDim,1:3)
+    real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
 !==================================================================================================
     integer:: i,j,k,x,y,z,xbgn,ybgn,zbgn,xend,yend,zend,iEL,nt,iterLBM,iND
-    real(8):: rx,ry,rz,Phi,dmaxLBM,dsum,invdh
+    real(8):: rx,ry,rz,Phi,dmaxLBM,dsum,invdh,forcetemp(1:3)
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
-    real(8):: forceTemp(zDim,yDim,xDim,1:3),forceElemTemp(nEL,3)
+    real(8):: forceElemTemp(nEL,3)
     real(8):: forceElem(nEL,3),forceNode(nND,3),velfulIB(nND,3)
     real(8):: posElem(nEL,3),posElemIB(nEL,3),velElem(nEL,3),velElemIB(nEL,3),areaElem(nEL)
 !==================================================================================================
@@ -186,15 +188,6 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     enddo
 !   ***********************************************************************************************
 !   calculate Eulerian body force
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
-    do  x = 1, xDim
-    do  y = 1, yDim
-    do  z = 1, zDim
-        forceTemp(z,y,x,1:3)=0.0d0
-    enddo
-    enddo
-    enddo
-    !$OMP END PARALLEL DO
     do    iEL=1,nEL
         call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
         call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
@@ -205,26 +198,15 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
                 ry=Phi((posElem(iEL,2)-yGrid(y))*invdh)
                 do z=-1+k,2+k
                     rz=Phi((posElem(iEL,3)-zGrid(z))*invdh)
-                    forceTemp(z,y,x,1:3)=forceTemp(z,y,x,1:3)-forceElemTemp(iEL,1:3)*rx*ry*rz*invdh*invdh*invdh
+                    forcetemp(1:3) = -forceElemTemp(iEL,1:3)*rx*ry*rz*invdh*invdh*invdh
+                    ! update velocity
+                    uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5*dt*forceTemp(1:3)/den(z,y,x)
+                    force(z,y,x,1:3)=force(z,y,x,1:3) + forcetemp(1:3)
                 enddo
             enddo
         enddo
     enddo
-!   ***********************************************************************************************
-!   update velocity
-!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
-    do  x = 1, xDim
-    do  y = 1, yDim
-    do  z = 1, zDim         
-        uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5*dt*forceTemp(z,y,x,1:3)/den(z,y,x)
-        force(z,y,x,1:3) = force(z,y,x,1:3) + forceTemp(z,y,x,1:3)
-    enddo
-    enddo
-    enddo
-!$OMP END PARALLEL DO
-!    force(1:zDim,1:yDim,1:xDim,1:3)=force(1:zDim,1:yDim,1:xDim,1:3)+forceTemp(1:zDim,1:yDim,1:xDim,1:3)
-    forceElem(1:nEL,1:3) = forceElem(1:nEL,1:3)+forceElemTemp(1:nEL,1:3)   
-!   ***********************************************************************************************
+    forceElem(1:nEL,1:3) = forceElem(1:nEL,1:3)+forceElemTemp(1:nEL,1:3)
 !   convergence test
     if(iterLBM==0)then
         dsum=0.0
@@ -279,9 +261,9 @@ real(8),intent(inout)::xyzfulIB(1:Nspan+1,nND,6),uuu(zDim,yDim,xDim,1:3)
 real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
 !==================================================================================================
 integer:: i,j,k,x,y,z,s,iEL,nt,iterLBM,iND
-real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh
+real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh,forceTemp(1:3)
 real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
-real(8):: forceTemp(zDim,yDim,xDim,1:3),forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
+real(8):: forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
 real(8):: forceElem(1:Nspan,nEL,3),forceElemTemp(1:Nspan,nEL,3),areaElem(nEL)
 real(8):: posElem(1:Nspan,nEL,3),posElemIB(1:Nspan,nEL,3),velElem(1:Nspan,nEL,3),velElemIB(1:Nspan,nEL,3)
 !==================================================================================================
@@ -371,7 +353,7 @@ dmaxLBM=1.0
 iterLBM=0
 do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)  
     !***********************************************************************************************
-    !   compute the velocity of IB nodes at element center
+    ! compute the velocity of IB nodes at element center
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz)
     do  iEL=1,nEL
         call my_minloc(posElem(1,iEL,1), xGrid, xDim, isUniformGrid(1), i)
@@ -398,7 +380,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
         enddo
     enddo
     !***********************************************************************************************
-    !   calculate interaction force
+    ! calculate interaction force
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,s)
     do  iEL=1,nEL
         do s=1,Nspan
@@ -412,13 +394,8 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     enddo
     !$OMP END PARALLEL DO
     !***********************************************************************************************
-    !   calculate Eulerian body force
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)  
-    do  x = 1, xDim
-        forceTemp(:,:,x,1:3)=0.0d0
-    enddo
-    !$OMP END PARALLEL DO
-    !no parallel to avoid write conflict to forceTemp
+    ! calculate Eulerian body force
+    ! no parallel to avoid write conflict to forceTemp
     do iEL=1,nEL
         call my_minloc(posElem(1,iEL,1), xGrid, xDim, isUniformGrid(1), i)
         call my_minloc(posElem(1,iEL,2), yGrid, yDim, isUniformGrid(2), j)
@@ -436,36 +413,17 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        forceTemp(z+k,y+j,x+i,1:3)=forceTemp(z+k,y+j,x+i,1:3)-forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)*invdh*invdh*invdh
+                        forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)*invdh*invdh*invdh
+                        ! update velocity
+                        uuu(z,y,x,1:3)  = uuu(z,y,x,1)+0.5*dt*forceTemp(1:3)/den(z,y,x)
+                        force(z,y,x,1:3) = force(z,y,x,1) + forceTemp(1:3)
                     enddo
                 enddo
             enddo
         enddo
     enddo
-    !   ***********************************************************************************************
-    !   update velocity
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-    do  x = 1, xDim
-        uuu(:,:,x,1)  = uuu(:,:,x,1)+0.5*dt*forceTemp(:,:,x,1)/den(:,:,x)
-        force(:,:,x,1) = force(:,:,x,1) + forceTemp(:,:,x,1)
-    enddo
-    !$OMP END PARALLEL DO
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-    do  x = 1, xDim
-        uuu(:,:,x,2)  = uuu(:,:,x,2)+0.5*dt*forceTemp(:,:,x,2)/den(:,:,x)
-        force(:,:,x,2) = force(:,:,x,2) + forceTemp(:,:,x,2)
-    enddo
-    !$OMP END PARALLEL DO
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-    do  x = 1, xDim
-        uuu(:,:,x,3)  = uuu(:,:,x,3)+0.5*dt*forceTemp(:,:,x,3)/den(:,:,x)
-        force(:,:,x,3) = force(:,:,x,3) + forceTemp(:,:,x,3)
-    enddo
-    !$OMP END PARALLEL DO
-    !    force(1:zDim,1:yDim,1:xDim,1:3)=force(1:zDim,1:yDim,1:xDim,1:3)+forceTemp(1:zDim,1:yDim,1:xDim,1:3)
-    forceElem(:,1:nEL,1:3) = forceElem(:,1:nEL,1:3)+forceElemTemp(:,1:nEL,1:3)   
-    !   ***********************************************************************************************
-    !   convergence test
+    forceElem(:,1:nEL,1:3) = forceElem(:,1:nEL,1:3)+forceElemTemp(:,1:nEL,1:3)
+    ! convergence test
     dsum=Uref*nEL
     dmaxLBM=0.0
     do iEL=1,nEL
