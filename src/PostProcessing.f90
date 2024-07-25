@@ -21,9 +21,10 @@
     do z=1,zDim
         do y=1,yDim
             do x=1,xDim
-                if ((.not. IEEE_IS_FINITE(uuu(z,y,x,1))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,2))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,3)))) then
+                if ((.not. IEEE_IS_FINITE(uuu(z,y,x,1))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,2))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,3))) .or. (.not. IEEE_IS_FINITE(prs(z,y,x)))) then
                     write(*, *) 'Nan found in uuu', x, y, z
                     uuu(z,y,x,1:3)=0.99d99
+                    prs(z,y,x) = 0.99d99
                     nanfound = .true.
                 endif
             enddo
