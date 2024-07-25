@@ -351,7 +351,7 @@
                           
         if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
             CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
-            if (.true.) then
+            if (Palpha.gt.0.d0) then
             CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
             endif
         endif
