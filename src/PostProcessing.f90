@@ -309,7 +309,9 @@
             enddo
         enddo
         do  i=1,nEL(iFish)
-            if(Nspan.eq.0) then
+            if(ElmType.eq.2) then
+                write(idfile) ele(iFish,i,1),ele(iFish,i,2)
+            elseif(ElmType.eq.3) then
                 write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
             else
                 do j=1,Nspan
