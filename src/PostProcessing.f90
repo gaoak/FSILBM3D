@@ -22,9 +22,9 @@
         do y=1,yDim
             do x=1,xDim
                 if ((.not. IEEE_IS_FINITE(uuu(z,y,x,1))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,2))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,3))) .or. (.not. IEEE_IS_FINITE(prs(z,y,x)))) then
-                    write(*, *) 'Nan found in uuu', x, y, z
-                    uuu(z,y,x,1:3)=0.99d99
-                    prs(z,y,x) = 0.99d99
+                    write(*, *) 'Nan found in uuu(x,y,z)', x, y, z
+                    uuu(z,y,x,1:3)=0.99d9
+                    prs(z,y,x) = 0.99d9
                     nanfound = .true.
                 endif
             enddo
@@ -139,7 +139,14 @@
             enddo
     endif
 
-    do iFish=1,nFish 
+    do iFish=1,nFish
+        do i=1,1,nND(iFish)
+            if ((.not. IEEE_IS_FINITE(velful(iFish,i,1))) .or. (.not. IEEE_IS_FINITE(velful(iFish,i,2))) .or. (.not. IEEE_IS_FINITE(velful(iFish,i,3)))) then
+                write(*, *) 'Nan found in body velocity (iFish, i)', iFish, i
+                velful(iFish,i,1:3)=0.99d9
+                nanfound = .true.
+            endif
+        enddo
         write(idfile) ZONEMARKER
         do  nv=1,numVar
             write(idfile) 1                                 
