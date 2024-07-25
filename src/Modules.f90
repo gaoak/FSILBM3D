@@ -81,7 +81,6 @@
     real(8):: dh,dt,ratio,dxmin,dymin,dzmin,dxmax,dymax,dzmax
     real(8):: cptxMin,cptxMax,cptyMin,cptyMax,cptzMin,cptzMax
     real(8):: Omega,tau,Cs2,nu,Mu
-    integer, allocatable:: image(:,:,:)
     real(8), allocatable:: dx(:), dy(:), dz(:) 
     real(8), allocatable:: xGrid0(:), yGrid0(:), zGrid0(:), xGrid(:), yGrid(:), zGrid(:)
     real(8), allocatable:: fIn(:,:,:,:), fInTemp(:,:,:)

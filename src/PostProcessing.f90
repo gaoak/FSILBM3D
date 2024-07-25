@@ -315,54 +315,7 @@
     
 
     END SUBROUTINE
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    
-!    copyright@ RuNanHua
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_image()
-    USE simParam
-    implicit none
-    integer:: x,y,z
-    !==================================================================================================
-    integer:: iimage        
-    integer:: nv
-    integer,parameter:: namLen=40,idfile=100,numVar=4
-    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=[character(namLen)::'x','y','z','image'] 
-    !==================================================================================================
-!   =============================================================================================
-    open(idfile,file='./DatOthe/Image.plt',form='unformatted',access='stream')        
-!   =============================================================================================
-    write(idfile) "#!TDV101"    
-    write(idfile) 1
-    call dumpstring(title,idfile)
-    write(idfile) numVar
-    do  nv=1,numVar
-        call dumpstring(varname(nv),idfile)
-    enddo
-!   ===============================================================================================
-    write(idfile) ZONEMARKER              
-    call dumpstring(zonename,idfile)
-    write(idfile) -1,0,1,0,0,zDim,ydim,xDim,0
-!   =============================================
-    write(idfile) EOHMARKER
-    write(idfile) ZONEMARKER
-    do  nv=1,numVar
-        write(idfile) 1                                 
-    enddo
-    write(idfile) 0,-1
-    do    x=1, xDim
-    do    y=1, yDim
-    do    z=1, zDim
-        write(idfile)    real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(image(z,y,x))
-    enddo
-    enddo
-    enddo
-    close(idfile)
-    END SUBROUTINE
-
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write parameters for checking
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
