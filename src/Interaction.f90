@@ -10,7 +10,7 @@
     real(8):: xyzful(1:nFish,1:nND_max,1:6),repful(1:nFish,1:nND_max,1:6)
     !local
     integer:: iND,jND,iFish,jFish
-    real(8):: delta_h,Phi,r(1:3),ds(1:3),phi_r(1:3),span
+    real(8):: delta_h,Phi,r(1:3),ds(1:3),phi_r(1:3),Lspan
     real(8):: minx,miny,maxx,maxy,minz,maxz
     real(8):: xmin(1:nFish),xmax(1:nFish),ymin(1:nFish),ymax(1:nFish),zmin(1:nFish),zmax(1:nFish)
 
@@ -18,7 +18,10 @@
     ds(1)=dxmin
     ds(2)=dymin
     ds(3)=dzmin
-    span=dspan*Nspan
+    Lspan=dspan*Nspan
+    if(Nspan.eq.0)then
+        Lspan=1.0d0
+    endif
     
     do iFish=1,nFish
         xmin(iFish) = minval(xyzful(iFish,1:nND(iFish),1))-dxmin*1.5d0
@@ -51,8 +54,8 @@
                     r(2)=(xyzful(iFish,iND,2)-xyzful(jFish,jND,2))/dymin
                     call get_phi_r(r,phi_r)
                     delta_h=phi_r(1)*phi_r(2)/dxmin/dymin/dsqrt(r(1)*r(1)+r(2)*r(2))
-                    repful(iFish,iND,1:2)=repful(iFish,iND,1:2) + delta_h*r(1:2)*ds(1:2)*span ! force
-                    repful(jFish,jND,1:2)=repful(jFish,jND,1:2) - delta_h*r(1:2)*ds(1:2)*span ! reaction force
+                    repful(iFish,iND,1:2)=repful(iFish,iND,1:2) + delta_h*r(1:2)*ds(1:2)*Lspan ! force
+                    repful(jFish,jND,1:2)=repful(jFish,jND,1:2) - delta_h*r(1:2)*ds(1:2)*Lspan ! reaction force
                 enddo !jND=1,nND(jFish)
             enddo !iND=1,nND(iFish)
         enddo !jFish=iFish+1,nFish
