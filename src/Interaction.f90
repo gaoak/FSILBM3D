@@ -262,7 +262,7 @@ real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
 !==================================================================================================
 integer:: i,j,k,x,y,z,s,iEL,nt,iterLBM,iND
 real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh,forceTemp(1:3)
-real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+real(8):: x1,x2,y1,y2,z1,ax,ay
 real(8):: forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
 real(8):: forceElem(1:Nspan,nEL,3),forceElemTemp(1:Nspan,nEL,3),areaElem(nEL)
 real(8):: posElem(1:Nspan,nEL,3),posElemIB(1:Nspan,nEL,3),velElem(1:Nspan,nEL,3),velElemIB(1:Nspan,nEL,3)
@@ -273,6 +273,10 @@ invdh = 1.D0/dh
 do iND=1,nND
     call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
     call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
+    if(i.lt.2 .or. i.gt.xDim-2 .or. j.lt.2 .or. j.gt.yDim-2) then
+        write(*, *) 'Point too close to boundary: ', xyzful(iND,1:3), i, j
+        stop
+    endif
     do x=-1+i,2+i
         rx(x-i)=Phi((xyzful(iND,1)-xGrid(x))*invdh)
     enddo
