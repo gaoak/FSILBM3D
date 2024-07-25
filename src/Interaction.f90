@@ -260,7 +260,7 @@ real(8),intent(in):: xyzful(nND,6),velful(nND,6)
 real(8),intent(inout)::xyzfulIB(1:Nspan+1,nND,6),uuu(zDim,yDim,xDim,1:3)
 real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
 !==================================================================================================
-integer:: i,j,k,x,y,z,s,iEL,nt,iterLBM,iND
+integer:: i,j,k,x,y,z,s,iEL,nt,iterLBM,iND,ix,iy,iz
 real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh,forceTemp(1:3)
 real(8):: x1,x2,y1,y2,z1,ax,ay
 real(8):: forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
@@ -419,8 +419,11 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
                     do z=-1,2
                         forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)*invdh*invdh*invdh
                         ! update velocity
-                        uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5*dt*forceTemp(1:3)/den(z,y,x)
-                        force(z,y,x,1:3) = force(z,y,x,1) + forceTemp(1:3)
+                        ix = i + x
+                        iy = j + y
+                        iz = k + z
+                        uuu(iz,iy,ix,1:3)  = uuu(iz,iy,ix,1:3)+0.5*dt*forceTemp(1:3)/den(iz,iy,ix)
+                        force(iz,iy,ix,1:3) = force(iz,iy,ix,1) + forceTemp(1:3)
                     enddo
                 enddo
             enddo
