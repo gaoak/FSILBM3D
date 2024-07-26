@@ -101,7 +101,7 @@
     integer,allocatable:: ele_all(:,:)
     integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:) 
     integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:),isMotionGiven(:,:)
-    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful1_all(:,:),extful2_all(:,:)
+    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful_all(:,:)
 !   ===============================================================================================
     integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
     real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)

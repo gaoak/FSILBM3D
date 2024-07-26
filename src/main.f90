@@ -10,7 +10,7 @@
     use omp_lib
     USE ImmersedBoundary
     implicit none
-    integer:: iND,isubstep,iFish,x,y,z
+    integer:: iND,isubstep,iFish,x,y,z,icount
     real(8), allocatable:: FishInfo(:,:)
     real(8):: temp(3),Pbetatemp,CPUtime
     logical alive
@@ -132,7 +132,7 @@
         call date_and_time(VALUES=values0)
         Pbeta=(1.0d0-dexp(-5.0d0/Pramp*time/Tref))*Pbetatemp
 
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z) 
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do x=1,xDim
             do y=1,yDim
                 do z=1,zDim
@@ -143,58 +143,53 @@
         !$OMP END PARALLEL DO
 
         !package n Fish to one 
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
         do iFish=1,nFish
-        if(iFish.eq.1)then
+            if(iFish.eq.1)then
+                icount = 0
+            elseif(iFish.ge.2)then
+                icount = sum(nND(1:iFish-1))
+            endif
             do iND=1,nND(iFish)
-                xyzful_all(iND,1:6)   =  xyzful(iFish,iND,1:6)
-                velful_all(iND,1:6)   =  velful(iFish,iND,1:6)
-                xyzfulIB_all(:,iND,1:6) = xyzfulIB(:,iFish,iND,1:6)
-                extful1_all(iND,1:6)  =  extful(iFish,iND,1:6)
-                extful2_all(iND,1:6)  =  extful(iFish,iND,1:6)
+                xyzful_all(iND+icount,1:6)  =  xyzful(iFish,iND,1:6)
+                velful_all(iND+icount,1:6)  =  velful(iFish,iND,1:6)
+                extful_all(iND+icount,1:6)  =  extful(iFish,iND,1:6)
             enddo
-        elseif(iFish.ge.2)then
-            do iND=1,nND(iFish)
-                xyzful_all(iND+sum(nND(1:iFish-1)),1:6)   =  xyzful(iFish,iND,1:6)
-                velful_all(iND+sum(nND(1:iFish-1)),1:6)   =  velful(iFish,iND,1:6)
-                xyzfulIB_all(:,iND+sum(nND(1:iFish-1)),1:6) = xyzfulIB(:,iFish,iND,1:6)
-                extful1_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
-                extful2_all(iND+sum(nND(1:iFish-1)),1:6)  =  extful(iFish,iND,1:6)
-            enddo
-        endif
-
         enddo
+        !$OMP END PARALLEL DO
+        call packxyzIB
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
             if    (Nspan .eq. 0) then 
                 CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all,isUniformGrid)
+                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)
             else
                 CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful1_all,isUniformGrid,Nspan,dspan)
+                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,Nspan,dspan)
             endif
         elseif(iForce2Body==2)then   !stress force
-        CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful2_all)
+            CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful_all)
         endif
 
         !compute volume force exerted on fluids
         CALL addVolumForc()
 
         ! unpackage
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
         do iFish=1,nFish
             if(iFish.eq.1)then
-               do iND=1,nND(iFish)
-                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND,1:6)
-                 velful(iFish,iND,1:6)   =  velful_all(iND,1:6)
-                 xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND,1:6)
-               enddo
+                icount = 0
             else
-               do iND=1,nND(iFish)
-                 xyzful(iFish,iND,1:6)   =  xyzful_all(iND + sum(nND(1:iFish-1)),1:6)
-                 velful(iFish,iND,1:6)   =  velful_all(iND + sum(nND(1:iFish-1)),1:6)
-                 xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND + sum(nND(1:iFish-1)),1:6)
-               enddo
+                icount = sum(nND(1:iFish-1))
             endif
-        enddo 
+            do iND=1,nND(iFish)
+                xyzful(iFish,iND,1:6) = xyzful_all(iND + icount,1:6)
+                velful(iFish,iND,1:6) = velful_all(iND + icount,1:6)
+                extful(iFish,iND,1:6) = extful_all(iND+icount,1:6)
+            enddo
+        enddo
+        !$OMP END PARALLEL DO
+        call unpackxyzIB
 
         call date_and_time(VALUES=values1)
         write(*,*)'time for IBM step : ',CPUtime(values1)-CPUtime(values0)
@@ -209,34 +204,6 @@
         CALL collision_step()
         call date_and_time(VALUES=values1)
         write(*,*)'time for collision_step:',CPUtime(values1)-CPUtime(values0)
-        !exert force to solid, two types of force: penalty and fluid stress
-        if (iForce2Body==1)then   !Same force as flow
-            do iFish=1,nFish
-            if(iFish.eq.1)then
-                do iND=1,nND(iFish)
-                extful(iFish,iND,1:6) = extful1_all(iND,1:6)
-                enddo
-            else
-                do iND=1,nND(iFish)
-                extful(iFish,iND,1:6) = extful1_all(iND+sum(nND(1:iFish-1)),1:6) 
-                enddo
-            endif
-            enddo
-        elseif(iForce2Body==2)then   !stress force
-            do iFish=1,nFish
-            if(iFish.eq.1)then
-                do iND=1,nND(iFish)
-                extful(iFish,iND,1:6) = extful2_all(iND,1:6)
-                enddo
-            else
-                do iND=1,nND(iFish)
-                extful(iFish,iND,1:6) = extful2_all(iND+sum(nND(1:iFish-1)),1:6)
-                enddo
-            endif
-            enddo
-        endif
-        !******************************************************************************************
-        !******************************************************************************************
         !******************************************************************************************
         !solve solid
         if(isRelease/=1)write(*,'(A)')' ----------------------solid solver----------------------'

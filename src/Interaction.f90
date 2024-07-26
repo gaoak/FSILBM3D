@@ -68,26 +68,31 @@
 !    calculate force at element center, distribute force to three nodes
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                                 xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid)    
-    IMPLICIT NONE
-    integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM
-    real(8),intent(in):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta
-    real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
-    logical,intent(in):: isUniformGrid(1:3)
-    real(8),intent(in):: xyzful(nND,6),velful(nND,6)
-    real(8),intent(inout)::xyzfulIB(nND,6),uuu(zDim,yDim,xDim,1:3)
-    real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
+USE, INTRINSIC :: IEEE_ARITHMETIC
+IMPLICIT NONE
+integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM
+real(8),intent(in):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta
+real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+logical,intent(in):: isUniformGrid(1:3)
+real(8),intent(in):: xyzful(nND,6),velful(nND,6)
+real(8),intent(inout)::xyzfulIB(nND,6),uuu(zDim,yDim,xDim,1:3)
+real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
 !==================================================================================================
-    integer:: i,j,k,x,y,z,xbgn,ybgn,zbgn,xend,yend,zend,iEL,nt,iterLBM,iND
-    real(8):: rx,ry,rz,Phi,dmaxLBM,dsum,invdh,forcetemp(1:3)
-    real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
-    real(8):: forceElemTemp(nEL,3)
-    real(8):: forceElem(nEL,3),forceNode(nND,3),velfulIB(nND,3)
-    real(8):: posElem(nEL,3),posElemIB(nEL,3),velElem(nEL,3),velElemIB(nEL,3),areaElem(nEL)
+integer:: i,j,k,x,y,z,xbgn,ybgn,zbgn,xend,yend,zend,iEL,nt,iterLBM,iND
+real(8):: rx,ry,rz,Phi,dmaxLBM,dsum,invdh,forcetemp(1:3)
+real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+real(8):: forceElemTemp(nEL,3)
+real(8):: forceElem(nEL,3),forceNode(nND,3),velfulIB(nND,3)
+real(8):: posElem(nEL,3),velElem(nEL,3),velElemIB(nEL,3),areaElem(nEL)
+real(8),allocatable::posElemIB(:,:)
 !==================================================================================================
 !   compute velocity and displacement at IB nodes
-    invdh = 1.D0/dh
+invdh = 1.D0/dh
+if(Palpha.gt.0.d0) then
+    allocate(posElemIB(1:nEL,1:3))
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iND,i,j,k,x,y,z,rx,ry,rz)
     do  iND=1,nND
         call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
         call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
@@ -108,50 +113,51 @@
         enddo
         xyzfulIB(iND,1:3)=xyzfulIB(iND,1:3)+velfulIB(iND,1:3)*dt
     enddo
-
+    !$OMP END PARALLEL DO
+endif
 !==================================================================================================
 !   compute displacement, velocity, area at surface element center
-    do  iEL=1,nEL
-        i=ele(iEL,1)
-        j=ele(iEL,2)
-        k=ele(iEL,3)
-        nt=ele(iEL,4)
+do  iEL=1,nEL
+    i=ele(iEL,1)
+    j=ele(iEL,2)
+    k=ele(iEL,3)
+    nt=ele(iEL,4)
 
-        x1=xyzful(i,1)
-        x2=xyzful(j,1)
-        x3=xyzful(k,1)
-        y1=xyzful(i,2)
-        y2=xyzful(j,2)
-        y3=xyzful(k,2)
-        z1=xyzful(i,3)
-        z2=xyzful(j,3)
-        z3=xyzful(k,3)
+    x1=xyzful(i,1)
+    x2=xyzful(j,1)
+    x3=xyzful(k,1)
+    y1=xyzful(i,2)
+    y2=xyzful(j,2)
+    y3=xyzful(k,2)
+    z1=xyzful(i,3)
+    z2=xyzful(j,3)
+    z3=xyzful(k,3)
 
-        if(nt==2)then
+    if(nt==2)then
         posElem(iEL,1:3)=(xyzful(i,1:3)+xyzful(j,1:3))/2.0d0
         velElem(iEL,1:3)=(velful(i,1:3)+velful(j,1:3))/2.0d0
-
-        posElemIB(iEL,1:3)=(xyzfulIB(i,1:3)+xyzfulIB(j,1:3))/2.0d0
-
+        if(Palpha.gt.0.d0) then
+            posElemIB(iEL,1:3)=(xyzfulIB(i,1:3)+xyzfulIB(j,1:3))/2.0d0
+        endif
         ax =(x1-x2)
         ay =(y1-y2)
         az =(z1-z2)
         areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
 
-        elseif(nt==3)then
+    elseif(nt==3)then
         posElem(iEL,1:3)=(xyzful(i,1:3)+xyzful(j,1:3)+xyzful(k,1:3))/3.0d0
         velElem(iEL,1:3)=(velful(i,1:3)+velful(j,1:3)+velful(k,1:3))/3.0d0
-
-        posElemIB(iEL,1:3)=(xyzfulIB(i,1:3)+xyzfulIB(j,1:3)+xyzfulIB(k,1:3))/3.0d0
-
+        if(Palpha.gt.0.d0) then
+            posElemIB(iEL,1:3)=(xyzfulIB(i,1:3)+xyzfulIB(j,1:3)+xyzfulIB(k,1:3))/3.0d0
+        endif
         ax =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0
         ay =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0
         az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0
         areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
-        else
+    else
             write(*,*)'cell type is not defined'
-        endif
-    enddo
+    endif
+enddo
 
 !**************************************************************************************************
 !**************************************************************************************************
@@ -181,12 +187,17 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
 !   ***********************************************************************************************
 !   calculate interaction force
     do  iEL=1,nEL
-        if(ele(iEL,4)==2)then
-            forceElemTemp(iEL,1:3) = 0.0d0
-        elseif(ele(iEL,4)==3)then
-            forceElemTemp(iEL,1:3) = -Palpha*2.0*denIn*(posElem(iEL,1:3)-posElemIB(iEL,1:3))/dt*areaElem(iEL)*dh  &
-                                     -Pbeta* 2.0*denIn*(velElem(iEL,1:3)-velElemIB(iEL,1:3))/dt*areaElem(iEL)*dh
+        if(ele(iEL,4)==3) then
+            forceElemTemp(iEL,1:3) = -Pbeta* 2.0*denIn*(velElem(iEL,1:3)-velElemIB(iEL,1:3))/dt*areaElem(iEL)*dh
+            if(Palpha.gt.0.d0) then
+                forceElemTemp(iEL,1:3) = forceElemTemp(iEL,1:3) - Palpha*2.0*denIn*(posElem(iEL,1:3)-posElemIB(iEL,1:3))/dt*areaElem(iEL)*dh
+            endif
         else
+            forceElemTemp(iEL,1:3) = 0.0d0
+        endif
+        if ((.not. IEEE_IS_FINITE(forceElemTemp(iEL,1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,3)))) then
+            write(*, *) 'Nan found in forceElemTemp', forceElemTemp
+            stop
         endif
     enddo
 !   ***********************************************************************************************
@@ -213,14 +224,14 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
 !   convergence test
     if(iterLBM==0)then
         dsum=0.0
-        do iEL=1,nEL              
+        do iEL=1,nEL
         dsum=dsum+dsqrt(sum((velElem(iEL,1:3)-velElemIB(iEL,1:3))**2))
-        enddo   
+        enddo
     endif
     dsum=Uref*nEL
     
     dmaxLBM=0.0
-    do iEL=1,nEL              
+    do iEL=1,nEL
         dmaxLBM=dmaxLBM+dsqrt(sum((velElem(iEL,1:3)-velElemIB(iEL,1:3))**2))
     enddo
     dmaxLBM=dmaxLBM/dsum
@@ -231,21 +242,23 @@ enddo
 !**************************************************************************************************
 !**************************************************************************************************
 !   element force to nodal force
-    forceNode(1:nND,1:3)=0.0
-    do    iEL=1,nEL
-        i=ele(iEL,1)
-        j=ele(iEL,2)
-        k=ele(iEL,3)
-        nt=ele(iEL,4)
-        forceNode(i,1:3)=forceNode(i,1:3)+forceElem(iEl,1:3)/3.0d0
-        forceNode(j,1:3)=forceNode(j,1:3)+forceElem(iEl,1:3)/3.0d0
-        forceNode(k,1:3)=forceNode(k,1:3)+forceElem(iEl,1:3)/3.0d0
-    enddo
+forceNode(1:nND,1:3)=0.0
+do    iEL=1,nEL
+    i=ele(iEL,1)
+    j=ele(iEL,2)
+    k=ele(iEL,3)
+    nt=ele(iEL,4)
+    forceNode(i,1:3)=forceNode(i,1:3)+forceElem(iEl,1:3)/3.0d0
+    forceNode(j,1:3)=forceNode(j,1:3)+forceElem(iEl,1:3)/3.0d0
+    forceNode(k,1:3)=forceNode(k,1:3)+forceElem(iEl,1:3)/3.0d0
+enddo
 
-    extful(1:nND,1:3) = forceNode(1:nND,1:3)
-    extful(1:nND,4:6) = 0.0d0
-
-    END SUBROUTINE
+extful(1:nND,1:3) = forceNode(1:nND,1:3)
+extful(1:nND,4:6) = 0.0d0
+if(Palpha.gt.0.d0) then
+    deallocate(posElemIB)
+endif
+END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    (displacement, velocity) spring, penalty method
@@ -268,39 +281,43 @@ real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh,forceTemp(1:3)
 real(8):: x1,x2,y1,y2,z1,ax,ay
 real(8):: forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
 real(8):: forceElem(1:Nspan,nEL,3),forceElemTemp(1:Nspan,nEL,3),areaElem(nEL)
-real(8):: posElem(1:Nspan,nEL,3),posElemIB(1:Nspan,nEL,3),velElem(1:Nspan,nEL,3),velElemIB(1:Nspan,nEL,3)
+real(8):: posElem(1:Nspan,nEL,3),velElem(1:Nspan,nEL,3),velElemIB(1:Nspan,nEL,3)
+real(8),allocatable::posElemIB(:,:,:)
 !==================================================================================================
 !   compute velocity and displacement at IB nodes
 invdh = 1.D0/dh
-!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iND,i,j,k,x,y,z,s,rx,ry,rz,z1)
-do iND=1,nND
-    call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
-    call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
-    do x=-1+i,2+i
-        rx(x-i)=Phi((xyzful(iND,1)-xGrid(x))*invdh)
-    enddo
-    do y=-1+j,2+j
-        ry(y-j)=Phi((xyzful(iND,2)-yGrid(y))*invdh)
-    enddo
-    do s=1,Nspan+1
-        z1 = xyzful(iND,3)+dspan * (s - 1)
-        call my_minloc(z1, zGrid, zDim, isUniformGrid(3), k)
-        do z=-1+k,2+k
-            rz(z-k)=Phi((z1-zGrid(z))*invdh)
+if(Palpha.gt.0.d0) then
+    allocate(posElemIB(1:Nspan,1:nEL,1:3))
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iND,i,j,k,x,y,z,s,rx,ry,rz,z1)
+    do iND=1,nND
+        call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
+        call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
+        do x=-1+i,2+i
+            rx(x-i)=Phi((xyzful(iND,1)-xGrid(x))*invdh)
         enddo
-        ! interpolate fluid velocity to body nodes
-        velfulIB(s,iND,1:3)=0.0
-        do x=-1,2
-            do y=-1,2
-                do z=-1,2
-                    velfulIB(s,iND,1:3)=velfulIB(s,iND,1:3)+uuu(z+k,y+j,x+i,1:3)*rx(x)*ry(y)*rz(z)
+        do y=-1+j,2+j
+            ry(y-j)=Phi((xyzful(iND,2)-yGrid(y))*invdh)
+        enddo
+        do s=1,Nspan+1
+            z1 = xyzful(iND,3)+dspan * (s - 1)
+            call my_minloc(z1, zGrid, zDim, isUniformGrid(3), k)
+            do z=-1+k,2+k
+                rz(z-k)=Phi((z1-zGrid(z))*invdh)
+            enddo
+            ! interpolate fluid velocity to body nodes
+            velfulIB(s,iND,1:3)=0.0
+            do x=-1,2
+                do y=-1,2
+                    do z=-1,2
+                        velfulIB(s,iND,1:3)=velfulIB(s,iND,1:3)+uuu(z+k,y+j,x+i,1:3)*rx(x)*ry(y)*rz(z)
+                    enddo
                 enddo
             enddo
         enddo
+        xyzfulIB(:,iND,1:3)=xyzfulIB(:,iND,1:3)+velfulIB(:,iND,1:3)*dt
     enddo
-    xyzfulIB(:,iND,1:3)=xyzfulIB(:,iND,1:3)+velfulIB(:,iND,1:3)*dt
-enddo
-!$OMP END PARALLEL DO
+    !$OMP END PARALLEL DO
+endif
 
 !==================================================================================================
 !   compute displacement, velocity, area at surface element center
@@ -321,7 +338,9 @@ do  iEL=1,nEL
         posElem(s,iEL,3)=xyzful(i,3) + dspan* (s-0.5)
         velElem(s,iEL,1:2)=(velful(i,1:2)+velful(j,1:2))*0.5d0
         velElem(s,iEL,3)=0.d0
-        posElemIB(s,iEL,1:3)=(xyzfulIB(s,i,1:3)+xyzfulIB(s,j,1:3)+xyzfulIB(s+1,i,1:3)+xyzfulIB(s+1,j,1:3))*0.25d0
+        if(Palpha.gt.0.d0) then
+            posElemIB(s,iEL,1:3)=(xyzfulIB(s,i,1:3)+xyzfulIB(s,j,1:3)+xyzfulIB(s+1,i,1:3)+xyzfulIB(s+1,j,1:3))*0.25d0
+        endif
     enddo
     ax =(x1-x2)
     ay =(y1-y2)
@@ -395,8 +414,10 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,s)
     do  iEL=1,nEL
         do s=1,Nspan
-            forceElemTemp(s,iEL,1:3) = -Palpha*2.0*denIn*(posElem(s,iEL,1:3)-posElemIB(s,iEL,1:3))/dt*areaElem(iEL)*dh  &
-            -Pbeta* 2.0*denIn*(velElem(s,iEL,1:3)-velElemIB(s,iEL,1:3))/dt*areaElem(iEL)*dh
+            forceElemTemp(s,iEL,1:3) = -Pbeta* 2.0*denIn*(velElem(s,iEL,1:3)-velElemIB(s,iEL,1:3))/dt*areaElem(iEL)*dh
+            if(Palpha.gt.0.d0) then
+                forceElemTemp(s,iEL,1:3) = forceElemTemp(s,iEL,1:3) - Palpha*2.0*denIn*(posElem(s,iEL,1:3)-posElemIB(s,iEL,1:3))/dt*areaElem(iEL)*dh
+            endif
             if ((.not. IEEE_IS_FINITE(forceElemTemp(s,iEL,1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(s,iEL,2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(s,iEL,3)))) then
                 write(*, *) 'Nan found in forceElemTemp', forceElemTemp
                 stop
@@ -464,7 +485,9 @@ do iEL=1,nEL
 enddo
 extful(1:nND,1:2) = forceNode(1:nND,1:2)
 extful(1:nND,3:6) = 0.0d0
-
+if(Palpha.gt.0.d0) then
+    deallocate(posElemIB)
+endif
 END SUBROUTINE calculate_interaction_force_quad
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -713,7 +736,7 @@ END SUBROUTINE calculate_interaction_force_quad
     else
         Phi=0.0d0
     endif
-    ENDFUNCTION
+    ENDFUNCTION Phi
 
     subroutine get_phi_r(r,phi_r)
         implicit none 
@@ -732,5 +755,66 @@ END SUBROUTINE calculate_interaction_force_quad
            endif
         enddo
     
-        end subroutine
+    end subroutine get_phi_r
+
+subroutine initializexyzIB
+USE simParam
+USE ImmersedBoundary
+implicit none
+integer:: iND,s,iFish,Nspanpts
+if(Palpha.gt.0.d0) then
+    Nspanpts = Nspan + 1
+    allocate(xyzfulIB_all(1:Nspanpts,nND_all,6),xyzfulIB(1:Nspanpts,1:nFish,nND_max,6))
+    !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,s)
+    do iFish=1,nFish
+        do s=1,Nspanpts
+            xyzfulIB(s,iFish,1:nND(iFish),1:6)=xyzful(iFish,1:nND(iFish),1:6)
+            xyzfulIB(s,iFish,1:nND(iFish),3)=xyzful(iFish,1:nND(iFish),3)+(s-1)*dspan
+        enddo
+    enddo
+    !$OMP END PARALLEL DO
+    call packxyzIB
+endif
+endsubroutine initializexyzIB
     
+subroutine packxyzIB
+USE simParam
+USE ImmersedBoundary
+implicit none
+integer:: iND,iFish,icount
+if(Palpha.gt.0.d0) then
+    !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
+    do iFish=1,nFish
+        if(iFish.eq.1)then
+            icount = 0
+        elseif(iFish.ge.2)then
+            icount = sum(nND(1:iFish-1))
+        endif
+        do iND=1,nND(iFish)
+            xyzfulIB_all(:,iND+icount,1:6) = xyzfulIB(:,iFish,iND,1:6)
+        enddo
+    enddo
+    !$OMP END PARALLEL DO
+endif
+endsubroutine packxyzIB
+
+subroutine unpackxyzIB
+USE simParam
+USE ImmersedBoundary
+implicit none
+integer:: iND,iFish,icount
+if(Palpha.gt.0.d0) then
+!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
+    do iFish=1,nFish
+        if(iFish.eq.1)then
+            icount = 0
+        else
+            icount = sum(nND(1:iFish-1))
+        endif
+        do iND=1,nND(iFish)
+            xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND + icount,1:6)
+        enddo
+    enddo
+    !$OMP END PARALLEL DO
+endif
+endsubroutine unpackxyzIB
