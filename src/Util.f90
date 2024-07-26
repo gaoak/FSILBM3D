@@ -133,6 +133,12 @@
 
         ElmType = ele(iFish,1,4)
 
+        write(fileName,'(I4)') iFish
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+             if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+
         if    (iForce2Body==1)then   !Same force as flow
         open(111,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
         write(111,'(4E20.10)')time/Tref,sum(extful(iFish,1:nND(iFish),1:3),1)/Fref                            
