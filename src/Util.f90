@@ -4,12 +4,15 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfoTitl()
     USE simParam
+    USE ImmersedBoundary
     implicit none
-    integer:: i,iFish
+    integer:: i,iFish,ElmType
     integer,parameter::nameLen=4
     character (LEN=nameLen):: fileName,Nodename
 
     do iFish=1,nFish
+
+        ElmType = ele(iFish,1,4)
 
         write(fileName,'(I4)') iFish
         fileName = adjustr(fileName)
@@ -39,6 +42,18 @@
             write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
             close(111)
         enddo
+
+        if (ElmType .eq. 2) then
+            !===============================================================================
+            open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt')
+            write(111,*)'variables= "t"  "x"  "y"  "u"  "v"  "ax"  "ay" '
+            close(111)
+            !===============================================================================
+            write(Nodename,'(I4.4)') nNd(iFish)
+            open(111,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt')
+            write(111,*)'variables= "t"  "x"  "y"  "u"  "v" "ax"  "ay" '
+            close(111)
+        endif
 
         open(111,file='./DatInfo/SampBodyCentP'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
@@ -141,7 +156,7 @@
             write(111,'(10E20.10)')time/Tref,xyzful(iFish,NDhd(iFish,i),1:3)/Lref,velful(iFish,NDhd(iFish,i),1:3)/Uref,accful(iFish,NDhd(iFish,i),1:3)/Aref                     
             close(111)
         enddo
-        
+
         if (ElmType .eq. 2) then
             !===============================================================================
             open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt',position='append')
