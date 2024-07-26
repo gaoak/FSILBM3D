@@ -289,7 +289,7 @@
         if(isRelease/=1)then
         do iFish=1,nFish
         write(*,'(A,I5.5)')' Fish number: ', int(FishInfo(iFish,1))
-        write(*,'(A,I5.5,A,D20.10)')' iterFEM = ',int(FishInfo(iFish,2)),'    dmaxFEM = ',FishInfo(iFish,3)
+        write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(FishInfo(iFish,2)),'    dmaxFEM = ',FishInfo(iFish,3)
         enddo
         endif
         write(*,'(A)')' --------------------------------------------------------'
@@ -318,6 +318,9 @@
                           
         if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
             CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
+            if (Nspan.ne.0) then 
+            CALL write_solid_span_field(nFish,xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+            endif
             if (Palpha.gt.0.d0) then
             CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
             endif
