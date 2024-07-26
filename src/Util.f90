@@ -46,12 +46,12 @@
         if (ElmType .eq. 2) then
             !===============================================================================
             open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt')
-            write(111,*)'variables= "t"  "x"  "y"  "u"  "v"  "ax"  "ay" '
+            write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
             close(111)
             !===============================================================================
             write(Nodename,'(I4.4)') nNd(iFish)
             open(111,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt')
-            write(111,*)'variables= "t"  "x"  "y"  "u"  "v" "ax"  "ay" '
+            write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
             close(111)
         endif
 
