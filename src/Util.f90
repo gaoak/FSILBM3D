@@ -166,12 +166,12 @@
         if (ElmType .eq. 2) then
             !===============================================================================
             open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt',position='append')
-            write(111,'(10E20.10)')time/Tref,xyzful(iFish,1,1:2)/Lref,velful(iFish,1,1:2)/Uref,accful(iFish,1,1:2)/Aref                     
+            write(111,'(10E20.10)')time/Tref,xyzful(iFish,1,1:3)/Lref,velful(iFish,1,1:3)/Uref,accful(iFish,1,1:3)/Aref                     
             close(111)
             !===============================================================================
             write(Nodename,'(I4.4)') nNd(iFish)
             open(111,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt',position='append')
-            write(111,'(10E20.10)')time/Tref,xyzful(iFish,nND(iFish),1:2)/Lref,velful(iFish,nND(iFish),1:2)/Uref,accful(iFish,nND(iFish),1:2)/Aref                  
+            write(111,'(10E20.10)')time/Tref,xyzful(iFish,nND(iFish),1:3)/Lref,velful(iFish,nND(iFish),1:3)/Uref,accful(iFish,nND(iFish),1:3)/Aref                  
             close(111)
         endif
 
