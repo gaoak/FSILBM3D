@@ -382,7 +382,6 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
         call my_minloc(posElem(1,iEL,2), yGrid, yDim, isUniformGrid(2), j)
         if(i.lt.2 .or. i.gt.xDim-2 .or. j.lt.2 .or. j.gt.yDim-2) then
             write(*, *) 'Point too close to boundary posElem(1,iEL,1:2): ', posElem(1,iEL,1:2), iEL
-            stop
         endif
         do x=-1+i,2+i
             rx(x-i)=Phi((posElem(1,iEL,1)-xGrid(x))*invdh)

@@ -315,22 +315,24 @@
         if(DABS(time/Tref-timeOutTemp*NINT(time/Tref/timeOutTemp)) <= 0.5*dt/Tref)then
             CALL write_checkpoint_file()
         endif
-                          
-        if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
-            CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
-            if (Nspan.ne.0) then 
-            CALL write_solid_span_field(nFish,xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+        
+        if((timeOutFlBg .le. time/Tref) .and. (time/Tref .le. timeOutFlEd)) then
+            if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
+                CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
+                if (Nspan.ne.0) then 
+                CALL write_solid_span_field(nFish,xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+                endif
+                if (Palpha.gt.0.d0) then
+                CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
+                endif
             endif
-            if (Palpha.gt.0.d0) then
-            CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
-            endif
-        endif
 
-        if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
-            CALL write_flow_field(1)
-            if(isRelease/=1) then
-                CALL write_flow_field(0) 
-            endif              
+            if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
+                CALL write_flow_field(1)
+                if(isRelease/=1) then
+                    CALL write_flow_field(0) 
+                endif              
+            endif
         endif
 
         !if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref .and. time/Tref>=timeOutFlBg .and. time/Tref<=timeOutFlEd)then            
