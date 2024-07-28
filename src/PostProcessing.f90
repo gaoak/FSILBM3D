@@ -826,6 +826,7 @@ if(pid.eq.0) then
         if(fileName(i:i)==' ')fileName(i:i)='0'
     enddo
     open(idfile,file='./DatFlow/Flow.plt',form='unformatted',access='stream')
+    WRITE(idfile) xmin,xmax,ymin,ymax,zmin,zmax
     write(idfile)oututmp,outvtmp,outwtmp
     close(idfile)
     wkspinbusy = .false.
