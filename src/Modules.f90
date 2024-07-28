@@ -44,7 +44,7 @@
     real(8):: time
 
     integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity
-    integer:: iChordDirection,move(1:SpcDim),numOutput
+    integer:: iChordDirection,move(1:SpcDim),offsetOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
     logical:: isUniformGrid(1:SpcDim)
     integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
@@ -125,4 +125,9 @@
         integer:: NSpan
         real(8):: dspan
         real(8), allocatable:: xyzfulIB_all(:,:,:),xyzfulIB(:,:,:,:)
+    END MODULE
+
+    MODULE OutFlowWorkspace
+        logical:: wkspinbusy
+        real(4), allocatable:: oututmp(:,:,:),outvtmp(:,:,:),outwtmp(:,:,:)
     END MODULE
