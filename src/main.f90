@@ -35,6 +35,16 @@
     Pbetatemp=Pbeta  
     deltat = dt  !set time step of solid deltat the same as fluid time step
 !===============================================================================================
+    time=0.0d0
+    step=0
+    CALL initialize_solid() 
+    CALL initialize_flow()
+    if(ismovegrid==1)then
+        iFish = 1
+        call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(iFish,1:nND(iFish),1:3),xGrid,yGrid,zGrid,Xref,Yref,Zref)
+    endif
+    if(step==0)    CALL wrtInfoTitl()
+
     inquire(file='./DatTemp/conwr.dat', exist=alive)
     if (isConCmpt==1 .and. alive)then
         write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
@@ -44,20 +54,10 @@
     else
         write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
         write(*,*)'NEW      compute!!!!!!!!!!!!!!!!!!'
-        write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'       
-        time=0.0d0
-        step=0
-        CALL initialize_solid() 
-        CALL initialize_flow()                  
+        write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'                     
 !===============================================================================================
-        if(ismovegrid==1)then
-            iFish = 1
-            call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(iFish,1:nND(iFish),1:3),xGrid,yGrid,zGrid,Xref,Yref,Zref)
-        endif  
     endif
 !===============================================================================================
-    if(step==0)    CALL wrtInfoTitl()
-!    ===============================================================================================
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_field(1)

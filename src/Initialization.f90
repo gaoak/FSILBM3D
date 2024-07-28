@@ -588,7 +588,9 @@
     endif   
 
     Tref = Lref / Uref
-    St = Lref * Freq / Uref
+    do iFish=1,nFish
+        St(iFish) = Lref * Freq(iFish) / Uref
+    enddo
     g(1:3)=Frod(1:3) * Uref ** 2/Lref
     uMax = 0.
     do iFish=1,nFish
@@ -597,9 +599,9 @@
         AoAAmpl(iFish,1:3)=AoAAmpl(iFish,1:3)/180.0*pi
         AoAPhi(iFish,1:3)=AoAPhi(iFish,1:3)/180.0*pi
         XYZPhi(iFish,1:3)=XYZPhi(iFish,1:3)/180.0*pi
-        uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(iFish,1:3)))*Freq, &
+        uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(iFish,1:3)))*Freq(iFish), &
             2.0*pi*MAXVAL(dabs(AoAAmpl(iFish,1:3))*[maxval(dabs(xyzful00(iFish,:,2))), &
-            maxval(dabs(xyzful00(iFish,:,1))),maxval(dabs(xyzful00(iFish,:,3)))])*Freq])
+            maxval(dabs(xyzful00(iFish,:,1))),maxval(dabs(xyzful00(iFish,:,3)))])*Freq(iFish)])
     enddo
 
 !   calculate viscosity, LBM relexation time
