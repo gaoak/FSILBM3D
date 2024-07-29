@@ -933,6 +933,7 @@ if(pid.eq.0) then
     write(idfile)oututmp,outvtmp,outwtmp
     close(idfile)
     wkspinbusy = .false.
+    call myexit(0)
 endif
 END SUBROUTINE
 
