@@ -867,21 +867,24 @@
     return
     ENDSUBROUTINE strain_energy_D
 
-SUBROUTINE write_flow_fast(isT)
+SUBROUTINE write_flow_fast()
 USE simParam
 USE OutFlowWorkspace
 implicit none
-integer:: x,y,z,pid,i,isT
+integer:: x,y,z,pid,i,waitsecnds
 integer::xmin,xmax,ymin,ymax,zmin,zmax
 integer,parameter::nameLen=10,idfile=100
 character (LEN=nameLen):: fileName
 real(8):: invUref
-
-do while(wkspinbusy)
-    write(*,*) "work space for flow field in busy, waiting ..."
-    call mysleep(1000)
-enddo
-wkspinbusy = .true.
+real(8):: CPUtime, waittime
+integer,dimension(8) :: values0,values1
+call date_and_time(VALUES=values0)
+call mywait()
+call date_and_time(VALUES=values1)
+waittime = CPUtime(values1)-CPUtime(values0)
+if(waittime.gt.1.d-1) then
+    write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
+endif
 xmin = 1 + offsetOutput
 ymin = 1 + offsetOutput
 zmin = 1 + offsetOutput
@@ -924,15 +927,10 @@ if(pid.eq.0) then
     do  i=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'
     enddo
-    if(isT==0)then
-        open(idfile,file='./DatFlow/Flow.plt',form='unformatted',access='stream')
-    else
-        open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
-    endif 
+    open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
     WRITE(idfile) xmin,xmax,ymin,ymax,zmin,zmax
     write(idfile)oututmp,outvtmp,outwtmp
     close(idfile)
-    wkspinbusy = .false.
     call myexit(0)
 endif
 END SUBROUTINE
@@ -948,7 +946,5 @@ zmin = 1 + offsetOutput
 xmax = xDim - offsetOutput
 ymax = yDim - offsetOutput
 zmax = zDim - offsetOutput
-wkspinbusy = .true.
 allocate( oututmp(zmin:zmax,ymin:ymax,xmin:xmax),outvtmp(zmin:zmax,ymin:ymax,xmin:xmax),outwtmp(zmin:zmax,ymin:ymax,xmin:xmax) )
-wkspinbusy = .false.
 endsubroutine initOutFlowWorkspace

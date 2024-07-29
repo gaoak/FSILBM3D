@@ -127,6 +127,5 @@
     END MODULE
 
     MODULE OutFlowWorkspace
-        logical:: wkspinbusy
         real(4), allocatable:: oututmp(:,:,:),outvtmp(:,:,:),outwtmp(:,:,:)
     END MODULE
