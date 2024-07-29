@@ -948,6 +948,6 @@ xmax = xDim - offsetOutput
 ymax = yDim - offsetOutput
 zmax = zDim - offsetOutput
 wkspinbusy = .true.
-allocate( oututmp(xmin:xmax,ymin:ymax,zmin:zmax),outvtmp(xmin:xmax,ymin:ymax,zmin:zmax),outwtmp(xmin:xmax,ymin:ymax,zmin:zmax) )
+allocate( oututmp(zmin:zmax,ymin:ymax,xmin:xmax),outvtmp(zmin:zmax,ymin:ymax,xmin:xmax),outwtmp(zmin:zmax,ymin:ymax,xmin:xmax) )
 wkspinbusy = .false.
 endsubroutine initOutFlowWorkspace
