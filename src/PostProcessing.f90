@@ -871,7 +871,7 @@ SUBROUTINE write_flow_fast()
 USE simParam
 USE OutFlowWorkspace
 implicit none
-integer:: x,y,z,pid,i,waitsecnds
+integer:: x,y,z,pid,i
 integer::xmin,xmax,ymin,ymax,zmin,zmax
 integer,parameter::nameLen=10,idfile=100
 character (LEN=nameLen):: fileName
