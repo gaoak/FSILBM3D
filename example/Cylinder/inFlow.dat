@@ -54,7 +54,7 @@
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     AoAAmpl(iFish,1:3)
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     AoAPhi(iFish,1:3)
 ====================================================is moving grid=====moving direction====is the output field translated==moving grid
- 0          0                                read(111,*)     isMoveGrid,      numOutput
+ 0          0                                read(111,*)     isMoveGrid,      offsetOutput
  1          0                                read(111,*)     isMoveDimX,      isMoveOutputX
  0          0                                read(111,*)     isMoveDimY,      isMoveOutputY
  0          0                                read(111,*)     isMoveDimZ,      isMoveOutputZ

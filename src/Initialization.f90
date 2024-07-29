@@ -139,7 +139,7 @@
         enddo
     enddo
     call readequal(111)
-    read(111,*)     isMoveGrid,      numOutput
+    read(111,*)     isMoveGrid,      offsetOutput
     read(111,*)     isMoveDimX,      isMoveOutputX
     read(111,*)     isMoveDimY,      isMoveOutputY
     read(111,*)     isMoveDimZ,      isMoveOutputZ
@@ -271,7 +271,8 @@
     stop
     endif
     dh=dxmin
-
+    ! allocate workspace for flow field output
+    call initOutFlowWorkspace
     !!!!!!!!!!!!! mannual partition in x-direction
     npsize_copy = npsize
     xDim_copy = xDim

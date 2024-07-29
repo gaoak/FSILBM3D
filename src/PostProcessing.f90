@@ -55,7 +55,7 @@
 !   ===============================================================================================
     write(idfile) ZONEMARKER
     call dumpstring(zonename,idfile)
-    write(idfile) -1,0,1,0,0,zDim-2*numOutput,ydim-2*numOutput,xDim-2*numOutput,0
+    write(idfile) -1,0,1,0,0,zDim-2*offsetOutput,ydim-2*offsetOutput,xDim-2*offsetOutput,0
 
     do iFish=1,nFish
         write(idfile) ZONEMARKER
@@ -73,66 +73,66 @@
     
     if(isMoveGrid==1 .and. (isMoveOutputX==1 .or. isMoveOutputY==1 .or. isMoveOutputZ==1))then 
         if    ((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real((xGrid(x)-xyzful(1,NDref,1))/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
         elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real(xGrid(x)/Lref),real((yGrid(y)-xyzful(1,NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
         elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real(xGrid(x)/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(1,NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
         elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real((xGrid(x)-xyzful(1,NDref,1))/Lref),real((yGrid(y)-xyzful(1,NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
         elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real((xGrid(x)-xyzful(1,NDref,1))/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(1,NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
         elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real(xGrid(x)/Lref),real((yGrid(y)-xyzful(1,NDref,2))/Lref),real((zGrid(z)-xyzful(1,NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
         else
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput      
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput      
             write(idfile) real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
         endif
     else
-            do    x=1+numOutput, xDim-numOutput
-            do    y=1+numOutput, yDim-numOutput
-            do    z=1+numOutput, zDim-numOutput
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
@@ -866,3 +866,85 @@
     
     return
     ENDSUBROUTINE strain_energy_D
+
+SUBROUTINE write_flow_fast()
+USE simParam
+USE OutFlowWorkspace
+implicit none
+integer:: x,y,z,pid,i
+integer::xmin,xmax,ymin,ymax,zmin,zmax
+integer,parameter::nameLen=10,idfile=100
+character (LEN=nameLen):: fileName
+real(8):: invUref
+real(8):: CPUtime, waittime
+integer,dimension(8) :: values0,values1
+call date_and_time(VALUES=values0)
+call mywait()
+call date_and_time(VALUES=values1)
+waittime = CPUtime(values1)-CPUtime(values0)
+if(waittime.gt.1.d-1) then
+    write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
+endif
+xmin = 1 + offsetOutput
+ymin = 1 + offsetOutput
+zmin = 1 + offsetOutput
+xmax = xDim - offsetOutput
+ymax = yDim - offsetOutput
+zmax = zDim - offsetOutput
+invUref = 1.d0/Uref
+
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+do x=xmin, xmax
+    do y=ymin, ymax
+        do z=zmin, zmax
+            oututmp(z,y,x) = uuu(z,y,x,1)*invUref
+        enddo
+    enddo
+enddo
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+do x=xmin, xmax
+    do y=ymin, ymax
+        do z=zmin, zmax
+            outvtmp(z,y,x) = uuu(z,y,x,2)*invUref
+        enddo
+    enddo
+enddo
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+do x=xmin, xmax
+    do y=ymin, ymax
+        do z=zmin, zmax
+            outwtmp(z,y,x) = uuu(z,y,x,3)*invUref
+        enddo
+    enddo
+enddo
+!$OMP END PARALLEL DO
+call myfork(pid)
+if(pid.eq.0) then
+    write(fileName,'(F10.5)') time/Tref
+    fileName = adjustr(fileName)
+    do  i=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    enddo
+    open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
+    WRITE(idfile) xmin,xmax,ymin,ymax,zmin,zmax
+    write(idfile)oututmp,outvtmp,outwtmp
+    close(idfile)
+    call myexit(0)
+endif
+END SUBROUTINE
+
+subroutine initOutFlowWorkspace
+use simParam
+use OutFlowWorkspace
+implicit none
+integer::xmin,xmax,ymin,ymax,zmin,zmax
+xmin = 1 + offsetOutput
+ymin = 1 + offsetOutput
+zmin = 1 + offsetOutput
+xmax = xDim - offsetOutput
+ymax = yDim - offsetOutput
+zmax = zDim - offsetOutput
+allocate( oututmp(zmin:zmax,ymin:ymax,xmin:xmax),outvtmp(zmin:zmax,ymin:ymax,xmin:xmax),outwtmp(zmin:zmax,ymin:ymax,xmin:xmax) )
+endsubroutine initOutFlowWorkspace

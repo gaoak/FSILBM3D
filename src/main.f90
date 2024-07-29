@@ -60,7 +60,7 @@
 !===============================================================================================
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
-    CALL write_flow_field(1)
+    CALL write_flow_fast()
     CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
 !==================================================================================================
 !==================================================================================================
@@ -77,7 +77,7 @@
         !******************************************************************************************
         write(*,'(A)')' ----------------------fluid solver----------------------'
         !solve fluid
-        call date_and_time(VALUES=values0)        
+        call date_and_time(VALUES=values0)
         CALL streaming_step()
         call date_and_time(VALUES=values1)
         write(*,*)'time for streaming_step:',CPUtime(values1)-CPUtime(values0)
@@ -326,23 +326,11 @@
                 CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
                 endif
             endif
-
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
-                CALL write_flow_field(1)
-                if(isRelease/=1) then
-                    CALL write_flow_field(0) 
-                endif              
+                CALL write_flow_fast()
             endif
         endif
 
-        !if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref .and. time/Tref>=timeOutFlBg .and. time/Tref<=timeOutFlEd)then            
-        !    CALL write_flow_field(1)
-        !endif
-
-        !if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref .and. time/Tref>=timeOutFlBg .and. time/Tref<=timeOutFlEd)then
-            !CALL write_flow_slice(xDim,yDim,zDim,XGrid,yGrid,zGrid,Lref,Uref,denIn,prs,uuu,time/Tref-timeOutFlBg,3)
-        !endif
-     
         if(DABS(time/Tref-timeOutInfo*NINT(time/Tref/timeOutInfo)) <= 0.5*dt/Tref)then
             CALL wrtInfo()
         endif

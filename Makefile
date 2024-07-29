@@ -15,14 +15,16 @@ FFLAGS += -ffpe-trap=invalid,zero -fbacktrace -Wall -Wextra -pedantic -Warray-bo
 endif
 FFLAGS += -Wconversion -Wconversion-extra -ffree-form -ffree-line-length-none -fopenmp -fimplicit-none -finit-real=zero -std=f2003 #-fdefault-real-4 -fdefault-double-8
 endif
-
+CC = gcc
 
 SRCDIR = ./src
 
 ### List of files for the main code
 OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
 SRC = $(SRCDIR)/Modules.f90 $(SRCDIR)/LatticeBoltzmannSolver.f90 $(SRCDIR)/PostProcessing.f90 $(SRCDIR)/StructureSolver.f90 $(SRCDIR)/Initialization.f90  $(SRCDIR)/Interaction.f90 $(SRCDIR)/main.f90  $(SRCDIR)/Util.f90
+CSRC = $(SRCDIR)/forkthread.c
 OBJ = $(SRC:%.f90=%.o)
+COBJ = $(CSRC:%.c=%.o)
 
 #######OPTIONS settings###########
 OPT := -I$(SRCDIR) $(FFLAGS)
@@ -34,19 +36,17 @@ LINKOPT := $(FFLAGS)
 
 all: FSILBM3D
 
-FSILBM3D : $(OBJ)
-	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ)
+FSILBM3D : $(OBJ) $(COBJ)
+	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(COBJ)
 
 
 $(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
 	$(FC) $(FFLAGS) $(OPT) $(INC) -c $<
 	mv $(@F) ${SRCDIR}
-	#mv *.mod ${SRCDIR}
 
-## This %.o : %.f90 doesn't appear to be called...
-%.o : %.f90
-	$(FC) $(FFLAGS) $(INC) -c $<
-
+$(COBJ):$(SRCDIR)%.o : $(SRCDIR)%.c
+	$(CC)  -c $<
+	mv $(@F) ${SRCDIR}
 
 clean:
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.mod $(SRCDIR)/*.smod
