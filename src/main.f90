@@ -60,7 +60,7 @@
 !===============================================================================================
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
-    CALL write_flow_fast()
+    CALL write_flow_fast(0)
     CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
 !==================================================================================================
 !==================================================================================================
@@ -327,7 +327,7 @@
                 endif
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
-                CALL write_flow_fast()
+                CALL write_flow_fast(1)
                 endif
             endif
      

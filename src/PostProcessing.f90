@@ -867,11 +867,11 @@
     return
     ENDSUBROUTINE strain_energy_D
 
-SUBROUTINE write_flow_fast()
+SUBROUTINE write_flow_fast(isT)
 USE simParam
 USE OutFlowWorkspace
 implicit none
-integer:: x,y,z,pid,i
+integer:: x,y,z,pid,i,isT
 integer::xmin,xmax,ymin,ymax,zmin,zmax
 integer,parameter::nameLen=10,idfile=100
 character (LEN=nameLen):: fileName
@@ -924,7 +924,11 @@ if(pid.eq.0) then
     do  i=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'
     enddo
-    open(idfile,file='./DatFlow/Flow.plt',form='unformatted',access='stream')
+    if(isT==0)then
+        open(idfile,file='./DatFlow/Flow.plt',form='unformatted',access='stream')
+    else
+        open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
+    endif 
     WRITE(idfile) xmin,xmax,ymin,ymax,zmin,zmax
     write(idfile)oututmp,outvtmp,outwtmp
     close(idfile)
