@@ -208,29 +208,9 @@ void stackDataFromFiles(const std::string filename,
   std::vector<OUTREAL> xcData;
   std::vector<OUTREAL> ycData;
   std::vector<OUTREAL> zcData;
+  std::vector<std::vector<OUTREAL>> tempStacks;
   int xmin, xmax, ymin, ymax, zmin, zmax;
 
-  readGridFiles(mesh_file, xcData, ycData, zcData);
-  NXc = xcData.size();
-  NYc = ycData.size();
-  NZc = zcData.size();
-  Stacks.resize(6);
-
-  for (size_t i = 0; i < Stacks.size(); ++i) {
-    Stacks[i].resize(NXc * NYc * NZc);
-  }
-
-  int count = 0;
-  for (int k = 0; k < NZc; ++k) {
-    for (int j = 0; j < NYc; ++j) {
-      for (int i = 0; i < NXc; ++i) {
-        Stacks[0][count] = xcData[i];
-        Stacks[1][count] = ycData[j];
-        Stacks[2][count] = zcData[k];
-        ++count;
-      }
-    }
-  }
   // Read files in sorted order
   // std::set<int> zids;
   // for (int i = 1; i <= NZc; ++i) {
@@ -248,61 +228,87 @@ void stackDataFromFiles(const std::string filename,
   infile.read(reinterpret_cast<char *>(&ymax), sizeof(ymax));
   infile.read(reinterpret_cast<char *>(&zmin), sizeof(zmin));
   infile.read(reinterpret_cast<char *>(&zmax), sizeof(zmax));
+  NXc = xmax - xmin + 1;
+  NYc = ymax - ymin + 1;
+  NZc = zmax - zmin + 1;
 
-  //modify mesh data size
-  Stacks[0].resize(Stacks[0].size() - (NXc - xmax));
-  Stacks[1].resize(Stacks[1].size() - (NYc - ymax));
-  Stacks[2].resize(Stacks[2].size() - (NZc - zmax));
+  readGridFiles(mesh_file, xcData, ycData, zcData);
+  Stacks.resize(6);
+  for (size_t i = 0; i < Stacks.size(); ++i)
+  {
+    Stacks[i].resize(NXc * NYc * NZc);
+  }
+  tempStacks.resize(3);
+  for (size_t i = 0; i < tempStacks.size(); ++i)
+  {
+    tempStacks[i].resize(NXc * NYc * NZc);
+  }
 
-  Stacks[0].erase(Stacks[0].begin(), Stacks[0].begin() + xmin);
-  Stacks[1].erase(Stacks[1].begin(), Stacks[1].begin() + ymin);
-  Stacks[2].erase(Stacks[2].begin(), Stacks[2].begin() + zmin);
-
-  NXc = Stacks[0].size();
-  NYc = Stacks[1].size();
-  NZc = Stacks[2].size();
+  int count = 0;
+  for (int k = zmin-1; k < zmax; ++k) {
+    for (int j = ymin-1; j < ymax; ++j) {
+      for (int i = xmin-1; i < xmax; ++i) {
+        Stacks[0][count] = xcData[i];
+        Stacks[1][count] = ycData[j];
+        Stacks[2][count] = zcData[k];
+        ++count;
+      }
+    }
+  }
   
   // Read data
   int offset = 0;
   int ndata = NXc * NYc * NZc;
   int datasize = sizeof(INREAL) * ndata;
   if (std::is_same<INREAL, OUTREAL>::value) {
-    infile.read((char *)&Stacks[3][offset], datasize);
-    infile.read((char *)&Stacks[4][offset], datasize);
-    infile.read((char *)&Stacks[5][offset], datasize);
+    infile.read((char *)&tempStacks[0][offset], datasize);
+    infile.read((char *)&tempStacks[1][offset], datasize);
+    infile.read((char *)&tempStacks[2][offset], datasize);
   } else {
     std::vector<INREAL> tempBuffer(datasize / sizeof(INREAL));
     for (int i = 0; i < 3; ++i) {
       infile.read(reinterpret_cast<char *>(tempBuffer.data()), datasize);
       for (size_t j = 0; j < tempBuffer.size(); j++) {
-        Stacks[i + 3][offset + j] = static_cast<OUTREAL>(tempBuffer[j]);
+        tempStacks[i][offset + j] = static_cast<OUTREAL>(tempBuffer[j]);
       }
     }
   }
-  //   if (showIb) {
-  //     datasize = std::ceil(ndata / 4);
-  //     std::vector<char> ibdata(datasize);
-  //     infile.read((char *)&ibdata[0], datasize);
-  //     ExtractIb(ibdata, &Stacks[7][offset], ndata);
-  //   }
-  //   infile.close();
-  //   for (int i = zc_start; i <= zc_end; ++i)
-  //     zids.erase(i);
+  for (int i = 0; i < NXc; ++i) {  
+        for (int j = 0; j < NYc; ++j) {  
+            for (int k = 0; k < NZc; ++k) {  
+                int idx1d = k * NYc * NXc + j * NXc + i; //  x, y, z
+                int idx3d = i * NYc * NZc + j * NZc + k; //  z, y, x
+                Stacks[3][idx1d] = tempStacks[0][idx3d];
+                Stacks[4][idx1d] = tempStacks[1][idx3d];
+                Stacks[5][idx1d] = tempStacks[2][idx3d];
+            }  
+        }  
+    }
+    std::cout << std::endl;
+    //   if (showIb) {
+    //     datasize = std::ceil(ndata / 4);
+    //     std::vector<char> ibdata(datasize);
+    //     infile.read((char *)&ibdata[0], datasize);
+    //     ExtractIb(ibdata, &Stacks[7][offset], ndata);
+    //   }
+    //   infile.close();
+    //   for (int i = zc_start; i <= zc_end; ++i)
+    //     zids.erase(i);
 
-  // if (!zids.empty()) {
-  //   std::cout << "Inconsistent data size " << std::endl;
-  //   std::cout << "missling z-slices: ";
-  //   for (auto i : zids) {
-  //     std::cout << i << " ";
-  //   }
-  //   std::cout << "." << std::endl;
-  // }
+    // if (!zids.empty()) {
+    //   std::cout << "Inconsistent data size " << std::endl;
+    //   std::cout << "missling z-slices: ";
+    //   for (auto i : zids) {
+    //     std::cout << i << " ";
+    //   }
+    //   std::cout << "." << std::endl;
+    // }
 }
 
 int main(int argc, char *argv[]) {
   if (argc < 4) {
     std::cout << "Error, insufficient input parameters, Usage: Combine "
-                 "FluidMesh.Dat DatFlow/Flow0000.00000 0.plt"
+                 "FluidMesh.dat DatFlow/Flow0000.00000 0.plt"
               << std::endl;
     exit(-1);
   }
