@@ -8,8 +8,8 @@
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
     integer:: i,iFish,iKind,FishKind,Order0
-    integer:: FishOrder1,FishOrder2,LineX,LineY
-    integer, allocatable:: FishNum(:),NumX(:),NumY(:)
+    integer:: FishOrder1,FishOrder2,LineX,LineY,LineZ
+    integer, allocatable:: FishNum(:),NumX(:),NumY(:),NumZ(:)
     character(LEN=40):: nFEmeshName
     integer:: niBodyModel,nisMotionGiven(1:6)
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
@@ -61,7 +61,7 @@
     if(nFish>0) then
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:nFish,1:DOFDim))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
-        allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
+        allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind),NumZ(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
         FishOrder2=0
@@ -69,7 +69,7 @@
 
     call readequal(111)
     do iKind=1,FishKind
-        read(111,*)     FishNum(iKind+1),NumX(iKind),NumY(iKind)
+        read(111,*)     FishNum(iKind+1),NumX(iKind),NumY(iKind),NumZ(iKind)
         read(111,*)     niBodyModel, nFEmeshName
         read(111,*)     nisMotionGiven(1:3)
         read(111,*)     nisMotionGiven(4:6)
@@ -132,10 +132,11 @@
             ! initial position distribution
             Order0 = iFish - FishOrder1
             LineX  = mod(Order0,NumX(iKind))
-            LineY  = Order0/NumX(iKind)
+            LineY  = mod(Order0/NumX(iKind),NumY(iKind))
+            LineZ  = Order0/(NumX(iKind)*NumY(iKind))
             XYZo(iFish,1) = iXYZ(1) + dXYZ(1) * LineX
             XYZo(iFish,2) = iXYZ(2) + dXYZ(2) * LineY
-            XYZo(iFish,3) = iXYZ(3)
+            XYZo(iFish,3) = iXYZ(3) + dXYZ(3) * LineZ
         enddo
     enddo
     call readequal(111)

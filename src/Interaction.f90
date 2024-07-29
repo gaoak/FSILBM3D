@@ -27,35 +27,41 @@
         xmin(iFish) = minval(xyzful(iFish,1:nND(iFish),1))-dxmin*1.5d0
         xmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),1))+dxmin*1.5d0
         ymin(iFish) = minval(xyzful(iFish,1:nND(iFish),2))-dymin*1.5d0
-        ymax(iFish) = maxval(xyzful(iFish,1:nND(iFish),2))+dymin*1.5d0 
+        ymax(iFish) = maxval(xyzful(iFish,1:nND(iFish),2))+dymin*1.5d0
+        zmin(iFish) = minval(xyzful(iFish,1:nND(iFish),3))-dzmin*1.5d0
+        zmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),3))+dzmin*1.5d0   
     enddo
 
     do iFish=1,nFish
         do jFish=iFish+1,nFish
             minx = max(xmin(iFish),xmin(jFish))
             miny = max(ymin(iFish),ymin(jFish))
+            minz = max(zmin(iFish),zmin(jFish))
             maxx = min(xmax(iFish),xmax(jFish))
             maxy = min(ymax(iFish),ymax(jFish))
-            if((minx > maxx).or.(miny > maxy)) then
+            maxz = min(zmax(iFish),zmax(jFish))
+            if((minx > maxx).or.(miny > maxy).or.(minz > maxz)) then
                 cycle
             endif
             ! overlapping regin [minx, maxx] X [miny, maxy] X [minz, maxz]
             do iND=1,nND(iFish)
                 if ( (minx>xyzful(iFish,iND,1)) .or. (xyzful(iFish,iND,1)>maxx)  &
-                .or. (miny>xyzful(iFish,iND,2)) .or. (xyzful(iFish,iND,2)>maxy)) then
+                .or. (miny>xyzful(iFish,iND,2)) .or. (xyzful(iFish,iND,2)>maxy)  &
+                .or. (minz>xyzful(iFish,iND,3)) .or. (xyzful(iFish,iND,3)>maxz)) then
                     cycle !point iND not in the overpalling region
                 endif
                 do jND=1,nND(jFish)
                     if ( (minx>xyzful(jFish,jND,1)) .or. (xyzful(jFish,jND,1)>maxx)  &
-                    .or. (miny>xyzful(jFish,jND,2)) .or. (xyzful(jFish,jND,2)>maxy)) then
+                    .or. (miny>xyzful(jFish,jND,2)) .or. (xyzful(jFish,jND,2)>maxy)  &
+                    .or. (minz>xyzful(jFish,jND,3)) .or. (xyzful(jFish,jND,3)>maxz)) then
                         cycle !point jND not in the overpalling region
                     endif
                     r(1)=(xyzful(iFish,iND,1)-xyzful(jFish,jND,1))/dxmin
                     r(2)=(xyzful(iFish,iND,2)-xyzful(jFish,jND,2))/dymin
-                    call get_phi_r(r,phi_r)
-                    delta_h=phi_r(1)*phi_r(2)/dxmin/dymin/dsqrt(r(1)*r(1)+r(2)*r(2))
-                    repful(iFish,iND,1:2)=repful(iFish,iND,1:2) + delta_h*r(1:2)*ds(1:2)*Lspan ! force
-                    repful(jFish,jND,1:2)=repful(jFish,jND,1:2) - delta_h*r(1:2)*ds(1:2)*Lspan ! reaction force
+                    r(3)=(xyzful(iFish,iND,3)-xyzful(jFish,jND,3))/dzmin
+                    delta_h=Phi(r(1))*Phi(r(2))*Phi(r(3))/dxmin/dymin/dzmin/sqrt(r(1)*r(1)+r(2)*r(2)+r(3)*r(3))
+                    repful(iFish,iND,1:3)=repful(iFish,iND,1:3) + delta_h*r(1:3)*ds(1:3)*Lspan ! force
+                    repful(jFish,jND,1:3)=repful(jFish,jND,1:3) - delta_h*r(1:3)*ds(1:3)*Lspan ! reaction force
                 enddo !jND=1,nND(jFish)
             enddo !iND=1,nND(iFish)
         enddo !jFish=iFish+1,nFish
