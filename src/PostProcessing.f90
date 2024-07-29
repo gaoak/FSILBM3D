@@ -3,17 +3,33 @@
 !    copyright@ RuNanHua       
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_flow_field(isT)
+    USE, INTRINSIC :: IEEE_ARITHMETIC
     USE simParam
     implicit none
     integer:: x,y,z,i,isT,iFish
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName
+    logical:: nanfound
     !==================================================================================================        
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=7 
     integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=['x','y','z','p','u','v','w']  
+                        varname(numVar)=['x','y','z','p','u','v','w']
+    ! check is the velocity finite
+    nanfound = .false.
+    do z=1,zDim
+        do y=1,yDim
+            do x=1,xDim
+                if ((.not. IEEE_IS_FINITE(uuu(z,y,x,1))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,2))) .or. (.not. IEEE_IS_FINITE(uuu(z,y,x,3))) .or. (.not. IEEE_IS_FINITE(prs(z,y,x)))) then
+                    write(*, *) 'Nan found in uuu(x,y,z)', x, y, z
+                    uuu(z,y,x,1:3)=0.99d9
+                    prs(z,y,x) = 0.99d9
+                    nanfound = .true.
+                endif
+            enddo
+        enddo
+    enddo
 
     write(fileName,'(F10.5)') time/Tref
     fileName = adjustr(fileName)
@@ -37,12 +53,12 @@
         call dumpstring(varname(nv),idfile)
     enddo
 !   ===============================================================================================
-    write(idfile) ZONEMARKER              
+    write(idfile) ZONEMARKER
     call dumpstring(zonename,idfile)
     write(idfile) -1,0,1,0,0,zDim-2*offsetOutput,ydim-2*offsetOutput,xDim-2*offsetOutput,0
 
     do iFish=1,nFish
-        write(idfile) ZONEMARKER              
+        write(idfile) ZONEMARKER
         call dumpstring(zonename,idfile)
         write(idfile) -1,2,1,0,0,nND(iFish),nEL(iFish),0,0,0,0
     enddo
@@ -123,7 +139,14 @@
             enddo
     endif
 
-    do iFish=1,nFish 
+    do iFish=1,nFish
+        do i=1,1,nND(iFish)
+            if ((.not. IEEE_IS_FINITE(velful(iFish,i,1))) .or. (.not. IEEE_IS_FINITE(velful(iFish,i,2))) .or. (.not. IEEE_IS_FINITE(velful(iFish,i,3)))) then
+                write(*, *) 'Nan found in body velocity (iFish, i)', iFish, i
+                velful(iFish,i,1:3)=0.99d9
+                nanfound = .true.
+            endif
+        enddo
         write(idfile) ZONEMARKER
         do  nv=1,numVar
             write(idfile) 1                                 
@@ -176,15 +199,16 @@
         enddo
     enddo
     close(idfile)
+    if(nanfound) stop
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot binary format
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
-    SUBROUTINE write_solid_field(nFish,xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max,isIB)
+    SUBROUTINE write_solid_field(nFish,xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max)
     implicit none
-    integer:: nND_max,nEL_max,isIB,nFish
+    integer:: nND_max,nEL_max,nFish
     integer:: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
     real(8):: xyzful(nFish,nND_max,6),velful(nFish,nND_max,6),accful(nFish,nND_max,6),extful(nFish,1:nND_max,1:6) !,streI(1:nND),bendO(1:nND)
     real(8):: time
@@ -209,13 +233,7 @@
 
     do iFish=1,nFish
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        if(isIB==0)then
-            OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
-        elseif(isIB==1)then
-            OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
-        else
-    endif
-
+        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
     !   I. The header section.
     !   =============================================        
         write(idfile) "#!TDV101"    
@@ -253,6 +271,134 @@
 !   =============================================
     END SUBROUTINE
 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write structure field, tecplot binary
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE write_solidIB_field(nFish,xyzfulIB,ele,time,nND,nEL,nND_max,nEL_max,Nspan)
+    implicit none
+    integer,intent(in):: nND_max,nEL_max,nFish,Nspan
+    integer,intent(in):: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
+    real(8),intent(in):: xyzfulIB(1:Nspan+1,nFish,nND_max,6)
+    real(8),intent(in):: time
+    !   -------------------------------------------------------
+    integer:: i,j,ireduc,iFish,Nspanpts,ElmType,off1, off2
+    integer,parameter::nameLen=10
+    character (LEN=nameLen):: fileName,idstr
+    integer,parameter:: namLen=40,idfile=100,numVar=3
+    !==========================================================================
+    write(fileName,'(F10.5)') time
+    fileName = adjustr(fileName)
+    DO  I=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    END DO
+    do iFish=1,nFish
+        if(Nspan.eq.0) then
+            Nspanpts = 1
+            ElmType = ele(iFish,1,4)
+        else
+            Nspanpts = Nspan + 1
+            ElmType = 4
+        endif
+        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
+        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
+        !   I. The header section.
+        write(idfile, '(A)') 'variables = x, y, z'
+        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan,', DATAPACKING=POINT, ZONETYPE='
+        if(ElmType.eq.2) then
+            write(idfile, '(A)') 'FELINESEG'
+        elseif (ElmType.eq.3) then
+            write(idfile, '(A)') 'FETRIANGLE'
+        elseif(ElmType.eq.4) then
+            write(idfile, '(A)') 'FEQUADRILATERAL'
+        endif
+        do  i=1,nND(iFish)
+            do j=1,Nspanpts
+                write(idfile,*)   xyzfulIB(j,iFish,i,1:3)
+            enddo
+        enddo
+        do  i=1,nEL(iFish)
+            if(ElmType.eq.2) then
+                write(idfile) ele(iFish,i,1),ele(iFish,i,2)
+            elseif(ElmType.eq.3) then
+                write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
+            else
+                do j=1,Nspan
+                    off1 = (ele(iFish,i,1)-1) * Nspanpts + j
+                    off2 = (ele(iFish,i,2)-1) * Nspanpts + j
+                    write(idfile,*) off1, off1+1, off2+1, off2
+                enddo
+            endif
+        enddo
+        close(idfile)
+    enddo
+    !   =============================================
+    END SUBROUTINE
+    
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write structure field, tecplot binary
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE write_solid_span_field(nFish,xyzful,ele,time,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+    implicit none
+    integer,intent(in):: nND_max,nEL_max,nFish,Nspan
+    real(8),intent(in):: dspan
+    integer,intent(in):: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
+    real(8),intent(in):: xyzful(nFish,nND_max,6)
+    real(8),intent(in):: time
+    !   -------------------------------------------------------
+    integer:: i,j,ireduc,iFish,Nspanpts,ElmType,off1, off2
+    real(8):: Lspan,Lref
+    integer,parameter::nameLen=10
+    character (LEN=nameLen):: fileName,idstr
+    integer,parameter:: namLen=40,idfile=100,numVar=3
+    !==========================================================================
+    write(fileName,'(F10.5)') time
+    fileName = adjustr(fileName)
+    DO  I=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    END DO
+    do iFish=1,nFish
+        if(Nspan.eq.0) then
+            Nspanpts = 1
+            ElmType = ele(iFish,1,4)
+        else
+            Nspanpts = Nspan + 1
+            ElmType = 4
+        endif
+        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
+        OPEN(idfile,FILE='./DatBodySpan/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
+        !   I. The header section.
+        write(idfile, '(A)') 'variables = x, y, z'
+        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan,', DATAPACKING=POINT, ZONETYPE='
+        if(ElmType.eq.2) then
+            write(idfile, '(A)') 'FELINESEG'
+        elseif (ElmType.eq.3) then
+            write(idfile, '(A)') 'FETRIANGLE'
+        elseif(ElmType.eq.4) then
+            write(idfile, '(A)') 'FEQUADRILATERAL'
+        endif
+        do  i=1,nND(iFish)
+            do j=1,Nspanpts
+                Lspan = (j-1)*dspan
+                write(idfile,*)  xyzful(iFish,i,1:2),xyzful(iFish,i,3)+Lspan/Lref
+            enddo
+        enddo
+        do  i=1,nEL(iFish)
+            if(ElmType.eq.2) then
+                write(idfile) ele(iFish,i,1),ele(iFish,i,2)
+            elseif(ElmType.eq.3) then
+                write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
+            else
+                do j=1,Nspan
+                    off1 = (ele(iFish,i,1)-1) * Nspanpts + j
+                    off2 = (ele(iFish,i,2)-1) * Nspanpts + j
+                    write(idfile,*) off1, off1+1, off2+1, off2
+                enddo
+            endif
+        enddo
+        close(idfile)
+    enddo
+    !   =============================================
+    END SUBROUTINE
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
 !   write flow slice, tecplot binary
 !   copyright@ RuNanHua  
@@ -284,7 +430,7 @@
         x=(xDim+1)/2
         do  y=1,yDim
         do  z=1,zDim
-            write(idfile,'(7D20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
+            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
         enddo
         enddo
         close(idfile)
@@ -295,7 +441,7 @@
         y=(yDim+1)/2
         do  x=1,xDim
         do  z=1,zDim
-            write(idfile,'(7D20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
+            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
         enddo
         enddo
         close(idfile)   
@@ -306,7 +452,7 @@
         z=(zDim+1)/2
         do  x=1,xDim
         do  y=1,yDim
-            write(idfile,'(7D20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
+            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
         enddo
         enddo
         close(idfile)
@@ -315,54 +461,7 @@
     
 
     END SUBROUTINE
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    
-!    copyright@ RuNanHua
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_image()
-    USE simParam
-    implicit none
-    integer:: x,y,z
-    !==================================================================================================
-    integer:: iimage        
-    integer:: nv
-    integer,parameter:: namLen=40,idfile=100,numVar=4
-    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=[character(namLen)::'x','y','z','image'] 
-    !==================================================================================================
-!   =============================================================================================
-    open(idfile,file='./DatOthe/Image.plt',form='unformatted',access='stream')        
-!   =============================================================================================
-    write(idfile) "#!TDV101"    
-    write(idfile) 1
-    call dumpstring(title,idfile)
-    write(idfile) numVar
-    do  nv=1,numVar
-        call dumpstring(varname(nv),idfile)
-    enddo
-!   ===============================================================================================
-    write(idfile) ZONEMARKER              
-    call dumpstring(zonename,idfile)
-    write(idfile) -1,0,1,0,0,zDim,ydim,xDim,0
-!   =============================================
-    write(idfile) EOHMARKER
-    write(idfile) ZONEMARKER
-    do  nv=1,numVar
-        write(idfile) 1                                 
-    enddo
-    write(idfile) 0,-1
-    do    x=1, xDim
-    do    y=1, yDim
-    do    z=1, zDim
-        write(idfile)    real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(image(z,y,x))
-    enddo
-    enddo
-    enddo
-    close(idfile)
-    END SUBROUTINE
-
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write parameters for checking
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -470,14 +569,14 @@
         write(111,'(A      )')'===================================='
         write(111,'(A,I5.5 )')'Fish number is',iFish
         write(111,'(A,I5.5 )')'MT:',iMT
-        write(111,'(A,D20.10 )')'E    =',prop(iFish,iMT,1)
-        write(111,'(A,D20.10 )')'G    =',prop(iFish,iMT,2)
-        write(111,'(A,D20.10 )')'h    =',prop(iFish,iMT,3)
-        write(111,'(A,D20.10 )')'rho  =',prop(iFish,iMT,4)
-        write(111,'(A,D20.10 )')'gamma=',prop(iFish,iMT,5)
-        write(111,'(A,D20.10 )')'Ip   =',prop(iFish,iMT,6)
-        write(111,'(A,D20.10 )')'alpha=',prop(iFish,iMT,7)
-        write(111,'(A,D20.10 )')'beta =',prop(iFish,iMT,8)
+        write(111,'(A,E20.10 )')'E    =',prop(iFish,iMT,1)
+        write(111,'(A,E20.10 )')'G    =',prop(iFish,iMT,2)
+        write(111,'(A,E20.10 )')'h    =',prop(iFish,iMT,3)
+        write(111,'(A,E20.10 )')'rho  =',prop(iFish,iMT,4)
+        write(111,'(A,E20.10 )')'gamma=',prop(iFish,iMT,5)
+        write(111,'(A,E20.10 )')'Ip   =',prop(iFish,iMT,6)
+        write(111,'(A,E20.10 )')'alpha=',prop(iFish,iMT,7)
+        write(111,'(A,E20.10 )')'beta =',prop(iFish,iMT,8)
         enddo
         enddo  
         close(111)
