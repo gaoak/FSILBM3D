@@ -691,5 +691,79 @@
             endif
         else
             index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
+            !int -1.1 -> -1; 1.1->1; 1.9->1
         endif
     END SUBROUTINE
+
+    ! return the array(index) <= x < array(index+1)
+    ! assum uniform grid around x(x=i0) = x0
+    SUBROUTINE minloc_fast(x, x0, i0, invdh, index, offset)
+        implicit none
+        integer, intent(in):: i0
+        real(8), intent(in):: x, x0, invdh
+        integer, intent(out):: index
+        real(8), intent(out):: offset
+        offset = (x - x0)*invdh
+        index = floor(offset)
+        offset = offset - dble(index)
+        index = index + i0
+    END SUBROUTINE
+
+    SUBROUTINE trimindex(i, j, k, xDim, yDim, zDim, boundaryConditions)
+        implicit none
+        integer, parameter:: Periodic=304,SYMMETRIC=101
+        integer, intent(in):: boundaryConditions(1:6)
+        integer, intent(in):: xDim, yDim, zDim
+        integer, intent(inout):: i, j, k
+        if (i<1) then
+            if(boundaryConditions(1).eq.Periodic) then
+                i = i + xDim
+            else if(boundaryConditions(1).eq.SYMMETRIC) then
+                i = 2 - i
+            else
+                write(*,*) 'index out of xmin bound', i
+            endif
+        else if(i>xDim) then
+            if(boundaryConditions(2).eq.Periodic) then
+                i = i - xDim
+            else if(boundaryConditions(2).eq.SYMMETRIC) then
+                i = 2 * xDim - i
+            else
+                write(*,*) 'index out of xmax bound', i
+            endif
+        endif
+        if (j<1) then
+            if(boundaryConditions(3).eq.Periodic) then
+                j = j + yDim
+            else if(boundaryConditions(3).eq.SYMMETRIC) then
+                j = 2 - j
+            else
+                write(*,*) 'index out of ymin bound', j
+            endif
+        else if(j>yDim) then
+            if(boundaryConditions(4).eq.Periodic) then
+                j = j - yDim
+            else if(boundaryConditions(4).eq.SYMMETRIC) then
+                j = 2 * yDim - j
+            else
+                write(*,*) 'index out of ymax bound', j
+            endif
+        endif
+        if (k<1) then
+            if(boundaryConditions(5).eq.Periodic) then
+                k = k + zDim
+            else if(boundaryConditions(5).eq.SYMMETRIC) then
+                k = 2 - k
+            else
+                write(*,*) 'index out of zmin bound', k
+            endif
+        else if(k>zDim) then
+            if(boundaryConditions(6).eq.Periodic) then
+                k = k - zDim
+            else if(boundaryConditions(6).eq.SYMMETRIC) then
+                k = 2 * zDim - k
+            else
+                write(*,*) 'index out of zmax bound', k
+            endif
+        endif
+    END SUBROUTINE trimindex
