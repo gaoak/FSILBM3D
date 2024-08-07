@@ -36,7 +36,7 @@
     real(8), parameter:: Pi=3.141592653589793d0,eps=1.0d-5
 !   ***********************************************************************************************
     integer, parameter:: fluid = 0, wall = 200, movingWall=201
-    integer, parameter:: DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304
+    integer, parameter:: DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304, Symmetric=101
                         !given balance function,unbalanced extrapolation,1st order extrapolate,2nd order extrapolate,periodic
 !   ***********************************************************************************************
 !   ***********************************************************************************************
