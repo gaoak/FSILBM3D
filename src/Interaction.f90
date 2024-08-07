@@ -393,7 +393,7 @@ iterLBM=0
 do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)  
     !***********************************************************************************************
     ! compute the velocity of IB nodes at element center
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz)
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz,detx,dety,detz)
     do  iEL=1,nEL
         call minloc_fast(posElem(1,iEL,1), x0, i0, invdh, i, detx)
         call minloc_fast(posElem(1,iEL,2), y0, j0, invdh, j, dety)
