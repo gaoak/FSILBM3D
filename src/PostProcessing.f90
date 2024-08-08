@@ -589,7 +589,7 @@
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE strain_energy_D(  strainEnergy, xord0,yord0,zord0,xord,yord,zord, &
-                                 ele,prop,triad_n1,triad_n2,triad_n3,triad_ee,triad_e0,triad_nn, &
+                                 ele,prop,triad_n1,triad_n2,triad_ee, &
                                  nND,nEL,nMT &
                                )
     implicit none
@@ -600,24 +600,19 @@
 !
     real(8):: prop(nMT,10)
  
-    real(8):: ek9(9,9),ekb12(12,12),ekb12Strech(12,12),ekb12BendTor(12,12)
-    real(8):: ekb(18,18),ekbInplane(18,18),ekbOutplane(18,18)
+    real(8):: ekb12(12,12),ekb12Strech(12,12),ekb12BendTor(12,12)
 !
-    real(8):: triad_nn(3,3,nND),triad_ee(3,3,nEL),triad_e0(3,3,nEL)
-    real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL),triad_n3(3,3,nEL)
+    real(8):: triad_ee(3,3,nEL)
+    real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL)
 
-    real(8):: triad_00(3,3),triad_11(3,3),triad_22(3,3),rr(3,3)
-    real(8):: ub(18),dl,temp(6)
+    real(8):: triad_00(3,3),triad_11(3,3),triad_22(3,3)
+    real(8):: ub(18),dl
 !
     real(8):: dx0,dy0,dz0,du,dv,dw,dx,dy,dz,xl0
-    real(8):: tx1,tx2,tx3,ty1,ty2,ty3,tz1,tz2,tz3,tx,ty,tz
-    real(8):: xyz012(3),xyz013(3),xyzb012(3),xyzb013(3)
-    real(8):: xyz12(3),xyz13(3),xyzb12(3),xyzb13(3),xyz11(3),xyzb11(3)
-    real(8):: xb01,xb02,xb03,yb01,yb02,yb03,xb1,xb2,xb3,yb1,yb2,yb3
-    real(8):: uub(6)
+    real(8):: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
 
-    real(8):: e0,g0,a0,b0,r0,zix0,ziy0,ziz0,xl,fxx,t0,pl0,zip0,zia0,zib0,alpha,beta
-    integer:: i,j,k,n,i1,j1,k1,mat,nELt
+    real(8):: e0,g0,a0,b0,r0,zix0,ziy0,ziz0,xl
+    integer:: i,j,n,i1,j1,k1,mat,nELt
 
 !   For each element, calculate the nodal forces
     do    n=1,nEL
@@ -675,16 +670,16 @@
             call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
 
 !            non-zero ty1 tz1 u2 tx2 ty2 tz2
-            ub(1)=0.0
-            ub(2)=0.0
-            ub(3)=0.0
+            ub(1)=0.0d0
+            ub(2)=0.0d0
+            ub(3)=0.0d0
             ub(4)=tx1
             ub(5)=ty1
             ub(6)=tz1
 !
             ub(7)=dl
-            ub(8)=0.0
-            ub(9)=0.0
+            ub(8)=0.0d0
+            ub(9)=0.0d0
             ub(10)=tx2
             ub(11)=ty2
             ub(12)=tz2
@@ -708,153 +703,8 @@
             ekb12BendTor(7,1)=0.0d0
 
 !           nodal forces in local coords
-            strainEnergy(n,1)=0.5*sum(matmul(ekb12Strech(1:12,1:12),ub(1:12))*ub(1:12))
-            strainEnergy(n,2)=0.5*sum(matmul(ekb12BendTor(1:12,1:12),ub(1:12))*ub(1:12))
-
-        elseif (nELt == 3) then
-!           plate
-            e0=prop(mat,1)
-            g0=prop(mat,2)
-            t0=prop(mat,3)
-            r0=prop(mat,4)
-            pl0=prop(mat,5)
-            zip0=prop(mat,6)
-            zia0=prop(mat,7)
-            zib0=prop(mat,8)
-!
-!           original lengths of triangle
-            xyz012(1) = xord0(j1)-xord0(i1)
-            xyz012(2) = yord0(j1)-yord0(i1)
-            xyz012(3) = zord0(j1)-zord0(i1)
-            xyz013(1) = xord0(k1)-xord0(i1)
-            xyz013(2) = yord0(k1)-yord0(i1)
-            xyz013(3) = zord0(k1)-zord0(i1)
-!
-!           use element triad to rotate to local x=[Rt]x
-            do    i=1,3
-            do    j=1,3
-                rr(i,j)=triad_e0(i,j,n)
-            enddo
-            enddo
-            do    i=1,3
-                xyzb012(i)=0.0
-                xyzb013(i)=0.0
-                do    k=1,3
-                    xyzb012(i) = xyzb012(i) + rr(k,i)*xyz012(k)
-                    xyzb013(i) = xyzb013(i) + rr(k,i)*xyz013(k)
-                enddo
-            enddo
-            xb01=0.0
-            yb01=0.0
-            xb02=xyzb012(1)
-            yb02=xyzb012(2)
-            xb03=xyzb013(1)
-            yb03=xyzb013(2)
-
-!           current lengths of triangle
-            xyz11(1) = xord(i1)-xord0(i1)
-            xyz11(2) = yord(i1)-yord0(i1)
-            xyz11(3) = zord(i1)-zord0(i1)
-            xyz12(1) = xord(j1)-xord0(i1)
-            xyz12(2) = yord(j1)-yord0(i1)
-            xyz12(3) = zord(j1)-zord0(i1)
-            xyz13(1) = xord(k1)-xord0(i1)
-            xyz13(2) = yord(k1)-yord0(i1)
-            xyz13(3) = zord(k1)-zord0(i1)
-!
-!           use element triad to rotate to local x=[Rt]x
-            do    i=1,3
-            do    j=1,3
-                rr(i,j)=triad_ee(i,j,n)
-            enddo
-            enddo
-            do    i=1,3
-                xyzb11(i)=0.0
-                xyzb12(i)=0.0
-                xyzb13(i)=0.0
-                do    k=1,3
-                    xyzb11(i) = xyzb11(i) + rr(k,i)*xyz11(k)
-                    xyzb12(i) = xyzb12(i) + rr(k,i)*xyz12(k)
-                    xyzb13(i) = xyzb13(i) + rr(k,i)*xyz13(k)
-                enddo
-            enddo
-
-            xb1=xyzb11(1)
-            yb1=xyzb11(2)
-            xb2=xyzb12(1)
-            yb2=xyzb12(2)
-            xb3=xyzb13(1)
-            yb3=xyzb13(2)
-
-!           get angles ref to orig from triads
-            do    i=1,3
-            do    j=1,3
-!2001!!!        triad_00(i,j)=triad_e0(i,j,n)
-                triad_00(i,j)=triad_ee(i,j,n)
-                triad_11(i,j)=triad_ee(i,j,n)
-                triad_22(i,j)=triad_n1(i,j,n)
-            enddo
-            enddo
-
-            call get_angle_triad(triad_11,triad_22,tx,ty,tz)
-            call global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
-
-            do    i=1,3
-            do    j=1,3
-                triad_11(i,j)=triad_ee(i,j,n)
-                triad_22(i,j)=triad_n2(i,j,n)
-            enddo
-            enddo
-
-            call get_angle_triad(triad_11,triad_22,tx,ty,tz)
-            call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
-
-            do    i=1,3
-            do    j=1,3
-                triad_11(i,j)=triad_ee(i,j,n)
-                triad_22(i,j)=triad_n3(i,j,n)
-            enddo
-            enddo
-
-            call get_angle_triad(triad_11,triad_22,tx,ty,tz)
-            call global_to_local(triad_00,tx,ty,tz,tx3,ty3,tz3)
-!
-!           local DoF
-            ub(1)=xb1-xb01
-            ub(2)=yb1-yb01
-            ub(3)=0.0
-            ub(4)=tx1
-            ub(5)=ty1
-            ub(6)=tz1
-
-            ub(7)=xb2-xb02
-            ub(8)=yb2-yb02
-            ub(9)=0.0
-            ub(10)=tx2
-            ub(11)=ty2
-            ub(12)=tz2
-
-            ub(13)=xb3-xb03
-            ub(14)=yb3-yb03
-            ub(15)=0.0
-            ub(16)=tx3
-            ub(17)=ty3
-            ub(18)=tz3
-
-!           Calculate LOCAL stiffness, use orig coords
-!            membrane
-            ekbInplane(1:18,1:18)=0.0
-            alpha=zia0
-            beta =zib0
-            call elmstfMRT_D(e0,g0,t0,pl0,alpha,beta,xb01,xb02,xb03,yb01,yb02,yb03,ekbInplane,ek9)
-!           flexure
-            ekbOutplane(1:18,1:18)=0.0
-            call elmstfDKT_D(e0,g0,t0,zip0,          xb01,xb02,xb03,yb01,yb02,yb03,ekbOutplane,ek9)
-
-            ekb=ekbInplane+ekbOutplane
-
-            strainEnergy(n,1)=0.5*sum(matmul(ekbInplane(1:18,1:18),ub(1:18))*ub(1:18))
-            strainEnergy(n,2)=0.5*sum(matmul(ekbOutplane(1:18,1:18),ub(1:18))*ub(1:18))
+            strainEnergy(n,1)=0.5d0*sum(matmul(ekb12Strech(1:12,1:12),ub(1:12))*ub(1:12))
+            strainEnergy(n,2)=0.5d0*sum(matmul(ekb12BendTor(1:12,1:12),ub(1:12))*ub(1:12))
         else
             write(*,*)'not this nELt:',nELt
             stop

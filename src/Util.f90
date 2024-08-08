@@ -228,8 +228,8 @@
         
         call strain_energy_D(strainEnergy(iFish,1:nEL(iFish),1:2),xyzful0(iFish,1:nND(iFish),1),xyzful0(iFish,1:nND(iFish),2),xyzful0(iFish,1:nND(iFish),3), &
                                 xyzful(iFish,1:nND(iFish),1), xyzful(iFish,1:nND(iFish),2), xyzful(iFish,1:nND(iFish),3),ele(iFish,1:nEL(iFish),1:5), prop(iFish,1:nMT(iFish),1:10), &
-                                triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)),triad_n3(iFish,1:3,1:3,1:nEL(iFish)), &
-                                triad_ee(iFish,1:3,1:3,1:nEL(iFish)),triad_e0(iFish,1:3,1:3,1:nEL(iFish)),triad_nn(iFish,1:3,1:3,1:nND(iFish)), &
+                                triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)), &
+                                triad_ee(iFish,1:3,1:3,1:nEL(iFish)), &
                                 nND(iFish),nEL(iFish),nMT(iFish))
         EEE(1)=sum(strainEnergy(iFish,1:nEL(iFish),1))
         EEE(2)=sum(strainEnergy(iFish,1:nEL(iFish),2))
@@ -421,9 +421,9 @@
         z3=xyzful(k,3)
 
         if(nt==2)then
-        ax =(x2-x1)*(x2-x1)
-        ay =(y2-y1)*(y2-y1)
-        az =(z2-z1)*(z2-z1)
+        ax =(x2-x1)
+        ay =(y2-y1)
+        az =(z2-z1)
         areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
         endif
 

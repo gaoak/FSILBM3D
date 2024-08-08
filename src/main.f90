@@ -264,14 +264,14 @@
             !loading vector
             lodful(iFish,1:nND(iFish),1:6) = extful(iFish,1:nND(iFish),1:6) + grav(iFish,1:nND(iFish),1:6) + repful(iFish,1:nND(iFish),1:6)
             !-----------------------------------------
-            CALL structure_solver(jBC(iFish,1:nND(iFish),1:6),vBC(iFish,1:nND(iFish),1:6),ele(iFish,1:nEL(iFish),1:5), &
+            CALL solver(jBC(iFish,1:nND(iFish),1:6),vBC(iFish,1:nND(iFish),1:6),ele(iFish,1:nEL(iFish),1:5), &
                                   nloc(iFish,1:nND(iFish)*6),nprof(iFish,1:nND(iFish)*6),nprof2(iFish,1:nND(iFish)*6), &
                                   prop(iFish,1:nMT(iFish),1:10),mss(iFish,1:nND(iFish)*6), &
                                   xyzful0(iFish,1:nND(iFish),1:6),xyzful(iFish,1:nND(iFish),1:6),dspful(iFish,1:nND(iFish),1:6), &
                                   velful(iFish,1:nND(iFish),1:6),accful(iFish,1:nND(iFish),1:6),lodful(iFish,1:nND(iFish),1:6),  &
                                   subdeltat,dampK,dampM,  &
-                                  triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_ee(iFish,1:3,1:3,1:nEL(iFish)),triad_e0(iFish,1:3,1:3,1:nEL(iFish)), &
-                                  triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)),triad_n3(iFish,1:3,1:3,1:nEL(iFish)), &
+                                  triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_ee(iFish,1:3,1:3,1:nEL(iFish)), &
+                                  triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)), &
                                   nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,    &
                                   nFish,iFish,FishInfo)
         else
