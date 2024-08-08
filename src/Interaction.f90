@@ -455,23 +455,23 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
         call minloc_fast(posElem(1,iEL,1), x0, i0, invdh, i, detx)
         call minloc_fast(posElem(1,iEL,2), y0, j0, invdh, j, dety)
         do x=-1,2
-            rx(x)=Phi(dble(x)-detx)
+            rx(x)=Phi(dble(x)-detx)*invdh
         enddo
         do y=-1,2
-            ry(y)=Phi(dble(y)-dety)
+            ry(y)=Phi(dble(y)-dety)*invdh
         enddo
         call trimedindex(i, xDim, ix, boundaryConditions(1:2))
         call trimedindex(j, yDim, jy, boundaryConditions(3:4))
         do s=1,Nspan
             call minloc_fast(posElem(s,iEL,3), z0, k0, invdh, k, detz)
             do z=-1,2
-                rz(z)=Phi(dble(z)-detz)
+                rz(z)=Phi(dble(z)-detz)*invdh
             enddo
             call trimedindex(k, zDim, kz, boundaryConditions(5:6))
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)*invdh*invdh*invdh
+                        forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)
                         ! update velocity
                         uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+0.5*dt*forceTemp(1:3)/den(kz(z),jy(y),ix(x))
                         force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1) + forceTemp(1:3)
