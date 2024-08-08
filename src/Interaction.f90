@@ -474,7 +474,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
                         forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)
                         ! update velocity
                         uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+0.5*dt*forceTemp(1:3)/den(kz(z),jy(y),ix(x))
-                        force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1) + forceTemp(1:3)
+                        force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
                     enddo
                 enddo
             enddo
