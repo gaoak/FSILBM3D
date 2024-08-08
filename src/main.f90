@@ -103,26 +103,25 @@
             call cptMove(move(1:3),xyzful(iFish,NDref,1:3),[xGrid(IXref),yGrid(IYref),zGrid(IZref)],[dx,dy,dz])
             write(*,'(A,3F10.5)')' *Grid:',[xGrid(IXref),yGrid(IYref),zGrid(IZref)]
             write(*,'(A,3F10.5)')' *Body:',xyzful(iFish,NDref,1:3)
-
             if(isMoveDimX==1)CALL movGrid(1,move(1))
             if(isMoveDimY==1)CALL movGrid(2,move(2))
             if(isMoveDimZ==1)CALL movGrid(3,move(3))
-        endif
-        !******************************************************************************************
-        !DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304,fluid=0, wall=200
-        if    (iStreamModel==1)then
-        xMinBC=boundaryConditions(1)
-        xMaxBC=boundaryConditions(2)
-        yMinBC=boundaryConditions(3)
-        yMaxBC=boundaryConditions(4)
-        zMinBC=boundaryConditions(5)
-        zMaxBC=boundaryConditions(6)
-        CALL set_other_farfld_BCs()
-        elseif(iStreamModel==2)then
-        CALL set_equilibrium_farfld_BC()
-        else
-            stop
-            write(*,*)'no such type LBMBC'
+            !******************************************************************************************
+            !DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304,fluid=0, wall=200
+            if    (iStreamModel==1)then
+            xMinBC=boundaryConditions(1)
+            xMaxBC=boundaryConditions(2)
+            yMinBC=boundaryConditions(3)
+            yMaxBC=boundaryConditions(4)
+            zMinBC=boundaryConditions(5)
+            zMaxBC=boundaryConditions(6)
+            CALL set_other_farfld_BCs()
+            elseif(iStreamModel==2)then
+            CALL set_equilibrium_farfld_BC()
+            else
+                stop
+                write(*,*)'no such type LBMBC'
+            endif
         endif
         !******************************************************************************************        
         CALL updateVolumForc()

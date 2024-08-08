@@ -303,7 +303,7 @@ z0 = zGrid(k0)
 !   compute velocity and displacement at IB nodes
 if(Palpha.gt.0.d0) then
     allocate(posElemIB(1:Nspan,1:nEL,1:3))
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iND,i,j,k,x,y,z,s,rx,ry,rz,z1,detx,dety,detz)
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iND,i,j,k,x,y,z,s,rx,ry,rz,z1,detx,dety,detz,ix,jy,kz)
     do iND=1,nND
         call minloc_fast(xyzful(iND,1), x0, i0, invdh, i, detx)
         call minloc_fast(xyzful(iND,2), y0, j0, invdh, j, dety)
@@ -394,7 +394,7 @@ iterLBM=0
 do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     !***********************************************************************************************
     ! compute the velocity of IB nodes at element center
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz,detx,dety,detz)
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz,detx,dety,detz,ix,jy,kz)
     do  iEL=1,nEL
         call minloc_fast(posElem(1,iEL,1), x0, i0, invdh, i, detx)
         call minloc_fast(posElem(1,iEL,2), y0, j0, invdh, j, dety)
@@ -492,7 +492,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     dmaxLBM=dmaxLBM/dsum
     iterLBM=iterLBM+1
 !***********************************************************************************************
-enddo 
+enddo
 !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
 !**************************************************************************************************
 !**************************************************************************************************
