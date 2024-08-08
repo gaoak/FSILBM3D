@@ -362,9 +362,9 @@
             do iEL=1,nEL(iFish)
                 ele_all(iEL+sum(nEL(1:iFish-1)),1:3)=ele(iFish,iEL,1:3)+sum(nND(1:iFish-1))
                 ele_all(iEL+sum(nEL(1:iFish-1)),4:5)=ele(iFish,iEL,4:5) 
-            enddo 
+            enddo
         endif
-    enddo  
+    enddo
 !   ===============================================================================================
 !   calculate area
     allocate(NDtl(1:nFish,1:5),NDhd(1:nFish,1:3),NDct(1:nFish),elmax(1:nFish),elmin(1:nFish))

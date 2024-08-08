@@ -718,15 +718,15 @@
                 else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
                     ix(k) = 2
                 else
-                    write(*,*) 'index out of xmin bound', i
+                    write(*,*) 'index out of xmin bound', ix(k)
                 endif
-            else if(i>xDim) then
+            else if(ix(k)>xDim) then
                 if(boundaryConditions(2).eq.Periodic) then
                     ix(k) = ix(k) - xDim
                 else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.xDim+1) then
                     ix(k) = xDim - 1
                 else
-                    write(*,*) 'index out of xmax bound', i
+                    write(*,*) 'index out of xmax bound', ix(k)
                 endif
             endif
         enddo
