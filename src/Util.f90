@@ -421,27 +421,17 @@
         z3=xyzful(k,3)
 
         if(nt==2)then
-        ax =(x2-x1)*(x2-x1)
-        ay =(y2-y1)*(y2-y1)
-        az =(z2-z1)*(z2-z1)
+        ax = x2-x1
+        ay = y2-y1
+        az = z2-z1
         areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
         endif
 
-        if(nt==3)then        
-        x1=xyzful(i,1)
-        x2=xyzful(j,1)
-        x3=xyzful(k,1)
-        y1=xyzful(i,2)
-        y2=xyzful(j,2)
-        y3=xyzful(k,2)
-        z1=xyzful(i,3)
-        z2=xyzful(j,3)
-        z3=xyzful(k,3)
-
-        ax =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0
-        ay =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0
-        az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0
-        areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
+        if(nt==3)then
+        ax =(z1-z2)*(y3-y2) + (y2-y1)*(z3-z2)
+        ay =(x1-x2)*(z3-z2) + (z2-z1)*(x3-x2)
+        az =(y1-y2)*(x3-x2) + (x2-x1)*(y3-y2)
+        areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az) * 0.5d0
         endif
 
     enddo
