@@ -344,7 +344,10 @@
                                       nprof2(iFish,1:nND(iFish)*6),xyzful00(iFish,1:nND(iFish),1:6),prop(iFish,1:nMT(iFish),1:10),nND(iFish), &
                                       nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),idat)
     close(idat)
-
+    if (Nspan.gt.0 .and. maxval(dabs(prop(iFish,1:nMT(iFish),5))).gt.1d-6) then
+        write(*,*) 'Extruded body should have zero rotation angle, gamma', prop(iFish,1:nMT(iFish),5)
+        stop
+    endif
     write(*,*)'read FEMeshFile ',iFish,' end' 
     enddo   
 !    ===============================================================================================

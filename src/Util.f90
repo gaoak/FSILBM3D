@@ -669,11 +669,11 @@
         integer:: len, index, count, step, it
         real(8):: x, array(len)
         logical:: uniform
-        if (x<array(1) .or. x>array(len)) then
-            write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-            stop
-        endif
         if (.not.uniform) then
+            if (x<array(1) .or. x>array(len)) then
+                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                stop
+            endif
             index = 1
             count = len
             do while(count > 0)
@@ -692,6 +692,10 @@
         else
             index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
             !int -1.1 -> -1; 1.1->1; 1.9->1
+            if (index<1 .or. index>len) then
+                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                stop
+            endif
         endif
     END SUBROUTINE
 
