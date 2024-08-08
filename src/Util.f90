@@ -709,61 +709,31 @@
         index = index + i0
     END SUBROUTINE
 
-    SUBROUTINE trimindex(i, j, k, xDim, yDim, zDim, boundaryConditions)
+    SUBROUTINE trimedindex(i, xDim, ix, boundaryConditions)
+        USE BoundCondParams
         implicit none
-        integer, parameter:: Periodic=304,SYMMETRIC=101
-        integer, intent(in):: boundaryConditions(1:6)
-        integer, intent(in):: xDim, yDim, zDim
-        integer, intent(inout):: i, j, k
-        if (i<1) then
-            if(boundaryConditions(1).eq.Periodic) then
-                i = i + xDim
-            else if(boundaryConditions(1).eq.SYMMETRIC) then
-                i = 2 - i
-            else
-                write(*,*) 'index out of xmin bound', i
+        integer, intent(in):: boundaryConditions(1:2)
+        integer, intent(in):: i, xDim
+        integer, intent(out):: ix(-1:2)
+        integer:: k
+        do k=-1,2
+            ix(k) = i + k
+            if (ix(k)<1) then
+                if(boundaryConditions(1).eq.Periodic) then
+                    ix(k) = ix(k) + xDim
+                else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
+                    ix(k) = 2
+                else
+                    write(*,*) 'index out of xmin bound', i
+                endif
+            else if(i>xDim) then
+                if(boundaryConditions(2).eq.Periodic) then
+                    ix(k) = ix(k) - xDim
+                else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.xDim+1) then
+                    ix(k) = xDim - 1
+                else
+                    write(*,*) 'index out of xmax bound', i
+                endif
             endif
-        else if(i>xDim) then
-            if(boundaryConditions(2).eq.Periodic) then
-                i = i - xDim
-            else if(boundaryConditions(2).eq.SYMMETRIC) then
-                i = 2 * xDim - i
-            else
-                write(*,*) 'index out of xmax bound', i
-            endif
-        endif
-        if (j<1) then
-            if(boundaryConditions(3).eq.Periodic) then
-                j = j + yDim
-            else if(boundaryConditions(3).eq.SYMMETRIC) then
-                j = 2 - j
-            else
-                write(*,*) 'index out of ymin bound', j
-            endif
-        else if(j>yDim) then
-            if(boundaryConditions(4).eq.Periodic) then
-                j = j - yDim
-            else if(boundaryConditions(4).eq.SYMMETRIC) then
-                j = 2 * yDim - j
-            else
-                write(*,*) 'index out of ymax bound', j
-            endif
-        endif
-        if (k<1) then
-            if(boundaryConditions(5).eq.Periodic) then
-                k = k + zDim
-            else if(boundaryConditions(5).eq.SYMMETRIC) then
-                k = 2 - k
-            else
-                write(*,*) 'index out of zmin bound', k
-            endif
-        else if(k>zDim) then
-            if(boundaryConditions(6).eq.Periodic) then
-                k = k - zDim
-            else if(boundaryConditions(6).eq.SYMMETRIC) then
-                k = 2 * zDim - k
-            else
-                write(*,*) 'index out of zmax bound', k
-            endif
-        endif
-    END SUBROUTINE trimindex
+        enddo
+    END SUBROUTINE trimedindex
