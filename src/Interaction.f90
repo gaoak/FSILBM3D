@@ -286,7 +286,7 @@ integer:: i,j,k,x,y,z,s,iEL,nt,iterLBM,iND
 integer:: ix(-1:2),jy(-1:2),kz(-1:2)
 real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh,forceTemp(1:3)
 real(8):: x1,x2,y1,y2,z1,ax,ay
-real(8):: forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
+real(8):: velfulIB(1:Nspan+1,nND,3)
 real(8):: forceElem(1:Nspan,nEL,3),forceElemTemp(1:Nspan,nEL,3),areaElem(nEL)
 real(8):: posElem(1:Nspan,nEL,3),velElem(1:Nspan,nEL,3),velElemIB(1:Nspan,nEL,3)
 real(8),allocatable::posElemIB(:,:,:)
@@ -497,17 +497,15 @@ enddo
 !**************************************************************************************************
 !**************************************************************************************************
 !   element force to nodal force
-forceNode(1:nND,1:3)=0.0
+extful(1:nND,1:6)=0.0
 do iEL=1,nEL
     i=ele(iEL,1)
     j=ele(iEL,2)
     do s=1,Nspan
-        forceNode(i,1:3)=forceNode(i,1:3)+forceElem(s,iEl,1:3)*0.5d0
-        forceNode(j,1:3)=forceNode(j,1:3)+forceElem(s,iEl,1:3)*0.5d0
+        extful(i,1:2)=extful(i,1:2)+forceElem(s,iEl,1:2)*0.5d0
+        extful(j,1:2)=extful(j,1:2)+forceElem(s,iEl,1:2)*0.5d0
     enddo
 enddo
-extful(1:nND,1:2) = forceNode(1:nND,1:2)
-extful(1:nND,3:6) = 0.0d0
 if(Palpha.gt.0.d0) then
     deallocate(posElemIB)
 endif
