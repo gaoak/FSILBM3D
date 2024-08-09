@@ -129,7 +129,8 @@
         !******************************************************************************************
         !******************************************************************************************
         call date_and_time(VALUES=values0)
-        Pbeta=(1.0d0-dexp(-5.0d0/Pramp*time/Tref))*Pbetatemp
+        !Pbeta=(1.0d0-dexp(-5.0d0/Pramp*time/Tref))*Pbetatemp
+        Pbeta=1.0d0*Pbetatemp
 
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do x=1,xDim

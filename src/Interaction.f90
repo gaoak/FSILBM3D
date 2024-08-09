@@ -422,6 +422,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
             enddo
         enddo
     enddo
+    !$OMP END PARALLEL DO
     !***********************************************************************************************
     ! calculate interaction force
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,s)
@@ -482,7 +483,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     enddo
     forceElem(:,1:nEL,1:3) = forceElem(:,1:nEL,1:3)+forceElemTemp(:,1:nEL,1:3)
     ! convergence test
-    dsum=Uref*nEL
+    dsum=Uref*nEL*Nspan
     dmaxLBM=0.0
     do iEL=1,nEL
         do s=1,Nspan
