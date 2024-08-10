@@ -32,7 +32,7 @@
  1          1                                read(111,*)     nFish,FishKind
  1          1                                read(111,*)     iForce2Body,iChordDirection  using xyz00, possible values 1,2
 ===================================================================================================structure property
- 1          1          1                     read(111,*)     FishNum(FishKind),NumX,NumY
+ 1          1          1                     read(111,*)     FishNum(FishKind),NumX,NumY,(NumZ=FishNum/NumX/NumY)
  2     Beam.dat                              read(111,*)     iBodyModel(iFish),FEmeshName(iFish) 
  1          1          1                     read(111,*)     isMotionGiven(iFish,1:3)
  1          1          1                     read(111,*)     isMotionGiven(iFish,4:6)
