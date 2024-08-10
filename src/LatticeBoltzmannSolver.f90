@@ -429,11 +429,28 @@
     elseif(xMinBC==Periodic .or. xMinBC==fluid )then
         ! no need set
     elseif(xMinBC==wall) then
+        !  2 -1  0  0 ->   1  1  0  0
+        !  8 -1  1  0 ->   9  1 -1  0
+        ! 10 -1 -1  0 ->   7  1  1  0
+        ! 12 -1  0  1 ->  13  1  0 -1
+        ! 14 -1  0 -1 ->  11  1  0  1
         do  y = 1, yDim
         do  z = 1, zDim
             fTmp([1,7,9,11,13]) = fIn(z,y,1,oppo([1,7,9,11,13]))
             fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
         enddo
+        enddo
+    elseif(xMinBC.eq.Symmetric) then
+        !  2 -1  0  0 ->   1  1  0  0
+        !  8 -1  1  0 ->   7  1  1  0
+        ! 10 -1 -1  0 ->   9  1 -1  0
+        ! 12 -1  0  1 ->  11  1  0  1
+        ! 14 -1  0 -1 ->  13  1  0 -1
+        do  y = 1, yDim
+            do  z = 1, zDim
+                fTmp([1,7,9,11,13]) = fIn(z,y,1,[2,8,10,12,14])
+                fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+            enddo
         enddo
     else
         stop 'no define BC'
@@ -479,11 +496,28 @@
     elseif(xMaxBC==Periodic .or. xMaxBC==fluid)then
         ! no need set
     elseif(xMaxBC==wall) then
+        !  1  1  0  0 ->   2 -1  0  0
+        !  7  1  1  0 ->  10 -1 -1  0
+        !  9  1 -1  0 ->   8 -1  1  0
+        ! 11  1  0  1 ->  14 -1  0 -1
+        ! 13  1  0 -1 ->  12 -1  0  1
         do  y = 1, yDim
         do  z = 1, zDim
             fTmp([2,8,10,12,14]) = fIn(z,y,xDim,oppo([2,8,10,12,14]))
             fIn(z,y,xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
         enddo
+        enddo
+    elseif(xMaxBC.eq.Symmetric) then
+        !  1  1  0  0 ->   2 -1  0  0
+        !  7  1  1  0 ->   8 -1  1  0
+        !  9  1 -1  0 ->  10 -1 -1  0
+        ! 11  1  0  1 ->  12 -1  0  1
+        ! 13  1  0 -1 ->  14 -1  0 -1
+        do  y = 1, yDim
+            do  z = 1, zDim
+                fTmp([2,8,10,12,14]) = fIn(z,y,xDim,[1,7,9,11,13])
+                fIn(z,y,xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
+            enddo
         enddo
     else
         stop 'no define BC'
@@ -520,11 +554,28 @@
     elseif(yMinBC==Periodic .or. yMinBC==fluid)then
         ! no need set
     elseif(yMinBC==wall) then
+        !  4  0 -1  0 ->   3  0  1  0
+        !  9  1 -1  0 ->   8 -1  1  0
+        ! 10 -1 -1  0 ->   7  1  1  0
+        ! 16  0 -1  1 ->  17  0  1 -1
+        ! 18  0 -1 -1 ->  15  0  1  1
         do  x = 1, xDim
         do  z = 1, zDim
             fTmp([3,7,8,15,17]) = fIn(z,1,x,oppo([3,7,8,15,17]))
             fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
         enddo
+        enddo
+    elseif(yMinBC.eq.Symmetric) then
+        !  4  0 -1  0 ->   3  0  1  0
+        !  9  1 -1  0 ->   7  1  1  0
+        ! 10 -1 -1  0 ->   8 -1  1  0
+        ! 16  0 -1  1 ->  15  0  1  1
+        ! 18  0 -1 -1 ->  17  0  1 -1
+        do  x = 1, xDim
+            do  z = 1, zDim
+                fTmp([3,7,8,15,17]) = fIn(z,1,x,[4,9,10,16,18])
+                fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
+            enddo
         enddo
     else
         stop 'no define BC'
@@ -560,11 +611,28 @@
     elseif(yMaxBC==Periodic .or. yMaxBC==fluid)then
         ! no need set
     elseif(yMaxBC==wall) then
+        !  3  0  1  0 ->   4  0 -1  0
+        !  7  1  1  0 ->  10 -1 -1  0
+        !  8 -1  1  0 ->   9  1 -1  0
+        ! 15  0  1  1 ->  18  0 -1 -1
+        ! 17  0  1 -1 ->  16  0 -1  1
         do  x = 1, xDim
         do  z = 1, zDim
             fTmp([4,9,10,16,18]) = fIn(z,yDim,x,oppo([4,9,10,16,18]))
             fIn(z,yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
         enddo
+        enddo
+    elseif(yMaxBC.eq.Symmetric) then
+        !  3  0  1  0 ->   4  0 -1  0
+        !  7  1  1  0 ->   9  1 -1  0
+        !  8 -1  1  0 ->  10 -1 -1  0
+        ! 15  0  1  1 ->  16  0 -1  1
+        ! 17  0  1 -1 ->  18  0 -1 -1
+        do  x = 1, xDim
+            do  z = 1, zDim
+                fTmp([4,9,10,16,18]) = fIn(z,yDim,x,[3,7,8,15,17])
+                fIn(z,yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
+            enddo
         enddo
     else
         stop 'no define BC'
@@ -601,12 +669,33 @@
     elseif(zMinBC==Periodic .or. zMinBC==fluid)then
         ! no need set
     elseif(zMinBC==wall) then
+        !  6  0  0 -1 ->   5  0  0  1
+        ! 13  1  0 -1 ->  12 -1  0  1
+        ! 14 -1  0 -1 ->  11  1  0  1
+        ! 17  0  1 -1 ->  16  0 -1  1
+        ! 18  0 -1 -1 ->  15  0  1  1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
         do  x = 1, xDim
         do  y = 1, yDim
             fTmp([5,11,12,15,16]) = fIn(1,y,x,oppo([5,11,12,15,16]))
             fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
         enddo
         enddo
+        !$OMP END PARALLEL DO
+    elseif(zMinBC.eq.Symmetric) then
+        !  6  0  0 -1 ->   5  0  0  1
+        ! 13  1  0 -1 ->  11  1  0  1
+        ! 14 -1  0 -1 ->  12 -1  0  1
+        ! 17  0  1 -1 ->  15  0  1  1
+        ! 18  0 -1 -1 ->  16  0 -1  1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
+        do  x = 1, xDim
+            do  y = 1, yDim
+                fTmp([5,11,12,15,16]) = fIn(1,y,x,[6,13,14,17,18])
+                fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
+            enddo
+        enddo
+        !$OMP END PARALLEL DO
     elseif(zMinBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim
@@ -667,12 +756,33 @@
     elseif(zMaxBC==Periodic .or. zMaxBC==fluid)then
         ! no need set
     elseif(zMaxBC==wall) then
+        !  5  0  0  1 ->   6  0  0 -1
+        ! 11  1  0  1 ->  14 -1  0 -1
+        ! 12 -1  0  1 ->  13  1  0 -1
+        ! 15  0  1  1 ->  18  0 -1 -1
+        ! 16  0 -1  1 ->  17  0  1 -1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
         do  x = 1, xDim
         do  y = 1, yDim
             fTmp([6,13,14,17,18]) = fIn(zDim,y,x,oppo([6,13,14,17,18]))
             fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
         enddo
         enddo
+        !$OMP END PARALLEL DO
+    elseif(zMaxBC.eq.Symmetric) then
+        !  5  0  0  1 ->   6  0  0 -1
+        ! 11  1  0  1 ->  13  1  0 -1
+        ! 12 -1  0  1 ->  14 -1  0 -1
+        ! 15  0  1  1 ->  17  0  1 -1
+        ! 16  0 -1  1 ->  18  0 -1 -1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
+        do  x = 1, xDim
+            do  y = 1, yDim
+                fTmp([6,13,14,17,18]) = fIn(zDim,y,x,[5,11,12,15,16])
+                fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
+            enddo
+        enddo
+        !$OMP END PARALLEL DO
     elseif(zMaxBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim

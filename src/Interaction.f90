@@ -263,53 +263,71 @@ END SUBROUTINE
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    (displacement, velocity) spring, penalty method
 !    calculate force at element center, distribute force to four nodes
+!    solid should be in uniform grid
+!    period body should span full from 1 to xDim+1
+!    symmetric body should not exceed domain
+!    the first body point should be in the domain or on the boundary
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE calculate_interaction_force_quad(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-    xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,dspan)
+SUBROUTINE calculate_interaction_force_quad(zDim,yDim,xDim,nEL,nND,ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+    xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,dspan,boundaryConditions)
 USE, INTRINSIC :: IEEE_ARITHMETIC
+use BoundCondParams
 IMPLICIT NONE
 integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM,Nspan
-real(8),intent(in):: dz(zDim),dy(yDim),dx(xDim),dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta,dspan
+real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta,dspan
 real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
 logical,intent(in):: isUniformGrid(1:3)
 real(8),intent(in):: xyzful(nND,6),velful(nND,6)
+integer,intent(in):: boundaryConditions(1:6)
 real(8),intent(inout)::xyzfulIB(1:Nspan+1,nND,6),uuu(zDim,yDim,xDim,1:3)
 real(8),intent(out)::extful(nND,6),force(zDim,yDim,xDim,1:3)
 !==================================================================================================
-integer:: i,j,k,x,y,z,s,iEL,nt,iterLBM,iND,ix,iy,iz
+integer:: i,j,k,x,y,z,s,iEL,nt,iterLBM,iND
+integer:: ix(-1:2),jy(-1:2),kz(-1:2)
 real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,dmaxLBM,dsum,invdh,forceTemp(1:3)
 real(8):: x1,x2,y1,y2,z1,ax,ay
-real(8):: forceNode(nND,3),velfulIB(1:Nspan+1,nND,3)
+real(8):: velfulIB(1:Nspan+1,nND,3)
 real(8):: forceElem(1:Nspan,nEL,3),forceElemTemp(1:Nspan,nEL,3),areaElem(nEL)
 real(8):: posElem(1:Nspan,nEL,3),velElem(1:Nspan,nEL,3),velElemIB(1:Nspan,nEL,3)
 real(8),allocatable::posElemIB(:,:,:)
+real(8)::x0,y0,z0,detx,dety,detz
+integer::i0,j0,k0
 !==================================================================================================
-!   compute velocity and displacement at IB nodes
 invdh = 1.D0/dh
+call my_minloc(xyzful(1,1), xGrid, xDim, isUniformGrid(1), i0)
+call my_minloc(xyzful(1,2), yGrid, yDim, isUniformGrid(2), j0)
+call my_minloc(xyzful(1,3), zGrid, zDim, isUniformGrid(3), k0)
+x0 = xGrid(i0)
+y0 = yGrid(j0)
+z0 = zGrid(k0)
+!   compute velocity and displacement at IB nodes
 if(Palpha.gt.0.d0) then
     allocate(posElemIB(1:Nspan,1:nEL,1:3))
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iND,i,j,k,x,y,z,s,rx,ry,rz,z1)
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iND,i,j,k,x,y,z,s,rx,ry,rz,z1,detx,dety,detz,ix,jy,kz)
     do iND=1,nND
-        call my_minloc(xyzful(iND,1), xGrid, xDim, isUniformGrid(1), i)
-        call my_minloc(xyzful(iND,2), yGrid, yDim, isUniformGrid(2), j)
-        do x=-1+i,2+i
-            rx(x-i)=Phi((xyzful(iND,1)-xGrid(x))*invdh)
+        call minloc_fast(xyzful(iND,1), x0, i0, invdh, i, detx)
+        call minloc_fast(xyzful(iND,2), y0, j0, invdh, j, dety)
+        do x=-1,2
+            rx(x)=Phi(dble(x)-detx)
         enddo
-        do y=-1+j,2+j
-            ry(y-j)=Phi((xyzful(iND,2)-yGrid(y))*invdh)
+        do y=-1,2
+            ry(y)=Phi(dble(y)-dety)
         enddo
+        call trimedindex(i, xDim, ix, boundaryConditions(1:2))
+        call trimedindex(j, yDim, jy, boundaryConditions(3:4))
         do s=1,Nspan+1
             z1 = xyzful(iND,3)+dspan * (s - 1)
-            call my_minloc(z1, zGrid, zDim, isUniformGrid(3), k)
-            do z=-1+k,2+k
-                rz(z-k)=Phi((z1-zGrid(z))*invdh)
+            call minloc_fast(z1, z0, k0, invdh, k, detz)
+            do z=-1,2
+                rz(z)=Phi(dble(z)-detz)
             enddo
+            call trimedindex(k, zDim, kz, boundaryConditions(5:6))
             ! interpolate fluid velocity to body nodes
             velfulIB(s,iND,1:3)=0.0
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        velfulIB(s,iND,1:3)=velfulIB(s,iND,1:3)+uuu(z+k,y+j,x+i,1:3)*rx(x)*ry(y)*rz(z)
+                        velfulIB(s,iND,1:3)=velfulIB(s,iND,1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
             enddo
@@ -373,41 +391,38 @@ enddo
 !***********************************************************************************************
 dmaxLBM=1.0
 iterLBM=0
-do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)  
+do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     !***********************************************************************************************
     ! compute the velocity of IB nodes at element center
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz)
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,s,rx,ry,rz,detx,dety,detz,ix,jy,kz)
     do  iEL=1,nEL
-        call my_minloc(posElem(1,iEL,1), xGrid, xDim, isUniformGrid(1), i)
-        call my_minloc(posElem(1,iEL,2), yGrid, yDim, isUniformGrid(2), j)
-        if(i.lt.2 .or. i.gt.xDim-2 .or. j.lt.2 .or. j.gt.yDim-2) then
-            write(*, *) 'Point too close to boundary posElem(1,iEL,1:2): ', posElem(1,iEL,1:2), iEL
-        endif
-        do x=-1+i,2+i
-            rx(x-i)=Phi((posElem(1,iEL,1)-xGrid(x))*invdh)
+        call minloc_fast(posElem(1,iEL,1), x0, i0, invdh, i, detx)
+        call minloc_fast(posElem(1,iEL,2), y0, j0, invdh, j, dety)
+        do x=-1,2
+            rx(x)=Phi(dble(x)-detx)
         enddo
-        do y=-1+j,2+j
-            ry(y-j)=Phi((posElem(1,iEL,2)-yGrid(y))*invdh)
+        do y=-1,2
+            ry(y)=Phi(dble(y)-dety)
         enddo
+        call trimedindex(i, xDim, ix, boundaryConditions(1:2))
+        call trimedindex(j, yDim, jy, boundaryConditions(3:4))
         do s=1,Nspan
-            call my_minloc(posElem(s,iEL,3), zGrid, zDim, isUniformGrid(3), k)
-            if(k.lt.2 .or. k.gt.zDim-2) then
-                write(*, *) 'Point too close to boundary posElem(s,iEL,3): ', posElem(s,iEL,3), s, iEL
-                stop
-            endif
-            do z=-1+k,2+k
-                rz(z-k)=Phi((posElem(s,iEL,3)-zGrid(z))*invdh)
+            call minloc_fast(posElem(s,iEL,3), z0, k0, invdh, k, detz)
+            do z=-1,2
+                rz(z)=Phi(dble(z)-detz)
             enddo
+            call trimedindex(k, zDim, kz, boundaryConditions(5:6))
             velElemIB(s,iEL,1:3)=0.0
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        velElemIB(s,iEL,1:3)=velElemIB(s,iEL,1:3)+uuu(z+k,y+j,x+i,1:3)*rx(x)*ry(y)*rz(z)
+                        velElemIB(s,iEL,1:3)=velElemIB(s,iEL,1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
             enddo
         enddo
     enddo
+    !$OMP END PARALLEL DO
     !***********************************************************************************************
     ! calculate interaction force
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,s)
@@ -428,29 +443,29 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     ! calculate Eulerian body force
     ! no parallel to avoid write conflict to forceTemp
     do iEL=1,nEL
-        call my_minloc(posElem(1,iEL,1), xGrid, xDim, isUniformGrid(1), i)
-        call my_minloc(posElem(1,iEL,2), yGrid, yDim, isUniformGrid(2), j)
-        do x=-1+i,2+i
-            rx(x-i)=Phi((posElem(1,iEL,1)-xGrid(x))*invdh)
+        call minloc_fast(posElem(1,iEL,1), x0, i0, invdh, i, detx)
+        call minloc_fast(posElem(1,iEL,2), y0, j0, invdh, j, dety)
+        do x=-1,2
+            rx(x)=Phi(dble(x)-detx)*invdh
         enddo
-        do y=-1+j,2+j
-            ry(y-j)=Phi((posElem(1,iEL,2)-yGrid(y))*invdh)
+        do y=-1,2
+            ry(y)=Phi(dble(y)-dety)*invdh
         enddo
+        call trimedindex(i, xDim, ix, boundaryConditions(1:2))
+        call trimedindex(j, yDim, jy, boundaryConditions(3:4))
         do s=1,Nspan
-            call my_minloc(posElem(s,iEL,3), zGrid, zDim, isUniformGrid(3), k)
-            do z=-1+k,2+k
-                rz(z-k)=Phi((posElem(s,iEL,3)-zGrid(z))*invdh)
+            call minloc_fast(posElem(s,iEL,3), z0, k0, invdh, k, detz)
+            do z=-1,2
+                rz(z)=Phi(dble(z)-detz)*invdh
             enddo
+            call trimedindex(k, zDim, kz, boundaryConditions(5:6))
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)*invdh*invdh*invdh
+                        forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)
                         ! update velocity
-                        ix = i + x
-                        iy = j + y
-                        iz = k + z
-                        uuu(iz,iy,ix,1:3)  = uuu(iz,iy,ix,1:3)+0.5*dt*forceTemp(1:3)/den(iz,iy,ix)
-                        force(iz,iy,ix,1:3) = force(iz,iy,ix,1) + forceTemp(1:3)
+                        uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+0.5*dt*forceTemp(1:3)/den(kz(z),jy(y),ix(x))
+                        force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
                     enddo
                 enddo
             enddo
@@ -458,7 +473,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     enddo
     forceElem(:,1:nEL,1:3) = forceElem(:,1:nEL,1:3)+forceElemTemp(:,1:nEL,1:3)
     ! convergence test
-    dsum=Uref*nEL
+    dsum=Uref*nEL*Nspan
     dmaxLBM=0.0
     do iEL=1,nEL
         do s=1,Nspan
@@ -468,22 +483,38 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     dmaxLBM=dmaxLBM/dsum
     iterLBM=iterLBM+1
 !***********************************************************************************************
-enddo 
+enddo
 !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
 !**************************************************************************************************
+if(.false. .and. boundaryConditions(5).eq.symmetric) then
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
+    do x=1,xDim
+        force(1,:,x,1) = force(1,:,x,1) * 2.d0
+        force(1,:,x,2) = force(1,:,x,2) * 2.d0
+        force(1,:,x,3) = 0.d0
+    enddo
+    !$OMP END PARALLEL DO
+endif
+if(.false. .and. boundaryConditions(6).eq.symmetric) then
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
+    do x=1,xDim
+        force(zDim,:,x,1) = force(zDim,:,x,1) * 2.d0
+        force(zDim,:,x,2) = force(zDim,:,x,2) * 2.d0
+        force(zDim,:,x,3) = 0.d0
+    enddo
+    !$OMP END PARALLEL DO
+endif
 !**************************************************************************************************
 !   element force to nodal force
-forceNode(1:nND,1:3)=0.0
+extful(1:nND,1:6)=0.0
 do iEL=1,nEL
     i=ele(iEL,1)
     j=ele(iEL,2)
     do s=1,Nspan
-        forceNode(i,1:3)=forceNode(i,1:3)+forceElem(s,iEl,1:3)*0.5d0
-        forceNode(j,1:3)=forceNode(j,1:3)+forceElem(s,iEl,1:3)*0.5d0
+        extful(i,1:2)=extful(i,1:2)+forceElem(s,iEl,1:2)*0.5d0
+        extful(j,1:2)=extful(j,1:2)+forceElem(s,iEl,1:2)*0.5d0
     enddo
 enddo
-extful(1:nND,1:2) = forceNode(1:nND,1:2)
-extful(1:nND,3:6) = 0.0d0
 if(Palpha.gt.0.d0) then
     deallocate(posElemIB)
 endif
