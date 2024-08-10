@@ -264,7 +264,7 @@
             !loading vector
             lodful(iFish,1:nND(iFish),1:6) = extful(iFish,1:nND(iFish),1:6) + grav(iFish,1:nND(iFish),1:6) + repful(iFish,1:nND(iFish),1:6)
             !-----------------------------------------
-            CALL solver(jBC(iFish,1:nND(iFish),1:6),vBC(iFish,1:nND(iFish),1:6),ele(iFish,1:nEL(iFish),1:5), &
+            CALL structure_solver(jBC(iFish,1:nND(iFish),1:6),vBC(iFish,1:nND(iFish),1:6),ele(iFish,1:nEL(iFish),1:5), &
                                   nloc(iFish,1:nND(iFish)*6),nprof(iFish,1:nND(iFish)*6),nprof2(iFish,1:nND(iFish)*6), &
                                   prop(iFish,1:nMT(iFish),1:10),mss(iFish,1:nND(iFish)*6), &
                                   xyzful0(iFish,1:nND(iFish),1:6),xyzful(iFish,1:nND(iFish),1:6),dspful(iFish,1:nND(iFish),1:6), &
