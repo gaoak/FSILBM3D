@@ -437,23 +437,8 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
                 stop
             endif
         enddo
-        if(boundaryConditions(5).eq.symmetric .and. posElem(1,iEL,3).le.zGrid(1)+dh)  then
-            forceElemTemp(1,iEL,1) = forceElemTemp(1,iEL,1) * 1.5d0
-            forceElemTemp(1,iEL,2) = forceElemTemp(1,iEL,2) * 1.5d0
-            forceElemTemp(1,iEL,3) = 0.d0
-        endif
-        if(boundaryConditions(6).eq.symmetric .and. posElem(Nspan,iEL,3).ge.zGrid(zDim)-dh)  then
-            forceElemTemp(Nspan,iEL,1) = forceElemTemp(Nspan,iEL,1) * 1.5d0
-            forceElemTemp(Nspan,iEL,2) = forceElemTemp(Nspan,iEL,2) * 1.5d0
-            forceElemTemp(Nspan,iEL,3) = 0.d0
-        endif
     enddo
     !$OMP END PARALLEL DO
-    if(boundaryConditions(3).eq.symmetric .and. posElem(1,1,2).le.yGrid(1)+dh)  then
-        forceElemTemp(:,1,1) = forceElemTemp(:,1,1) * 1.5d0
-        forceElemTemp(:,1,2) = 0.d0
-        forceElemTemp(:,1,3) = forceElemTemp(:,1,3) * 1.5d0
-    endif
     !***********************************************************************************************
     ! calculate Eulerian body force
     ! no parallel to avoid write conflict to forceTemp
