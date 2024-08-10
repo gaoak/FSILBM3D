@@ -270,8 +270,8 @@
                                   xyzful0(iFish,1:nND(iFish),1:6),xyzful(iFish,1:nND(iFish),1:6),dspful(iFish,1:nND(iFish),1:6), &
                                   velful(iFish,1:nND(iFish),1:6),accful(iFish,1:nND(iFish),1:6),lodful(iFish,1:nND(iFish),1:6),  &
                                   subdeltat,dampK,dampM,  &
-                                  triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_ee(iFish,1:3,1:3,1:nEL(iFish)),triad_e0(iFish,1:3,1:3,1:nEL(iFish)), &
-                                  triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)),triad_n3(iFish,1:3,1:3,1:nEL(iFish)), &
+                                  triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_ee(iFish,1:3,1:3,1:nEL(iFish)), &
+                                  triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)), &
                                   nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,    &
                                   nFish,iFish,FishInfo)
         else
