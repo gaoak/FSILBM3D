@@ -486,7 +486,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
 enddo
 !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
 !**************************************************************************************************
-if(boundaryConditions(5).eq.symmetric) then
+if(.false. .and. boundaryConditions(5).eq.symmetric) then
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
     do x=1,xDim
         force(1,:,x,1) = force(1,:,x,1) * 2.d0
@@ -495,7 +495,7 @@ if(boundaryConditions(5).eq.symmetric) then
     enddo
     !$OMP END PARALLEL DO
 endif
-if(boundaryConditions(6).eq.symmetric) then
+if(.false. .and. boundaryConditions(6).eq.symmetric) then
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
     do x=1,xDim
         force(zDim,:,x,1) = force(zDim,:,x,1) * 2.d0
