@@ -674,24 +674,28 @@
         ! 14 -1  0 -1 ->  11  1  0  1
         ! 17  0  1 -1 ->  16  0 -1  1
         ! 18  0 -1 -1 ->  15  0  1  1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
         do  x = 1, xDim
         do  y = 1, yDim
             fTmp([5,11,12,15,16]) = fIn(1,y,x,oppo([5,11,12,15,16]))
             fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
         enddo
         enddo
+        !$OMP END PARALLEL DO
     elseif(zMinBC.eq.Symmetric) then
         !  6  0  0 -1 ->   5  0  0  1
         ! 13  1  0 -1 ->  11  1  0  1
         ! 14 -1  0 -1 ->  12 -1  0  1
         ! 17  0  1 -1 ->  15  0  1  1
         ! 18  0 -1 -1 ->  16  0 -1  1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
         do  x = 1, xDim
             do  y = 1, yDim
                 fTmp([5,11,12,15,16]) = fIn(1,y,x,[6,13,14,17,18])
                 fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
         enddo
+        !$OMP END PARALLEL DO
     elseif(zMinBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim
@@ -757,24 +761,28 @@
         ! 12 -1  0  1 ->  13  1  0 -1
         ! 15  0  1  1 ->  18  0 -1 -1
         ! 16  0 -1  1 ->  17  0  1 -1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
         do  x = 1, xDim
         do  y = 1, yDim
             fTmp([6,13,14,17,18]) = fIn(zDim,y,x,oppo([6,13,14,17,18]))
             fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
         enddo
         enddo
+        !$OMP END PARALLEL DO
     elseif(zMaxBC.eq.Symmetric) then
         !  5  0  0  1 ->   6  0  0 -1
         ! 11  1  0  1 ->  13  1  0 -1
         ! 12 -1  0  1 ->  14 -1  0 -1
         ! 15  0  1  1 ->  17  0  1 -1
         ! 16  0 -1  1 ->  18  0 -1 -1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,fTmp)
         do  x = 1, xDim
             do  y = 1, yDim
                 fTmp([6,13,14,17,18]) = fIn(zDim,y,x,[5,11,12,15,16])
                 fIn(zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
         enddo
+        !$OMP END PARALLEL DO
     elseif(zMaxBC==movingWall) then
         do  x = 1, xDim
         do  y = 1, yDim
