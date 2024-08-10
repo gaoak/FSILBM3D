@@ -10,7 +10,7 @@
     real(8):: xyzful(1:nFish,1:nND_max,1:6),repful(1:nFish,1:nND_max,1:6)
     !local
     integer:: iND,jND,iFish,jFish
-    real(8):: delta_h,Phi,r(1:3),ds(1:3),phi_r(1:3),SpanLength
+    real(8):: delta_h,Phi,r(1:3),ds(1:3),phi_r(1:3),Lspan
     real(8):: minx,miny,maxx,maxy,minz,maxz
     real(8):: xmin(1:nFish),xmax(1:nFish),ymin(1:nFish),ymax(1:nFish),zmin(1:nFish),zmax(1:nFish)
 
@@ -18,16 +18,16 @@
     ds(1)=dxmin
     ds(2)=dymin
     ds(3)=dzmin
-    SpanLength=dspan*Nspan
+    Lspan=dspan*Nspan
     if(Nspan.eq.0)then
-        SpanLength=1.0d0
+        Lspan=1.0d0
     endif
     
     do iFish=1,nFish
-        xmin(iFish) = minval(xyzful(iFish,1:nND(iFish),1))-dxmin*2.5d0
-        xmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),1))+dxmin*2.5d0
-        ymin(iFish) = minval(xyzful(iFish,1:nND(iFish),2))-dymin*2.5d0
-        ymax(iFish) = maxval(xyzful(iFish,1:nND(iFish),2))+dymin*2.5d0 
+        xmin(iFish) = minval(xyzful(iFish,1:nND(iFish),1))-dxmin*1.5d0
+        xmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),1))+dxmin*1.5d0
+        ymin(iFish) = minval(xyzful(iFish,1:nND(iFish),2))-dymin*1.5d0
+        ymax(iFish) = maxval(xyzful(iFish,1:nND(iFish),2))+dymin*1.5d0 
     enddo
 
     do iFish=1,nFish
@@ -52,10 +52,10 @@
                     endif
                     r(1)=(xyzful(iFish,iND,1)-xyzful(jFish,jND,1))/dxmin
                     r(2)=(xyzful(iFish,iND,2)-xyzful(jFish,jND,2))/dymin
-                    call get_smooth_phi_r(r,phi_r)
+                    call get_phi_r(r,phi_r)
                     delta_h=phi_r(1)*phi_r(2)/dxmin/dymin/dsqrt(r(1)*r(1)+r(2)*r(2))
-                    repful(iFish,iND,1:2)=repful(iFish,iND,1:2) + delta_h*r(1:2)*ds(1:2)*SpanLength ! force
-                    repful(jFish,jND,1:2)=repful(jFish,jND,1:2) - delta_h*r(1:2)*ds(1:2)*SpanLength ! reaction force
+                    repful(iFish,iND,1:2)=repful(iFish,iND,1:2) + delta_h*r(1:2)*ds(1:2)*Lspan ! force
+                    repful(jFish,jND,1:2)=repful(jFish,jND,1:2) - delta_h*r(1:2)*ds(1:2)*Lspan ! reaction force
                 enddo !jND=1,nND(jFish)
             enddo !iND=1,nND(iFish)
         enddo !jFish=iFish+1,nFish
@@ -768,27 +768,24 @@ END SUBROUTINE calculate_interaction_force_quad
     endif
     ENDFUNCTION Phi
 
-    subroutine get_smooth_phi_r(r,phi_r)
+    subroutine get_phi_r(r,phi_r)
         implicit none 
         real(8):: r(1:3),phi_r(1:3)
-        real(8):: rr , pi
+        real(8):: rr 
         integer:: i
-        pi=4.0*datan(1.0d0)
     
         do i=1,3
            rr=dabs(r(i))
-           if(rr.le.0.5d0)then
-                Phi_r(i)=(12.0d0+pi-rr*rr*8.0d0)/32.0d0
-           elseif(rr.le.1.5d0)then
-                Phi_r(i)=(2.0d0+(1-rr)*dsqrt(-2.0d0+8.0d0*rr-4.0d0*rr*rr)-dasin(dsqrt(2.0d0)*(rr-1)))/8.0d0
-            elseif(rr.le.2.5d0)then
-                Phi_r(i)=(68.0d0-pi-48*rr+8*rr*rr+4*(rr-2)*dsqrt(-14.0d0+16.0d0*rr-4.0d0*rr*rr)+4*dasin(dsqrt(2.0d0)*(rr-2)))/64.0d0
+           if(rr<1.0d0)then
+                Phi_r(i)=(3.0d0-2.0d0*rr+dsqrt(1.0d0+4.0d0*rr-4.0d0*rr*rr))/8.0d0
+           elseif(rr<2.0d0)then
+                Phi_r(i)=(5.0d0-2.0d0*rr-dsqrt(-7.0d0+12.0d0*rr-4.0d0*rr*rr))/8.0d0
            else
                 Phi_r(i)=0.0d0
            endif
         enddo
     
-    end subroutine get_smooth_phi_r
+    end subroutine get_phi_r
 
 subroutine initializexyzIB
 USE simParam
