@@ -421,27 +421,17 @@
         z3=xyzful(k,3)
 
         if(nt==2)then
-        ax =(x2-x1)
-        ay =(y2-y1)
-        az =(z2-z1)
+        ax = x2-x1
+        ay = y2-y1
+        az = z2-z1
         areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
         endif
 
-        if(nt==3)then        
-        x1=xyzful(i,1)
-        x2=xyzful(j,1)
-        x3=xyzful(k,1)
-        y1=xyzful(i,2)
-        y2=xyzful(j,2)
-        y3=xyzful(k,2)
-        z1=xyzful(i,3)
-        z2=xyzful(j,3)
-        z3=xyzful(k,3)
-
-        ax =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0
-        ay =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0
-        az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0
-        areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
+        if(nt==3)then
+        ax =(z1-z2)*(y3-y2) + (y2-y1)*(z3-z2)
+        ay =(x1-x2)*(z3-z2) + (z2-z1)*(x3-x2)
+        az =(y1-y2)*(x3-x2) + (x2-x1)*(y3-y2)
+        areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az) * 0.5d0
         endif
 
     enddo
@@ -669,11 +659,11 @@
         integer:: len, index, count, step, it
         real(8):: x, array(len)
         logical:: uniform
-        if (x<array(1) .or. x>array(len)) then
-            write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-            stop
-        endif
         if (.not.uniform) then
+            if (x<array(1) .or. x>array(len)) then
+                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                stop
+            endif
             index = 1
             count = len
             do while(count > 0)
@@ -691,5 +681,53 @@
             endif
         else
             index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
+            !int -1.1 -> -1; 1.1->1; 1.9->1
+            if (index<1 .or. index>len) then
+                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                stop
+            endif
         endif
     END SUBROUTINE
+
+    ! return the array(index) <= x < array(index+1)
+    ! assum uniform grid around x(x=i0) = x0
+    SUBROUTINE minloc_fast(x, x0, i0, invdh, index, offset)
+        implicit none
+        integer, intent(in):: i0
+        real(8), intent(in):: x, x0, invdh
+        integer, intent(out):: index
+        real(8), intent(out):: offset
+        offset = (x - x0)*invdh
+        index = floor(offset)
+        offset = offset - dble(index)
+        index = index + i0
+    END SUBROUTINE
+
+    SUBROUTINE trimedindex(i, xDim, ix, boundaryConditions)
+        USE BoundCondParams
+        implicit none
+        integer, intent(in):: boundaryConditions(1:2)
+        integer, intent(in):: i, xDim
+        integer, intent(out):: ix(-1:2)
+        integer:: k
+        do k=-1,2
+            ix(k) = i + k
+            if (ix(k)<1) then
+                if(boundaryConditions(1).eq.Periodic) then
+                    ix(k) = ix(k) + xDim
+                else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
+                    ix(k) = 2
+                else
+                    write(*,*) 'index out of xmin bound', ix(k)
+                endif
+            else if(ix(k)>xDim) then
+                if(boundaryConditions(2).eq.Periodic) then
+                    ix(k) = ix(k) - xDim
+                else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(2).eq.wall) .and. ix(k).eq.xDim+1) then
+                    ix(k) = xDim - 1
+                else
+                    write(*,*) 'index out of xmax bound', ix(k)
+                endif
+            endif
+        enddo
+    END SUBROUTINE trimedindex
