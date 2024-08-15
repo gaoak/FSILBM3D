@@ -107,7 +107,7 @@
 !   ===============================================================================================
     integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
     real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)
-    real(8), allocatable:: lodful(:,:,:),repful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:),streI(:,:),bendO(:,:)
+    real(8), allocatable:: lodful(:,:,:),repful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:)
 
     real(8), allocatable:: xyzful0(:,:,:),xyzfulnxt(:,:,:),dspful(:,:,:),accful(:,:,:)
     real(8), allocatable:: xyzful(:,:,:),velful(:,:,:)

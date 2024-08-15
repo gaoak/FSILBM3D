@@ -6,8 +6,8 @@
     implicit none
     integer:: nFish,nEL_max,nND_max
     real(8):: dxmin,dymin,dzmin
-    integer:: nND(1:nFish),nEL(1:nFish),ele(1:nFish,1:nEL_max,1:5)
-    real(8):: xyzful(1:nFish,1:nND_max,1:6),repful(1:nFish,1:nND_max,1:6)
+    integer:: nND(1:nFish),nEL(1:nFish),ele(1:nEL_max,1:5,1:nFish)
+    real(8):: xyzful(1:nND_max,1:6,1:nFish),repful(1:nND_max,1:6,1:nFish)
     !local
     integer:: iND,jND,iFish,jFish
     real(8):: delta_h,Phi,r(1:3),ds(1:3),phi_r(1:3),SpanLength
@@ -823,12 +823,12 @@ implicit none
 integer:: iND,s,iFish,Nspanpts
 if(Palpha.gt.0.d0) then
     Nspanpts = Nspan + 1
-    allocate(xyzfulIB_all(1:Nspanpts,nND_all,6),xyzfulIB(1:Nspanpts,1:nFish,nND_max,6))
+    allocate(xyzfulIB_all(1:Nspanpts,nND_all,6),xyzfulIB(1:Nspanpts,nND_max,6,1:nFish))
     !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(s,iFish)
     do iFish=1,nFish
         do s=1,Nspanpts
-            xyzfulIB(s,iFish,1:nND(iFish),1:6)=xyzful(1:nND(iFish),1:6,iFish)
-            xyzfulIB(s,iFish,1:nND(iFish),3)=xyzful(1:nND(iFish),3,iFish)+(s-1)*dspan
+            xyzfulIB(s,1:nND(iFish),1:6,iFish)=xyzful(1:nND(iFish),1:6,iFish)
+            xyzfulIB(s,1:nND(iFish),3,iFish)=xyzful(1:nND(iFish),3,iFish)+(s-1)*dspan
         enddo
     enddo
     !$OMP END PARALLEL DO
@@ -850,7 +850,7 @@ if(Palpha.gt.0.d0) then
             icount = sum(nND(1:iFish-1))
         endif
         do iND=1,nND(iFish)
-            xyzfulIB_all(:,iND+icount,1:6) = xyzfulIB(:,iFish,iND,1:6)
+            xyzfulIB_all(:,iND+icount,1:6) = xyzfulIB(:,iND,1:6,iFish)
         enddo
     enddo
     !$OMP END PARALLEL DO
@@ -871,7 +871,7 @@ if(Palpha.gt.0.d0) then
             icount = sum(nND(1:iFish-1))
         endif
         do iND=1,nND(iFish)
-            xyzfulIB(:,iFish,iND,1:6) =  xyzfulIB_all(:,iND + icount,1:6)
+            xyzfulIB(:,iND,1:6,iFish) =  xyzfulIB_all(:,iND + icount,1:6)
         enddo
     enddo
     !$OMP END PARALLEL DO

@@ -247,13 +247,6 @@
         write(111,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
         close(111)
 
-        streI(1:nND(iFish),iFish)=0.0d0
-        bendO(1:nND(iFish),iFish)=0.0d0
-        do  iEL=1,nEL(iFish)
-            streI(ele(iEL,1:3,iFish),iFish)=streI(ele(iEL,1:3,iFish),iFish)+strainEnergy(iEL,1,iFish)/3
-            bendO(ele(iEL,1:3,iFish),iFish)=bendO(ele(iEL,1:3,iFish),iFish)+strainEnergy(iEL,2,iFish)/3
-        enddo
-
     enddo !nFish
 
     UNow=sum(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))
@@ -269,9 +262,9 @@
     close(111)
 
     open(111,file='./DatInfo/MaxValBody.plt',position='append')
-    write(111,'(4E20.10)')time/Tref,maxval(dsqrt(xyzful(1:nFish,1:nND_max,1)**2+xyzful(1:nFish,1:nND_max,2)**2+xyzful(1:nFish,1:nND_max,3)**2))/Lref, &
-                                    maxval(dsqrt(velful(1:nFish,1:nND_max,1)**2+velful(1:nFish,1:nND_max,2)**2+velful(1:nFish,1:nND_max,3)**2))/Uref, &
-                                    maxval(dsqrt(accful(1:nFish,1:nND_max,1)**2+accful(1:nFish,1:nND_max,2)**2+accful(1:nFish,1:nND_max,3)**2))/Aref
+    write(111,'(4E20.10)')time/Tref,maxval(dsqrt(xyzful(1:nND_max,1,1:nFish)**2+xyzful(1:nND_max,2,1:nFish)**2+xyzful(1:nND_max,3,1:nFish)**2))/Lref, &
+                                    maxval(dsqrt(velful(1:nND_max,1,1:nFish)**2+velful(1:nND_max,2,1:nFish)**2+velful(1:nND_max,3,1:nFish)**2))/Uref, &
+                                    maxval(dsqrt(accful(1:nND_max,1,1:nFish)**2+accful(1:nND_max,2,1:nFish)**2+accful(1:nND_max,3,1:nFish)**2))/Aref
     close(111)
 
     do  i=1,numSampFlow

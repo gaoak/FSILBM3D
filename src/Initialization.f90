@@ -59,7 +59,7 @@
     if(nFish.eq.0) iForce2Body = 0
 
     if(nFish>0) then
-        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:nFish,1:DOFDim))
+        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
@@ -104,8 +104,8 @@
 
     if(nFish>0) then
         allocate(Freq(1:nFish),St(1:nFish))
-        allocate(XYZo(1:nFish,1:3),XYZAmpl(1:nFish,1:3),XYZPhi(1:nFish,1:3))
-        allocate(AoAo(1:nFish,1:3),AoAAmpl(1:nFish,1:3),AoAPhi(1:nFish,1:3))
+        allocate(XYZo(1:3,1:nFish),XYZAmpl(1:3,1:nFish),XYZPhi(1:3,1:nFish))
+        allocate(AoAo(1:3,1:nFish),AoAAmpl(1:3,1:nFish),AoAPhi(1:3,1:nFish))
         FishOrder1 =0
         FishOrder2 =0
     endif
@@ -164,7 +164,7 @@
     call readequal(111)
     if(nFish>0) then
         read(111,*)     numSampBody
-        allocate(SampBodyNode(1:nFish,1:numSampBody))
+        allocate(SampBodyNode(1:numSampBody,1:nFish))
         read(111,*)     SampBodyNode(1,1:numSampBody)
         do iFish=1,nFish
         SampBodyNode(1:numSampBody,iFish)=SampBodyNode(1,1:numSampBody)
@@ -320,14 +320,14 @@
 !   ===============================================================================================
     allocate( ele_all(nEL_all,5),xyzful_all(nND_all,6),velful_all(nND_all,6),extful_all(nND_all,6))
 
-    allocate( ele(1:nFish,nEL_max,5),xyzful00(1:nFish,nND_max,6),xyzful0(1:nFish,nND_max,6),mssful(1:nFish,nND_max,6),lodful(1:nFish,nND_max,6), &
-              extful(1:nFish,nND_max,6),repful(1:nFish,nND_max,1:6),extful1(1:nFish,nND_max,6),extful2(1:nFish,nND_max,6),nloc(1:nFish,nND_max*6),nprof(1:nFish,nND_max*6), &
-              nprof2(1:nFish,nND_max*6),jBC(1:nFish,nND_max,6),streI(1:nFish,nND_max),bendO(1:nFish,nND_max))
-    allocate( grav(1:nFish,nND_max,6),vBC(1:nFish,nND_max,6),mss(1:nFish,nND_max*6),prop(1:nFish,nMT_max,10),areaElem00(1:nFish,nEL_max),areaElem(1:nFish,nEL_max))
+    allocate( ele(nEL_max,5,1:nFish),xyzful00(nND_max,6,1:nFish),xyzful0(nND_max,6,1:nFish),mssful(nND_max,6,1:nFish),lodful(nND_max,6,1:nFish), &
+              extful(nND_max,6,1:nFish),repful(nND_max,1:6,1:nFish),extful1(nND_max,6,1:nFish),extful2(nND_max,6,1:nFish),nloc(nND_max*6,1:nFish),nprof(nND_max*6,1:nFish), &
+              nprof2(nND_max*6,1:nFish),jBC(nND_max,6,1:nFish))
+    allocate( grav(nND_max,6,1:nFish),vBC(nND_max,6,1:nFish),mss(nND_max*6,1:nFish),prop(nMT_max,10,1:nFish),areaElem00(nEL_max,1:nFish),areaElem(nEL_max,1:nFish))
 
-    allocate( xyzful(1:nFish,nND_max,6),xyzfulnxt(1:nFish,nND_max,6),dspful(1:nFish,nND_max,6),velful(1:nFish,nND_max,6),accful(1:nFish,nND_max,6))
-    allocate( triad_nn(1:nFish,3,3,nND_max),triad_ee(1:nFish,3,3,nEL_max),triad_e0(1:nFish,3,3,nEL_max) )
-    allocate( triad_n1(1:nFish,3,3,nEL_max),triad_n2(1:nFish,3,3,nEL_max),triad_n3(1:nFish,3,3,nEL_max) )
+    allocate( xyzful(nND_max,6,1:nFish),xyzfulnxt(nND_max,6,1:nFish),dspful(nND_max,6,1:nFish),velful(nND_max,6,1:nFish),accful(nND_max,6,1:nFish))
+    allocate( triad_nn(3,3,nND_max,1:nFish),triad_ee(3,3,nEL_max,1:nFish),triad_e0(3,3,nEL_max,1:nFish) )
+    allocate( triad_n1(3,3,nEL_max,1:nFish),triad_n2(3,3,nEL_max,1:nFish),triad_n3(3,3,nEL_max,1:nFish) )
 
     repful(:,:,1:6) =0.d0
     extful1(:,:,1:6)=0.d0
@@ -368,15 +368,13 @@
     enddo
 !   ===============================================================================================
 !   calculate area
-    allocate(NDtl(1:nFish,1:5),NDhd(1:nFish,1:3),NDct(1:nFish),elmax(1:nFish),elmin(1:nFish))
+    allocate(NDtl(1:5,1:nFish),NDhd(1:3,1:nFish),NDct(1:nFish),elmax(1:nFish),elmin(1:nFish))
     allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish))
     do iFish=1,nFish
         call cptArea(areaElem00(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful00(1:nND(iFish),1:6,iFish))
         nAsfac(iFish)=sum(areaElem00(1:nEL(iFish),iFish))
         elmax(iFish)=maxval(areaElem00(1:nEL(iFish),iFish))
         elmin(iFish)=minval(areaElem00(1:nEL(iFish),iFish))
-        streI(1:nND(iFish),iFish)=0.0d0
-        bendO(1:nND(iFish),iFish)=0.0d0
     enddo
     !calculate spanwise length, chord length, aspect ratio
     if(iChordDirection==1)then
@@ -499,9 +497,9 @@
     implicit none
     integer:: iND,iFish,iCount
     if(nFish.eq.0) return
-    allocate(TTT00(1:nFish,1:3,1:3),TTT0(1:nFish,1:3,1:3),TTTnow(1:nFish,1:3,1:3),TTTnxt(1:nFish,1:3,1:3))
-    allocate(XYZ(1:nFish,1:3),XYZd(1:nFish,1:3),UVW(1:nFish,1:3) )
-    allocate(AoA(1:nFish,1:3),AoAd(1:nFish,1:3),WWW1(1:nFish,1:3),WWW2(1:nFish,1:3),WWW3(1:nFish,1:3) )
+    allocate(TTT00(1:3,1:3,1:nFish),TTT0(1:3,1:3,1:nFish),TTTnow(1:3,1:3,1:nFish),TTTnxt(1:3,1:3,1:nFish))
+    allocate(XYZ(1:3,1:nFish),XYZd(1:3,1:nFish),UVW(1:3,1:nFish) )
+    allocate(AoA(1:3,1:nFish),AoAd(1:3,1:nFish),WWW1(1:3,1:nFish),WWW2(1:3,1:nFish),WWW3(1:3,1:nFish) )
     iCount = 0
     do iFish=1,nFish
         TTT00(:,:,iFish)=0.0d0

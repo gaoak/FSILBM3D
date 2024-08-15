@@ -23,7 +23,7 @@
     CALL write_params()
     CALL calculate_MRTM_params()
 
-    allocate(FishInfo(1:nFish,1:3))
+    allocate(FishInfo(1:3,1:nFish))
 
     call OMP_set_num_threads(npsize)
     write(*,*)'npsize=', npsize

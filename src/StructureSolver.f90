@@ -36,7 +36,7 @@
     real(8):: Newmarkdelta,Newmarkalpha
     real(8):: a0,a1,a2,a3,a4,a5,a6,a7
     real(8):: beta0,beta,gamma,zi,z0
-    real(8):: dtol,dnorm,geoFRM(nEL),FishInfo(1:nFish,1:3)
+    real(8):: dtol,dnorm,geoFRM(nEL),FishInfo(1:3,1:nFish)
     integer:: i,j,iND,iEQ,iter,iterMax,iloc,ierror,maxramp,iModify,i1,i2
 !   -----------------------------------------------------------------------------------------------
     a0 = 1.0d0/(Newmarkalpha*deltat*deltat)

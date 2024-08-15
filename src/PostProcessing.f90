@@ -210,7 +210,7 @@
     implicit none
     integer:: nND_max,nEL_max,nFish
     integer:: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
-    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish) !,streI(1:nND),bendO(1:nND)
+    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish)
     real(8):: time
 !   -------------------------------------------------------
 
@@ -261,7 +261,7 @@
         enddo
         write(idfile) 0,-1
         do  i=1,nND(iFish)
-            write(idfile)   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish)) !,real(streI(i)),real(bendO(i))
+            write(idfile)   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish))
         enddo
         do  i=1,nEL(iFish)
             write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
@@ -523,7 +523,7 @@
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Re   =',Re
         write(111,'(A,F20.10)')'denR =',denIn
-        write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:nFish,1:3)))
+        write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3,1:nFish)))
         write(111,'(A,F20.10)')'AR   =',AR
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Asfac=',Asfac

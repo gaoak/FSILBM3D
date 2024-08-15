@@ -83,6 +83,34 @@ int main(int argc, char* argv[])
             }
             else break;
         }
+        string match3("(1:nFish,");
+        while(1)
+        {
+            size_t pos = line.find(match3);
+            if(pos!=line.npos)
+            {
+                size_t i, count = 1;
+                for(i=pos+1; i<line.size();++i)
+                {
+                    if(line[i]=='(') ++count;
+                    else if(line[i]==')') --count;
+                    if(count == 0) break;
+                }
+                for(size_t j=pos+9; j<i; ++j)
+                {
+                    line[j-8] = line[j];
+                }
+                line[i-8] = ',';
+                line[i-7] = '1';
+                line[i-6] = ':';
+                line[i-5] = 'n';
+                line[i-4] = 'F';
+                line[i-3] = 'i';
+                line[i-2] = 's';
+                line[i-1] = 'h';
+            }
+            else break;
+        }
         if(line.size())
         {
             ofile << line << endl;
