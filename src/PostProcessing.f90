@@ -1,6 +1,6 @@
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write field, tecplot binary format
-!    copyright@ RuNanHua       
+!    copyright@ RuNanHua
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_flow_field(isT)
     USE, INTRINSIC :: IEEE_ARITHMETIC
@@ -10,9 +10,9 @@
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName
     logical:: nanfound
-    !==================================================================================================        
+    !==================================================================================================
     integer::    nv
-    integer,parameter:: namLen=40,idfile=100,numVar=7 
+    integer,parameter:: namLen=40,idfile=100,numVar=7
     integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
                         varname(numVar)=['x','y','z','p','u','v','w']
@@ -41,10 +41,10 @@
     else
         open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
     endif
-    
-    
+
+
 !   =============================================================================================
-    write(idfile) "#!TDV101"    
+    write(idfile) "#!TDV101"
     write(idfile) 1
     call dumpstring(title,idfile)
 
@@ -67,11 +67,11 @@
     write(idfile) ZONEMARKER
 !    variable data format, 1=Float, 2=Double, 3=LongInt, 4=ShortInt, 5=Byte, 6=Bit
     do  nv=1,numVar
-        write(idfile) 1                                 
+        write(idfile) 1
     enddo
     write(idfile) 0,-1
-    
-    if(isMoveGrid==1 .and. (isMoveOutputX==1 .or. isMoveOutputY==1 .or. isMoveOutputZ==1))then 
+
+    if(isMoveGrid==1 .and. (isMoveOutputX==1 .or. isMoveOutputY==1 .or. isMoveOutputZ==1))then
         if    ((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ/=1.and. isMoveOutputZ/=1))then
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
@@ -123,7 +123,7 @@
         else
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
-            do    z=1+offsetOutput, zDim-offsetOutput      
+            do    z=1+offsetOutput, zDim-offsetOutput
             write(idfile) real(xGrid(x)/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
@@ -141,61 +141,61 @@
 
     do iFish=1,nFish
         do i=1,1,nND(iFish)
-            if ((.not. IEEE_IS_FINITE(velful(iFish,i,1))) .or. (.not. IEEE_IS_FINITE(velful(iFish,i,2))) .or. (.not. IEEE_IS_FINITE(velful(iFish,i,3)))) then
-                write(*, *) 'Nan found in body velocity (iFish, i)', iFish, i
-                velful(iFish,i,1:3)=0.99d9
+            if ((.not. IEEE_IS_FINITE(velful(i,1,iFish))) .or. (.not. IEEE_IS_FINITE(velful(i,2,iFish))) .or. (.not. IEEE_IS_FINITE(velful(i,3,iFish)))) then
+                write(*, *) 'Nan found in body velocity ( i,iFish)', iFish, i
+                velful(i,1:3,iFish)=0.99d9
                 nanfound = .true.
             endif
         enddo
         write(idfile) ZONEMARKER
         do  nv=1,numVar
-            write(idfile) 1                                 
+            write(idfile) 1
         enddo
         write(idfile) 0,-1
         if(isMoveGrid==1 .and. (isMoveOutputX==1 .or. isMoveOutputY==1 .or. isMoveOutputZ==1)) then
             if    ((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ/=1 .and. isMoveOutputZ/=1))then
                 do    i=1,nND(iFish)
-                write(idfile)   real((xyzful(iFish,i,1)-xyzful(iFish,NDref,1))/Lref),real(xyzful(iFish,i,2)/Lref),real(xyzful(iFish,i,3)/Lref),real(0.0), &
-                            real(velful(iFish,i,1:3)/Uref)
+                write(idfile)   real((xyzful(i,1,iFish)-xyzful(NDref,1,iFish))/Lref),real(xyzful(i,2,iFish)/Lref),real(xyzful(i,3,iFish)/Lref),real(0.0), &
+                            real(velful(i,1:3,iFish)/Uref)
                 enddo
             elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1 .and. isMoveOutputZ/=1))then
                 do    i=1,nND(iFish)
-                write(idfile)   real(xyzful(iFish,i,1)/Lref),real((xyzful(iFish,i,2)-xyzful(iFish,NDref,2))/Lref),real(xyzful(iFish,i,3)/Lref),real(0.0), &
-                            real(velful(iFish,i,1:3)/Uref)
+                write(idfile)   real(xyzful(i,1,iFish)/Lref),real((xyzful(i,2,iFish)-xyzful(NDref,2,iFish))/Lref),real(xyzful(i,3,iFish)/Lref),real(0.0), &
+                            real(velful(i,1:3,iFish)/Uref)
                 enddo
             elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
                 do    i=1,nND(iFish)
-                write(idfile)   real(xyzful(iFish,i,1)/Lref),real(xyzful(iFish,i,2)/Lref),real((xyzful(iFish,i,3)-xyzful(iFish,NDref,3))/Lref),real(0.0), &
-                            real(velful(iFish,i,1:3)/Uref)
+                write(idfile)   real(xyzful(i,1,iFish)/Lref),real(xyzful(i,2,iFish)/Lref),real((xyzful(i,3,iFish)-xyzful(NDref,3,iFish))/Lref),real(0.0), &
+                            real(velful(i,1:3,iFish)/Uref)
                 enddo
             elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ/=1 .and. isMoveOutputZ/=1))then
                 do    i=1,nND(iFish)
-                write(idfile)   real((xyzful(iFish,i,1)-xyzful(iFish,NDref,1))/Lref),real((xyzful(iFish,i,2)-xyzful(iFish,NDref,2))/Lref),real(xyzful(iFish,i,3)/Lref),real(0.0), &
-                            real(velful(iFish,i,1:3)/Uref)
+                write(idfile)   real((xyzful(i,1,iFish)-xyzful(NDref,1,iFish))/Lref),real((xyzful(i,2,iFish)-xyzful(NDref,2,iFish))/Lref),real(xyzful(i,3,iFish)/Lref),real(0.0), &
+                            real(velful(i,1:3,iFish)/Uref)
                 enddo
             elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY/=1 .and. isMoveOutputY/=1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
                 do    i=1,nND(iFish)
-                write(idfile)   real((xyzful(iFish,i,1)-xyzful(iFish,NDref,1))/Lref),real(xyzful(iFish,i,2)/Lref),real((xyzful(iFish,i,3)-xyzful(iFish,NDref,3))/Lref),real(0.0), &
-                            real(velful(iFish,i,1:3)/Uref)
+                write(idfile)   real((xyzful(i,1,iFish)-xyzful(NDref,1,iFish))/Lref),real(xyzful(i,2,iFish)/Lref),real((xyzful(i,3,iFish)-xyzful(NDref,3,iFish))/Lref),real(0.0), &
+                            real(velful(i,1:3,iFish)/Uref)
                 enddo
             elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
                 do    i=1,nND(iFish)
-                write(idfile)   real(xyzful(iFish,i,1)/Lref),real((xyzful(iFish,i,2)-xyzful(iFish,NDref,2))/Lref),real((xyzful(iFish,i,3)-xyzful(iFish,NDref,3))/Lref),real(0.0), &
-                            real(velful(iFish,i,1:3)/Uref)
+                write(idfile)   real(xyzful(i,1,iFish)/Lref),real((xyzful(i,2,iFish)-xyzful(NDref,2,iFish))/Lref),real((xyzful(i,3,iFish)-xyzful(NDref,3,iFish))/Lref),real(0.0), &
+                            real(velful(i,1:3,iFish)/Uref)
                 enddo
             else
                 do    i=1,nND(iFish)
-                write(idfile)   real(xyzful(iFish,i,1:3)/Lref),real(0.0),real(velful(iFish,i,1:3)/Uref)                           
+                write(idfile)   real(xyzful(i,1:3,iFish)/Lref),real(0.0),real(velful(i,1:3,iFish)/Uref)
                 enddo
-            endif                         
+            endif
         else
             do    i=1,nND(iFish)
-            write(idfile)   real(xyzful(iFish,i,1:3)/Lref),real(0.0),real(velful(iFish,i,1:3)/Uref)                           
+            write(idfile)   real(xyzful(i,1:3,iFish)/Lref),real(0.0),real(velful(i,1:3,iFish)/Uref)
             enddo
         endif
 
         do  i=1,nEL(iFish)
-            write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
+            write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
         enddo
     enddo
     close(idfile)
@@ -205,24 +205,24 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot binary format
 !    copyright@ RuNanHua
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
-    SUBROUTINE write_solid_field(nFish,xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max)
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max,nFish)
     implicit none
     integer:: nND_max,nEL_max,nFish
-    integer:: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
-    real(8):: xyzful(nFish,nND_max,6),velful(nFish,nND_max,6),accful(nFish,nND_max,6),extful(nFish,1:nND_max,1:6) !,streI(1:nND),bendO(1:nND)
+    integer:: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
+    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish) !,streI(1:nND),bendO(1:nND)
     real(8):: time
 !   -------------------------------------------------------
 
     integer:: i,iFish
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
-    !==================================================================================================        
+    !==================================================================================================
     integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=12
     integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
     character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz'] 
+                        varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz']
     !==================================================================================================
 
     write(fileName,'(I10)') nint(time*1d5)
@@ -235,8 +235,8 @@
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
         OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
     !   I. The header section.
-    !   =============================================        
-        write(idfile) "#!TDV101"    
+    !   =============================================
+        write(idfile) "#!TDV101"
         write(idfile) 1
         call dumpstring(title,idfile)
         write(idfile) numVar
@@ -246,7 +246,7 @@
     !   ---------------------------------------------
     !   zone head for ZONE1
     !   ---------------------------------------------
-        write(idfile) ZONEMARKER              
+        write(idfile) ZONEMARKER
         call dumpstring(zonename,idfile)
         write(idfile) -1,2,1,0,0,nND(iFish),nEL(iFish),0,0,0,0
 
@@ -257,14 +257,14 @@
     !   =============================================
         write(idfile) ZONEMARKER
         do  nv=1,numVar
-            write(idfile) 1                                 
+            write(idfile) 1
         enddo
         write(idfile) 0,-1
         do  i=1,nND(iFish)
-            write(idfile)   real(xyzful(iFish,i,1:3)),real(velful(iFish,i,1:3)),real(accful(iFish,i,1:3)),real(extful(iFish,i,1:3)) !,real(streI(i)),real(bendO(i))                                                  
+            write(idfile)   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish)) !,real(streI(i)),real(bendO(i))
         enddo
         do  i=1,nEL(iFish)
-            write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
+            write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
         enddo
         close(idfile)
     enddo
@@ -274,10 +274,10 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot binary
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solidIB_field(nFish,xyzfulIB,ele,time,nND,nEL,nND_max,nEL_max,Nspan)
+    SUBROUTINE write_solidIB_field(xyzfulIB,ele,time,nND,nEL,nND_max,nEL_max,Nspan,nFish)
     implicit none
     integer,intent(in):: nND_max,nEL_max,nFish,Nspan
-    integer,intent(in):: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
+    integer,intent(in):: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
     real(8),intent(in):: xyzfulIB(1:Nspan+1,nFish,nND_max,6)
     real(8),intent(in):: time
     !   -------------------------------------------------------
@@ -294,7 +294,7 @@
     do iFish=1,nFish
         if(Nspan.eq.0) then
             Nspanpts = 1
-            ElmType = ele(iFish,1,4)
+            ElmType = ele(1,4,iFish)
         else
             Nspanpts = Nspan + 1
             ElmType = 4
@@ -318,13 +318,13 @@
         enddo
         do  i=1,nEL(iFish)
             if(ElmType.eq.2) then
-                write(idfile) ele(iFish,i,1),ele(iFish,i,2)
+                write(idfile) ele(i,1,iFish),ele(i,2,iFish)
             elseif(ElmType.eq.3) then
-                write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
+                write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
             else
                 do j=1,Nspan
-                    off1 = (ele(iFish,i,1)-1) * Nspanpts + j
-                    off2 = (ele(iFish,i,2)-1) * Nspanpts + j
+                    off1 = (ele(i,1,iFish)-1) * Nspanpts + j
+                    off2 = (ele(i,2,iFish)-1) * Nspanpts + j
                     write(idfile,*) off1, off1+1, off2+1, off2
                 enddo
             endif
@@ -333,16 +333,16 @@
     enddo
     !   =============================================
     END SUBROUTINE
-    
+
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot binary
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_span_field(nFish,xyzful,ele,time,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+    SUBROUTINE write_solid_span_field(xyzful,ele,time,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
     implicit none
     integer,intent(in):: nND_max,nEL_max,nFish,Nspan
     real(8),intent(in):: dspan
-    integer,intent(in):: ele(nFish,nEL_max,5),nND(nFish),nEL(nFish)
-    real(8),intent(in):: xyzful(nFish,nND_max,6)
+    integer,intent(in):: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
+    real(8),intent(in):: xyzful(nND_max,6,nFish)
     real(8),intent(in):: time
     !   -------------------------------------------------------
     integer:: i,j,iFish,Nspanpts,ElmType,off1, off2
@@ -359,7 +359,7 @@
     do iFish=1,nFish
         if(Nspan.eq.0) then
             Nspanpts = 1
-            ElmType = ele(iFish,1,4)
+            ElmType = ele(1,4,iFish)
         else
             Nspanpts = Nspan + 1
             ElmType = 4
@@ -379,18 +379,18 @@
         do  i=1,nND(iFish)
             do j=1,Nspanpts
                 Lspan = (j-1)*dspan
-                write(idfile,*)  xyzful(iFish,i,1:2),xyzful(iFish,i,3)+Lspan/Lref
+                write(idfile,*)  xyzful(i,1:2,iFish),xyzful(i,3,iFish)+Lspan/Lref
             enddo
         enddo
         do  i=1,nEL(iFish)
             if(ElmType.eq.2) then
-                write(idfile) ele(iFish,i,1),ele(iFish,i,2)
+                write(idfile) ele(i,1,iFish),ele(i,2,iFish)
             elseif(ElmType.eq.3) then
-                write(idfile) ele(iFish,i,1),ele(iFish,i,2),ele(iFish,i,3)
+                write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
             else
                 do j=1,Nspan
-                    off1 = (ele(iFish,i,1)-1) * Nspanpts + j
-                    off2 = (ele(iFish,i,2)-1) * Nspanpts + j
+                    off1 = (ele(i,1,iFish)-1) * Nspanpts + j
+                    off2 = (ele(i,2,iFish)-1) * Nspanpts + j
                     write(idfile,*) off1, off1+1, off2+1, off2
                 enddo
             endif
@@ -399,9 +399,9 @@
     enddo
     !   =============================================
     END SUBROUTINE
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   write flow slice, tecplot binary
-!   copyright@ RuNanHua  
+!   copyright@ RuNanHua
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    SUBROUTINE write_flow_slice(xDim,yDim,zDim,XGrid,yGrid,zGrid,Lref,Uref,dIn,p,u,time,islic)
 !    implicit none
@@ -411,12 +411,12 @@
 !    real(8):: XGrid(xDim),yGrid(yDim),zGrid(zDim),p(zDim,yDim,xDim),u(zDim,yDim,xDim,3),time
 !    integer,parameter::nameLen=10
 !    character (LEN=nameLen):: fileName
-    !==================================================================================================        
+    !==================================================================================================
 !    integer::    nv
-!    integer,parameter:: namLen=40,idfile=100,numVar=7 
+!    integer,parameter:: namLen=40,idfile=100,numVar=7
 !    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
 !    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-!                        varname(numVar)=['x','y','z','p','u','v','w']  
+!                        varname(numVar)=['x','y','z','p','u','v','w']
 !
 !    write(fileName,'(I10)') nint(time*1d5)
 !    fileName = adjustr(fileName)
@@ -444,7 +444,7 @@
 !            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
 !        enddo
 !        enddo
-!        close(idfile)   
+!        close(idfile)
 !    elseif(islic==3)then    !zx plane
 !        open(idfile,file='./DatOthe/SlcZ'//trim(fileName)//'.plt') !,form='BINARY')
 !        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
@@ -519,14 +519,14 @@
         write(111,'(A,3F20.10)') 'cptxMax,cptyMax,cptzMax :',cptxMax, cptyMax, cptzMax
         !write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(elmin(1:nFish)), maxval(elmax(1:nFish))
         write(111,'(A      )')'===================================='
-        write(111,'(A,F20.10)')'Re   =',Re     
-        write(111,'(A,F20.10)')'denR =',denIn 
-        write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:nFish,1:3)))
+        write(111,'(A,F20.10)')'Re   =',Re
+        write(111,'(A,F20.10)')'denR =',denIn
+        write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3,1:nFish)))
         write(111,'(A,F20.10)')'AR   =',AR
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Asfac=',Asfac
         write(111,'(A,F20.10)')'Lchod=',Lchod
-        write(111,'(A,F20.10)')'Lspan=',Lspan       
+        write(111,'(A,F20.10)')'Lspan=',Lspan
         write(111,'(A,F20.10)')'uMax =',uMax
         write(111,'(A,F20.10)')'Lref =',Lref
         write(111,'(A,F20.10)')'Uref =',Uref
@@ -548,17 +548,17 @@
         write(111,'(A,2F20.10)')'Freq,St     =',Freq(iFish),St(iFish)
         write(111,'(A,2F20.10)')'denR,psR    =',denR(iFish),psR(iFish)
         write(111,'(A,2F20.10)')'KB,  KS     =',KB(iFish),KS(iFish)
-        write(111,'(A,2F20.10)')'EmR, tcR    =',EmR(iFish),tcR(iFish) 
-        write(111,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',XYZo(iFish,1:3)
-        write(111,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',XYZAmpl(iFish,1:3) 
-        write(111,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',XYZPhi(iFish,1:3) 
-        write(111,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',AoAo(iFish,1:3)
-        write(111,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',AoAAmpl(iFish,1:3) 
-        write(111,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',AoAPhi(iFish,1:3) 
+        write(111,'(A,2F20.10)')'EmR, tcR    =',EmR(iFish),tcR(iFish)
+        write(111,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',XYZo(1:3,iFish)
+        write(111,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',XYZAmpl(1:3,iFish)
+        write(111,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',XYZPhi(1:3,iFish)
+        write(111,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',AoAo(1:3,iFish)
+        write(111,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',AoAAmpl(1:3,iFish)
+        write(111,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',AoAPhi(1:3,iFish)
         write(111,'(3(A,1x,I8,2x))')'nND=',nND(iFish),'nEL=',nEL(iFish),'nEQ=',nEQ(iFish)
         write(111,'(3(A,1x,I8,2x))')'nMT=',nMT(iFish),'nBD=',nBD(iFish),'nSTF=',nSTF(iFish)
-        !write(111,'(A,3I20.10)')'T1,T2,T3:',NDtl(iFish,1:3) 
-        !write(111,'(A,3I20.10)')'H1,H2,H3:',NDhd(iFish,1:3)
+        !write(111,'(A,3I20.10)')'T1,T2,T3:',NDtl(1:3,iFish)
+        !write(111,'(A,3I20.10)')'H1,H2,H3:',NDhd(1:3,iFish)
         !write(111,'(A,1I20.10)')'CT      :',NDct(iFish)
         enddo
 
@@ -567,16 +567,16 @@
         write(111,'(A      )')'===================================='
         write(111,'(A,I5.5 )')'Fish number is',iFish
         write(111,'(A,I5.5 )')'MT:',iMT
-        write(111,'(A,E20.10 )')'E    =',prop(iFish,iMT,1)
-        write(111,'(A,E20.10 )')'G    =',prop(iFish,iMT,2)
-        write(111,'(A,E20.10 )')'h    =',prop(iFish,iMT,3)
-        write(111,'(A,E20.10 )')'rho  =',prop(iFish,iMT,4)
-        write(111,'(A,E20.10 )')'gamma=',prop(iFish,iMT,5)
-        write(111,'(A,E20.10 )')'Ip   =',prop(iFish,iMT,6)
-        write(111,'(A,E20.10 )')'alpha=',prop(iFish,iMT,7)
-        write(111,'(A,E20.10 )')'beta =',prop(iFish,iMT,8)
+        write(111,'(A,E20.10 )')'E    =',prop(iMT,1,iFish)
+        write(111,'(A,E20.10 )')'G    =',prop(iMT,2,iFish)
+        write(111,'(A,E20.10 )')'h    =',prop(iMT,3,iFish)
+        write(111,'(A,E20.10 )')'rho  =',prop(iMT,4,iFish)
+        write(111,'(A,E20.10 )')'gamma=',prop(iMT,5,iFish)
+        write(111,'(A,E20.10 )')'Ip   =',prop(iMT,6,iFish)
+        write(111,'(A,E20.10 )')'alpha=',prop(iMT,7,iFish)
+        write(111,'(A,E20.10 )')'beta =',prop(iMT,8,iFish)
         enddo
-        enddo  
+        enddo
         close(111)
     END SUBROUTINE
 
@@ -597,7 +597,7 @@
     real(8):: xord(nND), yord(nND), zord(nND)
 !
     real(8):: prop(nMT,10)
- 
+
     real(8):: ekb12(12,12),ekb12Strech(12,12),ekb12BendTor(12,12)
 !
     real(8):: triad_ee(3,3,nEL)
@@ -617,7 +617,7 @@
 
         i1  = ele(n,1)
         j1  = ele(n,2)
-        k1  = ele(n,3)        
+        k1  = ele(n,3)
         nELt= ele(n,4)
         mat = ele(n,5)
         if    ( nELt == 2) then
@@ -711,7 +711,7 @@
     enddo
 
 
-    
+
     return
     ENDSUBROUTINE strain_energy_D
 
