@@ -809,12 +809,12 @@ do i=1,3
     !$OMP END PARALLEL DO
     uL2(i) = dsqrt(uL2(i) / dble(xDim * yDim * zDim))
 enddo
-write(*,'(A,F16.9)')'FIELDSTAT L2 u ', uL2(1)
-write(*,'(A,F16.9)')'FIELDSTAT L2 v ', uL2(2)
-write(*,'(A,F16.9)')'FIELDSTAT L2 w ', uL2(3)
-write(*,'(A,F16.9)')'FIELDSTAT Linfinity u ', uLinfty(1)
-write(*,'(A,F16.9)')'FIELDSTAT Linfinity v ', uLinfty(2)
-write(*,'(A,F16.9)')'FIELDSTAT Linfinity w ', uLinfty(3)
+write(*,'(A,F18.12)')'FIELDSTAT L2 u ', uL2(1)
+write(*,'(A,F18.12)')'FIELDSTAT L2 v ', uL2(2)
+write(*,'(A,F18.12)')'FIELDSTAT L2 w ', uL2(3)
+write(*,'(A,F18.12)')'FIELDSTAT Linfinity u ', uLinfty(1)
+write(*,'(A,F18.12)')'FIELDSTAT Linfinity v ', uLinfty(2)
+write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
 endsubroutine ComputeFieldStat
 
 subroutine initOutFlowWorkspace
