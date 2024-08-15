@@ -1,7 +1,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    Calculate the repulsive force between solids
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE cptForceR(nFish,dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful)
+    SUBROUTINE cptForceR(dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful,nFish)
     USE ImmersedBoundary
     implicit none
     integer:: nFish,nEL_max,nND_max
@@ -22,14 +22,14 @@
     if(Nspan.eq.0)then
         SpanLength=1.0d0
     endif
-    
+
     do iFish=1,nFish
-        xmin(iFish) = minval(xyzful(iFish,1:nND(iFish),1))-dxmin*2.5d0
-        xmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),1))+dxmin*2.5d0
-        ymin(iFish) = minval(xyzful(iFish,1:nND(iFish),2))-dymin*2.5d0
-        ymax(iFish) = maxval(xyzful(iFish,1:nND(iFish),2))+dymin*2.5d0
-        zmin(iFish) = minval(xyzful(iFish,1:nND(iFish),3))-dzmin*2.5d0
-        zmax(iFish) = maxval(xyzful(iFish,1:nND(iFish),3))+dzmin*2.5d0   
+        xmin(iFish) = minval(xyzful(1:nND(iFish),1,iFish))-dxmin*2.5d0
+        xmax(iFish) = maxval(xyzful(1:nND(iFish),1,iFish))+dxmin*2.5d0
+        ymin(iFish) = minval(xyzful(1:nND(iFish),2,iFish))-dymin*2.5d0
+        ymax(iFish) = maxval(xyzful(1:nND(iFish),2,iFish))+dymin*2.5d0
+        zmin(iFish) = minval(xyzful(1:nND(iFish),3,iFish))-dzmin*2.5d0
+        zmax(iFish) = maxval(xyzful(1:nND(iFish),3,iFish))+dzmin*2.5d0
     enddo
 
     do iFish=1,nFish
@@ -45,9 +45,9 @@
             endif
             ! overlapping regin [minx, maxx] X [miny, maxy] X [minz, maxz]
             do iND=1,nND(iFish)
-                if ( (minx>xyzful(iFish,iND,1)) .or. (xyzful(iFish,iND,1)>maxx)  &
-                .or. (miny>xyzful(iFish,iND,2)) .or. (xyzful(iFish,iND,2)>maxy)  &
-                .or. (minz>xyzful(iFish,iND,3)) .or. (xyzful(iFish,iND,3)>maxz)) then
+                if ( (minx>xyzful(iND,1,iFish)) .or. (xyzful(iND,1,iFish)>maxx)  &
+                .or. (miny>xyzful(iND,2,iFish)) .or. (xyzful(iND,2,iFish)>maxy)  &
+                .or. (minz>xyzful(iND,3,iFish)) .or. (xyzful(iND,3,iFish)>maxz)) then
                     cycle !point iND not in the overpalling region
                 endif
                 do jND=1,nND(jFish)
@@ -56,12 +56,12 @@
                     .or. (minz>xyzful(jFish,jND,3)) .or. (xyzful(jFish,jND,3)>maxz)) then
                         cycle !point jND not in the overpalling region
                     endif
-                    r(1)=(xyzful(iFish,iND,1)-xyzful(jFish,jND,1))/dxmin
-                    r(2)=(xyzful(iFish,iND,2)-xyzful(jFish,jND,2))/dymin
-                    r(3)=(xyzful(iFish,iND,3)-xyzful(jFish,jND,3))/dzmin
+                    r(1)=(xyzful(iND,1,iFish)-xyzful(jFish,jND,1))/dxmin
+                    r(2)=(xyzful(iND,2,iFish)-xyzful(jFish,jND,2))/dymin
+                    r(3)=(xyzful(iND,3,iFish)-xyzful(jFish,jND,3))/dzmin
                     call get_smoother_phi_r(r,phi_r)
                     delta_h=phi_r(1)*phi_r(2)*phi_r(3)/dxmin/dymin/dzmin/sqrt(r(1)*r(1)+r(2)*r(2)+r(3)*r(3))
-                    repful(iFish,iND,1:3)=repful(iFish,iND,1:3) + delta_h*r(1:3)*ds(1:3)*SpanLength ! force
+                    repful(iND,1:3,iFish)=repful(iND,1:3,iFish) + delta_h*r(1:3)*ds(1:3)*SpanLength ! force
                     repful(jFish,jND,1:3)=repful(jFish,jND,1:3) - delta_h*r(1:3)*ds(1:3)*SpanLength ! reaction force
                 enddo !jND=1,nND(jFish)
             enddo !iND=1,nND(iFish)
@@ -76,7 +76,7 @@
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nEL,nND,ele,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                                xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid)    
+                                xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid)
 USE, INTRINSIC :: IEEE_ARITHMETIC
 IMPLICIT NONE
 integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM
@@ -172,9 +172,9 @@ forceElem(1:nEL,1:3)=0.0d0
 dmaxLBM=1.0
 iterLBM=0
 !   ***********************************************************************************************
-do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)  
+do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
 !   ***********************************************************************************************
-!   compute the velocity of IB nodes at element center    
+!   compute the velocity of IB nodes at element center
     do  iEL=1,nEL
         call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
         call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
@@ -236,7 +236,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
         enddo
     endif
     dsum=Uref*nEL
-    
+
     dmaxLBM=0.0
     do iEL=1,nEL
         dmaxLBM=dmaxLBM+dsqrt(sum((velElem(iEL,1:3)-velElemIB(iEL,1:3))**2))
@@ -244,7 +244,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
     dmaxLBM=dmaxLBM/dsum
     iterLBM=iterLBM+1
 !   ***********************************************************************************************
-enddo 
+enddo
 !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
 !**************************************************************************************************
 !**************************************************************************************************
@@ -530,10 +530,10 @@ END SUBROUTINE calculate_interaction_force_quad
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    �����������Ӧ������
 !   ��������������Ӧ��
-!    copyright@ RuNanHua 
+!    copyright@ RuNanHua
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE cptStrs(zDim,yDim,xDim,nEL,nND,ele,dh,dx,dy,dz,mu,rr,u,p,xGrid,yGrid,zGrid,xyzful,extful)    
+    SUBROUTINE cptStrs(zDim,yDim,xDim,nEL,nND,ele,dh,dx,dy,dz,mu,rr,u,p,xGrid,yGrid,zGrid,xyzful,extful)
     IMPLICIT NONE
     integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5)
     real(8):: dh,dx(xDim),dy(yDim),dz(zDim),mu,rr
@@ -559,7 +559,7 @@ END SUBROUTINE calculate_interaction_force_quad
 !   ���㵥Ԫ��
     forceElem(1:nEL,1:3)=0.0d0
     do    iEL=1,nEL
-        
+
         i  = ele(iEL,1)
         j  = ele(iEL,2)
         k  = ele(iEL,3)
@@ -584,7 +584,7 @@ END SUBROUTINE calculate_interaction_force_quad
             cy=(y1+y2+y3)/3.0
             cz=(z1+z2+z3)/3.0
 
-!            determine vector area         
+!            determine vector area
             ax(1) =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0
             ay(1) =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0
             az(1) =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0
@@ -593,7 +593,7 @@ END SUBROUTINE calculate_interaction_force_quad
             ny(1)=ay(1)/area
             nz(1)=az(1)/area
 
-            
+
             ax(2) =-ax(1)
             ay(2) =-ay(1)
             az(2) =-az(1)
@@ -603,7 +603,7 @@ END SUBROUTINE calculate_interaction_force_quad
             nz(2)=-nz(1)
 
 !==================================================================================================
-!   interpolation of flow variables by inverse-distance-weighted summation           
+!   interpolation of flow variables by inverse-distance-weighted summation
             forceElem(iEL,1:3)=0.0d0
             do  m=1,2
                 !******************************************
@@ -611,19 +611,19 @@ END SUBROUTINE calculate_interaction_force_quad
                 px(m)=cx+nx(m)*ll1
                 py(m)=cy+ny(m)*ll1
                 pz(m)=cz+nz(m)*ll1
-                
+
                 x=minloc(dabs(px(m)-xGrid(1:xDim)),1)
                 if(px(m)-xGrid(x)>0.0d0)then
                 xbgn=x; xend=x+1
                 else
                 xbgn=x-1;xend=x
-                endif              
+                endif
                 y=minloc(dabs(py(m)-yGrid(1:yDim)),1)
                 if(py(m)-yGrid(y)>0.0d0)then
                 ybgn=y; yend=y+1
                 else
                 ybgn=y-1;yend=y
-                endif                                
+                endif
                 z=minloc(dabs(pz(m)-zGrid(1:zDim)),1)
                 if(pz(m)-zGrid(z)>0.0d0)then
                 zbgn=z; zend=z+1
@@ -645,7 +645,7 @@ END SUBROUTINE calculate_interaction_force_quad
 
                 weightm=(dx(x)-dabs(xGrid(x)-px(m)))*(dy(y)-dabs(yGrid(y)-py(m)))*(dz(z)-dabs(zGrid(z)-pz(m)))
 !               stress on the interpolation supported node
-                SxxTemp=Mu*(u(z,y,x+1,1)-u(z,y,x-1,1))/dx(x)      !  x- normal stress             
+                SxxTemp=Mu*(u(z,y,x+1,1)-u(z,y,x-1,1))/dx(x)      !  x- normal stress
                 SyyTemp=Mu*(u(z,y+1,x,2)-u(z,y-1,x,2))/dy(y)      !  y- normal stress
                 SzzTemp=Mu*(u(z+1,y,x,3)-u(z-1,y,x,3))/dz(z)      !  z- normal stress
 
@@ -675,13 +675,13 @@ END SUBROUTINE calculate_interaction_force_quad
                 xbgn=x; xend=x+1
                 else
                 xbgn=x-1;xend=x
-                endif              
+                endif
                 y=minloc(dabs(py(m)-yGrid(1:yDim)),1)
                 if(py(m)-yGrid(y)>0.0d0)then
                 ybgn=y; yend=y+1
                 else
                 ybgn=y-1;yend=y
-                endif                                
+                endif
                 z=minloc(dabs(pz(m)-zGrid(1:zDim)),1)
                 if(pz(m)-zGrid(z)>0.0d0)then
                 zbgn=z; zend=z+1
@@ -703,7 +703,7 @@ END SUBROUTINE calculate_interaction_force_quad
 
                 weightm=(dx(x)-dabs(xGrid(x)-px(m)))*(dy(y)-dabs(yGrid(y)-py(m)))*(dz(z)-dabs(zGrid(z)-pz(m)))
 !               stress on the interpolation supported node
-                SxxTemp=Mu*(u(z,y,x+1,1)-u(z,y,x-1,1))/dx(x)      !  x- normal stress             
+                SxxTemp=Mu*(u(z,y,x+1,1)-u(z,y,x-1,1))/dx(x)      !  x- normal stress
                 SyyTemp=Mu*(u(z,y+1,x,2)-u(z,y-1,x,2))/dy(y)      !  y- normal stress
                 SzzTemp=Mu*(u(z+1,y,x,3)-u(z-1,y,x,3))/dz(z)      !  z- normal stress
 
@@ -729,16 +729,16 @@ END SUBROUTINE calculate_interaction_force_quad
                 forceElem(iEL,2)=forceElem(iEL,2)-Pre2*ay(m)+(w1*Sxy1+w2*Sxy2)*ax(m)+(w1*Syy1+w2*Syy2)*ay(m)+(w1*Syz1+w2*Syz2)*az(m)
                 forceElem(iEL,3)=forceElem(iEL,3)-Pre2*az(m)+(w1*Sxz1+w2*Sxz2)*ax(m)+(w1*Syz1+w2*Syz2)*ay(m)+(w1*Szz1+w2*Szz2)*az(m)
             enddo
-            
+
         else
             write(*,*)'not this nELt:',nELt
             stop
-        endif       
+        endif
     enddo
 !   ***********************************************************************************************
 !   element force to nodal force
     forceNode(1:nND,1:3)=0.0d0
-    do    iEL=1,nEL       
+    do    iEL=1,nEL
         i  = ele(iEL,1)
         j  = ele(iEL,2)
         k  = ele(iEL,3)
@@ -776,11 +776,11 @@ END SUBROUTINE calculate_interaction_force_quad
     ENDFUNCTION Phi
 
     subroutine get_phi_r(r,phi_r)
-        implicit none 
+        implicit none
         real(8):: r(1:3),phi_r(1:3)
-        real(8):: rr 
+        real(8):: rr
         integer:: i
-    
+
         do i=1,3
            rr=dabs(r(i))
            if(rr<1.0d0)then
@@ -791,16 +791,16 @@ END SUBROUTINE calculate_interaction_force_quad
                 Phi_r(i)=0.0d0
            endif
         enddo
-    
+
     end subroutine get_phi_r
 
     subroutine get_smoother_phi_r(r,phi_r)
-        implicit none 
+        implicit none
         real(8):: r(1:3),phi_r(1:3)
         real(8):: rr , pi
         integer:: i
         pi=4.0*datan(1.0d0)
-    
+
         do i=1,3
            rr=dabs(r(i))
            if(rr.le.0.5d0)then
@@ -813,7 +813,7 @@ END SUBROUTINE calculate_interaction_force_quad
                 phi_r(i)=0.0d0
            endif
         enddo
-    
+
     end subroutine get_smoother_phi_r
 
 subroutine initializexyzIB
@@ -824,25 +824,25 @@ integer:: iND,s,iFish,Nspanpts
 if(Palpha.gt.0.d0) then
     Nspanpts = Nspan + 1
     allocate(xyzfulIB_all(1:Nspanpts,nND_all,6),xyzfulIB(1:Nspanpts,1:nFish,nND_max,6))
-    !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,s)
+    !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(s,iFish)
     do iFish=1,nFish
         do s=1,Nspanpts
-            xyzfulIB(s,iFish,1:nND(iFish),1:6)=xyzful(iFish,1:nND(iFish),1:6)
-            xyzfulIB(s,iFish,1:nND(iFish),3)=xyzful(iFish,1:nND(iFish),3)+(s-1)*dspan
+            xyzfulIB(s,iFish,1:nND(iFish),1:6)=xyzful(1:nND(iFish),1:6,iFish)
+            xyzfulIB(s,iFish,1:nND(iFish),3)=xyzful(1:nND(iFish),3,iFish)+(s-1)*dspan
         enddo
     enddo
     !$OMP END PARALLEL DO
     call packxyzIB
 endif
 endsubroutine initializexyzIB
-    
+
 subroutine packxyzIB
 USE simParam
 USE ImmersedBoundary
 implicit none
 integer:: iND,iFish,icount
 if(Palpha.gt.0.d0) then
-    !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
+    !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
     do iFish=1,nFish
         if(iFish.eq.1)then
             icount = 0
@@ -863,7 +863,7 @@ USE ImmersedBoundary
 implicit none
 integer:: iND,iFish,icount
 if(Palpha.gt.0.d0) then
-!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
+!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
     do iFish=1,nFish
         if(iFish.eq.1)then
             icount = 0

@@ -1,4 +1,4 @@
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write files' header
 !    copyright@ RuNanHua
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -12,7 +12,7 @@
 
     do iFish=1,nFish
 
-        ElmType = ele(iFish,1,4)
+        ElmType = ele(1,4,iFish)
 
         write(fileName,'(I4)') iFish
         fileName = adjustr(fileName)
@@ -31,13 +31,13 @@
         endif
 
         do  i=1,5
-            write(Nodename,'(I4.4)') NDtl(iFish,i)
+            write(Nodename,'(I4.4)') NDtl(i,iFish)
             open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt')
             write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
             close(111)
-        enddo 
-        do  i=1,3   
-            write(Nodename,'(I4.4)') NDhd(iFish,i)
+        enddo
+        do  i=1,3
+            write(Nodename,'(I4.4)') NDhd(i,iFish)
             open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt')
             write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
             close(111)
@@ -73,7 +73,7 @@
         close(111)
 
         do  i=1,numSampBody
-            write(Nodename,'(I4.4)') SampBodyNode(iFish,i)
+            write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
             open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
             write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
             close(111)
@@ -112,17 +112,17 @@
     enddo
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !     write data
-!    copyright@ RuNanHua 
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��     
+!    copyright@ RuNanHua
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfo()
     USE simParam
     USE ImmersedBoundary
     implicit none
     integer:: i,j,k,nt,iEL,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend,iFish,ElmType
-    real(8):: EEE(2),strainEnergy(nFish,nEL_max,2)
+    real(8):: EEE(2),strainEnergy(nEL_max,2,nFish)
     real(8):: convergence,MaMax,weightm,velocity(1:3),Pressure
     real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
@@ -131,7 +131,7 @@
 
     do iFish=1,nFish
 
-        ElmType = ele(iFish,1,4)
+        ElmType = ele(1,4,iFish)
 
         write(fileName,'(I4)') iFish
         fileName = adjustr(fileName)
@@ -141,104 +141,104 @@
 
         if    (iForce2Body==1)then   !Same force as flow
         open(111,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
-        write(111,'(4E20.10)')time/Tref,sum(extful(iFish,1:nND(iFish),1:3),1)/Fref                            
+        write(111,'(4E20.10)')time/Tref,sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
         close(111)
         elseif(iForce2Body==2)then   !stress force
         open(111,file='./DatInfo/ForceStress'//trim(fileName)//'.plt',position='append')
-        write(111,'(4E20.10)')time/Tref,sum(extful(iFish,1:nND(iFish),1:3),1)/Fref                         
+        write(111,'(4E20.10)')time/Tref,sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
         close(111)
-        endif  
-    !==============================================================================================       
+        endif
+    !==============================================================================================
         do  i=1,5
-            write(Nodename,'(I4.4)') NDtl(iFish,i)
+            write(Nodename,'(I4.4)') NDtl(i,iFish)
             open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-            write(111,'(10E20.10)')time/Tref,xyzful(iFish,NDtl(iFish,i),1:3)/Lref,velful(iFish,NDtl(iFish,i),1:3)/Uref,accful(iFish,NDtl(iFish,i),1:3)/Aref                  
+            write(111,'(10E20.10)')time/Tref,xyzful(NDtl(i,iFish),1:3,iFish)/Lref,velful(NDtl(i,iFish),1:3,iFish)/Uref,accful(NDtl(i,iFish),1:3,iFish)/Aref
             close(111)
         enddo
             !===
         do  i=1,3
-            write(Nodename,'(I4.4)') NDhd(iFish,i)
+            write(Nodename,'(I4.4)') NDhd(i,iFish)
             open(111,file='./DatInfo/SampBodyNodeB'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-            write(111,'(10E20.10)')time/Tref,xyzful(iFish,NDhd(iFish,i),1:3)/Lref,velful(iFish,NDhd(iFish,i),1:3)/Uref,accful(iFish,NDhd(iFish,i),1:3)/Aref                     
+            write(111,'(10E20.10)')time/Tref,xyzful(NDhd(i,iFish),1:3,iFish)/Lref,velful(NDhd(i,iFish),1:3,iFish)/Uref,accful(NDhd(i,iFish),1:3,iFish)/Aref
             close(111)
         enddo
 
         if (ElmType .eq. 2) then
             !===============================================================================
             open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt',position='append')
-            write(111,'(10E20.10)')time/Tref,xyzful(iFish,1,1:3)/Lref,velful(iFish,1,1:3)/Uref,accful(iFish,1,1:3)/Aref                     
+            write(111,'(10E20.10)')time/Tref,xyzful(1,1:3,iFish)/Lref,velful(1,1:3,iFish)/Uref,accful(1,1:3,iFish)/Aref
             close(111)
             !===============================================================================
             write(Nodename,'(I4.4)') nNd(iFish)
             open(111,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt',position='append')
-            write(111,'(10E20.10)')time/Tref,xyzful(iFish,nND(iFish),1:3)/Lref,velful(iFish,nND(iFish),1:3)/Uref,accful(iFish,nND(iFish),1:3)/Aref                  
+            write(111,'(10E20.10)')time/Tref,xyzful(nND(iFish),1:3,iFish)/Lref,velful(nND(iFish),1:3,iFish)/Uref,accful(nND(iFish),1:3,iFish)/Aref
             close(111)
         endif
 
         open(111,file='./DatInfo/SampBodyCentP'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,xyzful(iFish,NDct,1:3)/Lref,velful(iFish,NDct,1:3)/Uref,accful(iFish,NDct,1:3)/Aref                     
+        write(111,'(10E20.10)')time/Tref,xyzful(NDct,1:3,iFish)/Lref,velful(NDct,1:3,iFish)/Uref,accful(NDct,1:3,iFish)/Aref
         close(111)
 
         open(111,file='./DatInfo/SampBodyCentM'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,sum(xyzful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Lref, &                                                                          
-                                         sum(velful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Uref, &
-                                         sum(accful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Aref                                                             
+        write(111,'(10E20.10)')time/Tref,sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref, &
+                                         sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref, &
+                                         sum(accful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Aref
         close(111)
 
         open(111,file='./DatInfo/SampBodyAngular1_'//trim(fileName)//'.plt',position='append')
-        write(111,'(5E20.10)')time/Tref,datan((xyzful(iFish,NDtl(iFish,1),3)-xyzful(iFish,NDhd(iFish,1),3))/(xyzful(iFish,NDtl(iFish,1),1)-xyzful(iFish,NDhd(iFish,1),1))),    &
-                                        xyzful(iFish,NDtl(iFish,1),3)/Lref-xyzful(iFish,NDhd(iFish,1),3)/Lref,xyzful(iFish,NDhd(iFish,1),3)/Lref,xyzful(iFish,NDtl(iFish,1),3)/Lref
+        write(111,'(5E20.10)')time/Tref,datan((xyzful(NDtl(1,iFish),3,iFish)-xyzful(NDhd(1,iFish),3,iFish))/(xyzful(NDtl(1,iFish),1,iFish)-xyzful(NDhd(1,iFish),1,iFish))),    &
+                                        xyzful(NDtl(1,iFish),3,iFish)/Lref-xyzful(NDhd(1,iFish),3,iFish)/Lref,xyzful(NDhd(1,iFish),3,iFish)/Lref,xyzful(NDtl(1,iFish),3,iFish)/Lref
         close(111)
         open(111,file='./DatInfo/SampBodyAngular2_'//trim(fileName)//'.plt',position='append')
-        write(111,'(5E20.10)')time/Tref,datan((xyzful(iFish,NDtl(iFish,2),3)-xyzful(iFish,NDhd(iFish,2),3))/(xyzful(iFish,NDtl(iFish,2),1)-xyzful(iFish,NDhd(iFish,2),1))),    &
-                                        xyzful(iFish,NDtl(iFish,2),3)/Lref-xyzful(iFish,NDhd(iFish,2),3)/Lref,xyzful(iFish,NDhd(iFish,2),3)/Lref,xyzful(iFish,NDtl(iFish,2),3)/Lref
+        write(111,'(5E20.10)')time/Tref,datan((xyzful(NDtl(2,iFish),3,iFish)-xyzful(NDhd(2,iFish),3,iFish))/(xyzful(NDtl(2,iFish),1,iFish)-xyzful(NDhd(2,iFish),1,iFish))),    &
+                                        xyzful(NDtl(2,iFish),3,iFish)/Lref-xyzful(NDhd(2,iFish),3,iFish)/Lref,xyzful(NDhd(2,iFish),3,iFish)/Lref,xyzful(NDtl(2,iFish),3,iFish)/Lref
         close(111)
         open(111,file='./DatInfo/SampBodyAngular3_'//trim(fileName)//'.plt',position='append')
-        write(111,'(5E20.10)')time/Tref,datan((xyzful(iFish,NDtl(iFish,3),3)-xyzful(iFish,NDhd(iFish,3),3))/(xyzful(iFish,NDtl(iFish,3),1)-xyzful(iFish,NDhd(iFish,3),1))),    &
-                                        xyzful(iFish,NDtl(iFish,3),3)/Lref-xyzful(iFish,NDhd(iFish,3),3)/Lref,xyzful(iFish,NDhd(iFish,3),3)/Lref,xyzful(iFish,NDtl(iFish,3),3)/Lref
+        write(111,'(5E20.10)')time/Tref,datan((xyzful(NDtl(3,iFish),3,iFish)-xyzful(NDhd(3,iFish),3,iFish))/(xyzful(NDtl(3,iFish),1,iFish)-xyzful(NDhd(3,iFish),1,iFish))),    &
+                                        xyzful(NDtl(3,iFish),3,iFish)/Lref-xyzful(NDhd(3,iFish),3,iFish)/Lref,xyzful(NDhd(3,iFish),3,iFish)/Lref,xyzful(NDtl(3,iFish),3,iFish)/Lref
         close(111)
-    
+
         do  i=1,numSampBody
-            write(Nodename,'(I4.4)') SampBodyNode(iFish,i)
+            write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
             open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-            write(111,'(10E20.10)')time/Tref, xyzful(iFish,SampBodyNode(iFish,i),1:3)/Lref,velful(iFish,SampBodyNode(iFish,i),1:3)/Uref,accful(iFish,SampBodyNode(iFish,i),1:3)/Aref 
+            write(111,'(10E20.10)')time/Tref, xyzful(SampBodyNode(i,iFish),1:3,iFish)/Lref,velful(SampBodyNode(i,iFish),1:3,iFish)/Uref,accful(SampBodyNode(i,iFish),1:3,iFish)/Aref
             close(111)
         enddo
-        !==============================================================================================  
+        !==============================================================================================
 
-        Pax=sum(extful(iFish,1:nND(iFish),1)*velful(iFish,1:nND(iFish),1))/Pref
-        Pay=sum(extful(iFish,1:nND(iFish),2)*velful(iFish,1:nND(iFish),2))/Pref
-        Paz=sum(extful(iFish,1:nND(iFish),3)*velful(iFish,1:nND(iFish),3))/Pref
+        Pax=sum(extful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
+        Pay=sum(extful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
+        Paz=sum(extful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
         Paero=Pax+Pay+Paz
         !write(*,*)'Pt:',Paero
         !write(*,*)'Pr:',(sum(extful(1:nND,4)*velful(1:nND,4))+sum(extful(1:nND,5)*velful(1:nND,5))+sum(extful(1:nND,6)*velful(1:nND,6)))/Pref
-        Pix=-sum(mssful(iFish,1:nND(iFish),1)*accful(iFish,1:nND(iFish),1)*velful(iFish,1:nND(iFish),1))/Pref
-        Piy=-sum(mssful(iFish,1:nND(iFish),2)*accful(iFish,1:nND(iFish),2)*velful(iFish,1:nND(iFish),2))/Pref
-        Piz=-sum(mssful(iFish,1:nND(iFish),3)*accful(iFish,1:nND(iFish),3)*velful(iFish,1:nND(iFish),3))/Pref
+        Pix=-sum(mssful(1:nND(iFish),1,iFish)*accful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
+        Piy=-sum(mssful(1:nND(iFish),2,iFish)*accful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
+        Piz=-sum(mssful(1:nND(iFish),3,iFish)*accful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
         Piner=Pix+Piy+Piz
         Ptot=Paero+Piner
         open(111,file='./DatInfo/Power'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz                                                                      
+        write(111,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
         close(111)
 
-        call cptArea(areaElem(iFish,1:nEL(iFish)),nND(iFish),nEL(iFish),ele(iFish,1:nEL(iFish),1:5),xyzful(iFish,1:nND(iFish),1:6))
+        call cptArea(areaElem(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1:6,iFish))
         open(111,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
-        write(111,'(2E20.10)')time/Tref,sum(areaElem(iFish,:))/Asfac
+        write(111,'(2E20.10)')time/Tref,sum(areaElem(:,iFish))/Asfac
         close(111)
-        
-        call strain_energy_D(strainEnergy(iFish,1:nEL(iFish),1:2),xyzful0(iFish,1:nND(iFish),1),xyzful0(iFish,1:nND(iFish),2),xyzful0(iFish,1:nND(iFish),3), &
-                                xyzful(iFish,1:nND(iFish),1), xyzful(iFish,1:nND(iFish),2), xyzful(iFish,1:nND(iFish),3),ele(iFish,1:nEL(iFish),1:5), prop(iFish,1:nMT(iFish),1:10), &
-                                triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)), &
-                                triad_ee(iFish,1:3,1:3,1:nEL(iFish)), &
+
+        call strain_energy_D(strainEnergy(1:nEL(iFish),1:2,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
+                                xyzful(1:nND(iFish),1,iFish), xyzful(1:nND(iFish),2,iFish), xyzful(1:nND(iFish),3,iFish),ele(1:nEL(iFish),1:5,iFish), prop(1:nMT(iFish),1:10,iFish), &
+                                triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
+                                triad_ee(1:3,1:3,1:nEL(iFish),iFish), &
                                 nND(iFish),nEL(iFish),nMT(iFish))
-        EEE(1)=sum(strainEnergy(iFish,1:nEL(iFish),1))
-        EEE(2)=sum(strainEnergy(iFish,1:nEL(iFish),2))
+        EEE(1)=sum(strainEnergy(1:nEL(iFish),1,iFish))
+        EEE(2)=sum(strainEnergy(1:nEL(iFish),2,iFish))
         Es=EEE(1)/Eref
         Eb=EEE(2)/Eref
         Ep=Es+Eb
         Ew=Ew+Paero*timeOutInfo
-        Ek=0.5*sum(mssful(iFish,1:nND(iFish),1:6)*velful(iFish,1:nND(iFish),1:6)*velful(iFish,1:nND(iFish),1:6))/Eref
-        
+        Ek=0.5*sum(mssful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish))/Eref
+
         !write(*,*)'Ekt:', 0.5*sum(mssful(1:nND,1:3)*velful(1:nND,1:3)*velful(1:nND,1:3))/Eref
         !write(*,*)'Ekr:', 0.5*sum(mssful(1:nND,4:6)*velful(1:nND,4:6)*velful(1:nND,4:6))/Eref
 
@@ -247,25 +247,25 @@
         write(111,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
         close(111)
 
-        streI(iFish,1:nND(iFish))=0.0d0
-        bendO(iFish,1:nND(iFish))=0.0d0
+        streI(1:nND(iFish),iFish)=0.0d0
+        bendO(1:nND(iFish),iFish)=0.0d0
         do  iEL=1,nEL(iFish)
-            streI(iFish,ele(iFish,iEL,1:3))=streI(iFish,ele(iFish,iEL,1:3))+strainEnergy(iFish,iEL,1)/3
-            bendO(iFish,ele(iFish,iEL,1:3))=bendO(iFish,ele(iFish,iEL,1:3))+strainEnergy(iFish,iEL,2)/3           
+            streI(ele(iEL,1:3,iFish),iFish)=streI(ele(iEL,1:3,iFish),iFish)+strainEnergy(iEL,1,iFish)/3
+            bendO(ele(iEL,1:3,iFish),iFish)=bendO(ele(iEL,1:3,iFish),iFish)+strainEnergy(iEL,2,iFish)/3
         enddo
 
     enddo !nFish
 
     UNow=sum(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))
-    convergence=dabs(UNow-UPre)/UNow 
+    convergence=dabs(UNow-UPre)/UNow
     UPre=UNow
     open(111,file='./DatInfo/Converg.plt',position='append')
-    write(111,'(2E20.10)')time/Tref,convergence             
+    write(111,'(2E20.10)')time/Tref,convergence
     close(111)
 
     MaMax=MaxVal(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))/dsqrt(Cs2)
     open(111,file='./DatInfo/MaMax.plt',position='append')
-    write(111,'(2E20.10)')time/Tref,MaMax             
+    write(111,'(2E20.10)')time/Tref,MaMax
     close(111)
 
     open(111,file='./DatInfo/MaxValBody.plt',position='append')
@@ -280,13 +280,13 @@
                 xbgn=x; xend=x+1
         else
                 xbgn=x-1;xend=x
-        endif              
+        endif
         y=minloc(dabs(SampFlowPint(i,2)-yGrid(1:yDim)),1)
         if(SampFlowPint(i,2)-yGrid(y)>0.0d0)then
                 ybgn=y; yend=y+1
         else
                 ybgn=y-1;yend=y
-        endif                                
+        endif
         z=minloc(dabs(SampFlowPint(i,3)-zGrid(1:zDim)),1)
         if(SampFlowPint(i,3)-zGrid(z)>0.0d0)then
                 zbgn=z; zend=z+1
@@ -316,16 +316,16 @@
 
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
-!     
-!    copyright@ RuNanHua 
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��       
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+!    copyright@ RuNanHua
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE movGrid(dim,direction)
     USE simParam
     implicit none
     integer:: dim,direction
-    
+
     if    (dim==1)then      !x
         if(direction<0)       then      !move to -x
             fIn(:,:,2:xDim,:)=fIn(:,:,1:xDim-1,:)
@@ -357,10 +357,10 @@
     endif
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua 
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
+!    copyright@ RuNanHua
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine  cptMove(move,xB,xG,d)
     implicit none
@@ -377,25 +377,25 @@
     enddo
     end subroutine
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    find reference point, moving grid
-!    copyright@ RuNanHua 
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
+!    copyright@ RuNanHua
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref)
     implicit none
     integer:: NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim
     real(8):: xyzful(1:nND,1:3),xGrid(xDim),yGrid(yDim),zGrid(zDim),Xref,Yref,Zref
 
-    NDref=minloc(dsqrt((xyzful(1:nND,1)-Xref)**2+(xyzful(1:nND,2)-Yref)**2+(xyzful(1:nND,3)-Zref)**2),1)        
+    NDref=minloc(dsqrt((xyzful(1:nND,1)-Xref)**2+(xyzful(1:nND,2)-Yref)**2+(xyzful(1:nND,3)-Zref)**2),1)
     IXref=minloc(dabs(xyzful(NDref,1)-xGrid(1:xDim)),1)
     IYref=minloc(dabs(xyzful(NDref,2)-yGrid(1:yDim)),1)
     IZref=minloc(dabs(xyzful(NDref,3)-zGrid(1:zDim)),1)
 
     end subroutine
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   
-!    copyright@ RuNanHua 
+!
+!    copyright@ RuNanHua
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine cptArea(areaElem,nND,nEL,ele,xyzful)
@@ -436,10 +436,10 @@
 
     enddo
     endsubroutine
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua 
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
+!    copyright@ RuNanHua
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine AoAtoTTT(AoA,TTT)
     implicit none
@@ -512,7 +512,7 @@
     end subroutine
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   write  string to unit=idfile  in binary format
-!    copyright@ RuNanHua 
+!    copyright@ RuNanHua
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine dumpstring(instring,idfile)
@@ -532,15 +532,15 @@
     return
     endsubroutine dumpstring
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua 
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
+!    copyright@ RuNanHua
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine  initDisturb()
     USE simParam
     implicit none
-    
+
     integer:: x, y,z
     do  z = 1, zDim
     do  y = 1, yDim
@@ -552,19 +552,19 @@
     enddo
     enddo
 
-    end 
+    end
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua 
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��            
+!    copyright@ RuNanHua
+!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine  forcDisturb()
     USE simParam
     implicit none
     integer:: x, y, z,xbgn,xend,ybgn,yend,zbgn,zend
     real(8):: rx,ry,rz,Phi
-    
+
     xbgn    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)-3
     xend    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)+4
     ybgn    = minloc(dabs(posiForcDist(2)-yGrid(1:yDim)),1)-3
@@ -583,7 +583,7 @@
         force(z,y,x,3)=force(z,y,x,3)+AmplforcDist(3)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
     enddo
     enddo
-    enddo 
+    enddo
     end
 
     SUBROUTINE OMPPartition(xDim, np, partition, parindex)
@@ -613,7 +613,7 @@
     SUBROUTINE evaluateShearVelocity(x, y, z, vel)
     USE simParam
     real(8):: x, y, z, vel(1:SpcDim)
-    vel(1) = uuuIn(1) + z * shearRateIn(1) + y * shearRateIn(2) 
+    vel(1) = uuuIn(1) + z * shearRateIn(1) + y * shearRateIn(2)
     vel(2) = uuuIn(2)
     vel(3) = uuuIn(3)
     END SUBROUTINE
@@ -667,7 +667,7 @@
             index = 1
             count = len
             do while(count > 0)
-                step = count / 2 
+                step = count / 2
                 it = index + step
                 if (array(it) < x) then
                     index = it + 1

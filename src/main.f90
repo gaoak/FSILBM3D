@@ -2,7 +2,7 @@
 !    copyright@ RuNanHua
 !    The main program, 3D Lattice Boltzmann Method
 !    flow past a flexible plate (uniform flow past a flag or flapping plate, and so on)
-!    flexible Plates or shells move in fluid.  
+!    flexible Plates or shells move in fluid.
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     PROGRAM main
@@ -32,16 +32,16 @@
         timeOutInfo=timeOutInfo*2
         write(*,*)'Release'
     endif
-    Pbetatemp=Pbeta  
+    Pbetatemp=Pbeta
     deltat = dt  !set time step of solid deltat the same as fluid time step
 !===============================================================================================
     time=0.0d0
     step=0
-    CALL initialize_solid() 
+    CALL initialize_solid()
     CALL initialize_flow()
     if(ismovegrid==1)then
         iFish = 1
-        call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(iFish,1:nND(iFish),1:3),xGrid,yGrid,zGrid,Xref,Yref,Zref)
+        call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(1:nND(iFish),1:3,iFish),xGrid,yGrid,zGrid,Xref,Yref,Zref)
     endif
     if(step==0)    CALL wrtInfoTitl()
 
@@ -50,21 +50,21 @@
         write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
         write(*,*)'Continue compute!!!!!!!!!!!!!!!!!!'
         write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-        call read_checkpoint_file() 
+        call read_checkpoint_file()
     else
         write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
         write(*,*)'NEW      compute!!!!!!!!!!!!!!!!!!'
-        write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'                     
+        write(*,*)'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
 !===============================================================================================
     endif
 !===============================================================================================
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
-    CALL write_solid_field(nFish,xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
+    CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
 !==================================================================================================
 !==================================================================================================
-!==================================================================================================      
+!==================================================================================================
     write(*,*)'time loop'
     do while(time/Tref < timeSimTotl)
         call date_and_time(VALUES=values_s)
@@ -100,9 +100,9 @@
         !******************************************************************************************
         if(ismovegrid==1)then ! move fluid grid
             iFish=1
-            call cptMove(move(1:3),xyzful(iFish,NDref,1:3),[xGrid(IXref),yGrid(IYref),zGrid(IZref)],[dx,dy,dz])
+            call cptMove(move(1:3),xyzful(NDref,1:3,iFish),[xGrid(IXref),yGrid(IYref),zGrid(IZref)],[dx,dy,dz])
             write(*,'(A,3F10.5)')' *Grid:',[xGrid(IXref),yGrid(IYref),zGrid(IZref)]
-            write(*,'(A,3F10.5)')' *Body:',xyzful(iFish,NDref,1:3)
+            write(*,'(A,3F10.5)')' *Body:',xyzful(NDref,1:3,iFish)
             if(isMoveDimX==1)CALL movGrid(1,move(1))
             if(isMoveDimY==1)CALL movGrid(2,move(2))
             if(isMoveDimZ==1)CALL movGrid(3,move(3))
@@ -123,7 +123,7 @@
                 write(*,*)'no such type LBMBC'
             endif
         endif
-        !******************************************************************************************        
+        !******************************************************************************************
         CALL updateVolumForc()
         CALL calculate_macro_quantities()
         !******************************************************************************************
@@ -142,8 +142,8 @@
         enddo
         !$OMP END PARALLEL DO
 
-        !package n Fish to one 
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
+        !package n Fish to one
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
         do iFish=1,nFish
             if(iFish.eq.1)then
                 icount = 0
@@ -151,16 +151,16 @@
                 icount = sum(nND(1:iFish-1))
             endif
             do iND=1,nND(iFish)
-                xyzful_all(iND+icount,1:6)  =  xyzful(iFish,iND,1:6)
-                velful_all(iND+icount,1:6)  =  velful(iFish,iND,1:6)
-                extful_all(iND+icount,1:6)  =  extful(iFish,iND,1:6)
+                xyzful_all(iND+icount,1:6)  =  xyzful(iND,1:6,iFish)
+                velful_all(iND+icount,1:6)  =  velful(iND,1:6,iFish)
+                extful_all(iND+icount,1:6)  =  extful(iND,1:6,iFish)
             enddo
         enddo
         !$OMP END PARALLEL DO
         call packxyzIB
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
-            if    (Nspan .eq. 0) then 
+            if    (Nspan .eq. 0) then
                 CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                         xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)
             else
@@ -175,7 +175,7 @@
         CALL addVolumForc()
 
         ! unpackage
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND,icount)
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
         do iFish=1,nFish
             if(iFish.eq.1)then
                 icount = 0
@@ -183,9 +183,9 @@
                 icount = sum(nND(1:iFish-1))
             endif
             do iND=1,nND(iFish)
-                xyzful(iFish,iND,1:6) = xyzful_all(iND + icount,1:6)
-                velful(iFish,iND,1:6) = velful_all(iND + icount,1:6)
-                extful(iFish,iND,1:6) = extful_all(iND+icount,1:6)
+                xyzful(iND,1:6,iFish) = xyzful_all(iND + icount,1:6)
+                velful(iND,1:6,iFish) = velful_all(iND + icount,1:6)
+                extful(iND,1:6,iFish) = extful_all(iND+icount,1:6)
             enddo
         enddo
         !$OMP END PARALLEL DO
@@ -194,13 +194,13 @@
         call date_and_time(VALUES=values1)
         write(*,*)'time for IBM step : ',CPUtime(values1)-CPUtime(values0)
         if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
-        
-        call date_and_time(VALUES=values0)  
-        call cptForceR(nFish,dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful)
+
+        call date_and_time(VALUES=values0)
+        call cptForceR(dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful,nFish)
         call date_and_time(VALUES=values1)
         write(*,*)'time for Lubforce :',CPUtime(values1)-CPUtime(values0)
 
-        call date_and_time(VALUES=values0)  
+        call date_and_time(VALUES=values0)
         CALL collision_step()
         call date_and_time(VALUES=values1)
         write(*,*)'time for collision_step:',CPUtime(values1)-CPUtime(values0)
@@ -210,68 +210,68 @@
         call date_and_time(VALUES=values0)
         subdeltat=deltat/numsubstep
         do isubstep=1,numsubstep
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish,iND)
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,iFish)
         do iFish=1,nFish
         if(iBodyModel(iFish)==1)then     ! rigid body
             !======================================================
             !prescribed motion
             !------------------------------------------------------
             !translational displacement
-            XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
+            XYZ(1:3,iFish)=XYZo(1:3,iFish)+XYZAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(1:3,iFish))
             !rotational displacement
-            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
-            call AoAtoTTT(AoA(iFish,1:3),TTTnxt(iFish,1:3,1:3))
-            call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnxt(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
+            AoA(1:3,iFish)=AoAo(1:3,iFish)+AoAAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(1:3,iFish))
+            call AoAtoTTT(AoA(1:3,iFish),TTTnxt(1:3,1:3,iFish))
+            call get_angle_triad(TTT0(1:3,1:3,iFish),TTTnxt(1:3,1:3,iFish),AoAd(1,iFish),AoAd(2,iFish),AoAd(3,iFish))
             !given displacement
             do  iND=1,nND(iFish)
-                xyzfulnxt(iFish,iND,1:3)=matmul(TTTnxt(iFish,1:3,1:3),xyzful00(iFish,iND,1:3))+XYZ(iFish,1:3)
-                xyzfulnxt(iFish,iND,4:6)=AoAd(iFish,1:3)
+                xyzfulnxt(iND,1:3,iFish)=matmul(TTTnxt(1:3,1:3,iFish),xyzful00(iND,1:3,iFish))+XYZ(1:3,iFish)
+                xyzfulnxt(iND,4:6,iFish)=AoAd(1:3,iFish)
             enddo
-            xyzful(iFish,1:nND(iFish),1:6)=xyzfulnxt(iFish,1:nND(iFish),1:6)
+            xyzful(1:nND(iFish),1:6,iFish)=xyzfulnxt(1:nND(iFish),1:6,iFish)
             !------------------------------------------------------
             !translational velocity
-            UVW(iFish,1:3) =-2.0*pi*Freq(iFish)*XYZAmpl(iFish,1:3)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
+            UVW(1:3,iFish) =-2.0*pi*Freq(iFish)*XYZAmpl(1:3,iFish)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(1:3,iFish))
             !rotational velocity
-            WWW1(iFish,1:3)=-2.0*pi*Freq(iFish)*AoAAmpl(iFish,1:3)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
-            WWW2(iFish,1:3)=[WWW1(iFish,1)*dcos(AoA(iFish,2))+WWW1(iFish,3),    &
-                             WWW1(iFish,1)*dsin(AoA(iFish,2))*dsin(AoA(iFish,3))+WWW1(iFish,2)*dcos(AoA(iFish,3)),   &
-                             WWW1(iFish,1)*dsin(AoA(iFish,2))*dcos(AoA(iFish,3))-WWW1(iFish,2)*dsin(AoA(iFish,3))    ]
-            WWW3(iFish,1:3)=matmul(TTTnxt(iFish,1:3,1:3),WWW2(iFish,1:3))
+            WWW1(1:3,iFish)=-2.0*pi*Freq(iFish)*AoAAmpl(1:3,iFish)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(1:3,iFish))
+            WWW2(1:3,iFish)=[WWW1(1,iFish)*dcos(AoA(2,iFish))+WWW1(3,iFish),    &
+                             WWW1(1,iFish)*dsin(AoA(2,iFish))*dsin(AoA(3,iFish))+WWW1(2,iFish)*dcos(AoA(3,iFish)),   &
+                             WWW1(1,iFish)*dsin(AoA(2,iFish))*dcos(AoA(3,iFish))-WWW1(2,iFish)*dsin(AoA(3,iFish))    ]
+            WWW3(1:3,iFish)=matmul(TTTnxt(1:3,1:3,iFish),WWW2(1:3,iFish))
             !given velocity
             do  iND=1,nND(iFish)
-                velful(iFish,iND,1:3)=[WWW3(iFish,2)*xyzful(iFish,iND,3)-WWW3(iFish,3)*xyzful(iFish,iND,2),    &
-                                       WWW3(iFish,3)*xyzful(iFish,iND,1)-WWW3(iFish,1)*xyzful(iFish,iND,3),    &
-                                       WWW3(iFish,1)*xyzful(iFish,iND,2)-WWW3(iFish,2)*xyzful(iFish,iND,1)    ]&
-                                       + UVW(iFish,1:3)
-                velful(iFish,iND,4:6)=WWW3(iFish,1:3)
+                velful(iND,1:3,iFish)=[WWW3(2,iFish)*xyzful(iND,3,iFish)-WWW3(3,iFish)*xyzful(iND,2,iFish),    &
+                                       WWW3(3,iFish)*xyzful(iND,1,iFish)-WWW3(1,iFish)*xyzful(iND,3,iFish),    &
+                                       WWW3(1,iFish)*xyzful(iND,2,iFish)-WWW3(2,iFish)*xyzful(iND,1,iFish)    ]&
+                                       + UVW(1:3,iFish)
+                velful(iND,4:6,iFish)=WWW3(1:3,iFish)
             enddo
             !-------------------------------------------------------
         elseif(iBodyModel(iFish)==2)then !elastic model
             !translational displacement
-            XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(iFish,1:3))
+            XYZ(1:3,iFish)=XYZo(1:3,iFish)+XYZAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(1:3,iFish))
             !rotational displacement
-            AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(iFish,1:3))
-            call AoAtoTTT(AoA(iFish,1:3),TTTnxt(iFish,1:3,1:3))
-            call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnxt(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
+            AoA(1:3,iFish)=AoAo(1:3,iFish)+AoAAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(1:3,iFish))
+            call AoAtoTTT(AoA(1:3,iFish),TTTnxt(1:3,1:3,iFish))
+            call get_angle_triad(TTT0(1:3,1:3,iFish),TTTnxt(1:3,1:3,iFish),AoAd(1,iFish),AoAd(2,iFish),AoAd(3,iFish))
             !given displacement
             do  iND=1,nND(iFish)
-                xyzfulnxt(iFish,iND,1:3)=matmul(TTTnxt(iFish,1:3,1:3),xyzful00(iFish,iND,1:3))+XYZ(iFish,1:3)
-                xyzfulnxt(iFish,iND,4:6)=AoAd(iFish,1:3)
+                xyzfulnxt(iND,1:3,iFish)=matmul(TTTnxt(1:3,1:3,iFish),xyzful00(iND,1:3,iFish))+XYZ(1:3,iFish)
+                xyzfulnxt(iND,4:6,iFish)=AoAd(1:3,iFish)
             enddo
             !-------------------------------------------------------
             !displacement condition
-            vBC(iFish,1:nND(iFish),1:6) = xyzfulnxt(iFish,1:nND(iFish),1:6) - xyzful(iFish,1:nND(iFish),1:6)
+            vBC(1:nND(iFish),1:6,iFish) = xyzfulnxt(1:nND(iFish),1:6,iFish) - xyzful(1:nND(iFish),1:6,iFish)
             !loading vector
-            lodful(iFish,1:nND(iFish),1:6) = extful(iFish,1:nND(iFish),1:6) + grav(iFish,1:nND(iFish),1:6) + repful(iFish,1:nND(iFish),1:6)
+            lodful(1:nND(iFish),1:6,iFish) = extful(1:nND(iFish),1:6,iFish) + grav(1:nND(iFish),1:6,iFish) + repful(1:nND(iFish),1:6,iFish)
             !-----------------------------------------
-            CALL structure_solver(jBC(iFish,1:nND(iFish),1:6),vBC(iFish,1:nND(iFish),1:6),ele(iFish,1:nEL(iFish),1:5), &
-                                  nloc(iFish,1:nND(iFish)*6),nprof(iFish,1:nND(iFish)*6),nprof2(iFish,1:nND(iFish)*6), &
-                                  prop(iFish,1:nMT(iFish),1:10),mss(iFish,1:nND(iFish)*6), &
-                                  xyzful0(iFish,1:nND(iFish),1:6),xyzful(iFish,1:nND(iFish),1:6),dspful(iFish,1:nND(iFish),1:6), &
-                                  velful(iFish,1:nND(iFish),1:6),accful(iFish,1:nND(iFish),1:6),lodful(iFish,1:nND(iFish),1:6),  &
+            CALL structure_solver(jBC(1:nND(iFish),1:6,iFish),vBC(1:nND(iFish),1:6,iFish),ele(1:nEL(iFish),1:5,iFish), &
+                                  nloc(1:nND(iFish)*6,iFish),nprof(1:nND(iFish)*6,iFish),nprof2(1:nND(iFish)*6,iFish), &
+                                  prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish), &
+                                  xyzful0(1:nND(iFish),1:6,iFish),xyzful(1:nND(iFish),1:6,iFish),dspful(1:nND(iFish),1:6,iFish), &
+                                  velful(1:nND(iFish),1:6,iFish),accful(1:nND(iFish),1:6,iFish),lodful(1:nND(iFish),1:6,iFish),  &
                                   subdeltat,dampK,dampM,  &
-                                  triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_ee(iFish,1:3,1:3,1:nEL(iFish)), &
-                                  triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)), &
+                                  triad_nn(1:3,1:3,1:nND(iFish),iFish),triad_ee(1:3,1:3,1:nEL(iFish),iFish), &
+                                  triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
                                   nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,    &
                                   nFish,iFish,FishInfo)
         else
@@ -288,8 +288,8 @@
         !******************************************************************************************
         if(isRelease/=1)then
             do iFish=1,nFish
-                write(*,'(A,I5.5)')' Fish number: ', int(FishInfo(iFish,1))
-                write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(FishInfo(iFish,2)),'    dmaxFEM = ',FishInfo(iFish,3)
+                write(*,'(A,I5.5)')' Fish number: ', int(FishInfo(1,iFish))
+                write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(FishInfo(2,iFish)),'    dmaxFEM = ',FishInfo(3,iFish)
             enddo
         endif
         write(*,'(A)')' --------------------------------------------------------'
@@ -302,29 +302,29 @@
         if(isRelease/=1)then
             do iFish=1,nFish
                 write(*,'(A,I5.5)')' Fish number: ',iFish
-                write(*,'(A,3D15.5)')" forceDre: ",sum(extful(iFish,1:nND(iFish),1:3),1)/Fref
+                write(*,'(A,3D15.5)')" forceDre: ",sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
                 !write(*,'(A,3D15.5)')" forceStress:",sum(extful2(1:nND,1:3),1)/Fref
-                write(*,'(A,3D15.5)')" accCentM: ",sum(accful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Aref
-                write(*,'(A,3D15.5)')" velCentM: ",sum(velful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Uref
-                write(*,'(A,3D15.5)')" xyzCentM: ",sum(xyzful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Lref
+                write(*,'(A,3D15.5)')" accCentM: ",sum(accful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Aref
+                write(*,'(A,3D15.5)')" velCentM: ",sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref
+                write(*,'(A,3D15.5)')" xyzCentM: ",sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref
             enddo
-        endif                
+        endif
         !******************************************************************************************
         !******************************************************************************************
         !******************************************************************************************
         if(DABS(time/Tref-timeOutTemp*NINT(time/Tref/timeOutTemp)) <= 0.5*dt/Tref)then
             CALL write_checkpoint_file()
         endif
-        
+
         if((timeOutFlBg .le. time/Tref) .and. (time/Tref .le. timeOutFlEd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
-                if (Nspan.ne.0) then 
-                    CALL write_solid_span_field(nFish,xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+                if (Nspan.ne.0) then
+                    CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
                 else
-                    CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
+                    CALL write_solid_field(xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
                 endif
                 if (Palpha.gt.0.d0) then
-                    CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
+                    CALL write_solidIB_field(xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,nFish)
                 endif
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then

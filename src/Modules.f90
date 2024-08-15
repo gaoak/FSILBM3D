@@ -11,14 +11,14 @@
                                          0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0, &
                                          0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1, &
                                          0, 0, 0, 0, 0, 1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 1, 1,-1,-1  &
-                                                 ],[lbmDim+1,SpcDim])   
+                                                 ],[lbmDim+1,SpcDim])
 !    Opposite directions****************************************************************************
     integer, parameter:: oppo(0:lbmDim)=[0, 2, 1, 4, 3, 6, 5,10, 9, 8, 7,14,13,12,11,18,17,16,15]
 !    Weights****************************************************************************************
-    real(8), parameter:: wt(0:lbmDim) = [& 
+    real(8), parameter:: wt(0:lbmDim) = [&
        1.0d0/3.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0, &
                    1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0, &
-                   1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0  ]  
+                   1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0  ]
 !   MRT model Matrix*******************************************************************************
     real(8)::M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim)
     !real(8),parameter::s0=1.0d0,s1=1.0d0,s2=1.0d0,s4=1.0d0,s10=1.0d0,s16=1.0d0
@@ -76,23 +76,23 @@
     real(8):: cnzc0, cnzcm, cnzcp
 
 !   ***********************************************************************************************
-    character (LEN=40):: LBmeshName 
+    character (LEN=40):: LBmeshName
     integer:: xDim,yDim,zDim
     integer:: xMinBC,xMaxBC,yMinBC,yMaxBC,zMinBC,zMaxBC,iBC
     real(8), allocatable:: elmax(:),elmin(:)
     real(8):: dh,dt,ratio,dxmin,dymin,dzmin,dxmax,dymax,dzmax
     real(8):: cptxMin,cptxMax,cptyMin,cptyMax,cptzMin,cptzMax
     real(8):: Omega,tau,Cs2,nu,Mu
-    real(8), allocatable:: dx(:), dy(:), dz(:) 
+    real(8), allocatable:: dx(:), dy(:), dz(:)
     real(8), allocatable:: xGrid0(:), yGrid0(:), zGrid0(:), xGrid(:), yGrid(:), zGrid(:)
     real(8), allocatable:: fIn(:,:,:,:), fInTemp(:,:,:)
     real(8), allocatable:: uuu(:,:,:,:), force(:,:,:,:), den(:,:,:), prs(:,:,:)
-    
-!   *********************************************************************************************** 
-!   *********************************************************************************************** 
+
+!   ***********************************************************************************************
+!   ***********************************************************************************************
     integer, parameter:: idat=12, DOFDim=6
     character (LEN=40), allocatable:: FEmeshName(:)
-!   ***********************************************************************************************     
+!   ***********************************************************************************************
     real(8):: deltaT
     real(8), allocatable:: Freq(:)
     real(8), allocatable:: XYZ(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),XYZd(:,:),UVW(:,:)
@@ -101,7 +101,7 @@
 !   ***********************************************************************************************
     integer:: nFish,nEL_all,nND_all,nND_max,nEL_max,nMT_max,nEQ_max,NDref
     integer,allocatable:: ele_all(:,:)
-    integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:) 
+    integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:)
     integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:),isMotionGiven(:,:)
     real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful_all(:,:)
 !   ===============================================================================================
@@ -113,7 +113,7 @@
     real(8), allocatable:: xyzful(:,:,:),velful(:,:,:)
     real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
     real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
-!   ***********************************************************************************************   
+!   ***********************************************************************************************
     END MODULE simParam
 
     MODULE PartitionXDim

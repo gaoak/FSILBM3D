@@ -16,7 +16,7 @@
 !    workspace variables:
 !
 !
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,     &
                       triad_nn,triad_ee,triad_n1,triad_n2,nND,nEL,nEQ,nMT,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
                       dtol,iterMax,nFish,iFish,FishInfo)
@@ -31,8 +31,8 @@
     real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL)
 !   ----------------------------------------------------------------------------------------------
     real(8):: dspt(nEQ),du(nEQ),ddu(nEQ),lodEffe(nEQ),lodInte(nEQ),lodExte(nEQ),dsp(nEQ),vel(nEQ),acc(nEQ)
-    real(8):: stfEffe(maxstiff),stfElas(maxstiff),stfGeom(maxstiff)      
-    real(8):: wk1(nEQ),wk2(nEQ),velO(nEQ),accO(nEQ) 
+    real(8):: stfEffe(maxstiff),stfElas(maxstiff),stfGeom(maxstiff)
+    real(8):: wk1(nEQ),wk2(nEQ),velO(nEQ),accO(nEQ)
     real(8):: Newmarkdelta,Newmarkalpha
     real(8):: a0,a1,a2,a3,a4,a5,a6,a7
     real(8):: beta0,beta,gamma,zi,z0
@@ -56,7 +56,7 @@
 
     !igeoFRM=27
     !igeoPLT=28
-    !open(unit=igeoFRM,file='geoFRM.tmp')   
+    !open(unit=igeoFRM,file='geoFRM.tmp')
     !open(unit=igeoPLT,file='geoPLT.tmp')
 
 !   ***********************************************************************************************
@@ -125,7 +125,7 @@
         endif
 !       -------------------------------------------------------------------
 !       apply boundary conditions
-!       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!           
+!       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         do  iND=1,nND
         do  j=1  ,6
             if(jBC(iND,j)>0)then
@@ -139,7 +139,7 @@
             endif
         enddo
         enddo
-                           
+
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
 
@@ -160,7 +160,7 @@
 
         ddu(1:nEQ)= beta*du(1:nEQ)
         dsp(1:nEQ)= dsp(1:nEQ) + ddu(1:nEQ)
-        
+
 
         do  i=1,nND
             dspful(i,1:6)=dsp((i-1)*6+1:(i-1)*6+6)
@@ -179,9 +179,9 @@
     enddo
 
 
-    FishInfo(iFish,1)=dble(iFish)
-    FishInfo(iFish,2)=dble(iter)
-    FishInfo(iFish,3)=dnorm
+    FishInfo(1,iFish)=dble(iFish)
+    FishInfo(2,iFish)=dble(iter)
+    FishInfo(3,iFish)=dnorm
 
     velO(1:nEQ) = vel(1:nEQ)
     accO(1:nEQ) = acc(1:nEQ)
@@ -191,9 +191,9 @@
 
     do  i=1,nND
         velful(i,1:6)=vel((i-1)*6+1:(i-1)*6+6)
-        accful(i,1:6)=acc((i-1)*6+1:(i-1)*6+6)        
+        accful(i,1:6)=acc((i-1)*6+1:(i-1)*6+6)
     enddo
-  
+
     return
     ENDSUBROUTINE
 
@@ -216,7 +216,7 @@
     do    i= 1, nND
         read(idat,*) node,xyzful0(node,1),xyzful0(node,2),xyzful0(node,3)
     enddo
-    read(idat,'(1a50)') endin  
+    read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 !   READ elem data
     ! element number, node left, node right, node right, element type, material property index
@@ -232,10 +232,10 @@
     read(idat,*)  nbc
     do  i=1,nbc
         read(idat,*)node,jBC(node,1),jBC(node,2),jBC(node,3), &
-                         jBC(node,4),jBC(node,5),jBC(node,6)   
-       
+                         jBC(node,4),jBC(node,5),jBC(node,6)
+
     enddo
-    read(idat,'(1a50)') endin  
+    read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 !   READ element material properties
     ! can have nMT types of material
@@ -294,7 +294,7 @@
     subroutine maxbnd(ele,nprof,nEL,nEQ,nBD)
     implicit none
     integer:: nBD,nEQ,nEL
-    integer:: ele(nEL,5),nprof(nEQ) 
+    integer:: ele(nEL,5),nprof(nEQ)
 
     integer:: ipv(18)
     integer:: i,j,n,ihfbnd,idof,jdof,kdof,ieqn1,ieqn2,jband,ieq,ieq2
@@ -313,7 +313,7 @@
         enddo
 
         do  i=1,18
-            ieqn1=ipv(i)          
+            ieqn1=ipv(i)
             do  j=i,18
                 ieqn2=ipv(j)
                 ihfbnd = max0(ihfbnd,iabs(ieqn1-ieqn2))
@@ -337,10 +337,10 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   set angle of initial triads
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE init_triad_D(ele,xord0,yord0,zord0,triad_nn,triad_n1,triad_n2,triad_ee,triad_e0,nND,nEL)
     implicit none
-    integer:: nND,nEL         
+    integer:: nND,nEL
     integer:: ele(nEL,5)
     real(8):: xord0(nND),yord0(nND),zord0(nND)
     real(8):: triad_nn(3,3,nND),triad_ee(3,3,nEL),triad_e0(3,3,nEL)
@@ -401,8 +401,8 @@
                 triad_n1(3,2,n)=0.0d0
 
                 triad_n1(1,3,n)=-xll1*xnn1/dd
-                triad_n1(2,3,n)=-xmm1*xnn1/dd                                    
-                triad_n1(3,3,n)= dd 
+                triad_n1(2,3,n)=-xmm1*xnn1/dd
+                triad_n1(3,3,n)= dd
             endif
 !            all element triads have same initial orientation
             triad_n2(1:3,1:3,n)=triad_n1(1:3,1:3,n)
@@ -420,15 +420,15 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   update angle of  triads
-!    
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE update_triad_D(ele,ddut,triad_nn,triad_n1,triad_n2,nND,nEL,nEQ)
     implicit none
-    integer:: nND,nEL,nEQ         
+    integer:: nND,nEL,nEQ
     integer:: ele(nEL,5)
     real(8):: ddut(nEQ)
     real(8):: triad_nn(3,3,nND),triad_n1(3,3,nEL),triad_n2(3,3,nEL)
-   
+
     real(8):: ddutful(nND,6),rr(3,3)
     real(8):: dtx1,dty1,dtz1
     integer:: i,n,i1,j1,k1,node,jdof,ireduc,nELt
@@ -474,8 +474,8 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   get orientation of element
-!    
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE make_triad_ee(ele,xord,yord,zord,triad_ee,triad_n1,triad_n2,nND,nEL)
     implicit none
     integer:: nND,nEL
@@ -489,7 +489,7 @@
     real(8):: triad_11(3,3),triad_22(3,3)
 !
     real(8):: dx,dy,dz,xl0
-    
+
     real(8):: xll,xmm,xnn,dd,r2e1,r3e1
     integer:: i,j,k,n,i1,j1,k1,nELt
 !
@@ -562,7 +562,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
 !
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE finite_rot(t1,t2,t3,rr)
     implicit none
     real(8):: rr(3,3),rr1(3,3),rr2(3,3),rr3(3,3)
@@ -625,7 +625,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   GET ANGLE of between TRIADs
 !    pass
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE get_angle_triad(triad_n1,triad_n2,tx,ty,tz)
     implicit none
     real(8):: triad_n1(3,3),triad_n2(3,3)
@@ -668,7 +668,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
 !
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE global_to_local(triad,tx,ty,tz,tx2,ty2,tz2)
     implicit none
     real(8):: triad(3,3)
@@ -701,7 +701,7 @@
     real(8):: xord(nND), yord(nND), zord(nND)
 !
     real(8):: prop(nMT,10),geoFRM(nEL)
- 
+
     real(8):: force(18),forceb(18)
     real(8):: gforce(nEQ)
     real(8):: ekb12(12,12)
@@ -723,7 +723,7 @@
 !    pi=4.0*datan(1.0d0)
 
     gforce(1:nEQ)=0.0d0
-  
+
     !rewind(igeoFRM)
     !rewind(igeoPLT)
 
@@ -733,7 +733,7 @@
 
         i1  = ele(n,1)
         j1  = ele(n,2)
-        k1  = ele(n,3)        
+        k1  = ele(n,3)
         nELt= ele(n,4)
         mat = ele(n,5)
         if    ( nELt == 2) then
@@ -838,7 +838,7 @@
         endif
 
     enddo
-    
+
     return
     ENDSUBROUTINE body_stress_D
 
@@ -847,7 +847,7 @@
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,alphaf)
-    implicit none                  
+    implicit none
     integer:: nND,nEL,nEQ,nMT
     integer:: ele(nEL,5)
     real(8):: prop(nMT,10)
@@ -855,7 +855,7 @@
     real(8):: xord(nND), yord(nND), zord(nND)
     real(8):: mss(nEQ), em(18,18)
     real(8):: em12(12,12)
- 
+
     integer:: i,i1,j1,k1,mat,nELt
     real(8):: a0,r0,b0,zix0,ziy0,ziz0,dx,dy,dz,xl,xll,xmm,xnn
 
@@ -870,7 +870,7 @@
     do  i=1,nEL
         i1  = ele(i,1)
         j1  = ele(i,2)
-        k1  = ele(i,3)        
+        k1  = ele(i,3)
         nELt= ele(i,4) ! element type, 2 line segment
         mat = ele(i,5)
         if (nELt == 2) then
@@ -896,7 +896,7 @@
             write(*,*)'not this nELt:',nELt
             stop
         endif
-    enddo    
+    enddo
     return
     end
 
@@ -906,8 +906,8 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine formstif_s(stf,ele,xord0,yord0,zord0,xord,yord,zord,prop,nloc,nND,nEL,nEQ,nMT,maxstiff)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,maxstiff  
-    integer:: ele(nEL,5), nloc(nEQ) 
+    integer:: nND,nEL,nEQ,nMT,maxstiff
+    integer:: ele(nEL,5), nloc(nEQ)
     real(8):: prop(nMT,10)
     real(8):: xord0(nND), yord0(nND),zord0(nND)
     real(8):: xord(nND), yord(nND),zord(nND)
@@ -924,7 +924,7 @@
     do    n=1,nEL
         i1  = ele(n,1)
         j1  = ele(n,2)
-        k1  = ele(n,3)       
+        k1  = ele(n,3)
         nELt= ele(n,4)
         mat = ele(n,5)
 !
@@ -1007,7 +1007,7 @@
     do    n=1,nEL
         i1  = ele(n,1)
         j1  = ele(n,2)
-        k1  = ele(n,3)       
+        k1  = ele(n,3)
         nELt= ele(n,4)
         mat = ele(n,5)
 !
@@ -1228,11 +1228,11 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine assembCOL(maxstiff,nEQ,aa,a,i1,j1,k1,nloc)
     implicit none
-    integer:: maxstiff,nEQ            
+    integer:: maxstiff,nEQ
     real(8):: aa(maxstiff),a(18,18)
     integer:: idof(18)
     integer:: i1,j1,k1,nloc(nEQ)
-    integer:: i,j,imax,jmax,ieqn1,ieqn2,jband,iloc    
+    integer:: i,j,imax,jmax,ieqn1,ieqn2,jband,iloc
     imax = 0
 !
 !   Set idof to posible DoF number of each nodes
@@ -1254,7 +1254,7 @@
     do  i= 1, imax
         ieqn1 = idof(i)
         do    j= i, jmax
-            ieqn2 = idof(j)          
+            ieqn2 = idof(j)
             if    (ieqn1 .gt. ieqn2) then
                     jband= (ieqn1-ieqn2)+1
                     iloc = nloc(ieqn1)
@@ -1309,7 +1309,7 @@
 !   output:: aa global value
     subroutine assembFOR(nEQ, aa, a,i1, j1,k1)
     implicit none
-    integer:: nEQ   
+    integer:: nEQ
     real(8):: aa(nEQ  ),a(18)
     integer:: i1,j1,k1
     integer:: idof(18),i,ieqn1
@@ -1463,7 +1463,7 @@
     subroutine uduCOL_D(a,maxstore,nEQ,imult,nprof,nloc)
     implicit none
     integer:: maxstore,nEQ,imult
-    real(8):: a(maxstore)    
+    real(8):: a(maxstore)
     integer:: nprof(nEQ), nloc(nEQ)
 
     real(8):: temp,sum
@@ -1571,7 +1571,7 @@
     subroutine bakCOL_D(a,maxstore,b,nEQ,nBD,wk,imult,nprof,nprof2,nloc)
     implicit none
     integer:: maxstore,nEQ,nBD,imult
-    real(8):: a(maxstore),b(nEQ),wk(nEQ)    
+    real(8):: a(maxstore),b(nEQ),wk(nEQ)
     integer:: nprof(nEQ), nprof2(nEQ),nloc(nEQ)
 
     real(8):: sum

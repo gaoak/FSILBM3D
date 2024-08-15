@@ -6,14 +6,14 @@
     USE simParam
     implicit none
     integer::x,y,z,ig
-    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z) 
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
     do  x = 1, xDim
     do  y = 1, yDim
     do  z = 1, zDim
-        den(z,y,x  )  = SUM(fIn(z,y,x,0:lbmDim)) 
+        den(z,y,x  )  = SUM(fIn(z,y,x,0:lbmDim))
         uuu(z,y,x,1)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*VolumeForce(1)*dt)/den(z,y,x)
         uuu(z,y,x,2)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*VolumeForce(2)*dt)/den(z,y,x)
-        uuu(z,y,x,3)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*VolumeForce(3)*dt)/den(z,y,x)    
+        uuu(z,y,x,3)  = (SUM(fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*VolumeForce(3)*dt)/den(z,y,x)
         prs(z,y,x)   = Cs2*(den(z,y,x)-denIn)
     enddo
     enddo
@@ -29,7 +29,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE collision_step()
     USE simParam
-    implicit none 
+    implicit none
     real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),m(0:lbmDim),mEq(0:lbmDim),Flb(0:lbmDim)
     integer:: x,y,z
 
@@ -193,7 +193,7 @@
 !============================================
     elseif(iStreamModel==2)then    !Interpolation
 !============================================
-         
+
         do  i=1,lbmDim
         fInTemp(1:zDim,1:yDim,1:xDim)=fIn(1:zDim,1:yDim,1:xDim,i)
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,upwind,center,outer,upxc0,upxcm,upxcmm,upyc0,upycm,upycmm,upzc0,upzcm,upzcmm,cnxc0,cnxcm,cnxcp,cnyc0,cnycm,cnycp,cnzc0,cnzcm,cnzcp)
@@ -201,13 +201,13 @@
         do  y=2,yDim-1
         do  z=2,zDim-1
             !set logical flag
-            upwind = (x>=3).and.(x<=xDim-2).and.(y>=3).and.(y<=yDim-2) .and. (z>=3) .and. (z<=zDim-2)                    
-            center = (x>=2).and.(x<=xDim-1).and.(y>=2).and.(y<=yDim-1) .and. (z>=2) .and. (z<=zDim-1) .and. (.not.upwind) 
+            upwind = (x>=3).and.(x<=xDim-2).and.(y>=3).and.(y<=yDim-2) .and. (z>=3) .and. (z<=zDim-2)
+            center = (x>=2).and.(x<=xDim-1).and.(y>=2).and.(y<=yDim-1) .and. (z>=2) .and. (z<=zDim-1) .and. (.not.upwind)
             outer  = .not.(upwind .or. center)
 
         !******************************************************************
         !******************************************************************
-        if(upwind) then      
+        if(upwind) then
             !2nd-order upwind interpolation
             !2nd-order upwind interpolation coefficient
             if(ee(i,1)/=0 )then
@@ -247,15 +247,15 @@
                           upzcm *(upxc0 *( upyc0 *fInTemp(z-ee(i,3), y, x          )+upycm *fInTemp(z-ee(i,3), y-ee(i,2), x          )+upycmm *fInTemp(z-ee(i,3), y-2*ee(i,2), x          ))+&
                                   upxcm *( upyc0 *fInTemp(z-ee(i,3), y, x-  ee(i,1))+upycm *fInTemp(z-ee(i,3), y-ee(i,2), x-  ee(i,1))+upycmm *fInTemp(z-ee(i,3), y-2*ee(i,2), x-  ee(i,1)))+&
                                   upxcmm*( upyc0 *fInTemp(z-ee(i,3), y, x-2*ee(i,1))+upycm *fInTemp(z-ee(i,3), y-ee(i,2), x-2*ee(i,1))+upycmm *fInTemp(z-ee(i,3), y-2*ee(i,2), x-2*ee(i,1))) &
-                                 ) +& 
+                                 ) +&
                           upzcmm*(upxc0 *( upyc0 *fInTemp(z-2*ee(i,3), y, x          )+upycm *fInTemp(z-2*ee(i,3), y-ee(i,2), x          )+upycmm *fInTemp(z-2*ee(i,3), y-2*ee(i,2), x          ))+&
                                   upxcm *( upyc0 *fInTemp(z-2*ee(i,3), y, x-  ee(i,1))+upycm *fInTemp(z-2*ee(i,3), y-ee(i,2), x-  ee(i,1))+upycmm *fInTemp(z-2*ee(i,3), y-2*ee(i,2), x-  ee(i,1)))+&
                                   upxcmm*( upyc0 *fInTemp(z-2*ee(i,3), y, x-2*ee(i,1))+upycm *fInTemp(z-2*ee(i,3), y-ee(i,2), x-2*ee(i,1))+upycmm *fInTemp(z-2*ee(i,3), y-2*ee(i,2), x-2*ee(i,1))) &
-                                 )            
-        endif           
+                                 )
+        endif
         !******************************************************************
         !******************************************************************
-        if(center)then 
+        if(center)then
             !2nd-order central difference
             !2n-order central difference coefficient
             if(ee(i,1)/=0)then
@@ -267,7 +267,7 @@
             cnxc0 = 1.0d0/3.0d0
             cnxcp = 1.0d0/3.0d0
             endif
-            
+
             if(ee(i,2)/=0)then
             cnycm = (yGrid(y)-ratio*dh*ee(i,2)-yGrid(y        ))*(yGrid(y)-ratio*dh*ee(i,2)-yGrid(y+ee(i,2)))/((yGrid(y-ee(i,2))-yGrid(y        ))*(yGrid(y-ee(i,2))-yGrid(y+ee(i,2))))
             cnyc0 = (yGrid(y)-ratio*dh*ee(i,2)-yGrid(y-ee(i,2)))*(yGrid(y)-ratio*dh*ee(i,2)-yGrid(y+ee(i,2)))/((yGrid(y        )-yGrid(y-ee(i,2)))*(yGrid(y        )-yGrid(y+ee(i,2))))
@@ -275,7 +275,7 @@
             else
             cnycm = 1.0d0/3.0d0
             cnyc0 = 1.0d0/3.0d0
-            cnycp = 1.0d0/3.0d0    
+            cnycp = 1.0d0/3.0d0
             endif
 
             if(ee(i,3)/=0)then
@@ -285,9 +285,9 @@
             else
             cnzcm = 1.0d0/3.0d0
             cnzc0 = 1.0d0/3.0d0
-            cnzcp = 1.0d0/3.0d0    
+            cnzcp = 1.0d0/3.0d0
             endif
-                
+
             fIn(z,y,x,i)= cnzc0 *(cnxc0 *(cnyc0*fInTemp(z,y, x        )+cnycm*fInTemp(z,y-ee(i,2),x        )+cnycp*fInTemp(z,y+ee(i,2),x        ))+&
                                   cnxcm *(cnyc0*fInTemp(z,y, x-ee(i,1))+cnycm*fInTemp(z,y-ee(i,2),x-ee(i,1))+cnycp*fInTemp(z,y+ee(i,2),x-ee(i,1)))+&
                                   cnxcp *(cnyc0*fInTemp(z,y, x+ee(i,1))+cnycm*fInTemp(z,y-ee(i,2),x+ee(i,1))+cnycp*fInTemp(z,y+ee(i,2),x+ee(i,1))) &
@@ -301,7 +301,7 @@
                                   cnxcp *(cnyc0*fInTemp(z+ee(i,3),y, x+ee(i,1))+cnycm*fInTemp(z+ee(i,3),y-ee(i,2),x+ee(i,1))+cnycp*fInTemp(z+ee(i,3),y+ee(i,2),x+ee(i,1))) &
                                  )
          endif
-            
+
          !******************************************************************
          !******************************************************************
          if(outer)then
@@ -319,7 +319,7 @@
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    far field boundary set     
+!    far field boundary set
 !    set all far-field boundary conditions as equilibrium function
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -352,7 +352,7 @@
         outer = x.le.xl .or. x.ge.xr
     do  y=1,yDim
         outer = outer .or. y.le.yl .or. y.ge.yr
-    do  z=1,zDim 
+    do  z=1,zDim
         outer = outer .or. z.le.zl .or. z.ge.zr
         !set logical flag
         if (outer) then !outer most layer
@@ -368,12 +368,12 @@
         endif
     enddo
     enddo
-    enddo  
-    !$OMP END PARALLEL DO     
+    enddo
+    !$OMP END PARALLEL DO
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    far field boundary set     
+!    far field boundary set
 !    set far-field boundary conditions, other types
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -384,7 +384,7 @@
     integer:: x, y, z,ig
     real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim)
     real(8):: uSqri,uxyzi(0:lbmDim),fEqi(0:lbmDim)
-    real(8):: fTmp(0:lbmDim), vel(1:SpcDim)   
+    real(8):: fTmp(0:lbmDim), vel(1:SpcDim)
 !    ---------------------------------------
 !    ---------------------------------------
 
@@ -399,7 +399,7 @@
             endif
             uSqr           = sum(vel(1:3)**2)
             uxyz(0:lbmDim) = vel(1) * ee(0:lbmDim,1) + vel(2) * ee(0:lbmDim,2)+vel(3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)  
+            fEq(0:lbmDim)  = wt(0:lbmDim) * denIn * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
             fIn(z,y,1,0:lbmDim)   = fEq(0:lbmDim)
         enddo
         enddo
@@ -712,7 +712,7 @@
             elseif(MovingKind1==2) then
                 vel(1)=MovingVel1 * dcos(2*pi*MovingFreq1*time)
                 vel(2)=0.0d0
-                vel(3)=0.0d0             
+                vel(3)=0.0d0
             endif
             fTmp(5) = fIn(1,y,x,oppo(5)) + 2.0 * wt(5) * denIn * (ee(5,1) * vel(1) + ee(5,2) * vel(2) + ee(5,3) * vel(3)) * 3.0
             fTmp(11) = fIn(1,y,x,oppo(11)) + 2.0 * wt(11) * denIn * (ee(11,1) * vel(1) + ee(11,2) * vel(2) + ee(11,3) * vel(3)) * 3.0
