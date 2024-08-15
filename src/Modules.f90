@@ -45,8 +45,8 @@
     integer:: step
     real(8):: time
 
-    integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity
-    integer:: iChordDirection,move(1:SpcDim),offsetOutput
+    integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity,isFluidOutput,isBodyOutput
+    integer:: move(1:SpcDim),offsetOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
     logical:: isUniformGrid(1:SpcDim)
     integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
@@ -56,7 +56,7 @@
     integer, allocatable:: SampBodyNode(:,:), iBodyModel(:)
     real(8), allocatable:: SampFlowPint(:,:)
     real(8):: Xref,Yref,Zref
-    real(8):: timeSimTotl,timeOutTemp,timeOutBody,timeOutFlow,timeOutInfo,timeOutFlBg,timeOutFlEd
+    real(8):: timeSimTotl,timeOutTemp,timeOutBody,timeOutFlow,timeOutInfo,timeOutBegin,timeOutEnd
     real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFEM,dtolFSI,subdeltat
     real(8):: uuuIn(1:SpcDim),shearRateIn(1:SpcDim),denIn,g(1:SpcDim)
     real(8):: AmplInitDist(1:SpcDim),waveInitDist,AmplforcDist(1:SpcDim),FreqforcDist

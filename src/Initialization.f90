@@ -22,7 +22,7 @@
     read(111,*)     RefVelocity, iKB
     read(111,*)     timeSimTotl,timeOutTemp
     read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
-    read(111,*)     timeOutFlEd,timeOutFlBg
+    read(111,*)     timeOutBegin,timeOutEnd
     read(111,*)     Palpha,Pbeta,Pramp 
     call readequal(111)
     read(111,*)     uuuIn(1:3)
@@ -43,7 +43,7 @@
     read(111,*)     dspan,Nspan
     call readequal(111)
     read(111,*)     Re     
-    read(111,*)     dt      
+    read(111,*)     dt,Tref     
     read(111,*)     Frod(1:3)            !Gravity
     call readequal(111)
     read(111,*)     iBC 
@@ -51,8 +51,7 @@
     read(111,*)     denIn   
     read(111,*)     dtolLBM,ntolLBM      !velocity iteration
     call readequal(111)
-    read(111,*)     nFish,FishKind
-    read(111,*)     iForce2Body,iChordDirection
+    read(111,*)     nFish,FishKind,iForce2Body
     if(nFish.lt.FishKind) then
         write(*, *) "Fish kind is more than fish number ", FishKind, nFish
     endif
@@ -99,7 +98,7 @@
     read(111,*)     dampK,dampM
     read(111,*)     NewmarkGamma,NewmarkBeta
     read(111,*)     alphaf,alpham,alphap
-    read(111,*)     dtolFEM,ntolFEM  
+    read(111,*)     dtolFEM,ntolFEM
     call readequal(111)
 
     if(nFish>0) then
@@ -140,10 +139,10 @@
         enddo
     enddo
     call readequal(111)
-    read(111,*)     isMoveGrid,      offsetOutput
-    read(111,*)     isMoveDimX,      isMoveOutputX
-    read(111,*)     isMoveDimY,      isMoveOutputY
-    read(111,*)     isMoveDimZ,      isMoveOutputZ
+    read(111,*)     isMoveGrid,offsetOutput
+    read(111,*)     isMoveDimX,isMoveOutputX
+    read(111,*)     isMoveDimY,isMoveOutputY
+    read(111,*)     isMoveDimZ,isMoveOutputZ
     read(111,*)     Xref,Yref,Zref
     if(nFish .eq. 0 .and. isMoveGrid .eq. 1) then
         write(*, *) 'No fish, resetting move grid as false'
@@ -156,14 +155,14 @@
     read(111,*)     posiForcDist(1:SpcDim)
     call readequal(111)
 
-    read(111,*)     numSampFlow
+    read(111,*)     numSampFlow,isFluidOutput
     allocate(SampFlowPint(1:numSampFlow,1:3))
     do i=1,numSampFlow
         read(111,*) SampFlowPint(i,1:3)
     enddo
     call readequal(111)
     if(nFish>0) then
-        read(111,*)     numSampBody
+        read(111,*)     numSampBody,isBodyOutput
         allocate(SampBodyNode(1:nFish,1:numSampBody))
         read(111,*)     SampBodyNode(1,1:numSampBody)
         do iFish=1,nFish
@@ -292,9 +291,7 @@
     USE simParam
     USE ImmersedBoundary
     implicit none
-    integer:: iEL,iND,iFish,maxN(1)
-    real(8):: xCT,yCT,zCT,xl,xr,yl,yr,zl,zr
-    real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+    integer:: iEL,iND,iFish
     if(nFish==0) return
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
 
@@ -367,70 +364,12 @@
         endif
     enddo
 !   ===============================================================================================
-!   calculate area
-    allocate(NDtl(1:nFish,1:5),NDhd(1:nFish,1:3),NDct(1:nFish),elmax(1:nFish),elmin(1:nFish))
-    allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish))
-    do iFish=1,nFish
-        call cptArea(areaElem00(iFish,1:nEL(iFish)),nND(iFish),nEL(iFish),ele(iFish,1:nEL(iFish),1:5),xyzful00(iFish,1:nND(iFish),1:6))
-        nAsfac(iFish)=sum(areaElem00(iFish,1:nEL(iFish)))
-        elmax(iFish)=maxval(areaElem00(iFish,1:nEL(iFish)))
-        elmin(iFish)=minval(areaElem00(iFish,1:nEL(iFish)))
-        streI(iFish,1:nND(iFish))=0.0d0
-        bendO(iFish,1:nND(iFish))=0.0d0
-    enddo
-    !calculate spanwise length, chord length, aspect ratio
-    if(iChordDirection==1)then     
-        do iFish=1,nFish
-        nLchod(iFish) = maxval(xyzful00(iFish,:,1))-minval(xyzful00(iFish,:,1))
-        nLspan(iFish) = maxval(xyzful00(iFish,:,2))-minval(xyzful00(iFish,:,2))
-        enddo
-    elseif(iChordDirection==2)then
-        do iFish=1,nFish
-        nLchod(iFish) = maxval(xyzful00(iFish,:,2))-minval(xyzful00(iFish,:,2))
-        nLspan(iFish) = maxval(xyzful00(iFish,:,1))-minval(xyzful00(iFish,:,1))  
-        enddo      
-    else
-        stop 'no define chordwise'
-    endif
-    !Use the plate with the largest area as the reference plate
-    maxN  = maxloc(nAsfac)
-    Asfac = nAsfac(maxN(1))
-    Lchod = nLchod(maxN(1))
-    Lspan = nLspan(maxN(1))
-
-    if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
-    if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
-
-    AR    = Lspan**2/Asfac
-!    Lchod=1.0d0 
-!    Lspan=1.0d0
-
-    !calculate central position, central node
-    do iFish=1,nFish
-    xCT=sum(xyzful00(iFish,:,1))/nND(iFish)
-    yCT=sum(xyzful00(iFish,:,2))/nND(iFish)
-    zCT=sum(xyzful00(iFish,:,3))/nND(iFish)
-
-    !calculate leading-edge central node, three trailing nodes, the nearest neighbouring node
-    xl=minval(xyzful00(iFish,:,1))
-    xr=maxval(xyzful00(iFish,:,1))
-    yl=minval(xyzful00(iFish,:,2))
-    yr=maxval(xyzful00(iFish,:,2))
-    zl=minval(xyzful00(iFish,:,3))
-    zr=maxval(xyzful00(iFish,:,3))
-    ! center point
-    NDct(iFish)   =minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xCT)**2+(xyzful00(iFish,1:nND(iFish),2)-yCT)**2),1)
-    ! edge points
-    NDtl(iFish,1)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xr )**2+(xyzful00(iFish,1:nND(iFish),2)-         yl)**2),1)
-    NDtl(iFish,2)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xr )**2+(xyzful00(iFish,1:nND(iFish),2)-0.5*(yl+yr))**2),1)
-    NDtl(iFish,3)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xr )**2+(xyzful00(iFish,1:nND(iFish),2)-         yr)**2),1)
-    NDtl(iFish,4)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-0.5*(xl+xr) )**2+(xyzful00(iFish,1:nND(iFish),2)-yl)**2),1)
-    NDtl(iFish,5)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-0.5*(xl+xr) )**2+(xyzful00(iFish,1:nND(iFish),2)-yr)**2),1)
+    Lchod = maxval(xyzful00(1,:,1))-minval(xyzful00(1,:,1))
+    Lspan = dspan*real(Nspan)
     
-    NDhd(iFish,1)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-         yl)**2),1)
-    NDhd(iFish,2)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-0.5*(yl+yr))**2),1)
-    NDhd(iFish,3)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-         yr)**2),1)
-    enddo
+    Asfac = Lchod * Lspan
+    AR    = Lspan / Lchod
+
 !   loading boundary type*******************************************************************************
     do  iFish=1,nFish
     do    iND=1,nND(iFish)
@@ -469,9 +408,6 @@
     enddo
     enddo
     enddo
-    !uuu(1:zDim,1:yDim,1:xDim,1) = uuuIn(1)
-    !uuu(1:zDim,1:yDim,1:xDim,2) = uuuIn(2)
-    !uuu(1:zDim,1:yDim,1:xDim,3) = uuuIn(3)
     den(1:zDim,1:yDim,1:xDim)   = denIn
     prs(1:zDim,1:yDim,1:xDim)   = Cs2*(den(1:zDim,1:yDim,1:xDim)-denIn)
 !   initial disturbance***************************************************************************************
@@ -592,7 +528,10 @@
         Uref = 1.d0
     endif   
 
+    if(Tref==0.0d0) then
     Tref = Lref / Uref
+    endif
+    
     do iFish=1,nFish
         St(iFish) = Lref * Freq(iFish) / Uref
     enddo

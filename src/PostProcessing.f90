@@ -31,7 +31,7 @@
         enddo
     enddo
 
-    write(fileName,'(F10.5)') time/Tref
+    write(fileName,'(I10)') nint(time/Tref*1d5)
     fileName = adjustr(fileName)
     do  i=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'
@@ -214,7 +214,7 @@
     real(8):: time
 !   -------------------------------------------------------
 
-    integer:: i,j,ireduc,iFish
+    integer:: i,iFish
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
     !==================================================================================================        
@@ -225,7 +225,7 @@
                         varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz'] 
     !==================================================================================================
 
-    write(fileName,'(F10.5)') time
+    write(fileName,'(I10)') nint(time*1d5)
     fileName = adjustr(fileName)
     DO  I=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'
@@ -281,12 +281,12 @@
     real(8),intent(in):: xyzfulIB(1:Nspan+1,nFish,nND_max,6)
     real(8),intent(in):: time
     !   -------------------------------------------------------
-    integer:: i,j,ireduc,iFish,Nspanpts,ElmType,off1, off2
+    integer:: i,j,iFish,Nspanpts,ElmType,off1, off2
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
-    integer,parameter:: namLen=40,idfile=100,numVar=3
+    integer,parameter:: idfile=100
     !==========================================================================
-    write(fileName,'(F10.5)') time
+    write(fileName,'(I10)') nint(time*1d5)
     fileName = adjustr(fileName)
     DO  I=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'
@@ -345,13 +345,13 @@
     real(8),intent(in):: xyzful(nFish,nND_max,6)
     real(8),intent(in):: time
     !   -------------------------------------------------------
-    integer:: i,j,ireduc,iFish,Nspanpts,ElmType,off1, off2
+    integer:: i,j,iFish,Nspanpts,ElmType,off1, off2
     real(8):: Lspan,Lref
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
-    integer,parameter:: namLen=40,idfile=100,numVar=3
+    integer,parameter:: idfile=100
     !==========================================================================
-    write(fileName,'(F10.5)') time
+    write(fileName,'(I10)') nint(time*1d5)
     fileName = adjustr(fileName)
     DO  I=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'
@@ -403,64 +403,62 @@
 !   write flow slice, tecplot binary
 !   copyright@ RuNanHua  
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_flow_slice(xDim,yDim,zDim,XGrid,yGrid,zGrid,Lref,Uref,dIn,p,u,time,islic)
-    implicit none
-    integer:: x,y,z,i,isT
-    integer:: xDim,yDim,zDim,islic
-    real(8):: Lref,Uref,dIn
-    real(8):: XGrid(xDim),yGrid(yDim),zGrid(zDim),p(zDim,yDim,xDim),u(zDim,yDim,xDim,3),time
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileName
+!    SUBROUTINE write_flow_slice(xDim,yDim,zDim,XGrid,yGrid,zGrid,Lref,Uref,dIn,p,u,time,islic)
+!    implicit none
+!    integer:: x,y,z,i,isT
+!    integer:: xDim,yDim,zDim,islic
+!    real(8):: Lref,Uref,dIn
+!    real(8):: XGrid(xDim),yGrid(yDim),zGrid(zDim),p(zDim,yDim,xDim),u(zDim,yDim,xDim,3),time
+!    integer,parameter::nameLen=10
+!    character (LEN=nameLen):: fileName
     !==================================================================================================        
-    integer::    nv
-    integer,parameter:: namLen=40,idfile=100,numVar=7 
-    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=['x','y','z','p','u','v','w']  
-
-    write(fileName,'(F10.5)') time
-    fileName = adjustr(fileName)
-    do  i=1,nameLen
-        if(fileName(i:i)==' ')fileName(i:i)='0'
-    enddo
-    if    (islic==1)then    !yz plane
-        open(idfile,file='./DatOthe/SlcX'//trim(fileName)//'.plt') !,form='BINARY')
-        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
-        write(idfile,*)'ZONE I=',zDim,', J=',yDim,', K=',1,',F=POINT'
-        x=(xDim+1)/2
-        do  y=1,yDim
-        do  z=1,zDim
-            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
-        enddo
-        enddo
-        close(idfile)
-    elseif(islic==2)then    !zx plane
-        open(idfile,file='./DatOthe/SlcY'//trim(fileName)//'.plt') !,form='BINARY')
-        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
-        write(idfile,*)'ZONE I=',zDim,', J=',1,', K=',xDim,',F=POINT'
-        y=(yDim+1)/2
-        do  x=1,xDim
-        do  z=1,zDim
-            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
-        enddo
-        enddo
-        close(idfile)   
-    elseif(islic==3)then    !zx plane
-        open(idfile,file='./DatOthe/SlcZ'//trim(fileName)//'.plt') !,form='BINARY')
-        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
-        write(idfile,*)'ZONE I=',1,', J=',yDim,', K=',xDim,',F=POINT'
-        z=(zDim+1)/2
-        do  x=1,xDim
-        do  y=1,yDim
-            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
-        enddo
-        enddo
-        close(idfile)
-    else
-    endif
-    
-
-    END SUBROUTINE
+!    integer::    nv
+!    integer,parameter:: namLen=40,idfile=100,numVar=7 
+!    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
+!    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
+!                        varname(numVar)=['x','y','z','p','u','v','w']  
+!
+!    write(fileName,'(I10)') nint(time*1d5)
+!    fileName = adjustr(fileName)
+!    do  i=1,nameLen
+!        if(fileName(i:i)==' ')fileName(i:i)='0'
+!    enddo
+!    if    (islic==1)then    !yz plane
+!        open(idfile,file='./DatOthe/SlcX'//trim(fileName)//'.plt') !,form='BINARY')
+!        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
+!        write(idfile,*)'ZONE I=',zDim,', J=',yDim,', K=',1,',F=POINT'
+!        x=(xDim+1)/2
+!        do  y=1,yDim
+!        do  z=1,zDim
+!           write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
+!        enddo
+!        enddo
+!        close(idfile)
+!    elseif(islic==2)then    !zx plane
+!        open(idfile,file='./DatOthe/SlcY'//trim(fileName)//'.plt') !,form='BINARY')
+!        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
+!        write(idfile,*)'ZONE I=',zDim,', J=',1,', K=',xDim,',F=POINT'
+!        y=(yDim+1)/2
+!        do  x=1,xDim
+!        do  z=1,zDim
+!            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
+!        enddo
+!        enddo
+!        close(idfile)   
+!    elseif(islic==3)then    !zx plane
+!        open(idfile,file='./DatOthe/SlcZ'//trim(fileName)//'.plt') !,form='BINARY')
+!        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
+!        write(idfile,*)'ZONE I=',1,', J=',yDim,', K=',xDim,',F=POINT'
+!        z=(zDim+1)/2
+!        do  x=1,xDim
+!        do  y=1,yDim
+!            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
+!        enddo
+!        enddo
+!        close(idfile)
+!    else
+!    endif
+!    END SUBROUTINE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write parameters for checking
 !    copyright@ RuNanHua
@@ -519,7 +517,7 @@
         write(111,'(A,3F20.10)') 'dxmax,dymax,dzmax       :',dxmax, dymax, dzmax
         write(111,'(A,3F20.10)') 'cptxMin,cptyMin,cptzMin :',cptxMin, cptyMin, cptzMin
         write(111,'(A,3F20.10)') 'cptxMax,cptyMax,cptzMax :',cptxMax, cptyMax, cptzMax
-        write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(elmin(1:nFish)), maxval(elmax(1:nFish))
+        !write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(elmin(1:nFish)), maxval(elmax(1:nFish))
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Re   =',Re     
         write(111,'(A,F20.10)')'denR =',denIn 
@@ -559,9 +557,9 @@
         write(111,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',AoAPhi(iFish,1:3) 
         write(111,'(3(A,1x,I8,2x))')'nND=',nND(iFish),'nEL=',nEL(iFish),'nEQ=',nEQ(iFish)
         write(111,'(3(A,1x,I8,2x))')'nMT=',nMT(iFish),'nBD=',nBD(iFish),'nSTF=',nSTF(iFish)
-        write(111,'(A,3I20.10)')'T1,T2,T3:',NDtl(iFish,1:3) 
-        write(111,'(A,3I20.10)')'H1,H2,H3:',NDhd(iFish,1:3)
-        write(111,'(A,1I20.10)')'CT      :',NDct(iFish)
+        !write(111,'(A,3I20.10)')'T1,T2,T3:',NDtl(iFish,1:3) 
+        !write(111,'(A,3I20.10)')'H1,H2,H3:',NDhd(iFish,1:3)
+        !write(111,'(A,1I20.10)')'CT      :',NDct(iFish)
         enddo
 
         do iFish=1,nFish
@@ -772,7 +770,7 @@ enddo
 !$OMP END PARALLEL DO
 call myfork(pid)
 if(pid.eq.0) then
-    write(fileName,'(F10.5)') time/Tref
+    write(fileName,'(I10)') nint(time/Tref*1d5)
     fileName = adjustr(fileName)
     do  i=1,nameLen
         if(fileName(i:i)==' ')fileName(i:i)='0'

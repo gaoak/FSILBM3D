@@ -5,7 +5,7 @@
     SUBROUTINE calculate_macro_quantities()
     USE simParam
     implicit none
-    integer::x,y,z,ig
+    integer::x,y,z
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z) 
     do  x = 1, xDim
     do  y = 1, yDim
@@ -30,7 +30,7 @@
     SUBROUTINE collision_step()
     USE simParam
     implicit none 
-    real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),m(0:lbmDim),mEq(0:lbmDim),Flb(0:lbmDim)
+    real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim)
     integer:: x,y,z
 
     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb)
@@ -380,8 +380,7 @@
     SUBROUTINE set_other_farfld_BCs()
     USE simParam
     implicit none
-    integer:: i,k
-    integer:: x, y, z,ig
+    integer:: x, y, z
     real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim)
     real(8):: uSqri,uxyzi(0:lbmDim),fEqi(0:lbmDim)
     real(8):: fTmp(0:lbmDim), vel(1:SpcDim)   
