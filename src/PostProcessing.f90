@@ -142,7 +142,7 @@
     do iFish=1,nFish
         do i=1,1,nND(iFish)
             if ((.not. IEEE_IS_FINITE(velful(i,1,iFish))) .or. (.not. IEEE_IS_FINITE(velful(i,2,iFish))) .or. (.not. IEEE_IS_FINITE(velful(i,3,iFish)))) then
-                write(*, *) 'Nan found in body velocity ( i,iFish)', iFish, i
+                write(*, *) 'Nan found in body velocity (i,iFish)', i, iFish
                 velful(i,1:3,iFish)=0.99d9
                 nanfound = .true.
             endif

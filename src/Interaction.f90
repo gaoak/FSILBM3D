@@ -51,18 +51,18 @@
                     cycle !point iND not in the overpalling region
                 endif
                 do jND=1,nND(jFish)
-                    if ( (minx>xyzful(jFish,jND,1)) .or. (xyzful(jFish,jND,1)>maxx)  &
-                    .or. (miny>xyzful(jFish,jND,2)) .or. (xyzful(jFish,jND,2)>maxy)  &
-                    .or. (minz>xyzful(jFish,jND,3)) .or. (xyzful(jFish,jND,3)>maxz)) then
+                    if ( (minx>xyzful(jND,1,jFish)) .or. (xyzful(jND,1,jFish)>maxx)  &
+                    .or. (miny>xyzful(jND,2,jFish)) .or. (xyzful(jND,2,jFish)>maxy)  &
+                    .or. (minz>xyzful(jND,3,jFish)) .or. (xyzful(jND,3,jFish)>maxz)) then
                         cycle !point jND not in the overpalling region
                     endif
-                    r(1)=(xyzful(iND,1,iFish)-xyzful(jFish,jND,1))/dxmin
-                    r(2)=(xyzful(iND,2,iFish)-xyzful(jFish,jND,2))/dymin
-                    r(3)=(xyzful(iND,3,iFish)-xyzful(jFish,jND,3))/dzmin
+                    r(1)=(xyzful(iND,1,iFish)-xyzful(jND,1,jFish))/dxmin
+                    r(2)=(xyzful(iND,2,iFish)-xyzful(jND,2,jFish))/dymin
+                    r(3)=(xyzful(iND,3,iFish)-xyzful(jND,3,jFish))/dzmin
                     call get_smoother_phi_r(r,phi_r)
                     delta_h=phi_r(1)*phi_r(2)*phi_r(3)/dxmin/dymin/dzmin/sqrt(r(1)*r(1)+r(2)*r(2)+r(3)*r(3))
                     repful(iND,1:3,iFish)=repful(iND,1:3,iFish) + delta_h*r(1:3)*ds(1:3)*SpanLength ! force
-                    repful(jFish,jND,1:3)=repful(jFish,jND,1:3) - delta_h*r(1:3)*ds(1:3)*SpanLength ! reaction force
+                    repful(jND,1:3,jFish)=repful(jND,1:3,jFish) - delta_h*r(1:3)*ds(1:3)*SpanLength ! reaction force
                 enddo !jND=1,nND(jFish)
             enddo !iND=1,nND(iFish)
         enddo !jFish=iFish+1,nFish
