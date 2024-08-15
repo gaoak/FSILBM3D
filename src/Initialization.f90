@@ -14,7 +14,7 @@
     integer:: niBodyModel,nisMotionGiven(1:6)
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
-    open(unit=111,file='inFlow.dat') 
+    open(unit=111,file='inFlow.dat')
     call readequal(111)
     read(111,*)     npsize
     read(111,*)     isRelease
@@ -23,10 +23,10 @@
     read(111,*)     timeSimTotl,timeOutTemp
     read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
     read(111,*)     timeOutFlEd,timeOutFlBg
-    read(111,*)     Palpha,Pbeta,Pramp 
+    read(111,*)     Palpha,Pbeta,Pramp
     call readequal(111)
     read(111,*)     uuuIn(1:3)
-    read(111,*)     shearRateIn(1:3)     
+    read(111,*)     shearRateIn(1:3)
     read(111,*)     boundaryConditions(1:6)
     read(111,*)     VelocityKind
     if(VelocityKind==2) then
@@ -42,13 +42,13 @@
     call readequal(111)
     read(111,*)     dspan,Nspan
     call readequal(111)
-    read(111,*)     Re     
-    read(111,*)     dt      
+    read(111,*)     Re
+    read(111,*)     dt
     read(111,*)     Frod(1:3)            !Gravity
     call readequal(111)
-    read(111,*)     iBC 
+    read(111,*)     iBC
     read(111,*)     LBmeshName
-    read(111,*)     denIn   
+    read(111,*)     denIn
     read(111,*)     dtolLBM,ntolLBM      !velocity iteration
     call readequal(111)
     read(111,*)     nFish,FishKind
@@ -59,7 +59,7 @@
     if(nFish.eq.0) iForce2Body = 0
 
     if(nFish>0) then
-        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:nFish,1:DOFDim))
+        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
@@ -75,13 +75,13 @@
         read(111,*)     nisMotionGiven(4:6)
         read(111,*)     ndenR, npsR
         if(iKB==0) read(111,*)     nEmR, ntcR
-        if(iKB==1) read(111,*)     nKB, nKS      
+        if(iKB==1) read(111,*)     nKB, nKS
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
             iBodyModel(iFish)=niBodyModel
             FEmeshName(iFish)=nFEmeshName
-            isMotionGiven(iFish,1:6)=nisMotionGiven(1:6)
+            isMotionGiven(1:6,iFish)=nisMotionGiven(1:6)
             denR(iFish)= ndenR
             psR(iFish) = npsR
             if(iKB==0) then
@@ -99,13 +99,13 @@
     read(111,*)     dampK,dampM
     read(111,*)     NewmarkGamma,NewmarkBeta
     read(111,*)     alphaf,alpham,alphap
-    read(111,*)     dtolFEM,ntolFEM  
+    read(111,*)     dtolFEM,ntolFEM
     call readequal(111)
 
     if(nFish>0) then
         allocate(Freq(1:nFish),St(1:nFish))
-        allocate(XYZo(1:nFish,1:3),XYZAmpl(1:nFish,1:3),XYZPhi(1:nFish,1:3))
-        allocate(AoAo(1:nFish,1:3),AoAAmpl(1:nFish,1:3),AoAPhi(1:nFish,1:3))
+        allocate(XYZo(1:3,1:nFish),XYZAmpl(1:3,1:nFish),XYZPhi(1:3,1:nFish))
+        allocate(AoAo(1:3,1:nFish),AoAAmpl(1:3,1:nFish),AoAPhi(1:3,1:nFish))
         FishOrder1 =0
         FishOrder2 =0
     endif
@@ -124,19 +124,19 @@
         do iFish=FishOrder1,FishOrder2
             Freq(iFish)=nFreq
             St(iFish)  =nSt
-            XYZAmpl(iFish,1:3)=nXYZAmpl(1:3)
-            XYZPhi(iFish,1:3) =nXYZPhi(1:3)
-            AoAo(iFish,1:3)   =nAoAo(1:3)
-            AoAAmpl(iFish,1:3)=nAoAAmpl(1:3)
-            AoAPhi(iFish,1:3) =nAoAPhi(1:3)
+            XYZAmpl(1:3,iFish)=nXYZAmpl(1:3)
+            XYZPhi(1:3,iFish) =nXYZPhi(1:3)
+            AoAo(1:3,iFish)   =nAoAo(1:3)
+            AoAAmpl(1:3,iFish)=nAoAAmpl(1:3)
+            AoAPhi(1:3,iFish) =nAoAPhi(1:3)
             ! initial position distribution
             Order0 = iFish - FishOrder1
             LineX  = mod(Order0,NumX(iKind))
             LineY  = mod(Order0/NumX(iKind),NumY(iKind))
             LineZ  = Order0/(NumX(iKind)*NumY(iKind))
-            XYZo(iFish,1) = iXYZ(1) + dXYZ(1) * LineX
-            XYZo(iFish,2) = iXYZ(2) + dXYZ(2) * LineY
-            XYZo(iFish,3) = iXYZ(3) + dXYZ(3) * LineZ
+            XYZo(1,iFish) = iXYZ(1) + dXYZ(1) * LineX
+            XYZo(2,iFish) = iXYZ(2) + dXYZ(2) * LineY
+            XYZo(3,iFish) = iXYZ(3) + dXYZ(3) * LineZ
         enddo
     enddo
     call readequal(111)
@@ -164,10 +164,10 @@
     call readequal(111)
     if(nFish>0) then
         read(111,*)     numSampBody
-        allocate(SampBodyNode(1:nFish,1:numSampBody))
+        allocate(SampBodyNode(1:numSampBody,1:nFish))
         read(111,*)     SampBodyNode(1,1:numSampBody)
         do iFish=1,nFish
-        SampBodyNode(iFish,1:numSampBody)=SampBodyNode(1,1:numSampBody)
+        SampBodyNode(1:numSampBody,iFish)=SampBodyNode(1,1:numSampBody)
         enddo
     endif
     call readequal(111)
@@ -194,23 +194,23 @@
     implicit none
     integer,parameter::idFile=111
     integer:: x,y,z,temp,allocatemsg
-     
+
 !   read initial grid**********************************************************************************
     open(unit=idFile,file=trim(adjustl(LBmeshName)))
     read(idFile,*)xDim
     allocate(xGrid0(xDim),xGrid(xDim),dx(xDim))
     do x=1,xDim
-    read(idFile,*)temp,xGrid0(x)   
+    read(idFile,*)temp,xGrid0(x)
     enddo
     read(idFile,*)yDim
     allocate(yGrid0(yDim),yGrid(yDim),dy(yDim))
     do y=1,yDim
-    read(idFile,*)temp,yGrid0(y)   
+    read(idFile,*)temp,yGrid0(y)
     enddo
     read(idFile,*)zDim
     allocate(zGrid0(zDim),zGrid(zDim),dz(zDim))
     do z=1,zDim
-    read(idFile,*)temp,zGrid0(z)   
+    read(idFile,*)temp,zGrid0(z)
     enddo
     close(idFile)
 
@@ -219,7 +219,7 @@
     allocate(uuu(zDim,yDim,xDim,1:3),force(zDim,yDim,xDim,1:3))
     allocate(den(zDim,yDim,xDim),prs(zDim,yDim,xDim))
 
-!   calculate grid size**********************************************************************************    
+!   calculate grid size**********************************************************************************
     dx(1)=dabs(xGrid0(2)-xGrid0(1))
     do  x=2,xDim-1
         dx(x)=dabs(0.5*(xGrid0(x)+xGrid0(x+1))-0.5*(xGrid0(x-1)+xGrid0(x)))
@@ -302,11 +302,11 @@
     do iFish=1,nFish
     open(unit=idat, file = trim(adjustl(FEmeshName(iFish))))
     rewind(idat)
-    read(idat,*)  
+    read(idat,*)
     read(idat,*)nND(iFish),nEL(iFish),nMT(iFish)
-    read(idat,*)        
+    read(idat,*)
     close(idat)
-    enddo  
+    enddo
 
     nND_max=maxval(nND(:))
     nEL_max=maxval(nEL(:))
@@ -314,81 +314,79 @@
     nEQ_max=nND_max*6
     nEQ(:)=nND(:)*6
 
-    nEL_all = sum(nEL(:)) 
-    nND_all = sum(nND(:))    
+    nEL_all = sum(nEL(:))
+    nND_all = sum(nND(:))
 
 !   ===============================================================================================
     allocate( ele_all(nEL_all,5),xyzful_all(nND_all,6),velful_all(nND_all,6),extful_all(nND_all,6))
 
-    allocate( ele(1:nFish,nEL_max,5),xyzful00(1:nFish,nND_max,6),xyzful0(1:nFish,nND_max,6),mssful(1:nFish,nND_max,6),lodful(1:nFish,nND_max,6), &
-              extful(1:nFish,nND_max,6),repful(1:nFish,nND_max,1:6),extful1(1:nFish,nND_max,6),extful2(1:nFish,nND_max,6),nloc(1:nFish,nND_max*6),nprof(1:nFish,nND_max*6), &
-              nprof2(1:nFish,nND_max*6),jBC(1:nFish,nND_max,6),streI(1:nFish,nND_max),bendO(1:nFish,nND_max))
-    allocate( grav(1:nFish,nND_max,6),vBC(1:nFish,nND_max,6),mss(1:nFish,nND_max*6),prop(1:nFish,nMT_max,10),areaElem00(1:nFish,nEL_max),areaElem(1:nFish,nEL_max))
+    allocate( ele(nEL_max,5,1:nFish),xyzful00(nND_max,6,1:nFish),xyzful0(nND_max,6,1:nFish),mssful(nND_max,6,1:nFish),lodful(nND_max,6,1:nFish), &
+              extful(nND_max,6,1:nFish),repful(nND_max,1:6,1:nFish),extful1(nND_max,6,1:nFish),extful2(nND_max,6,1:nFish),nloc(nND_max*6,1:nFish),nprof(nND_max*6,1:nFish), &
+              nprof2(nND_max*6,1:nFish),jBC(nND_max,6,1:nFish))
+    allocate( grav(nND_max,6,1:nFish),vBC(nND_max,6,1:nFish),mss(nND_max*6,1:nFish),prop(nMT_max,10,1:nFish),areaElem00(nEL_max,1:nFish),areaElem(nEL_max,1:nFish))
 
-    allocate( xyzful(1:nFish,nND_max,6),xyzfulnxt(1:nFish,nND_max,6),dspful(1:nFish,nND_max,6),velful(1:nFish,nND_max,6),accful(1:nFish,nND_max,6)) 
-    allocate( triad_nn(1:nFish,3,3,nND_max),triad_ee(1:nFish,3,3,nEL_max),triad_e0(1:nFish,3,3,nEL_max) )
-    allocate( triad_n1(1:nFish,3,3,nEL_max),triad_n2(1:nFish,3,3,nEL_max),triad_n3(1:nFish,3,3,nEL_max) )
+    allocate( xyzful(nND_max,6,1:nFish),xyzfulnxt(nND_max,6,1:nFish),dspful(nND_max,6,1:nFish),velful(nND_max,6,1:nFish),accful(nND_max,6,1:nFish))
+    allocate( triad_nn(3,3,nND_max,1:nFish),triad_ee(3,3,nEL_max,1:nFish),triad_e0(3,3,nEL_max,1:nFish) )
+    allocate( triad_n1(3,3,nEL_max,1:nFish),triad_n2(3,3,nEL_max,1:nFish),triad_n3(3,3,nEL_max,1:nFish) )
 
     repful(:,:,1:6) =0.d0
     extful1(:,:,1:6)=0.d0
     extful2(:,:,1:6)=0.d0
 
-!   ===============================================================================================     
+!   ===============================================================================================
     do iFish=1,nFish
     open(unit=idat, file = trim(adjustl(FEmeshName(iFish))))
     rewind(idat)
-    read(idat,*)  
+    read(idat,*)
     read(idat,*)nND(iFish),nEL(iFish),nMT(iFish)
-    read(idat,*) 
+    read(idat,*)
 
-    call read_structural_datafile(jBC(iFish,1:nND(iFish),1:6),ele(iFish,1:nEL(iFish),1:5),nloc(iFish,1:nND(iFish)*6),nprof(iFish,1:nND(iFish)*6), &
-                                      nprof2(iFish,1:nND(iFish)*6),xyzful00(iFish,1:nND(iFish),1:6),prop(iFish,1:nMT(iFish),1:10),nND(iFish), &
+    call read_structural_datafile(jBC(1:nND(iFish),1:6,iFish),ele(1:nEL(iFish),1:5,iFish),nloc(1:nND(iFish)*6,iFish),nprof(1:nND(iFish)*6,iFish), &
+                                      nprof2(1:nND(iFish)*6,iFish),xyzful00(1:nND(iFish),1:6,iFish),prop(1:nMT(iFish),1:10,iFish),nND(iFish), &
                                       nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),idat)
     close(idat)
-    if (Nspan.gt.0 .and. maxval(dabs(prop(iFish,1:nMT(iFish),5))).gt.1d-6) then
-        write(*,*) 'Extruded body should have zero rotation angle, gamma', prop(iFish,1:nMT(iFish),5)
+    if (Nspan.gt.0 .and. maxval(dabs(prop(1:nMT(iFish),5,iFish))).gt.1d-6) then
+        write(*,*) 'Extruded body should have zero rotation angle, gamma', prop(1:nMT(iFish),5,iFish)
         stop
     endif
-    write(*,*)'read FEMeshFile ',iFish,' end' 
-    enddo   
+    write(*,*)'read FEMeshFile ',iFish,' end'
+    enddo
 !    ===============================================================================================
 !    package
     do iFish=1,nFish
         if(iFish.eq.1)then
             do iEL=1,nEL(iFish)
-                ele_all(iEL,1:3)=ele(iFish,iEL,1:3) 
-                ele_all(iEL,4:5)=ele(iFish,iEL,4:5) 
+                ele_all(iEL,1:3)=ele(iEL,1:3,iFish)
+                ele_all(iEL,4:5)=ele(iEL,4:5,iFish)
             enddo
         else
             do iEL=1,nEL(iFish)
-                ele_all(iEL+sum(nEL(1:iFish-1)),1:3)=ele(iFish,iEL,1:3)+sum(nND(1:iFish-1))
-                ele_all(iEL+sum(nEL(1:iFish-1)),4:5)=ele(iFish,iEL,4:5) 
+                ele_all(iEL+sum(nEL(1:iFish-1)),1:3)=ele(iEL,1:3,iFish)+sum(nND(1:iFish-1))
+                ele_all(iEL+sum(nEL(1:iFish-1)),4:5)=ele(iEL,4:5,iFish)
             enddo
         endif
     enddo
 !   ===============================================================================================
 !   calculate area
-    allocate(NDtl(1:nFish,1:5),NDhd(1:nFish,1:3),NDct(1:nFish),elmax(1:nFish),elmin(1:nFish))
+    allocate(NDtl(1:5,1:nFish),NDhd(1:3,1:nFish),NDct(1:nFish),elmax(1:nFish),elmin(1:nFish))
     allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish))
     do iFish=1,nFish
-        call cptArea(areaElem00(iFish,1:nEL(iFish)),nND(iFish),nEL(iFish),ele(iFish,1:nEL(iFish),1:5),xyzful00(iFish,1:nND(iFish),1:6))
-        nAsfac(iFish)=sum(areaElem00(iFish,1:nEL(iFish)))
-        elmax(iFish)=maxval(areaElem00(iFish,1:nEL(iFish)))
-        elmin(iFish)=minval(areaElem00(iFish,1:nEL(iFish)))
-        streI(iFish,1:nND(iFish))=0.0d0
-        bendO(iFish,1:nND(iFish))=0.0d0
+        call cptArea(areaElem00(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful00(1:nND(iFish),1:6,iFish))
+        nAsfac(iFish)=sum(areaElem00(1:nEL(iFish),iFish))
+        elmax(iFish)=maxval(areaElem00(1:nEL(iFish),iFish))
+        elmin(iFish)=minval(areaElem00(1:nEL(iFish),iFish))
     enddo
     !calculate spanwise length, chord length, aspect ratio
-    if(iChordDirection==1)then     
+    if(iChordDirection==1)then
         do iFish=1,nFish
-        nLchod(iFish) = maxval(xyzful00(iFish,:,1))-minval(xyzful00(iFish,:,1))
-        nLspan(iFish) = maxval(xyzful00(iFish,:,2))-minval(xyzful00(iFish,:,2))
+        nLchod(iFish) = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
+        nLspan(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
         enddo
     elseif(iChordDirection==2)then
         do iFish=1,nFish
-        nLchod(iFish) = maxval(xyzful00(iFish,:,2))-minval(xyzful00(iFish,:,2))
-        nLspan(iFish) = maxval(xyzful00(iFish,:,1))-minval(xyzful00(iFish,:,1))  
-        enddo      
+        nLchod(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
+        nLspan(iFish) = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
+        enddo
     else
         stop 'no define chordwise'
     endif
@@ -402,39 +400,39 @@
     if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
 
     AR    = Lspan**2/Asfac
-!    Lchod=1.0d0 
+!    Lchod=1.0d0
 !    Lspan=1.0d0
 
     !calculate central position, central node
     do iFish=1,nFish
-    xCT=sum(xyzful00(iFish,:,1))/nND(iFish)
-    yCT=sum(xyzful00(iFish,:,2))/nND(iFish)
-    zCT=sum(xyzful00(iFish,:,3))/nND(iFish)
+    xCT=sum(xyzful00(:,1,iFish))/nND(iFish)
+    yCT=sum(xyzful00(:,2,iFish))/nND(iFish)
+    zCT=sum(xyzful00(:,3,iFish))/nND(iFish)
 
     !calculate leading-edge central node, three trailing nodes, the nearest neighbouring node
-    xl=minval(xyzful00(iFish,:,1))
-    xr=maxval(xyzful00(iFish,:,1))
-    yl=minval(xyzful00(iFish,:,2))
-    yr=maxval(xyzful00(iFish,:,2))
-    zl=minval(xyzful00(iFish,:,3))
-    zr=maxval(xyzful00(iFish,:,3))
+    xl=minval(xyzful00(:,1,iFish))
+    xr=maxval(xyzful00(:,1,iFish))
+    yl=minval(xyzful00(:,2,iFish))
+    yr=maxval(xyzful00(:,2,iFish))
+    zl=minval(xyzful00(:,3,iFish))
+    zr=maxval(xyzful00(:,3,iFish))
     ! center point
-    NDct(iFish)   =minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xCT)**2+(xyzful00(iFish,1:nND(iFish),2)-yCT)**2),1)
+    NDct(iFish)   =minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xCT)**2+(xyzful00(1:nND(iFish),2,iFish)-yCT)**2),1)
     ! edge points
-    NDtl(iFish,1)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xr )**2+(xyzful00(iFish,1:nND(iFish),2)-         yl)**2),1)
-    NDtl(iFish,2)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xr )**2+(xyzful00(iFish,1:nND(iFish),2)-0.5*(yl+yr))**2),1)
-    NDtl(iFish,3)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xr )**2+(xyzful00(iFish,1:nND(iFish),2)-         yr)**2),1)
-    NDtl(iFish,4)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-0.5*(xl+xr) )**2+(xyzful00(iFish,1:nND(iFish),2)-yl)**2),1)
-    NDtl(iFish,5)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-0.5*(xl+xr) )**2+(xyzful00(iFish,1:nND(iFish),2)-yr)**2),1)
-    
-    NDhd(iFish,1)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-         yl)**2),1)
-    NDhd(iFish,2)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-0.5*(yl+yr))**2),1)
-    NDhd(iFish,3)=minloc(dsqrt((xyzful00(iFish,1:nND(iFish),1)-xl )**2+(xyzful00(iFish,1:nND(iFish),2)-         yr)**2),1)
+    NDtl(1,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xr )**2+(xyzful00(1:nND(iFish),2,iFish)-         yl)**2),1)
+    NDtl(2,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xr )**2+(xyzful00(1:nND(iFish),2,iFish)-0.5*(yl+yr))**2),1)
+    NDtl(3,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xr )**2+(xyzful00(1:nND(iFish),2,iFish)-         yr)**2),1)
+    NDtl(4,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-0.5*(xl+xr) )**2+(xyzful00(1:nND(iFish),2,iFish)-yl)**2),1)
+    NDtl(5,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-0.5*(xl+xr) )**2+(xyzful00(1:nND(iFish),2,iFish)-yr)**2),1)
+
+    NDhd(1,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xl )**2+(xyzful00(1:nND(iFish),2,iFish)-         yl)**2),1)
+    NDhd(2,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xl )**2+(xyzful00(1:nND(iFish),2,iFish)-0.5*(yl+yr))**2),1)
+    NDhd(3,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xl )**2+(xyzful00(1:nND(iFish),2,iFish)-         yr)**2),1)
     enddo
 !   loading boundary type*******************************************************************************
     do  iFish=1,nFish
     do    iND=1,nND(iFish)
-        if(jBC(iFish,iND,1)==1) jBC(iFish,iND,1:6)=isMotionGiven(iFish,1:6)
+        if(jBC(iND,1,iFish)==1) jBC(iND,1:6,iFish)=isMotionGiven(1:6,iFish)
     enddo
     enddo
     END SUBROUTINE allocate_solid_memory
@@ -450,11 +448,11 @@
     real(8):: vel(1:SpcDim)
     integer:: x, y, z
 
-!   grid coordinate***************************************************************************************         
+!   grid coordinate***************************************************************************************
     xGrid(1:xDim)=xGrid0(1:xDim)
     yGrid(1:yDim)=yGrid0(1:yDim)
     zGrid(1:zDim)=zGrid0(1:zDim)
-!   macro quantities***************************************************************************************    
+!   macro quantities***************************************************************************************
     do  x = 1, xDim
     do  y = 1, yDim
     do  z = 1, zDim
@@ -499,52 +497,52 @@
     implicit none
     integer:: iND,iFish,iCount
     if(nFish.eq.0) return
-    allocate(TTT00(1:nFish,1:3,1:3),TTT0(1:nFish,1:3,1:3),TTTnow(1:nFish,1:3,1:3),TTTnxt(1:nFish,1:3,1:3))
-    allocate(XYZ(1:nFish,1:3),XYZd(1:nFish,1:3),UVW(1:nFish,1:3) )
-    allocate(AoA(1:nFish,1:3),AoAd(1:nFish,1:3),WWW1(1:nFish,1:3),WWW2(1:nFish,1:3),WWW3(1:nFish,1:3) )
+    allocate(TTT00(1:3,1:3,1:nFish),TTT0(1:3,1:3,1:nFish),TTTnow(1:3,1:3,1:nFish),TTTnxt(1:3,1:3,1:nFish))
+    allocate(XYZ(1:3,1:nFish),XYZd(1:3,1:nFish),UVW(1:3,1:nFish) )
+    allocate(AoA(1:3,1:nFish),AoAd(1:3,1:nFish),WWW1(1:3,1:nFish),WWW2(1:3,1:nFish),WWW3(1:3,1:nFish) )
     iCount = 0
     do iFish=1,nFish
-        TTT00(iFish,:,:)=0.0d0
-        TTT00(iFish,1,1)=1.0d0
-        TTT00(iFish,2,2)=1.0d0
-        TTT00(iFish,3,3)=1.0d0
+        TTT00(:,:,iFish)=0.0d0
+        TTT00(1,1,iFish)=1.0d0
+        TTT00(2,2,iFish)=1.0d0
+        TTT00(3,3,iFish)=1.0d0
 
-        XYZ(iFish,1:3)=XYZo(iFish,1:3)+XYZAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*time+XYZPhi(iFish,1:3))
-        AoA(iFish,1:3)=AoAo(iFish,1:3)+AoAAmpl(iFish,1:3)*dcos(2.0*pi*Freq(iFish)*time+AoAPhi(iFish,1:3))
+        XYZ(1:3,iFish)=XYZo(1:3,iFish)+XYZAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*time+XYZPhi(1:3,iFish))
+        AoA(1:3,iFish)=AoAo(1:3,iFish)+AoAAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*time+AoAPhi(1:3,iFish))
 
-        call AoAtoTTT(AoA(iFish,1:3),TTT0(iFish,1:3,1:3))
-        call AoAtoTTT(AoA(iFish,1:3),TTTnow(iFish,1:3,1:3))
-        call get_angle_triad(TTT0(iFish,1:3,1:3),TTTnow(iFish,1:3,1:3),AoAd(iFish,1),AoAd(iFish,2),AoAd(iFish,3))
+        call AoAtoTTT(AoA(1:3,iFish),TTT0(1:3,1:3,iFish))
+        call AoAtoTTT(AoA(1:3,iFish),TTTnow(1:3,1:3,iFish))
+        call get_angle_triad(TTT0(1:3,1:3,iFish),TTTnow(1:3,1:3,iFish),AoAd(1,iFish),AoAd(2,iFish),AoAd(3,iFish))
 
         do iND=1,nND(iFish)
-            xyzful0(iFish,iND,1:3)=matmul(TTT0(iFish,1:3,1:3),xyzful00(iFish,iND,1:3))+XYZ(iFish,1:3)
-            xyzful0(iFish,iND,4:6)=AoAd(iFish,1:3)
+            xyzful0(iND,1:3,iFish)=matmul(TTT0(1:3,1:3,iFish),xyzful00(iND,1:3,iFish))+XYZ(1:3,iFish)
+            xyzful0(iND,4:6,iFish)=AoAd(1:3,iFish)
         enddo
 
-        xyzful(iFish,1:nND(iFish),1:6)=xyzful0(iFish,1:nND(iFish),1:6)     
-        velful(iFish,1:nND(iFish),1:6)=0.0
-                    
-        dspful(iFish,1:nND(iFish),1:6)=0.0
-        accful(iFish,1:nND(iFish),1:6)=0.0
+        xyzful(1:nND(iFish),1:6,iFish)=xyzful0(1:nND(iFish),1:6,iFish)
+        velful(1:nND(iFish),1:6,iFish)=0.0
+
+        dspful(1:nND(iFish),1:6,iFish)=0.0
+        accful(1:nND(iFish),1:6,iFish)=0.0
 
         do iND=1,nND(iFish)
-            xyzful_all(iND+iCount,1:6)   =xyzful(iFish,iND,1:6)
-            velful_all(iND+iCount,1:6)   =velful(iFish,iND,1:6)
+            xyzful_all(iND+iCount,1:6)   =xyzful(iND,1:6,iFish)
+            velful_all(iND+iCount,1:6)   =velful(iND,1:6,iFish)
             extful_all(iND+iCount,1:6)  =0.d0
         enddo
 
-        CALL formmass_D(ele(iFish,1:nEL(iFish),1:5),xyzful0(iFish,1:nND(iFish),1),xyzful0(iFish,1:nND(iFish),2),xyzful0(iFish,1:nND(iFish),3), &
-                        prop(iFish,1:nMT(iFish),1:10),mss(iFish,1:nND(iFish)*6),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf) 
-        
+        CALL formmass_D(ele(1:nEL(iFish),1:5,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
+                        prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf)
+
         do iND = 1, nND(iFish)
-            mssful(iFish,iND,1:6)= mss(iFish,(iND-1)*6+1:(iND-1)*6+6)
-            grav(iFish,iND,1:6)  = mssful(iFish,iND,1:6)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+            mssful(iND,1:6,iFish)= mss((iND-1)*6+1:(iND-1)*6+6,iFish)
+            grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
         enddo
 
-        CALL init_triad_D(ele(iFish,1:nEL(iFish),1:5),xyzful(iFish,1:nND(iFish),1),xyzful(iFish,1:nND(iFish),2),xyzful(iFish,1:nND(iFish),3), &
-                          triad_nn(iFish,1:3,1:3,1:nND(iFish)),triad_n1(iFish,1:3,1:3,1:nEL(iFish)),triad_n2(iFish,1:3,1:3,1:nEL(iFish)), &
-                          triad_ee(iFish,1:3,1:3,1:nEL(iFish)),triad_e0(iFish,1:3,1:3,1:nEL(iFish)),nND(iFish),nEL(iFish)) 
-        
+        CALL init_triad_D(ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1,iFish),xyzful(1:nND(iFish),2,iFish),xyzful(1:nND(iFish),3,iFish), &
+                          triad_nn(1:3,1:3,1:nND(iFish),iFish),triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
+                          triad_ee(1:3,1:3,1:nEL(iFish),iFish),triad_e0(1:3,1:3,1:nEL(iFish),iFish),nND(iFish),nEL(iFish))
+
         iCount = iCount + nND(iFish)
     enddo
     call initializexyzIB
@@ -575,22 +573,22 @@
     elseif(RefVelocity==3) then
         Uref = dsqrt(uuuIn(1)**2 + uuuIn(2)**2 + uuuIn(3)**2)
     elseif(RefVelocity==4) then
-        Uref = dabs(VelocityAmp)  !Velocity Amplitude 
+        Uref = dabs(VelocityAmp)  !Velocity Amplitude
     elseif(RefVelocity==10) then
         Uref = Lref * MAXVAL(Freq(1:nFish))
     elseif(RefVelocity==11) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(iFish,1:3)))
+        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     elseif(RefVelocity==12) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(iFish,1:3)))*2.D0 !Park 2017 pof
+        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*2.D0 !Park 2017 pof
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     else
         Uref = 1.d0
-    endif   
+    endif
 
     Tref = Lref / Uref
     do iFish=1,nFish
@@ -600,13 +598,13 @@
     uMax = 0.
     do iFish=1,nFish
         ! angle to radian
-        AoAo(iFish,1:3)=AoAo(iFish,1:3)/180.0*pi
-        AoAAmpl(iFish,1:3)=AoAAmpl(iFish,1:3)/180.0*pi
-        AoAPhi(iFish,1:3)=AoAPhi(iFish,1:3)/180.0*pi
-        XYZPhi(iFish,1:3)=XYZPhi(iFish,1:3)/180.0*pi
-        uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(iFish,1:3)))*Freq(iFish), &
-            2.0*pi*MAXVAL(dabs(AoAAmpl(iFish,1:3))*[maxval(dabs(xyzful00(iFish,:,2))), &
-            maxval(dabs(xyzful00(iFish,:,1))),maxval(dabs(xyzful00(iFish,:,3)))])*Freq(iFish)])
+        AoAo(1:3,iFish)=AoAo(1:3,iFish)/180.0*pi
+        AoAAmpl(1:3,iFish)=AoAAmpl(1:3,iFish)/180.0*pi
+        AoAPhi(1:3,iFish)=AoAPhi(1:3,iFish)/180.0*pi
+        XYZPhi(1:3,iFish)=XYZPhi(1:3,iFish)/180.0*pi
+        uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*Freq(iFish), &
+            2.0*pi*MAXVAL(dabs(AoAAmpl(1:3,iFish))*[maxval(dabs(xyzful00(:,2,iFish))), &
+            maxval(dabs(xyzful00(:,1,iFish))),maxval(dabs(xyzful00(:,3,iFish)))])*Freq(iFish)])
     enddo
 
 !   calculate viscosity, LBM relexation time
@@ -621,7 +619,7 @@
     isUniformGrid(1) = dabs(dxmax/dh-1.0d0)<eps
     isUniformGrid(2) = dabs(dymax/dh-1.0d0)<eps
     isUniformGrid(3) = dabs(dzmax/dh-1.0d0)<eps
-    if(dabs(dt/dh-1.0d0)<eps .and. isUniformGrid(1) .and. isUniformGrid(2) .and. isUniformGrid(3))then 
+    if(dabs(dt/dh-1.0d0)<eps .and. isUniformGrid(1) .and. isUniformGrid(2) .and. isUniformGrid(3))then
         iStreamModel=1
         write(*,*)'uniform grid,STLBM'
     else
@@ -634,53 +632,53 @@
     Mu    =  nu*denIn
     tau   =  nu/(dt*Cs2)+0.5d0
     Omega =  1.0d0 / tau
-    
+
     Aref=Uref/Tref
     Fref=0.5*denIn*Uref**2*Asfac
     Eref=denIn*Uref**2*Lref**2*Lref
     Pref=denIn*Uref**2*Lref**2*Uref
     !calculate material parameters
     do iFish=1,nFish
-    nt(iFish)=ele(iFish,1,4)  
+    nt(iFish)=ele(1,4,iFish)
     if(iKB==0)then
-        prop(iFish,1:nMT(iFish),1) = EmR(iFish)*denIn*Uref**2
-        prop(iFish,1:nMT(iFish),2) = prop(iFish,1:nMT(iFish),1)/2.0d0/(1.0+psR(iFish))
+        prop(1:nMT(iFish),1,iFish) = EmR(iFish)*denIn*Uref**2
+        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0+psR(iFish))
         Lthck= tcR(iFish)*Lref
-        prop(iFish,1:nMT(iFish),3) = tcR(iFish)*Lref
-        prop(iFish,1:nMT(iFish),4) = denR(iFish)*Lref*denIn/prop(iFish,1:nMT(iFish),3)        
+        prop(1:nMT(iFish),3,iFish) = tcR(iFish)*Lref
+        prop(1:nMT(iFish),4,iFish) = denR(iFish)*Lref*denIn/prop(1:nMT(iFish),3,iFish)
         if    (nt(iFish)==2)then   !frame
-        prop(iFish,1:nMT(iFish),7) = prop(iFish,1:nMT(iFish),3)**3/12.0d0
-        prop(iFish,1:nMT(iFish),8) = prop(iFish,1:nMT(iFish),3)**3/12.0d0
+        prop(1:nMT(iFish),7,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
+        prop(1:nMT(iFish),8,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
         elseif(nt(iFish)==3)then   !plate
-        prop(iFish,1:nMT(iFish),6) = prop(iFish,1:nMT(iFish),3)**3/12.0d0
+        prop(1:nMT(iFish),6,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
         else
         endif
-        KB=prop(iFish,nMT(iFish),1)*prop(iFish,nMT(iFish),6)/(denIn*Uref**2*Lref**3)
-        KS=prop(iFish,nMT(iFish),1)*prop(iFish,nMT(iFish),3)/(denIn*Uref**2*Lref)
+        KB=prop(nMT(iFish),1,iFish)*prop(nMT(iFish),6,iFish)/(denIn*Uref**2*Lref**3)
+        KS=prop(nMT(iFish),1,iFish)*prop(nMT(iFish),3,iFish)/(denIn*Uref**2*Lref)
     endif
-    
+
     if(iKB==1)then
-        prop(iFish,1:nMT(iFish),3) = dsqrt(KB(iFish)/KS(iFish)*12.0d0)*Lref
-        prop(iFish,1:nMT(iFish),4) = denR(iFish)*Lref*denIn/prop(iFish,1:nMT(iFish),3)
+        prop(1:nMT(iFish),3,iFish) = dsqrt(KB(iFish)/KS(iFish)*12.0d0)*Lref
+        prop(1:nMT(iFish),4,iFish) = denR(iFish)*Lref*denIn/prop(1:nMT(iFish),3,iFish)
         if    (nt(iFish)==2)then   !frame
-        prop(iFish,1:nMT(iFish),1) = KS(iFish)*denIn*Uref**2*Lref/prop(iFish,1:nMT(iFish),3)
-        prop(iFish,1:nMT(iFish),2) = prop(iFish,1:nMT(iFish),1)/2.0d0/(1.0d0+psR(iFish))
-        prop(iFish,1:nMT(iFish),7) = prop(iFish,1:nMT(iFish),3)**3/12.0d0
-        prop(iFish,1:nMT(iFish),8) = prop(iFish,1:nMT(iFish),3)**3/12.0d0
+        prop(1:nMT(iFish),1,iFish) = KS(iFish)*denIn*Uref**2*Lref/prop(1:nMT(iFish),3,iFish)
+        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0d0+psR(iFish))
+        prop(1:nMT(iFish),7,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
+        prop(1:nMT(iFish),8,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
         elseif(nt(iFish)==3)then   !plate
-        prop(iFish,1:nMT(iFish),1) = KS(iFish)*denIn*Uref**2*Lref/prop(iFish,1:nMT(iFish),3)
-        prop(iFish,1:nMT(iFish),2) = prop(iFish,1:nMT(iFish),1)/2.0d0/(1.0d0+psR(iFish))
-        prop(iFish,1:nMT(iFish),6) = prop(iFish,1:nMT(iFish),3)**3/12.0d0
+        prop(1:nMT(iFish),1,iFish) = KS(iFish)*denIn*Uref**2*Lref/prop(1:nMT(iFish),3,iFish)
+        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0d0+psR(iFish))
+        prop(1:nMT(iFish),6,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
         else
         endif
-        EmR(iFish) = prop(iFish,nMT(iFish),1)/(denIn*Uref**2) 
-        tcR(iFish) = prop(iFish,nMT(iFish),3)/Lref
-        Lthck=prop(iFish,nMT(iFish),3)
+        EmR(iFish) = prop(nMT(iFish),1,iFish)/(denIn*Uref**2)
+        tcR(iFish) = prop(nMT(iFish),3,iFish)/Lref
+        Lthck=prop(nMT(iFish),3,iFish)
     endif
     enddo
 
     END SUBROUTINE calculate_LB_params
-     
+
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    calculate multiple relexasion time model parameters
 !    copyright@ RuNanHua
@@ -689,10 +687,10 @@
     USE simParam
     implicit none
 !   ===============================================================================================
-    integer:: I 
-    real(8):: M_MRT(0:lbmDim,0:lbmDim),M_MRTI(0:lbmDim,0:lbmDim),M(0:lbmDim,0:lbmDim)  
-    real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)   
-!   ======================================================= 
+    integer:: I
+    real(8):: M_MRT(0:lbmDim,0:lbmDim),M_MRTI(0:lbmDim,0:lbmDim),M(0:lbmDim,0:lbmDim)
+    real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)
+!   =======================================================
 !   calculate MRTM transformation matrix
     DO    I=0,lbmDim
         M_MRT(0,I)=1
@@ -722,8 +720,8 @@
         M_MRT(18,I)=(ee(I,1)**2-ee(I,2)**2)*ee(I,3)
     ENDDO
 !   calculate the inverse matrix
-    M_MRTI=TRANSPOSE(M_MRT)    
-    M=MATMUL(M_MRT,M_MRTI)   
+    M_MRTI=TRANSPOSE(M_MRT)
+    M=MATMUL(M_MRT,M_MRTI)
     DO    I=0,lbmDim
         M_MRTI(0:lbmDim,I)=M_MRTI(0:lbmDim,I)/M(I,I)
     ENDDO
@@ -738,7 +736,7 @@
     S_D(0:lbmDim,0:lbmDim)=0.0D0
     DO    i=0,lbmDim
         S_D(i,i)=S(i)
-    ENDDO    
+    ENDDO
     M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
     !=====================
 !   calculate MRTM body-force matrix
