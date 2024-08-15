@@ -1,7 +1,7 @@
 ===================================================================================================control parameters
  16                                          read(111,*)     npsize
  0                                           read(111,*)     isRelease
- 1          1                                read(111,*)     isConCmpt,  iCollidModel
+ 0          1                                read(111,*)     isConCmpt,  iCollidModel
  0          1                                read(111,*)     RefVelocity, iKB
  1.00D-1   50.00D+0                        read(111,*)     timeSimTotl,timeOutTemp
  0.100D+0   0.100D+0   0.0100D+0              read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
