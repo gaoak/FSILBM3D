@@ -142,7 +142,7 @@
     do iFish=1,nFish
         do i=1,1,nND(iFish)
             if ((.not. IEEE_IS_FINITE(velful(i,1,iFish))) .or. (.not. IEEE_IS_FINITE(velful(i,2,iFish))) .or. (.not. IEEE_IS_FINITE(velful(i,3,iFish)))) then
-                write(*, *) 'Nan found in body velocity ( i,iFish)', iFish, i
+                write(*, *) 'Nan found in body velocity (i,iFish)', i, iFish
                 velful(i,1:3,iFish)=0.99d9
                 nanfound = .true.
             endif
@@ -210,7 +210,7 @@
     implicit none
     integer:: nND_max,nEL_max,nFish
     integer:: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
-    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish) !,streI(1:nND),bendO(1:nND)
+    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish)
     real(8):: time
 !   -------------------------------------------------------
 
@@ -261,7 +261,7 @@
         enddo
         write(idfile) 0,-1
         do  i=1,nND(iFish)
-            write(idfile)   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish)) !,real(streI(i)),real(bendO(i))
+            write(idfile)   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish))
         enddo
         do  i=1,nEL(iFish)
             write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
@@ -365,7 +365,7 @@
             ElmType = 4
         endif
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBodySpan/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
+        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
         !   I. The header section.
         write(idfile, '(A)') 'variables = x, y, z'
         write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan,', DATAPACKING=POINT, ZONETYPE='
@@ -399,66 +399,7 @@
     enddo
     !   =============================================
     END SUBROUTINE
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   write flow slice, tecplot binary
-!   copyright@ RuNanHua
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    SUBROUTINE write_flow_slice(xDim,yDim,zDim,XGrid,yGrid,zGrid,Lref,Uref,dIn,p,u,time,islic)
-!    implicit none
-!    integer:: x,y,z,i,isT
-!    integer:: xDim,yDim,zDim,islic
-!    real(8):: Lref,Uref,dIn
-!    real(8):: XGrid(xDim),yGrid(yDim),zGrid(zDim),p(zDim,yDim,xDim),u(zDim,yDim,xDim,3),time
-!    integer,parameter::nameLen=10
-!    character (LEN=nameLen):: fileName
-    !==================================================================================================
-!    integer::    nv
-!    integer,parameter:: namLen=40,idfile=100,numVar=7
-!    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
-!    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-!                        varname(numVar)=['x','y','z','p','u','v','w']
-!
-!    write(fileName,'(I10)') nint(time*1d5)
-!    fileName = adjustr(fileName)
-!    do  i=1,nameLen
-!        if(fileName(i:i)==' ')fileName(i:i)='0'
-!    enddo
-!    if    (islic==1)then    !yz plane
-!        open(idfile,file='./DatOthe/SlcX'//trim(fileName)//'.plt') !,form='BINARY')
-!        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
-!        write(idfile,*)'ZONE I=',zDim,', J=',yDim,', K=',1,',F=POINT'
-!        x=(xDim+1)/2
-!        do  y=1,yDim
-!        do  z=1,zDim
-!           write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
-!        enddo
-!        enddo
-!        close(idfile)
-!    elseif(islic==2)then    !zx plane
-!        open(idfile,file='./DatOthe/SlcY'//trim(fileName)//'.plt') !,form='BINARY')
-!        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
-!        write(idfile,*)'ZONE I=',zDim,', J=',1,', K=',xDim,',F=POINT'
-!        y=(yDim+1)/2
-!        do  x=1,xDim
-!        do  z=1,zDim
-!            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
-!        enddo
-!        enddo
-!        close(idfile)
-!    elseif(islic==3)then    !zx plane
-!        open(idfile,file='./DatOthe/SlcZ'//trim(fileName)//'.plt') !,form='BINARY')
-!        write(idfile,*)'VARIABLES = "x" "y" "z" "p" "u" "v" "w"'
-!        write(idfile,*)'ZONE I=',1,', J=',yDim,', K=',xDim,',F=POINT'
-!        z=(zDim+1)/2
-!        do  x=1,xDim
-!        do  y=1,yDim
-!            write(idfile,'(7E20.10)')xGrid(x)/Lref,yGrid(y)/Lref,zGrid(z)/Lref,p(z,y,x)/(0.5*dIn*Uref**2),u(z,y,x,1:3)/Uref
-!        enddo
-!        enddo
-!        close(idfile)
-!    else
-!    endif
-!    END SUBROUTINE
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write parameters for checking
 !    copyright@ RuNanHua

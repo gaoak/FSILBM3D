@@ -318,12 +318,13 @@
 
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
-                CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
                 if (Nspan.ne.0) then
-                CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
+                    CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
+                else
+                    CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
                 endif
                 if (Palpha.gt.0.d0) then
-                CALL write_solidIB_field(xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,nFish)
+                    CALL write_solidIB_field(xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,nFish)
                 endif
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
@@ -341,4 +342,5 @@
         call date_and_time(VALUES=values_e)
         write(*,*)'time for one step:',CPUtime(values_e)-CPUtime(values_s)
     enddo
+    call ComputeFieldStat
     END PROGRAM main
