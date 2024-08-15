@@ -365,7 +365,7 @@
             ElmType = 4
         endif
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBodySpan/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
+        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
         !   I. The header section.
         write(idfile, '(A)') 'variables = x, y, z'
         write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan,', DATAPACKING=POINT, ZONETYPE='
@@ -784,6 +784,38 @@ if(pid.eq.0) then
     call myexit(0)
 endif
 END SUBROUTINE
+
+subroutine ComputeFieldStat
+USE simParam
+USE OutFlowWorkspace
+implicit none
+integer:: x,y,z,i
+real(8):: invUref, uLinfty(1:3), uL2(1:3), temp
+invUref = 1.d0/Uref
+uLinfty = -1.d0
+uL2 = 0.d0
+do i=1,3
+    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp) &
+    !$OMP reduction (+: uL2) reduction(max: uLinfty)
+    do x=1, xDim
+        do y=1, yDim
+            do z=1, zDim
+                temp = dabs(uuu(z,y,x,i)*invUref)
+                uL2(i) = uL2(i) + temp * temp
+                if(temp.gt.uLinfty(i)) uLinfty(i) = temp
+            enddo
+        enddo
+    enddo
+    !$OMP END PARALLEL DO
+    uL2(i) = dsqrt(uL2(i) / dble(xDim * yDim * zDim))
+enddo
+write(*,'(A,F16.9)')'FIELDSTAT L2 u ', uL2(1)
+write(*,'(A,F16.9)')'FIELDSTAT L2 v ', uL2(2)
+write(*,'(A,F16.9)')'FIELDSTAT L2 w ', uL2(3)
+write(*,'(A,F16.9)')'FIELDSTAT Linfinity u ', uLinfty(1)
+write(*,'(A,F16.9)')'FIELDSTAT Linfinity v ', uLinfty(2)
+write(*,'(A,F16.9)')'FIELDSTAT Linfinity w ', uLinfty(3)
+endsubroutine ComputeFieldStat
 
 subroutine initOutFlowWorkspace
 use simParam

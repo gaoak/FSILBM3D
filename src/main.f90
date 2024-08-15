@@ -287,10 +287,10 @@
         !******************************************************************************************
         !******************************************************************************************
         if(isRelease/=1)then
-        do iFish=1,nFish
-        write(*,'(A,I5.5)')' Fish number: ', int(FishInfo(iFish,1))
-        write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(FishInfo(iFish,2)),'    dmaxFEM = ',FishInfo(iFish,3)
-        enddo
+            do iFish=1,nFish
+                write(*,'(A,I5.5)')' Fish number: ', int(FishInfo(iFish,1))
+                write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(FishInfo(iFish,2)),'    dmaxFEM = ',FishInfo(iFish,3)
+            enddo
         endif
         write(*,'(A)')' --------------------------------------------------------'
         call date_and_time(VALUES=values1)
@@ -298,16 +298,16 @@
         !******************************************************************************************
         !******************************************************************************************
         !******************************************************************************************
-        if(isRelease/=1)write(*,'(A)')' ----------------------post process----------------------'
+        if(isRelease/=1) write(*,'(A)')' ----------------------post process----------------------'
         if(isRelease/=1)then
-        do iFish=1,nFish
-        write(*,'(A,I5.5)')' Fish number: ',iFish
-        write(*,'(A,3D15.5)')" forceDre: ",sum(extful(iFish,1:nND(iFish),1:3),1)/Fref       
-        !write(*,'(A,3D15.5)')" forceStress:",sum(extful2(1:nND,1:3),1)/Fref
-        write(*,'(A,3D15.5)')" accCentM: ",sum(accful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Aref
-        write(*,'(A,3D15.5)')" velCentM: ",sum(velful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Uref
-        write(*,'(A,3D15.5)')" xyzCentM: ",sum(xyzful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Lref
-        enddo
+            do iFish=1,nFish
+                write(*,'(A,I5.5)')' Fish number: ',iFish
+                write(*,'(A,3D15.5)')" forceDre: ",sum(extful(iFish,1:nND(iFish),1:3),1)/Fref
+                !write(*,'(A,3D15.5)')" forceStress:",sum(extful2(1:nND,1:3),1)/Fref
+                write(*,'(A,3D15.5)')" accCentM: ",sum(accful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Aref
+                write(*,'(A,3D15.5)')" velCentM: ",sum(velful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Uref
+                write(*,'(A,3D15.5)')" xyzCentM: ",sum(xyzful(iFish,1:nND(iFish),1:3)*mssful(iFish,1:nND(iFish),1:3),1)/sum(mssful(iFish,1:nND(iFish),1:3),1)/Lref
+            enddo
         endif                
         !******************************************************************************************
         !******************************************************************************************
@@ -318,12 +318,13 @@
         
         if((timeOutFlBg .le. time/Tref) .and. (time/Tref .le. timeOutFlEd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
-                CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
                 if (Nspan.ne.0) then 
-                CALL write_solid_span_field(nFish,xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+                    CALL write_solid_span_field(nFish,xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref)
+                else
+                    CALL write_solid_field(nFish,xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max)
                 endif
                 if (Palpha.gt.0.d0) then
-                CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
+                    CALL write_solidIB_field(nFish,xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan)
                 endif
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
@@ -341,4 +342,5 @@
         call date_and_time(VALUES=values_e)
         write(*,*)'time for one step:',CPUtime(values_e)-CPUtime(values_s)
     enddo
+    call ComputeFieldStat
     END PROGRAM main
