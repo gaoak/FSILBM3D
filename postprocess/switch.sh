@@ -1,4 +1,5 @@
 #!/bin/bash
+c++ switchifish.cpp 
 cd ../src/
 ls -l *f90 | awk '{if($NF~/f90/) print $NF}' | while read frqcase
 do
