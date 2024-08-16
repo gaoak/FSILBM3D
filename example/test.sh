@@ -2,7 +2,7 @@ cd ..
 make clean
 make
 cd example
-
+sleep 2
 ls -l ./ | awk '{print $NF}' | while read frqcase
 do
   if [ -d ${frqcase} ]; then
