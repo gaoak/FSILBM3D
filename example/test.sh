@@ -1,9 +1,8 @@
-if [ -f ../../FSILBM3D ]; then
-  cd ..
-  make clean
-  make
-  cd example
-fi
+cd ..
+make clean
+make
+cd example
+
 ls -l ./ | awk '{print $NF}' | while read frqcase
 do
   if [ -d ${frqcase} ]; then
