@@ -172,7 +172,6 @@
                         xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,Nspan,dspan,boundaryConditions)
             endif
         elseif(iForce2Body==2)then   !stress force
-            CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful_all)
         endif
 
         !compute volume force exerted on fluids
