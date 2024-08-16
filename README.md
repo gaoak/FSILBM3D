@@ -1,4 +1,4 @@
-**FSILBM2D**: Fluid-structure interaction solver based on Lattice Boltzmann method
+**FSILBM3D**: Fluid-structure interaction solver based on Lattice Boltzmann method
 
 ## Table of contents
 
@@ -11,24 +11,24 @@
 
 ## Installation
 ### Linux
-Clone FSIBLM2D to a local machine,
+Clone FSIBLM3D to a local machine,
 ```
-git clone git@github.com:gaoak/FSILBM2D.git
-cd FSILBM2D
+git clone git@github.com:gaoak/FSILBM3D.git
+cd FSILBM3D
 ```
-To compile FSILBM2D in linux system, run
+To compile FSILBM3D in linux system, run
 ```
 make
 ```
-The executable file is **FSILBM2D**
+The executable file is **FSILBM3D**
 
-The default compiler is GNU gfortran. To use an intel fortran compiler **ifort**, you need to change line 15 in the Makefile
+The default compiler is intel fortran. To use a GNU gfortran compiler **gcc**, you need to change the first line in the Makefile
 ```
-CMP = gcc# intel,gcc
+CMP = intel# intel,gcc
 ```
 to
 ```
-CMP = intel# intel,gcc
+CMP = gcc# intel,gcc
 ```
 
 ## Run solver
@@ -51,7 +51,7 @@ done
 ### On local linux machine
 Run the solve using bash script
 ```
-nohup /home/gaoak/LBM/FSILBM2D/FSILBM2D &>log
+nohup /home/gaoak/LBM/FSILBM3D/FSILBM3D &>log
 ```
 ### On compute node
 submit the PBS script (2 threads for example)
@@ -63,8 +63,8 @@ submit the PBS script (2 threads for example)
 #PBS -l nodes=1:ppn=2
 #PBS -l walltime=1:59:00
 #PBS -q CPU_Small
-PBS_WDIR=`pwd`/code/FSILBM2D
-PBS_ENAME=FSILBM2D
+PBS_WDIR=`pwd`/code/FSILBM3D
+PBS_ENAME=FSILBM3D
 #########################################
 echo Working directory is $PBS_O_WORKDIR
 echo test is $PBS_O_HOST
@@ -84,7 +84,7 @@ $PBS_WDIR/$PBS_ENAME
 - **inFlow.dat**     Simulation control parameters
 - **FluidMesh.dat**  Fluid mesh
 - **BMeshNum.dat**   Body mesh info (Removed)
-- **BeamN.dat**      Body mesh
+- **Plate.dat**      Body mesh
 - **cleanfiles.sh**  Bash script to create/clean output directories
 
 ## Simulation control parameters
@@ -111,7 +111,7 @@ $PBS_WDIR/$PBS_ENAME
 5. *timeOutInfo*  : Dimensionless time interval for DatInfo output (force, velocity *et. al.*)
 6. *timeOutBegin* : Dimensionless time to start flow field and body output
 7. *timeOutEnd*   : Dimensionless time to end flow field and body output (output only in timeOutBegin<= time/Tref <= timeOutEnd)
-8. *dt* : For uniform grid dt=dx=dy. For non-uniform grid (dt<min(dx, dy))
+8. *dt* : For uniform grid dt=dx=dy=dz. For non-uniform grid (dt<min(dx, dy,dz))
 
 - **Reference values**
 1. *Lref* : The reference length, whihc is the mimimum chord length of all bodies
@@ -130,42 +130,41 @@ $PBS_WDIR/$PBS_ENAME
 7. *Frod*: Inverse square of the Froude number $Frod = g L / U_{ref}^2$. Determining the gravity force exerted on the body
 
 - **Initial conditions and boundary conditions**
-1. *uIn* : The incoming Velocity *($U_\infty$, $V_\infty$)*, determined by the boundary kind
-2. *boundaryConditions* : Boundary conditions on four boundaries: *(xmin, xmax, ymin, ymax)* 
+1. *uIn* : The incoming Velocity *($U_\infty$, $V_\infty$, $W_\infty$)*, determined by the boundary kind
+2. *boundaryConditions* : Boundary conditions on four boundaries: *(xmin, xmax, ymin, ymax, zmin, zmax)* 
+    - 101 : Symmetric boundary
     - 200 : Fixed wall
     - 201 : Moving wall, only for the top and bottom boundaries *(ymin, ymax)*
     - 300 : Dirichlet boundary (DirecletUP)
     - 301 : Dirichlet boundary (DirecletUU)
     - 302 : Neumann boundary (Advection1)
     - 303 : Neumann boundary (Advection2)
-    - 304 : Periodic boundary
+    - 304 : Periodic boundary (When calculating infinite bodies, the fluid grid should be one grid less than the solid grid)
 3. *VelocityKind* : Especially for Direclet velocity conditions on the left and right boundaries
     - 0, Uniform or uniform shear flow, the boundary velocity is 
-    *[uIn(1) + y * shearRateIn(1), uIn(2) - x * shearRateIn(2)]*;
-    - 1, Parabolic flow, the boundary velocity is 
-    *[uIn(1) - ParabolicParameter(1) * (y-yGrid(1)) * (y-ParabolicParameter(2)), uIn(2)]*;
+    *[uIn(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)]*;
     - 2, Vibration flow, the boundary velocity is 
     *[uIn(1) + VelocityAmp * dcos(2 * pi * VelocityFreq * time), uIn(2)]*
 4. *shearRateIn* : Parameters for uniform shear flow
-5. *parabolicParameter* : Parameters for parabolic flow
-6. *VelocityAmp,VelocityFreq* : Parameters for vibration flow
-7. *MovingKind* : Especially for moving wall conditions *(201)* on the bottom wall (1) and upper wall (2)
+5. *VelocityAmp,VelocityFreq* : Parameters for vibration flow
+6. *MovingKind* : Especially for moving wall conditions *(201)* on the bottom wall (1) and upper wall (2)
     - 0, Passive moving wall, the velocity is *uIn(1)*; 
     - 1, Couette moving wall, the velocity is *movingVel*; 
     - 2, Stokes moving wall, the velocity is *MovingVel * dcos(2 * pi * MovingFreq * time)*;
 8. *movingVel,movingFreq* : Parameters for moving wall boundary
 9. *AmplInitDist, FreqInitDist*
     - Parameters for initial velocity disturbance, the velocity is 
-    *[Uin(1) + AmplInitDist(1) * dsin(2.0 * pi * FreqInitDist(1) * xGrid(x)) * dsin(2.0 * pi * FreqInitDist(2) * yGrid(y)),*
-     *Uin(2) + AmplInitDist(2) * dsin(2.0 * pi * FreqInitDist(2) * xGrid(x)) * dsin(2.0 * pi * FreqInitDist(2) * yGrid(y))]*;
+    *[Uin(1) + AmplInitDist(1) * dsin(2.0 * pi * FreqInitDist(1)),*
+     *Uin(2) + AmplInitDist(2) * dsin(2.0 * pi * FreqInitDist(2)),*
+     *Uin(3) + AmplInitDist(3) * dsin(2.0 * pi * FreqInitDist(3)),*]*;
 10. *VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi* : Parameters for Volume Force
     According to the NS equation : *[rho * Du/Dt = rho * f_x - dp/dx]*
-    *[VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi), VolumeForceIn(2)]*;
+    *[VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi), VolumeForceIn(2), VolumeForceIn(3)]*;
 
 - **Moving grid**
 1. *isMoveGrid* : The computation domain moves with first body if this equals 1
-2. *iMoveDim* : The grid moves in which space dimension (1, 2, 3)
-3. *isMoveOutput* : Outputting the relative flow grid and body, i.e. in the moving frame of reference, if this equals 1
+2. *iMoveDimX,Y,Z* : The grid moves space dimension, if this equals 1
+3. *isMoveOutputX,Y,Z* : Outputting the relative flow grid and body, i.e. in the moving frame of reference, if this equals 1
 
 - **Data probe set**
 1. *numSampFlow* : The number of data detection points in flow field
@@ -176,23 +175,25 @@ $PBS_WDIR/$PBS_ENAME
 6. *SampBodyNode* : The serial number of each detection points in the specific body
 
 - **Body parameters input**
-1. *FishKind* : Numbers of the solid bodies type
-2. *nFish* : Total number of the solid bodies
-3. *Fishnum* : The number of the solid bodies in the specific type
-4. *FEmeshName* : The name of the body mesh file  in the specific type
-5. *iBodyModel* : Choose for the body models
+1. *dspan* : The virtual grid length of the bodies along the span
+2. *Nspan* : The number of virtual grids along the span of the bodies
+3. *FishKind* : Numbers of the solid bodies type
+4. *nFish* : Total number of the solid bodies
+5. *Fishnum* : The number of the solid bodies in the specific type
+6. *FEmeshName* : The name of the body mesh file  in the specific type
+7. *iBodyModel* : Choose for the body models
     - 1, rigid body;
     - 2, flexible body;
-6. *isMotionGiven* : Degrees of freedom in six directions
-7. *denR* : Density ratio, *rho_b * h / rho_f * L*, *h* is plate thickness
-8. *psR* : Poisson ratio
-9. *KB, KS* : Dimensionless tension rigidity and bending rigidity
-10. *waittingTime* : The dimensionaless time stayed at the peak and trough in flapping period (t/T)
-11. *XYZointial* : The initial position of the first point of the bodies
-12. *dXYZo* : If there are more than one bodies in a type, *dXYZo* determines the interval between front and rear solids
-13. *XYZAmpl, XYZPhi* : Parameters for body flapping
+8. *isMotionGiven* : Degrees of freedom in six directions
+9. *denR* : Density ratio, *rho_b * h / rho_f * L*, *h* is plate thickness
+10. *psR* : Poisson ratio
+11. *KB, KS* : Dimensionless tension rigidity and bending rigidity
+12. *waittingTime* : The dimensionaless time stayed at the peak and trough in flapping period (t/T)
+13. *XYZointial* : The initial position of the first point of the bodies
+14. *dXYZo* : If there are more than one bodies in a type, *dXYZo* determines the interval between front and rear solids
+15. *XYZAmpl, XYZPhi* : Parameters for body flapping
     - *XYZ = XYZAmpl * dcos(2.0 * pi * Freq * time + XYZPhi)*
-14. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
+16. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
     - *Theta = AoAo + AoAAmpl * dcos(2.0 * pi * Freq * time + AoAPhi)*
 
 ## Output file description
