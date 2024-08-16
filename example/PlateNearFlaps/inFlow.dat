@@ -3,7 +3,7 @@
  1                                           		read(111,*)     isRelease
  1          1                               		read(111,*)     isConCmpt,  iCollidModel
  6          1                                		read(111,*)     RefVelocity, iKB  
- 2.000D+1   2.000D+1                        	read(111,*)     timeSimTotl,timeOutTemp
+ 0.020D+0   0.020D+0                        	read(111,*)     timeSimTotl,timeOutTemp
  0.100D+0   0.100D+0   0.010D+0	read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
  4.000D+0   8.000D+0                         	read(111,*)     timeOutBegin,timeOutEnd
  0.000D+0   1.000D+0   1.000D+0	read(111,*)     Palpha,Pbeta,Pramp                     
