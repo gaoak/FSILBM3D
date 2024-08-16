@@ -24,6 +24,10 @@
     read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
     read(111,*)     timeOutBegin,timeOutEnd
     read(111,*)     Palpha,Pbeta,Pramp
+    if(timeOutBegin.gt.timeOutEnd) then
+        write(*,*) 'The start time for output should be earlier than the end time.'
+        stop
+    endif
     call readequal(111)
     read(111,*)     uuuIn(1:3)
     read(111,*)     shearRateIn(1:3)
@@ -292,6 +296,7 @@
     USE ImmersedBoundary
     implicit none
     integer:: iEL,iND,iFish
+    real(8):: lentemp
     if(nFish==0) return
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
 
@@ -364,9 +369,15 @@
         endif
     enddo
 !   ===============================================================================================
-    Lchod = maxval(xyzful00(1,:,1))-minval(xyzful00(1,:,1))
-    Lspan = dspan*real(Nspan)
-
+    iFish = 1
+    Lchod   = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
+    lentemp = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
+    if(lentemp .gt. Lchod) Lchod = lentemp
+    if (Nspan.gt.0) then
+        Lspan = dspan*real(Nspan)
+    else
+        Lspan = maxval(xyzful00(:,3,iFish))-minval(xyzful00(:,3,iFish))
+    endif
     Asfac = Lchod * Lspan
     AR    = Lspan / Lchod
 
@@ -528,8 +539,8 @@
         Uref = 1.d0
     endif
 
-    if(Tref==0.0d0) then
-    Tref = Lref / Uref
+    if(Tref.le.0.0d0) then
+        Tref = Lref / Uref
     endif
 
     do iFish=1,nFish
