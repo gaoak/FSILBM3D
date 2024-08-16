@@ -151,7 +151,6 @@
         Pay=sum(extful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
         Paz=sum(extful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
         Paero=Pax+Pay+Paz
-
         Pix=-sum(mssful(1:nND(iFish),1,iFish)*accful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
         Piy=-sum(mssful(1:nND(iFish),2,iFish)*accful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
         Piz=-sum(mssful(1:nND(iFish),3,iFish)*accful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
@@ -183,13 +182,6 @@
         open(111,file='./DatInfo/Energy'//trim(fileName)//'.plt', position='append')
         write(111,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
         close(111)
-
-        streI(1:nND(iFish),iFish)=0.0d0
-        bendO(1:nND(iFish),iFish)=0.0d0
-        do  iEL=1,nEL(iFish)
-            streI(ele(iEL,1:3,iFish),iFish)=streI(ele(iEL,1:3,iFish),iFish)+strainEnergy(iEL,1,iFish)/3
-            bendO(ele(iEL,1:3,iFish),iFish)=bendO(ele(iEL,1:3,iFish),iFish)+strainEnergy(iEL,2,iFish)/3
-        enddo
 
     enddo !nFish
 

@@ -61,8 +61,11 @@
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
-    CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-    CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
+    if (Nspan.ne.0) then
+        CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
+    else
+        CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
+    endif
 !==================================================================================================
 !==================================================================================================
 !==================================================================================================
@@ -288,10 +291,10 @@
         !******************************************************************************************
         !******************************************************************************************
         if(isRelease/=1)then
-        do iFish=1,nFish
-        write(*,'(A,I5.5)')' Fish number: ', int(FishInfo(1,iFish))
-        write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(FishInfo(2,iFish)),'    dmaxFEM = ',FishInfo(3,iFish)
-        enddo
+            do iFish=1,nFish
+                write(*,'(A,I5.5)')' Fish number: ', int(FishInfo(1,iFish))
+                write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(FishInfo(2,iFish)),'    dmaxFEM = ',FishInfo(3,iFish)
+            enddo
         endif
         write(*,'(A)')' --------------------------------------------------------'
         call date_and_time(VALUES=values1)
@@ -299,15 +302,15 @@
         !******************************************************************************************
         !******************************************************************************************
         !******************************************************************************************
-        if(isRelease/=1)write(*,'(A)')' ----------------------post process----------------------'
+        if(isRelease/=1) write(*,'(A)')' ----------------------post process----------------------'
         if(isRelease/=1)then
-        do iFish=1,nFish
-        write(*,'(A,I5.5)')' Fish number: ',iFish
-        write(*,'(A,3D15.5)')" forceDre: ",sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
-        write(*,'(A,3D15.5)')" accCentM: ",sum(accful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Aref
-        write(*,'(A,3D15.5)')" velCentM: ",sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref
-        write(*,'(A,3D15.5)')" xyzCentM: ",sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref
-        enddo
+            do iFish=1,nFish
+                write(*,'(A,I5.5)')' Fish number: ',iFish
+                write(*,'(A,3D15.5)')" forceDre: ",sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
+                write(*,'(A,3D15.5)')" accCentM: ",sum(accful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Aref
+                write(*,'(A,3D15.5)')" velCentM: ",sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref
+                write(*,'(A,3D15.5)')" xyzCentM: ",sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref
+            enddo
         endif
         !******************************************************************************************
         !******************************************************************************************
