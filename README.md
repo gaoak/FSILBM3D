@@ -125,17 +125,17 @@ $PBS_WDIR/$PBS_ENAME
     - 10 : Flapping frequency velocity $L f$
     - 11 : Maximum plunging velocity $2\pi f a$
     - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF $2\pi f a * 2$
-    - *else* : The input value (*Uref*) in parameter file inflow.dat
+    - *else* : The input value ( *Uref* ) in parameter file inflow.dat
 5. *RefTime* : Determining the definition of reference time
-    - 0  : Caculated by referece length and reference velocity (*Tref = Lref / Uref*)
-    - 1  : Caculated by the maximum frequency of the bodies (*Tref = 1 / max(frequency)*)
-    - *else*  : The input value (*Tref*) in parameter file inflow.dat
+    - 0  : Caculated by referece length and reference velocity ( *Tref = Lref / Uref* )
+    - 1  : Caculated by the maximum frequency of the bodies ( *Tref = 1 / max(frequency)* )
+    - *else*  : The input value ( *Tref* ) in parameter file inflow.dat
 5. *Tref=Lref/Uref* : The reference time, when Tref < 0 is defined as (Lref/Uref), otherwise, it equals its input value
 6. *Freq, St* : The flapping frequence for flexible bodies;
 7. *Frod*: Inverse square of the Froude number $Frod = g L / U_{ref}^2$. Determining the gravity force exerted on the body
 
 - **Initial conditions and boundary conditions**
-1. *uIn* : The incoming Velocity *($U_\infty$, $V_\infty$, $W_\infty$)*, determined by the boundary kind
+1. *uIn* : The incoming Velocity ($U_\infty$, $V_\infty$, $W_\infty$), determined by the boundary kind
 2. *boundaryConditions* : Boundary conditions on four boundaries: *(xmin, xmax, ymin, ymax, zmin, zmax)* 
     - 101 : Symmetric boundary
     - 200 : Fixed wall
