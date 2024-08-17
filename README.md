@@ -91,10 +91,10 @@ $PBS_WDIR/$PBS_ENAME
 - **Calculate control parameters**
 1. *npsize* : The core number used in the simulaion
 2. *isRelease* : Determining the content of the output log
-    - 0 : Output more detail (body state) 
+    - 0 : Output more detail (body states) 
     - 1 : Brief output to save memory
 3. *isConCmpt* : Determining new simulation or continue simulaion
-    - 0 : Calculate from the beginning (t=0)
+    - 0 : Calculate from the beginning
     - 1 : Calculate from last output (DatTemp/conwr.dat)
 4. *iCollidModel* : Determines the LBM model used in simualtion
     - 1 : *LBGK*
@@ -111,7 +111,7 @@ $PBS_WDIR/$PBS_ENAME
 5. *timeOutInfo*  : Dimensionless time interval for DatInfo output (force, velocity *et. al.*)
 6. *timeOutBegin* : Dimensionless time to start flow field and body output
 7. *timeOutEnd*   : Dimensionless time to end flow field and body output (output only in timeOutBegin<= time/Tref <= timeOutEnd)
-8. *dt* : For uniform grid dt=dx=dy=dz. For non-uniform grid (dt<min(dx, dy,dz))
+8. *dt* : For uniform grid dt=dx=dy=dz. For non-uniform grid $(dt<min(dx, dy,dz))$
 
 - **Reference values**
 1. *Lref* : The reference length, whihc is the mimimum chord length of all bodies
@@ -127,19 +127,19 @@ $PBS_WDIR/$PBS_ENAME
     - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF $2\pi f a * 2$
     - *else* : The input value $(Uref)$ in parameter file inflow.dat
 5. *RefTime* : Determining the definition of reference time
-    - 0  : Caculated by referece length and reference velocity ( *Tref = Lref / Uref* )
-    - 1  : Caculated by the maximum frequency of the bodies ( *Tref = 1 / max(frequency)* )
-    - *else*  : The input value ( *Tref* ) in parameter file inflow.dat
-5. *Tref=Lref/Uref* : The reference time, when Tref < 0 is defined as (Lref/Uref), otherwise, it equals its input value
+    - 0  : Caculated by referece length and reference velocity $(Tref = Lref / Uref)$
+    - 1  : Caculated by the maximum frequency of the bodies $(Tref = 1 / max(frequency))$
+    - *else*  : The input value $(Tref)$ in parameter file inflow.dat
+5. *Tref=Lref/Uref* : The reference time, when Tref < 0 is defined as $(Lref/Uref)$, otherwise, it equals its input value
 6. *Freq, St* : The flapping frequence for flexible bodies;
 7. *Frod*: Inverse square of the Froude number $Frod = g L / U_{ref}^2$. Determining the gravity force exerted on the body
 
 - **Initial conditions and boundary conditions**
 1. *uIn* : The incoming Velocity ($U_\infty$, $V_\infty$, $W_\infty$), determined by the boundary kind
-2. *boundaryConditions* : Boundary conditions on four boundaries: *(xmin, xmax, ymin, ymax, zmin, zmax)* 
+2. *boundaryConditions* : Boundary conditions on four boundaries: $(xmin, xmax, ymin, ymax, zmin, zmax)$ 
     - 101 : Symmetric boundary
     - 200 : Fixed wall
-    - 201 : Moving wall, only for the top and bottom boundaries *(ymin, ymax)*
+    - 201 : Moving wall, only for the top and bottom boundaries $(ymin, ymax)$
     - 300 : Dirichlet boundary (DirecletUP)
     - 301 : Dirichlet boundary (DirecletUU)
     - 302 : Neumann boundary (Advection1)
@@ -147,24 +147,24 @@ $PBS_WDIR/$PBS_ENAME
     - 304 : Periodic boundary (When calculating infinite bodies, the fluid grid should be one grid less than the solid grid)
 3. *VelocityKind* : Especially for Direclet velocity conditions on the left and right boundaries
     - 0, Uniform or uniform shear flow, the boundary velocity is 
-    *[uIn(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)]*;
+    $[uIn(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)]$;
     - 2, Vibration flow, the boundary velocity is 
-    *[uIn(1) + VelocityAmp * dcos(2 * pi * VelocityFreq * time), uIn(2)]*
+    $[uIn(1) + VelocityAmp * dcos(2 * pi * VelocityFreq * time), uIn(2)]$
 4. *shearRateIn* : Parameters for uniform shear flow
 5. *VelocityAmp,VelocityFreq* : Parameters for vibration flow
-6. *MovingKind* : Especially for moving wall conditions *(201)* on the bottom wall (1) and upper wall (2)
-    - 0, Passive moving wall, the velocity is *uIn(1)*; 
-    - 1, Couette moving wall, the velocity is *movingVel*; 
-    - 2, Stokes moving wall, the velocity is *MovingVel * dcos(2 * pi * MovingFreq * time)*;
+6. *MovingKind* : Especially for moving wall conditions $(201)$ on the bottom wall (1) and upper wall (2)
+    - 0, Passive moving wall, the velocity is $uIn(1)$; 
+    - 1, Couette moving wall, the velocity is $movingVel$; 
+    - 2, Stokes moving wall, the velocity is $MovingVel * dcos(2 * pi * MovingFreq * time)$;
 8. *movingVel,movingFreq* : Parameters for moving wall boundary
 9. *AmplInitDist, FreqInitDist*
     - Parameters for initial velocity disturbance, the velocity is 
-    *[Uin(1) + AmplInitDist(1) * dsin(2.0 * pi * FreqInitDist(1)),*
-     *Uin(2) + AmplInitDist(2) * dsin(2.0 * pi * FreqInitDist(2)),*
-     *Uin(3) + AmplInitDist(3) * dsin(2.0 * pi * FreqInitDist(3)),*]*;
+    $[Uin(1) + AmplInitDist(1) * dsin(2.0 * pi * FreqInitDist(1)),$
+     $Uin(2) + AmplInitDist(2) * dsin(2.0 * pi * FreqInitDist(2)),$
+     $Uin(3) + AmplInitDist(3) * dsin(2.0 * pi * FreqInitDist(3))]$;
 10. *VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi* : Parameters for Volume Force
-    According to the NS equation : *[rho * Du/Dt = rho * f_x - dp/dx]*
-    *[VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi), VolumeForceIn(2), VolumeForceIn(3)]*;
+    According to the NS equation : $[rho * Du/Dt = rho * f_x - dp/dx]$
+    $[VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi), VolumeForceIn(2), VolumeForceIn(3)]$;
 
 - **Moving grid**
 1. *isMoveGrid* : The computation domain moves with first body if this equals 1
@@ -190,16 +190,16 @@ $PBS_WDIR/$PBS_ENAME
     - 1, rigid body;
     - 2, flexible body;
 8. *isMotionGiven* : Degrees of freedom in six directions
-9. *denR* : Density ratio, *rho_b * h / rho_f * L*, *h* is plate thickness
+9. *denR* : Density ratio, $rho_b * h / rho_f * L$, $h$ is plate thickness
 10. *psR* : Poisson ratio
 11. *KB, KS* : Dimensionless tension rigidity and bending rigidity
-12. *waittingTime* : The dimensionaless time stayed at the peak and trough in flapping period (t/T)
+12. *waittingTime* : The dimensionaless time stayed at the peak and trough in flapping period $(t/T)$
 13. *XYZointial* : The initial position of the first point of the bodies
 14. *dXYZo* : If there are more than one bodies in a type, *dXYZo* determines the interval between front and rear solids
 15. *XYZAmpl, XYZPhi* : Parameters for body flapping
-    - *XYZ = XYZAmpl * dcos(2.0 * pi * Freq * time + XYZPhi)*
+    - $XYZ = XYZAmpl * dcos(2.0 * pi * Freq * time + XYZPhi)$
 16. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
-    - *Theta = AoAo + AoAAmpl * dcos(2.0 * pi * Freq * time + AoAPhi)*
+    - $Theta = AoAo + AoAAmpl * dcos(2.0 * pi * Freq * time + AoAPhi)$
 
 ## Output file description
 - **Output files**
@@ -211,11 +211,11 @@ $PBS_WDIR/$PBS_ENAME
 
 - **Files description**
 1. *SampBodyAngular.plt* 
-    - *Hy*: *y* Coordinate of the first point (y1)
-    - *Ty*: *y* Coordinate of the last point (y2)
-    - *Ty-TH* : Height difference between the first and last points (y2 - y1)
-    - *AoA* :  The deflection angle of the body (y2-y1)/(x2-x1);
-2. *SampBodyMean.plt* : The average information (x, y, u, v, ax, ay) of the bodies 
+    - *Hy*: *y* Coordinate of the first point $(y1)$
+    - *Ty*: *y* Coordinate of the last point $(y2)$
+    - *Ty-TH* : Height difference between the first and last points $(y2 - y1)$
+    - *AoA* :  The deflection angle of the body $(y2-y1)/(x2-x1)$;
+2. *SampBodyMean.plt* : The average information $(x, y, u, v, ax, ay)$ of the bodies 
 3. *SampBodyBegin.plt* : The same information of the first point of the bodies 
 4. *SampBodyEnd.plt* : The same information of the last point of the bodies 
 5. *SampFlowPint.plt* : The information of the detected points in the flow field
