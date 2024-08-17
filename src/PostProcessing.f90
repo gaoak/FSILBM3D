@@ -452,34 +452,34 @@
         write(111,'(A,I20.10)')'number of fish is',nFish
         write(111,'(A      )')'===================================='
         write(111,'(A,3I20.10)') 'xDim,yDim,zDim          :',xDim, yDim, zDim
-        write(111,'(A,3F20.10)') 'dh,dt,ratio             :',dh,     dt, ratio
+        write(111,'(A,3F20.10)') 'dh,dt,ratio             :',dh, dt, ratio
         write(111,'(A,3F20.10)') 'dxmin,dymin,dzmin       :',dxmin, dymin, dzmin
         write(111,'(A,3F20.10)') 'dxmax,dymax,dzmax       :',dxmax, dymax, dzmax
         write(111,'(A,3F20.10)') 'cptxMin,cptyMin,cptzMin :',cptxMin, cptyMin, cptzMin
         write(111,'(A,3F20.10)') 'cptxMax,cptyMax,cptzMax :',cptxMax, cptyMax, cptzMax
-        !write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(elmin(1:nFish)), maxval(elmax(1:nFish))
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Re   =',Re
-        write(111,'(A,F20.10)')'denR =',denIn
-        write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3,1:nFish)))
-        write(111,'(A,F20.10)')'AR   =',AR
-        write(111,'(A      )')'===================================='
-        write(111,'(A,F20.10)')'Asfac=',Asfac
-        write(111,'(A,F20.10)')'Lchod=',Lchod
-        write(111,'(A,F20.10)')'Lspan=',Lspan
-        write(111,'(A,F20.10)')'uMax =',uMax
         write(111,'(A,F20.10)')'Lref =',Lref
         write(111,'(A,F20.10)')'Uref =',Uref
         write(111,'(A,F20.10)')'Tref =',Tref
+        write(111,'(A      )')'===================================='
+        write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3,1:nFish)))
+        write(111,'(A,F20.10)')'Lchod=',Lchod
+        write(111,'(A,F20.10)')'Lspan=',Lspan
+        write(111,'(A,F20.10)')'Asfac=',Asfac
+        write(111,'(A,F20.10)')'AR   =',AR
+        write(111,'(A      )')'===================================='
+        write(111,'(A,F20.10)')'denR =',denIn
+        write(111,'(A,F20.10)')'Aref =',Aref
         write(111,'(A,F20.10)')'Pref =',Pref
         write(111,'(A,F20.10)')'Eref =',Eref
         write(111,'(A,F20.10)')'Fref =',Fref
-        write(111,'(A,F20.10)')'Aref =',Aref
-        write(111,'(A,F20.10)')'mxMa =',uMax/dsqrt(Cs2)
-        write(111,'(A,F20.10)')'Nu   =',Nu
-        write(111,'(A,F20.10)')'Mu   =',Mu
+        write(111,'(A,F20.10)')'uMax =',uMax
+        write(111,'(A,F20.10)')'maxMa=',uMax/dsqrt(Cs2)
         write(111,'(A,F20.10)')'Tau  =',Tau
         write(111,'(A,F20.10)')'Omega=',Omega
+        write(111,'(A,F20.10)')'Nu   =',Nu
+        write(111,'(A,F20.10)')'Mu   =',Mu
 
         do iFish=1,nFish
         write(111,'(A      )')'===================================='
@@ -497,9 +497,6 @@
         write(111,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',AoAPhi(1:3,iFish)
         write(111,'(3(A,1x,I8,2x))')'nND=',nND(iFish),'nEL=',nEL(iFish),'nEQ=',nEQ(iFish)
         write(111,'(3(A,1x,I8,2x))')'nMT=',nMT(iFish),'nBD=',nBD(iFish),'nSTF=',nSTF(iFish)
-        !write(111,'(A,3I20.10)')'T1,T2,T3:',NDtl(1:3,iFish)
-        !write(111,'(A,3I20.10)')'H1,H2,H3:',NDhd(1:3,iFish)
-        !write(111,'(A,1I20.10)')'CT      :',NDct(iFish)
         enddo
 
         do iFish=1,nFish
