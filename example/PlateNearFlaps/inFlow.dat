@@ -1,17 +1,17 @@
 ===================================================================================================control parameters
- 16                                          		read(111,*)     npsize
- 1                                           		read(111,*)     isRelease
- 1          1                               		read(111,*)     isConCmpt,  iCollidModel
- 6          1                                		read(111,*)     RefVelocity, iKB  
+ 16                                          	read(111,*)     npsize
+ 1          1                       		    read(111,*)     isRelease,isConCmpt
+ 1          1                       		    read(111,*)     iCollidModel,iKB
+ 5          0.0157079633               	        read(111,*)     RefVelocity,Uref
  0.020D+0   0.020D+0                        	read(111,*)     timeSimTotl,timeOutTemp
- 0.100D+0   0.100D+0   0.010D+0	read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
+ 0.100D+0   0.100D+0   0.010D+0	                read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
  4.000D+0   8.000D+0                         	read(111,*)     timeOutBegin,timeOutEnd
- 0.000D+0   1.000D+0   1.000D+0	read(111,*)     Palpha,Pbeta,Pramp                     
+ 0.000D+0   1.000D+0   1.000D+0	                read(111,*)     Palpha,Pbeta,Pramp                     
 ===================================================================================================fluid information
- 0.000D+0   0.000D+0   0.000D+0	read(111,*)     uuuIn(1:3)
- 0.000D+0   0.000D+0   0.000D+0	read(111,*)     shearRateIn(1:3)     
- 302  302  200  302  304  304		read(111,*)     boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0                                           		read(111,*)     VelocityKind
+ 0.000D+0   0.000D+0   0.000D+0	                read(111,*)     uuuIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0	                read(111,*)     shearRateIn(1:3)     
+ 302  302  200  302  304  304		            read(111,*)     boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 0                                           	read(111,*)     VelocityKind
  0   0.000D+0   0.000D+0                    	read(111,*)     MovingKind1,MovingVel1,MovingFreq1
  0   0.000D+0   0.000D+0                     	read(111,*)     MovingKind2,MovingVel2,MovingFreq2
 ===================================================================================================
@@ -20,9 +20,9 @@
 ===================================================================================================
  0.020D+0   50			read(111,*)     dspan,Nspan
 ===================================================================================================
- 1.000D+2                                    	read(111,*)     Re    
- 0.020D+0   100.0D+0                        	read(111,*)     dt,Tref        
- 0.000D+0   0.000D+0   0.000D+0	read(111,*)     Frod(1:3)
+ 1.000D+2   0.020D+0                       	    read(111,*)     Re,dt
+ 1          100.0D+0       		                read(111,*)     RefTime,Uref   
+ 0.000D+0   0.000D+0   0.000D+0	                read(111,*)     Frod(1:3)
 ===================================================================================================far field boundary condition
  1                                           		read(111,*)     iBC      1: set 1 layer 2: set 2 layers
  FluidMesh.dat                               	read(111,*)     LBmeshName

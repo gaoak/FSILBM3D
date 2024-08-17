@@ -12,7 +12,7 @@ do
     mkdir test
     cp *.dat test/
     cd test
-    for folder in DatTemp DatBodyIB DatBodySpan DatInfo DatOthe DatBody DatFlow 
+    for folder in DatTemp DatBodyIB DatInfo DatOthe DatBody DatFlow 
     do
       mkdir $folder
     done
@@ -29,7 +29,7 @@ do
         echo $result
     fi
     cd ..
-    rm -rf test
+    #rm -rf test
     cd ..
   fi
 done

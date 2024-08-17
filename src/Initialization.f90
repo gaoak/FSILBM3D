@@ -17,9 +17,9 @@
     open(unit=111,file='inFlow.dat')
     call readequal(111)
     read(111,*)     npsize
-    read(111,*)     isRelease
-    read(111,*)     isConCmpt,  iCollidModel
-    read(111,*)     RefVelocity, iKB
+    read(111,*)     isRelease,isConCmpt
+    read(111,*)     iCollidModel,iKB
+    read(111,*)     RefVelocity,Uref
     read(111,*)     timeSimTotl,timeOutTemp
     read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
     read(111,*)     timeOutBegin,timeOutEnd
@@ -46,8 +46,8 @@
     call readequal(111)
     read(111,*)     dspan,Nspan
     call readequal(111)
-    read(111,*)     Re
-    read(111,*)     dt,Tref
+    read(111,*)     Re,dt
+    read(111,*)     RefTime,Tref
     read(111,*)     Frod(1:3)            !Gravity
     call readequal(111)
     read(111,*)     iBC
@@ -536,11 +536,13 @@
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     else
-        Uref = 1.d0
+        !Uref = 1.0d0
     endif
 
-    if(Tref.le.0.0d0) then
+    if(RefTime==0) then
         Tref = Lref / Uref
+    elseif(RefTime==1) then
+        Tref = 1 / maxval(Freq(:))
     endif
 
     do iFish=1,nFish

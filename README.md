@@ -117,14 +117,19 @@ $PBS_WDIR/$PBS_ENAME
 1. *Lref* : The reference length, whihc is the mimimum chord length of all bodies
 3. *Uref* : The reference velocity, which is determined by *RefVelocity*
 4. *RefVelocity* : Determining the definition of reference velocity
-    - 0  : x-incoming flow velocity $U_\infty$;
-    - 1  : y-incoming flow velocity $V_\infty$;
-    - 2  : incoming flow velocity magnitude $\sqrt{U_\infty^2 + V_\infty^2}$
-    - 3  : maximum moving wall velocity
+    - 0  : X-incoming flow velocity $U_\infty$;
+    - 1  : Y-incoming flow velocity $V_\infty$;
+    - 2  : Incoming flow velocity magnitude $\sqrt{U_\infty^2 + V_\infty^2}$
+    - 3  : Maximum moving wall velocity
     - 4  : Velocity amplitude of Concussion velocity
-    - 10 : flapping frequency velocity $L f$
-    - 11 : maximum plunging velocity $2\pi f a$
-    - 12 : twice maximum plunging velocity used by Park et al. (2017) PoF $2\pi f a * 2$
+    - 10 : Flapping frequency velocity $L f$
+    - 11 : Maximum plunging velocity $2\pi f a$
+    - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF $2\pi f a * 2$
+    - *else* : The input value *Uref* after *RefVelocity* 
+5. *RefTime* : Determining the definition of reference time
+    - 0  : *Tref = Lref / Uref*
+    - 1  : *Tref = 1 / frequency*
+    - *else*  : The input value *Tref* after *RefTime*
 5. *Tref=Lref/Uref* : The reference time, when Tref < 0 is defined as (Lref/Uref), otherwise, it equals its input value
 6. *Freq, St* : The flapping frequence for flexible bodies;
 7. *Frod*: Inverse square of the Froude number $Frod = g L / U_{ref}^2$. Determining the gravity force exerted on the body

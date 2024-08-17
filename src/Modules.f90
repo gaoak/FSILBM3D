@@ -45,7 +45,7 @@
     integer:: step
     real(8):: time
 
-    integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity,isFluidOutput,isBodyOutput
+    integer:: isConCmpt,iCollidModel,iStreamModel,iForce2Body,iKB,isRelease,RefVelocity,RefTime,isFluidOutput,isBodyOutput
     integer:: move(1:SpcDim),offsetOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ
     logical:: isUniformGrid(1:SpcDim)
