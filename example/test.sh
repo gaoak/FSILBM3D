@@ -19,6 +19,8 @@ do
     ../../../FSILBM3D &> newrunlog
     cat newrunlog | awk '{if($1=="FIELDSTAT") print $2, $3, $4}' > newfield
     cat ../runlog | awk '{if($1=="FIELDSTAT") print $2, $3, $4}' > oldfield
+    sed -i 's/\r//' newfield
+    sed -i 's/\r//' oldfield
     result=`diff oldfield newfield`
     end=$(date +%s)
     echo -n "Time used $(($end-$start)) seconds. "
@@ -29,7 +31,7 @@ do
         echo $result
     fi
     cd ..
-    #rm -rf test
+    rm -rf test
     cd ..
   fi
 done
