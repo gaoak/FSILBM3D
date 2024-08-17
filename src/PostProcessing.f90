@@ -463,6 +463,7 @@
         write(111,'(A,F20.10)')'Uref =',Uref
         write(111,'(A,F20.10)')'Tref =',Tref
         write(111,'(A      )')'===================================='
+        write(111,'(A,F20.10)')'Freq =',maxval(Freq(:))
         write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3,1:nFish)))
         write(111,'(A,F20.10)')'Lchod=',Lchod
         write(111,'(A,F20.10)')'Lspan=',Lspan
