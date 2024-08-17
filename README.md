@@ -125,7 +125,7 @@ $PBS_WDIR/$PBS_ENAME
     - 10 : Flapping frequency velocity $L f$
     - 11 : Maximum plunging velocity $2\pi f a$
     - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF $2\pi f a * 2$
-    - *else* : The input value ( *Uref* ) in parameter file inflow.dat
+    - *else* : The input value $(Uref)$ in parameter file inflow.dat
 5. *RefTime* : Determining the definition of reference time
     - 0  : Caculated by referece length and reference velocity ( *Tref = Lref / Uref* )
     - 1  : Caculated by the maximum frequency of the bodies ( *Tref = 1 / max(frequency)* )
