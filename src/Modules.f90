@@ -65,7 +65,6 @@
     real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
     real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
     real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Lspan,Asfac
-    real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:)
     real(8):: UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
 
     real(8):: upxc0, upxcm, upxcmm
@@ -123,8 +122,8 @@
     END MODULE
 
     MODULE ImmersedBoundary
-        integer:: Nspan
-        real(8):: dspan
+        integer, allocatable:: Nspan(:)
+        real(8), allocatable:: dspan(:), theta(:)
         real(8), allocatable:: xyzfulIB_all(:,:,:),xyzfulIB(:,:,:,:)
     END MODULE
 

@@ -11,8 +11,8 @@
     integer:: FishOrder1,FishOrder2,LineX,LineY,LineZ
     integer, allocatable:: FishNum(:),NumX(:),NumY(:)
     character(LEN=40):: nFEmeshName
-    integer:: niBodyModel,nisMotionGiven(1:6)
-    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
+    integer:: niBodyModel,nisMotionGiven(1:6),nNspan
+    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt,ndspan,ntheta
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     open(unit=111,file='inFlow.dat')
     call readequal(111)
@@ -44,8 +44,6 @@
     read(111,*)     VolumeForceIn(1:SpcDim)
     read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
     call readequal(111)
-    read(111,*)     dspan,Nspan
-    call readequal(111)
     read(111,*)     Re,dt
     read(111,*)     RefTime,Tref
     read(111,*)     Frod(1:3)            !Gravity
@@ -64,6 +62,7 @@
     if(nFish>0) then
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
+        allocate(dspan(1:nFish),theta(1:nFish),Nspan(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -79,6 +78,7 @@
         read(111,*)     ndenR, npsR
         if(iKB==0) read(111,*)     nEmR, ntcR
         if(iKB==1) read(111,*)     nKB, nKS
+        read(111,*)     ndspan,ntheta,nNspan
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
@@ -88,12 +88,15 @@
             denR(iFish)= ndenR
             psR(iFish) = npsR
             if(iKB==0) then
-            EmR(iFish) =nEmR
-            tcR(iFish) =ntcR
+            EmR(iFish) = nEmR
+            tcR(iFish) = ntcR
             elseif(iKB==1) then
-            KB(iFish)  =nKB
-            KS(iFish)  =nKS
+            KB(iFish)  = nKB
+            KS(iFish)  = nKS
             endif
+            dspan(iFish) = ndspan
+            theta(iFish) = ntheta
+            Nspan(iFish) = nNspan
         enddo
     enddo
 
@@ -347,7 +350,7 @@
                                       nprof2(1:nND(iFish)*6,iFish),xyzful00(1:nND(iFish),1:6,iFish),prop(1:nMT(iFish),1:10,iFish),nND(iFish), &
                                       nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),idat)
     close(idat)
-    if (Nspan.gt.0 .and. maxval(dabs(prop(1:nMT(iFish),5,iFish))).gt.1d-6) then
+    if (maxval(Nspan).gt.0 .and. maxval(dabs(prop(1:nMT(iFish),5,iFish))).gt.1d-6) then
         write(*,*) 'Extruded body should have zero rotation angle, gamma', prop(1:nMT(iFish),5,iFish)
         stop
     endif
@@ -373,8 +376,8 @@
     Lchod   = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
     lentemp = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
     if(lentemp .gt. Lchod) Lchod = lentemp
-    if (Nspan.gt.0) then
-        Lspan = dspan*real(Nspan)
+    if (maxval(Nspan).gt.0) then
+        Lspan = maxval(dspan**Nspan)
     else
         Lspan = maxval(xyzful00(:,3,iFish))-minval(xyzful00(:,3,iFish))
     endif

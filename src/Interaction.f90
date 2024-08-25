@@ -1,12 +1,11 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    Calculate the repulsive force between solids
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish)
-    USE ImmersedBoundary
+    SUBROUTINE cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,dspan,Nspan)
     implicit none
-    integer:: nFish,nND_max,nND(1:nFish)
+    integer:: nFish,nND_max,nND(1:nFish),Nspan(1:nFish)
     real(8):: dxmin,dymin,dzmin
-    real(8):: xyzful(1:nND_max,1:6,1:nFish),repful(1:nND_max,1:6,1:nFish)
+    real(8):: xyzful(1:nND_max,1:6,1:nFish),repful(1:nND_max,1:6,1:nFish),dspan(1:nFish)
     !local
     integer:: iND,jND,iFish,jFish
     real(8):: delta_h,r(1:3),ds(1:3),phi_r(1:3),SpanLength
@@ -17,10 +16,6 @@
     ds(1)=dxmin
     ds(2)=dymin
     ds(3)=dzmin
-    SpanLength=dspan*Nspan
-    if(Nspan.eq.0)then
-        SpanLength=1.0d0
-    endif
 
     do iFish=1,nFish
         xmin(iFish) = minval(xyzful(1:nND(iFish),1,iFish))-dxmin*2.5d0
@@ -32,6 +27,10 @@
     enddo
 
     do iFish=1,nFish
+        SpanLength=dspan(iFish)*Nspan(iFish)
+        if(Nspan(iFish).eq.0)then
+            SpanLength=1.0d0
+        endif
         do jFish=iFish+1,nFish
             minx = max(xmin(iFish),xmin(jFish))
             miny = max(ymin(iFish),ymin(jFish))
@@ -275,12 +274,12 @@ END SUBROUTINE
 !    the first body point should be in the domain or on the boundary
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 SUBROUTINE calculate_interaction_force_quad(zDim,yDim,xDim,nEL,nND,ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-    xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,dspan,boundaryConditions)
+    xyzful,velful,xyzfulIB,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,theta,dspan,boundaryConditions)
 USE, INTRINSIC :: IEEE_ARITHMETIC
 use BoundCondParams
 IMPLICIT NONE
 integer,intent(in):: zDim,yDim,xDim,nEL,nND,ele(nEL,5),ntolLBM,Nspan
-real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta,dspan
+real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Palpha,Pbeta,dspan,theta
 real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
 logical,intent(in):: isUniformGrid(1:3)
 real(8),intent(in):: xyzful(nND,6),velful(nND,6)
@@ -594,7 +593,7 @@ USE ImmersedBoundary
 implicit none
 integer:: s,iFish,Nspanpts
 if(Palpha.gt.0.d0) then
-    Nspanpts = Nspan + 1
+    Nspanpts = maxval(Nspan) + 1
     allocate(xyzfulIB_all(1:Nspanpts,nND_all,6),xyzfulIB(1:Nspanpts,nND_max,6,1:nFish))
     !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(s,iFish)
     do iFish=1,nFish
