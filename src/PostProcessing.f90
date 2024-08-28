@@ -206,10 +206,10 @@
 !    write structure field, tecplot binary format
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,ele,time,nND,nEL,nND_max,nEL_max,nFish)
+    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,time,nND,nND_max,nFish)
     implicit none
-    integer:: nND_max,nEL_max,nFish
-    integer:: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
+    integer:: nND_max,nFish
+    integer:: nND(nFish)
     real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish)
     real(8):: time
 !   -------------------------------------------------------
@@ -218,11 +218,8 @@
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
     !==================================================================================================
-    integer::    nv
     integer,parameter:: namLen=40,idfile=100,numVar=12
-    integer(4),parameter:: ZONEMARKER=1133871104,EOHMARKER =1135771648
-    character(namLen):: ZoneName='ZONE 1',title="Binary File.",    &
-                        varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz']
+    character(namLen):: varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz']
     !==================================================================================================
 
     write(fileName,'(I10)') nint(time*1d5)
@@ -233,38 +230,14 @@
 
     do iFish=1,nFish
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.plt',form='unformatted',access='stream')
-    !   I. The header section.
-    !   =============================================
-        write(idfile) "#!TDV101"
-        write(idfile) 1
-        call dumpstring(title,idfile)
-        write(idfile) numVar
-        do  nv=1,numVar
-            call dumpstring(varname(nv),idfile)
+        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
+        write(idfile, '(A)', advance='no') 'variables= '
+        do i=1,numVar-1
+            write(idfile, '(2A)', advance='no') trim(varname(i)), ','
         enddo
-    !   ---------------------------------------------
-    !   zone head for ZONE1
-    !   ---------------------------------------------
-        write(idfile) ZONEMARKER
-        call dumpstring(zonename,idfile)
-        write(idfile) -1,2,1,0,0,nND(iFish),nEL(iFish),0,0,0,0
-
-    !   =============================================
-        write(idfile) EOHMARKER
-    !   =============================================
-    !   II. Data section
-    !   =============================================
-        write(idfile) ZONEMARKER
-        do  nv=1,numVar
-            write(idfile) 1
-        enddo
-        write(idfile) 0,-1
-        do  i=1,nND(iFish)
-            write(idfile)   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish))
-        enddo
-        do  i=1,nEL(iFish)
-            write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
+        write(idfile, '(A)') varname(numVar)
+        do i=1,nND(iFish)
+            write(idfile, '(10E28.18 )')   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish))
         enddo
         close(idfile)
     enddo
@@ -366,7 +339,6 @@
         endif
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
         OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
-        !   I. The header section.
         write(idfile, '(A)') 'variables = x, y, z'
         write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan(iFish),', DATAPACKING=POINT, ZONETYPE='
         if(ElmType.eq.2) then
