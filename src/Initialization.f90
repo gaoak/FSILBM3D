@@ -377,7 +377,7 @@
     lentemp = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
     if(lentemp .gt. Lchod) Lchod = lentemp
     if (maxval(Nspan).gt.0) then
-        Lspan = maxval(dspan**Nspan)
+        Lspan = maxval(dspan*Nspan)
     else
         Lspan = maxval(xyzful00(:,3,iFish))-minval(xyzful00(:,3,iFish))
     endif

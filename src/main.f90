@@ -330,7 +330,8 @@
                 endif
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
-                CALL write_flow_fast()
+                !CALL write_flow_fast()
+                CALL write_flow_field(1)
             endif
         endif
 
