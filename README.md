@@ -181,24 +181,25 @@ $PBS_WDIR/$PBS_ENAME
 
 - **Body parameters input**
 1. *dspan* : The virtual grid length of the bodies along the span
-2. *Nspan* : The number of virtual grids along the span of the bodies
-3. *FishKind* : Numbers of the solid bodies type
-4. *nFish* : Total number of the solid bodies
-5. *Fishnum* : The number of the solid bodies in the specific type
-6. *FEmeshName* : The name of the body mesh file  in the specific type
-7. *iBodyModel* : Choose for the body models
+2. *theta* : The angle between the body span direction and the x-axis (have not yet implemented)
+3. *Nspan* : The number of virtual grids along the span of the bodies
+4. *FishKind* : Numbers of the solid bodies type
+5. *nFish* : Total number of the solid bodies
+6. *Fishnum* : The number of the solid bodies in the specific type
+7. *FEmeshName* : The name of the body mesh file  in the specific type
+8. *iBodyModel* : Choose for the body models
     - 1, rigid body;
     - 2, flexible body;
-8. *isMotionGiven* : Degrees of freedom in six directions
-9. *denR* : Density ratio, $rho_b * h / rho_f * L$, $h$ is plate thickness
-10. *psR* : Poisson ratio
-11. *KB, KS* : Dimensionless tension rigidity and bending rigidity
-12. *waittingTime* : The dimensionaless time stayed at the peak and trough in flapping period $(t/T)$
-13. *XYZointial* : The initial position of the first point of the bodies
-14. *dXYZo* : If there are more than one bodies in a type, *dXYZo* determines the interval between front and rear solids
-15. *XYZAmpl, XYZPhi* : Parameters for body flapping
+9. *isMotionGiven* : Degrees of freedom in six directions
+10. *denR* : Density ratio, $rho_b * h / rho_f * L$, $h$ is plate thickness
+11. *psR* : Poisson ratio
+12. *KB, KS* : Dimensionless tension rigidity and bending rigidity
+13. *waittingTime* : The dimensionaless time stayed at the peak and trough in flapping period $(t/T)$
+14. *XYZointial* : The initial position of the first point of the bodies
+15. *dXYZo* : If there are more than one bodies in a type, *dXYZo* determines the interval between front and rear solids
+16. *XYZAmpl, XYZPhi* : Parameters for body flapping
     - $XYZ = XYZAmpl * dcos(2.0 * pi * Freq * time + XYZPhi)$
-16. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
+17. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
     - $Theta = AoAo + AoAAmpl * dcos(2.0 * pi * Freq * time + AoAPhi)$
 
 ## Output file description
