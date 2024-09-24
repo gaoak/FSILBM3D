@@ -258,8 +258,8 @@ void stackDataFromFiles(const std::string filename,
   
   // Read data
   int offset = 0;
-  int ndata = NXc * NYc * NZc;
-  int datasize = sizeof(INREAL) * ndata;
+  size_t ndata = NXc * NYc * NZc;
+  size_t datasize = sizeof(INREAL) * ndata;
   if (std::is_same<INREAL, OUTREAL>::value) {
     infile.read((char *)&tempStacks[0][offset], datasize);
     infile.read((char *)&tempStacks[1][offset], datasize);
@@ -276,8 +276,8 @@ void stackDataFromFiles(const std::string filename,
   for (int i = 0; i < NXc; ++i) {  
         for (int j = 0; j < NYc; ++j) {  
             for (int k = 0; k < NZc; ++k) {  
-                int idx1d = k * NYc * NXc + j * NXc + i; //  x, y, z
-                int idx3d = i * NYc * NZc + j * NZc + k; //  z, y, x
+                size_t idx1d = k * NYc * NXc + j * NXc + i; //  x, y, z
+                size_t idx3d = i * NYc * NZc + j * NZc + k; //  z, y, x
                 Stacks[3][idx1d] = tempStacks[0][idx3d];
                 Stacks[4][idx1d] = tempStacks[1][idx3d];
                 Stacks[5][idx1d] = tempStacks[2][idx3d];

@@ -194,7 +194,7 @@ do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
 !   ***********************************************************************************************
 !   calculate interaction force
     do  iEL=1,nEL
-        if(ele(iEL,4)==3) then
+        if(ele(iEL,4)==2) then
             forceElemTemp(iEL,1:3) = -Pbeta* 2.0*denIn*(velElem(iEL,1:3)-velElemIB(iEL,1:3))/dt*areaElem(iEL)*dh
             if(Palpha.gt.0.d0) then
                 forceElemTemp(iEL,1:3) = forceElemTemp(iEL,1:3) - Palpha*2.0*denIn*(posElem(iEL,1:3)-posElemIB(iEL,1:3))/dt*areaElem(iEL)*dh

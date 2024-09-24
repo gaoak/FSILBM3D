@@ -10,10 +10,10 @@ static float EOHMARKER = 357.0f;
 
 static float ZONEMARKER = 299.0f;
 
-template <typename T> int FindMax(int N, const T *data) {
-  int ind = 0;
+template <typename T> size_t FindMax(size_t N, const T *data) {
+  size_t ind = 0;
   T tmp = data[0];
-  for (int i = 1; i < N; ++i) {
+  for (size_t i = 1; i < N; ++i) {
     if (tmp < data[i]) {
       ind = i;
       tmp = data[i];
@@ -22,10 +22,10 @@ template <typename T> int FindMax(int N, const T *data) {
   return ind;
 }
 
-template <typename T> int FindMin(int N, const T *data) {
-  int ind = 0;
+template <typename T> size_t FindMin(size_t N, const T *data) {
+  size_t ind = 0;
   T tmp = data[0];
-  for (int i = 1; i < N; ++i) {
+  for (size_t i = 1; i < N; ++i) {
     if (tmp > data[i]) {
       ind = i;
       tmp = data[i];
@@ -96,7 +96,7 @@ int OutputTec360_binary(const std::string filename,
   odata.write((char *)&zero, 4);
   odata.write((char *)&zero, 4);
   for (int i = 0; i < 3; ++i) {
-    int tmp = N[i];
+    size_t tmp = N[i];
     odata.write((char *)&tmp, 4);
   }
 
@@ -112,7 +112,7 @@ int OutputTec360_binary(const std::string filename,
   int minus1 = -1;
   odata.write((char *)&minus1, 4);
 
-  int datanumber, datasize;
+  size_t datanumber, datasize;
   datanumber = N[0] * N[1] * N[2];
   datasize = N[0] * N[1] * N[2] * sizeof(T);
   for (int i = 0; i < nvar; ++i) {
