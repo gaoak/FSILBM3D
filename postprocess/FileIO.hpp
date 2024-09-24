@@ -48,11 +48,11 @@ int BinaryWrite(std::ofstream &ofile, std::string str) {
 template <typename T>
 int OutputTec360_binary(const std::string filename,
                         const std::vector<std::string> &variables,
-                        const std::vector<int> &rawN,
+                        const std::vector<size_t> &rawN,
                         const std::vector<std::vector<T>> &data) {
   int isdouble = sizeof(T) / 8;
-  std::vector<int> N = rawN;
-  for (int i = N.size(); i < 3; ++i) {
+  std::vector<size_t> N = rawN;
+  for (size_t i = N.size(); i < 3; ++i) {
     N.push_back(1);
   }
   std::ofstream odata;
@@ -96,7 +96,7 @@ int OutputTec360_binary(const std::string filename,
   odata.write((char *)&zero, 4);
   odata.write((char *)&zero, 4);
   for (int i = 0; i < 3; ++i) {
-    size_t tmp = N[i];
+    int tmp = N[i];
     odata.write((char *)&tmp, 4);
   }
 
