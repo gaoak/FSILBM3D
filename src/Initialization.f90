@@ -592,8 +592,8 @@
 
     Aref=Uref/Tref
     Fref=0.5*denIn*Uref**2*Asfac
-    Eref=denIn*Uref**2*Lref**2*Lref
-    Pref=denIn*Uref**2*Lref**2*Uref
+    Eref=denIn*Uref**2*Asfac*Lref
+    Pref=denIn*Uref**2*Asfac*Uref
     !calculate material parameters
     do iFish=1,nFish
     nt(iFish)=ele(1,4,iFish)
