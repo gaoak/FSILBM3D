@@ -206,11 +206,11 @@
 !    write structure field, tecplot binary format
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,time,nND,nND_max,nFish)
+    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,repful,time,nND,nND_max,nFish)
     implicit none
     integer:: nND_max,nFish
     integer:: nND(nFish)
-    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish)
+    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish),repful(1:nND_max,1:6,nFish)
     real(8):: time
 !   -------------------------------------------------------
 
@@ -218,8 +218,8 @@
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
     !==================================================================================================
-    integer,parameter:: namLen=40,idfile=100,numVar=12
-    character(namLen):: varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fx','fy','fz']
+    integer,parameter:: namLen=40,idfile=100,numVar=15
+    character(namLen):: varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fxi','fyi','fzi','fxr','fyr','fzr']
     !==================================================================================================
 
     write(fileName,'(I10)') nint(time*1d5)
@@ -237,7 +237,7 @@
         enddo
         write(idfile, '(A)') varname(numVar)
         do i=1,nND(iFish)
-            write(idfile, '(10E28.18 )')   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish))
+            write(idfile, '(10E28.18 )')   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish)),real(repful(i,1:3,iFish))
         enddo
         close(idfile)
     enddo
@@ -338,7 +338,7 @@
             ElmType = 4
         endif
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
+        OPEN(idfile,FILE='./DatBody/BodySpan'//trim(idstr)//'_'//trim(filename)//'.dat')
         write(idfile, '(A)') 'variables = x, y, z'
         write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan(iFish),', DATAPACKING=POINT, ZONETYPE='
         if(ElmType.eq.2) then

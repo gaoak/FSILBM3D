@@ -19,7 +19,7 @@
  0.000D+0   0.000D+0   0.000D+0	read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
 ===================================================================================================
  1.000D+2   0.020D+0                       	read(111,*)     Re,dt
- 1          100.0D+0       		read(111,*)     RefTime,Uref   
+ 1          100.0D+0       		read(111,*)     RefTime,Tref   
  0.000D+0   0.000D+0   0.000D+0	read(111,*)     Frod(1:3)
 ===================================================================================================far field boundary condition
  1                                           		read(111,*)     iBC      1: set 1 layer 2: set 2 layers

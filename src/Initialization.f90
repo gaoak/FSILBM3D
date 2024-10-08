@@ -540,12 +540,17 @@
         Uref = MAXVAL(nUref(1:nFish))
     else
         !Uref = 1.0d0
+        write(*,*) 'Error: wrong RefVelocity:', RefVelocity
+        stop
     endif
 
     if(RefTime==0) then
         Tref = Lref / Uref
     elseif(RefTime==1) then
         Tref = 1 / maxval(Freq(:))
+    else
+        write(*,*) 'Error: wrong RefTime:', RefTime
+        stop
     endif
 
     do iFish=1,nFish
