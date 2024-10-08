@@ -19,20 +19,22 @@ namespace fs = std::filesystem;
 
 // void SubsExactSolution(const std::vector<OUTREAL> &x,
 //                        const std::vector<OUTREAL> &y,
-//                        const std::vector<OUTREAL> &z, std::vector<OUTREAL> &u,
-//                        std::vector<OUTREAL> &v, std::vector<OUTREAL> &w,
+//                        const std::vector<OUTREAL> &z, std::vector<OUTREAL>
+//                        &u, std::vector<OUTREAL> &v, std::vector<OUTREAL> &w,
 //                        std::vector<OUTREAL> &p) {
 //   for (size_t i = 0; i < z.size(); ++i) {
-//     u[i] -= exp(-0.7071067811865*z[i])*cos(1*12000*0.00628319-0.7071067811865*z[i]);
+//     u[i] -=
+//     exp(-0.7071067811865*z[i])*cos(1*12000*0.00628319-0.7071067811865*z[i]);
 //     v[i] -= 0.;
 //     w[i] -= 0.;
 //     p[i] -= 0.;
 //   }
 // }
 
-// void Integrate(const std::vector<OUTREAL> &dxc, const std::vector<OUTREAL> &dyc,
-//                const std::vector<OUTREAL> &dzc, const std::vector<OUTREAL> &var,
-//                int n, OUTREAL &resn, OUTREAL &resinfty) {
+// void Integrate(const std::vector<OUTREAL> &dxc, const std::vector<OUTREAL>
+// &dyc,
+//                const std::vector<OUTREAL> &dzc, const std::vector<OUTREAL>
+//                &var, int n, OUTREAL &resn, OUTREAL &resinfty) {
 //   int Nx = dxc.size(), Ny = dyc.size(), Nz = dzc.size();
 //   int count = 0, cnt2 = 0;
 //   resinfty = -1;
@@ -70,7 +72,8 @@ namespace fs = std::filesystem;
 //   resn = pow(result, 1. / n);
 // }
 
-// void Integrate(const std::vector<OUTREAL> &dxc, const std::vector<OUTREAL> &dyc,
+// void Integrate(const std::vector<OUTREAL> &dxc, const std::vector<OUTREAL>
+// &dyc,
 //                const std::vector<OUTREAL> &dzc,
 //                const std::vector<std::vector<OUTREAL>> &vars, int n,
 //                std::vector<OUTREAL> &resn, std::vector<OUTREAL> &resinfty) {
@@ -105,7 +108,8 @@ namespace fs = std::filesystem;
 //   }
 //   printf("============================\n");
 //   for (size_t v = 0; v < Stacks.size(); ++v) {
-//     printf("VAR = %s, LInfinity norm %24.16e\n", vars[v].c_str(), resinfty[v]);
+//     printf("VAR = %s, LInfinity norm %24.16e\n", vars[v].c_str(),
+//     resinfty[v]);
 //   }
 // }
 
@@ -158,26 +162,21 @@ void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
       gridfile,
       line)) { // If getline successfully reads a line, it will return true
     std::istringstream iss(line);
-    if(num == 0){
+    if (num == 0) {
       iss >> gridNum;
-    }
-    else
-    {
+    } else {
       iss >> id >> x;
       if (iss.good()) {
         Data.push_back(x);
       }
-    } 
+    }
     num++;
-    if(num == gridNum + 1)
-    {
-      if(dimension == 1){
+    if (num == gridNum + 1) {
+      if (dimension == 1) {
         xcData = Data;
-      }
-      else if(dimension == 2){
+      } else if (dimension == 2) {
         ycData = Data;
-      }
-      else{
+      } else {
         zcData = Data;
       }
       Data.clear();
@@ -188,7 +187,8 @@ void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
   gridfile.close();
 }
 
-void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData, std::vector<OUTREAL> &ycData, std::vector<OUTREAL> &zcData) {
+void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
+                   std::vector<OUTREAL> &ycData, std::vector<OUTREAL> &zcData) {
   std::vector<OUTREAL> dcData;
   readGridFiles(igridfile, xcData, ycData, zcData, dcData);
 }
@@ -201,10 +201,9 @@ void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData, s
 //   }
 // }
 
-void stackDataFromFiles(const std::string filename,
-                        const std::string mesh_file,
-                        std::vector<std::vector<OUTREAL>> &Stacks, int &NXc,
-                        int &NYc, int &NZc) {
+void stackDataFromFiles(const std::string filename, const std::string mesh_file,
+                        std::vector<std::vector<OUTREAL>> &Stacks, size_t &NXc,
+                        size_t &NYc, size_t &NZc) {
   std::vector<OUTREAL> xcData;
   std::vector<OUTREAL> ycData;
   std::vector<OUTREAL> zcData;
@@ -234,20 +233,18 @@ void stackDataFromFiles(const std::string filename,
 
   readGridFiles(mesh_file, xcData, ycData, zcData);
   Stacks.resize(6);
-  for (size_t i = 0; i < Stacks.size(); ++i)
-  {
+  for (size_t i = 0; i < Stacks.size(); ++i) {
     Stacks[i].resize(NXc * NYc * NZc);
   }
   tempStacks.resize(3);
-  for (size_t i = 0; i < tempStacks.size(); ++i)
-  {
+  for (size_t i = 0; i < tempStacks.size(); ++i) {
     tempStacks[i].resize(NXc * NYc * NZc);
   }
 
-  int count = 0;
-  for (int k = zmin-1; k < zmax; ++k) {
-    for (int j = ymin-1; j < ymax; ++j) {
-      for (int i = xmin-1; i < xmax; ++i) {
+  size_t count = 0;
+  for (size_t k = zmin - 1; k < zmax; ++k) {
+    for (size_t j = ymin - 1; j < ymax; ++j) {
+      for (size_t i = xmin - 1; i < xmax; ++i) {
         Stacks[0][count] = xcData[i];
         Stacks[1][count] = ycData[j];
         Stacks[2][count] = zcData[k];
@@ -255,54 +252,54 @@ void stackDataFromFiles(const std::string filename,
       }
     }
   }
-  
+
   // Read data
-  int offset = 0;
-  int ndata = NXc * NYc * NZc;
-  int datasize = sizeof(INREAL) * ndata;
+  size_t offset = 0;
+  size_t ndata = NXc * NYc * NZc;
+  size_t datasize = sizeof(INREAL) * ndata;
   if (std::is_same<INREAL, OUTREAL>::value) {
     infile.read((char *)&tempStacks[0][offset], datasize);
     infile.read((char *)&tempStacks[1][offset], datasize);
     infile.read((char *)&tempStacks[2][offset], datasize);
   } else {
     std::vector<INREAL> tempBuffer(datasize / sizeof(INREAL));
-    for (int i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < 3; ++i) {
       infile.read(reinterpret_cast<char *>(tempBuffer.data()), datasize);
       for (size_t j = 0; j < tempBuffer.size(); j++) {
         tempStacks[i][offset + j] = static_cast<OUTREAL>(tempBuffer[j]);
       }
     }
   }
-  for (int i = 0; i < NXc; ++i) {  
-        for (int j = 0; j < NYc; ++j) {  
-            for (int k = 0; k < NZc; ++k) {  
-                int idx1d = k * NYc * NXc + j * NXc + i; //  x, y, z
-                int idx3d = i * NYc * NZc + j * NZc + k; //  z, y, x
-                Stacks[3][idx1d] = tempStacks[0][idx3d];
-                Stacks[4][idx1d] = tempStacks[1][idx3d];
-                Stacks[5][idx1d] = tempStacks[2][idx3d];
-            }  
-        }  
+  for (size_t i = 0; i < NXc; ++i) {
+    for (size_t j = 0; j < NYc; ++j) {
+      for (size_t k = 0; k < NZc; ++k) {
+        size_t idx1d = k * NYc * NXc + j * NXc + i; //  x, y, z
+        size_t idx3d = i * NYc * NZc + j * NZc + k; //  z, y, x
+        Stacks[3][idx1d] = tempStacks[0][idx3d];
+        Stacks[4][idx1d] = tempStacks[1][idx3d];
+        Stacks[5][idx1d] = tempStacks[2][idx3d];
+      }
     }
-    std::cout << std::endl;
-    //   if (showIb) {
-    //     datasize = std::ceil(ndata / 4);
-    //     std::vector<char> ibdata(datasize);
-    //     infile.read((char *)&ibdata[0], datasize);
-    //     ExtractIb(ibdata, &Stacks[7][offset], ndata);
-    //   }
-    //   infile.close();
-    //   for (int i = zc_start; i <= zc_end; ++i)
-    //     zids.erase(i);
+  }
+  std::cout << std::endl;
+  //   if (showIb) {
+  //     datasize = std::ceil(ndata / 4);
+  //     std::vector<char> ibdata(datasize);
+  //     infile.read((char *)&ibdata[0], datasize);
+  //     ExtractIb(ibdata, &Stacks[7][offset], ndata);
+  //   }
+  //   infile.close();
+  //   for (int i = zc_start; i <= zc_end; ++i)
+  //     zids.erase(i);
 
-    // if (!zids.empty()) {
-    //   std::cout << "Inconsistent data size " << std::endl;
-    //   std::cout << "missling z-slices: ";
-    //   for (auto i : zids) {
-    //     std::cout << i << " ";
-    //   }
-    //   std::cout << "." << std::endl;
-    // }
+  // if (!zids.empty()) {
+  //   std::cout << "Inconsistent data size " << std::endl;
+  //   std::cout << "missling z-slices: ";
+  //   for (auto i : zids) {
+  //     std::cout << i << " ";
+  //   }
+  //   std::cout << "." << std::endl;
+  // }
 }
 
 int main(int argc, char *argv[]) {
@@ -331,14 +328,13 @@ int main(int argc, char *argv[]) {
   std::string mesh_file(argv[1]);
   std::string flow_file(argv[2]);
   std::string plt_file(argv[3]);
-  std::vector<int> rawN(3);
+  std::vector<size_t> rawN(3);
   std::vector<std::vector<OUTREAL>> Stacks;
   std::vector<std::string> var = {"x", "y", "z", "u", "v", "w"};
   // if (showIb) {
   //   var.push_back("Ib");
   // }
-  stackDataFromFiles(flow_file, mesh_file, Stacks, rawN[0],
-                     rawN[1], rawN[2]);
+  stackDataFromFiles(flow_file, mesh_file, Stacks, rawN[0], rawN[1], rawN[2]);
   OutputTec360_binary(plt_file, var, rawN, Stacks);
   std::cout << "Write " << plt_file << std::endl;
   // if (showError) {
