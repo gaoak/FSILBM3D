@@ -538,19 +538,15 @@
         nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*2.D0 !Park 2017 pof
         enddo
         Uref = MAXVAL(nUref(1:nFish))
-    else
+    !else
         !Uref = 1.0d0
-        write(*,*) 'Error: wrong RefVelocity:', RefVelocity
-        stop
     endif
 
     if(RefTime==0) then
         Tref = Lref / Uref
     elseif(RefTime==1) then
         Tref = 1 / maxval(Freq(:))
-    else
-        write(*,*) 'Error: wrong RefTime:', RefTime
-        stop
+    !else
     endif
 
     do iFish=1,nFish
