@@ -165,9 +165,9 @@
     if(nFish>0) then
         read(111,*)     numSampBody
         allocate(SampBodyNode(1:numSampBody,1:nFish))
-        read(111,*)     SampBodyNode(1,1:numSampBody)
+        read(111,*)     SampBodyNode(1:numSampBody,1)
         do iFish=1,nFish
-        SampBodyNode(1:numSampBody,iFish)=SampBodyNode(1,1:numSampBody)
+        SampBodyNode(1:numSampBody,iFish)=SampBodyNode(1:numSampBody,1)
         enddo
     endif
     call readequal(111)
@@ -329,9 +329,9 @@
     allocate( triad_nn(3,3,nND_max,1:nFish),triad_ee(3,3,nEL_max,1:nFish),triad_e0(3,3,nEL_max,1:nFish) )
     allocate( triad_n1(3,3,nEL_max,1:nFish),triad_n2(3,3,nEL_max,1:nFish),triad_n3(3,3,nEL_max,1:nFish) )
 
-    repful(:,:,1:6) =0.d0
-    extful1(:,:,1:6)=0.d0
-    extful2(:,:,1:6)=0.d0
+    repful(:,:,:) =0.d0
+    extful1(:,:,:)=0.d0
+    extful2(:,:,:)=0.d0
 
 !   ===============================================================================================
     do iFish=1,nFish
@@ -531,17 +531,24 @@
             extful_all(iND+iCount,1:6)  =0.d0
         enddo
 
-        CALL formmass_D(ele(1:nEL(iFish),1:5,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
-                        prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf)
+        if(ele(1,4,iFish).eq.2)then
+            CALL formmass_D(ele(1:nEL(iFish),1:5,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
+                            prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf)
 
-        do iND = 1, nND(iFish)
-            mssful(iND,1:6,iFish)= mss((iND-1)*6+1:(iND-1)*6+6,iFish)
-            grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
-        enddo
+            do iND = 1, nND(iFish)
+                mssful(iND,1:6,iFish)= mss((iND-1)*6+1:(iND-1)*6+6,iFish)
+                grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+            enddo
 
-        CALL init_triad_D(ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1,iFish),xyzful(1:nND(iFish),2,iFish),xyzful(1:nND(iFish),3,iFish), &
-                          triad_nn(1:3,1:3,1:nND(iFish),iFish),triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
-                          triad_ee(1:3,1:3,1:nEL(iFish),iFish),triad_e0(1:3,1:3,1:nEL(iFish),iFish),nND(iFish),nEL(iFish))
+            CALL init_triad_D(ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1,iFish),xyzful(1:nND(iFish),2,iFish),xyzful(1:nND(iFish),3,iFish), &
+                            triad_nn(1:3,1:3,1:nND(iFish),iFish),triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
+                            triad_ee(1:3,1:3,1:nEL(iFish),iFish),triad_e0(1:3,1:3,1:nEL(iFish),iFish),nND(iFish),nEL(iFish))
+        else
+            do iND = 1, nND(iFish)
+                mssful(iND,1:6,iFish)= 1.0d0 !Culculate accCentM/velCentM/xyzCentM requires mass not zero
+                grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+            enddo
+        endif
 
         iCount = iCount + nND(iFish)
     enddo
