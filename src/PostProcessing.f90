@@ -76,7 +76,7 @@
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
             do    z=1+offsetOutput, zDim-offsetOutput
-            write(idfile) real((xGrid(x)-xyzful(1,NDref,1))/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
+            write(idfile) real((xGrid(x)-xyzful(NDref,1,1))/Lref),real(yGrid(y)/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
@@ -84,7 +84,7 @@
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
             do    z=1+offsetOutput, zDim-offsetOutput
-            write(idfile) real(xGrid(x)/Lref),real((yGrid(y)-xyzful(1,NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
+            write(idfile) real(xGrid(x)/Lref),real((yGrid(y)-xyzful(NDref,2,1))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
@@ -92,7 +92,7 @@
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
             do    z=1+offsetOutput, zDim-offsetOutput
-            write(idfile) real(xGrid(x)/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(1,NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
+            write(idfile) real(xGrid(x)/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(NDref,3,1))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
@@ -100,7 +100,7 @@
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
             do    z=1+offsetOutput, zDim-offsetOutput
-            write(idfile) real((xGrid(x)-xyzful(1,NDref,1))/Lref),real((yGrid(y)-xyzful(1,NDref,2))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
+            write(idfile) real((xGrid(x)-xyzful(NDref,1,1))/Lref),real((yGrid(y)-xyzful(NDref,2,1))/Lref),real(zGrid(z)/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
@@ -108,7 +108,7 @@
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
             do    z=1+offsetOutput, zDim-offsetOutput
-            write(idfile) real((xGrid(x)-xyzful(1,NDref,1))/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(1,NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
+            write(idfile) real((xGrid(x)-xyzful(NDref,1,1))/Lref),real(yGrid(y)/Lref),real((zGrid(z)-xyzful(NDref,3,1))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
@@ -116,7 +116,7 @@
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
             do    z=1+offsetOutput, zDim-offsetOutput
-            write(idfile) real(xGrid(x)/Lref),real((yGrid(y)-xyzful(1,NDref,2))/Lref),real((zGrid(z)-xyzful(1,NDref,3))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
+            write(idfile) real(xGrid(x)/Lref),real((yGrid(y)-xyzful(NDref,2,1))/Lref),real((zGrid(z)-xyzful(NDref,3,1))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
             enddo
             enddo
             enddo
@@ -501,13 +501,13 @@
         else
             write(111,'(A      )')'This is a FLRXIBLE And RIGID body problem'
         endif
-        if    (minval(isMotionGiven(:,1))==0)then
+        if    (minval(isMotionGiven(1,:))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in X-direction freely'
         endif
-        if    (minval(isMotionGiven(:,2))==0)then
+        if    (minval(isMotionGiven(2,:))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in Y-direction freely'
         endif
-        if    (minval(isMotionGiven(:,3))==0)then
+        if    (minval(isMotionGiven(3,:))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in Z-direction freely'
         endif
         write(111,'(A      )')'===================================================================='
@@ -706,8 +706,9 @@
             strainEnergy(n,1)=0.5d0*sum(matmul(ekb12Strech(1:12,1:12),ub(1:12))*ub(1:12))
             strainEnergy(n,2)=0.5d0*sum(matmul(ekb12BendTor(1:12,1:12),ub(1:12))*ub(1:12))
         else
-            write(*,*)'not this nELt:',nELt
-            stop
+            !write(*,*)'not this nELt:',nELt
+            !stop
+            strainEnergy(n,:) = 0.0d0
         endif
 
     enddo
