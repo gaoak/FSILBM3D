@@ -11,19 +11,23 @@
     integer:: FishOrder1,FishOrder2,LineX,LineY,LineZ
     integer, allocatable:: FishNum(:),NumX(:),NumY(:)
     character(LEN=40):: nFEmeshName
-    integer:: niBodyModel,nisMotionGiven(1:6)
-    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
+    integer:: niBodyModel,nisMotionGiven(1:6),nNspan
+    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt,ndspan,ntheta
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     open(unit=111,file='inFlow.dat')
     call readequal(111)
     read(111,*)     npsize
-    read(111,*)     isRelease
-    read(111,*)     isConCmpt,  iCollidModel
-    read(111,*)     RefVelocity, iKB
+    read(111,*)     isRelease,isConCmpt
+    read(111,*)     iCollidModel,iKB
+    read(111,*)     RefVelocity,Uref
     read(111,*)     timeSimTotl,timeOutTemp
     read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
-    read(111,*)     timeOutFlEd,timeOutFlBg
+    read(111,*)     timeOutBegin,timeOutEnd
     read(111,*)     Palpha,Pbeta,Pramp
+    if(timeOutBegin.gt.timeOutEnd) then
+        write(*,*) 'The start time for output should be earlier than the end time.'
+        stop
+    endif
     call readequal(111)
     read(111,*)     uuuIn(1:3)
     read(111,*)     shearRateIn(1:3)
@@ -40,10 +44,8 @@
     read(111,*)     VolumeForceIn(1:SpcDim)
     read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
     call readequal(111)
-    read(111,*)     dspan,Nspan
-    call readequal(111)
-    read(111,*)     Re
-    read(111,*)     dt
+    read(111,*)     Re,dt
+    read(111,*)     RefTime,Tref
     read(111,*)     Frod(1:3)            !Gravity
     call readequal(111)
     read(111,*)     iBC
@@ -51,8 +53,7 @@
     read(111,*)     denIn
     read(111,*)     dtolLBM,ntolLBM      !velocity iteration
     call readequal(111)
-    read(111,*)     nFish,FishKind
-    read(111,*)     iForce2Body,iChordDirection
+    read(111,*)     nFish,FishKind,iForce2Body
     if(nFish.lt.FishKind) then
         write(*, *) "Fish kind is more than fish number ", FishKind, nFish
     endif
@@ -61,6 +62,7 @@
     if(nFish>0) then
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
+        allocate(dspan(1:nFish),theta(1:nFish),Nspan(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -76,6 +78,7 @@
         read(111,*)     ndenR, npsR
         if(iKB==0) read(111,*)     nEmR, ntcR
         if(iKB==1) read(111,*)     nKB, nKS
+        read(111,*)     ndspan,ntheta,nNspan
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
@@ -85,12 +88,15 @@
             denR(iFish)= ndenR
             psR(iFish) = npsR
             if(iKB==0) then
-            EmR(iFish) =nEmR
-            tcR(iFish) =ntcR
+            EmR(iFish) = nEmR
+            tcR(iFish) = ntcR
             elseif(iKB==1) then
-            KB(iFish)  =nKB
-            KS(iFish)  =nKS
+            KB(iFish)  = nKB
+            KS(iFish)  = nKS
             endif
+            dspan(iFish) = ndspan
+            theta(iFish) = ntheta
+            Nspan(iFish) = nNspan
         enddo
     enddo
 
@@ -140,10 +146,10 @@
         enddo
     enddo
     call readequal(111)
-    read(111,*)     isMoveGrid,      offsetOutput
-    read(111,*)     isMoveDimX,      isMoveOutputX
-    read(111,*)     isMoveDimY,      isMoveOutputY
-    read(111,*)     isMoveDimZ,      isMoveOutputZ
+    read(111,*)     isMoveGrid,offsetOutput
+    read(111,*)     isMoveDimX,isMoveOutputX
+    read(111,*)     isMoveDimY,isMoveOutputY
+    read(111,*)     isMoveDimZ,isMoveOutputZ
     read(111,*)     Xref,Yref,Zref
     if(nFish .eq. 0 .and. isMoveGrid .eq. 1) then
         write(*, *) 'No fish, resetting move grid as false'
@@ -156,14 +162,14 @@
     read(111,*)     posiForcDist(1:SpcDim)
     call readequal(111)
 
-    read(111,*)     numSampFlow
+    read(111,*)     numSampFlow,isFluidOutput
     allocate(SampFlowPint(1:numSampFlow,1:3))
     do i=1,numSampFlow
         read(111,*) SampFlowPint(i,1:3)
     enddo
     call readequal(111)
     if(nFish>0) then
-        read(111,*)     numSampBody
+        read(111,*)     numSampBody,isBodyOutput
         allocate(SampBodyNode(1:numSampBody,1:nFish))
         read(111,*)     SampBodyNode(1:numSampBody,1)
         do iFish=1,nFish
@@ -292,9 +298,8 @@
     USE simParam
     USE ImmersedBoundary
     implicit none
-    integer:: iEL,iND,iFish,maxN(1)
-    real(8):: xCT,yCT,zCT,xl,xr,yl,yr,zl,zr
-    real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+    integer:: iEL,iND,iFish,maxN
+    real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:),lentemp(:)
     if(nFish==0) return
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
 
@@ -345,7 +350,7 @@
                                       nprof2(1:nND(iFish)*6,iFish),xyzful00(1:nND(iFish),1:6,iFish),prop(1:nMT(iFish),1:10,iFish),nND(iFish), &
                                       nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),idat)
     close(idat)
-    if (Nspan.gt.0 .and. maxval(dabs(prop(1:nMT(iFish),5,iFish))).gt.1d-6) then
+    if (maxval(Nspan).gt.0 .and. maxval(dabs(prop(1:nMT(iFish),5,iFish))).gt.1d-6) then
         write(*,*) 'Extruded body should have zero rotation angle, gamma', prop(1:nMT(iFish),5,iFish)
         stop
     endif
@@ -368,8 +373,8 @@
     enddo
 !   ===============================================================================================
 !   calculate area
-    allocate(NDtl(1:5,1:nFish),NDhd(1:3,1:nFish),NDct(1:nFish),elmax(1:nFish),elmin(1:nFish))
-    allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish))
+    allocate(elmax(1:nFish),elmin(1:nFish))
+    allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish),lentemp(1:nFish))
     do iFish=1,nFish
         call cptArea(areaElem00(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful00(1:nND(iFish),1:6,iFish))
         nAsfac(iFish)=sum(areaElem00(1:nEL(iFish),iFish))
@@ -377,58 +382,26 @@
         elmin(iFish)=minval(areaElem00(1:nEL(iFish),iFish))
     enddo
     !calculate spanwise length, chord length, aspect ratio
-    if(iChordDirection==1)then
-        do iFish=1,nFish
-        nLchod(iFish) = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
-        nLspan(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
-        enddo
-    elseif(iChordDirection==2)then
-        do iFish=1,nFish
-        nLchod(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
-        nLspan(iFish) = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
-        enddo
+    do iFish=1,nFish
+        nLchod(iFish)  = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
+        lentemp(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
+        if(lentemp(iFish) .gt. nLchod(iFish)) nLchod(iFish) = lentemp(iFish)
+    enddo
+    if (maxval(Nspan).gt.0) then
+        Lspan = maxval(dspan*Nspan)
     else
-        stop 'no define chordwise'
+        Lspan = maxval(xyzful00(:,3,iFish))-minval(xyzful00(:,3,iFish))
     endif
-    !Use the plate with the largest area as the reference plate
-    maxN  = maxloc(nAsfac)
-    Asfac = nAsfac(maxN(1))
-    Lchod = nLchod(maxN(1))
-    Lspan = nLspan(maxN(1))
+    !Use the object with the largest area as the reference object
+    maxN  = maxloc(nAsfac, dim=1)
+    Asfac = nAsfac(maxN)
+    Lchod = nLchod(maxN)
 
     if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
     if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
 
     AR    = Lspan**2/Asfac
-!    Lchod=1.0d0
-!    Lspan=1.0d0
 
-    !calculate central position, central node
-    do iFish=1,nFish
-    xCT=sum(xyzful00(:,1,iFish))/nND(iFish)
-    yCT=sum(xyzful00(:,2,iFish))/nND(iFish)
-    zCT=sum(xyzful00(:,3,iFish))/nND(iFish)
-
-    !calculate leading-edge central node, three trailing nodes, the nearest neighbouring node
-    xl=minval(xyzful00(:,1,iFish))
-    xr=maxval(xyzful00(:,1,iFish))
-    yl=minval(xyzful00(:,2,iFish))
-    yr=maxval(xyzful00(:,2,iFish))
-    zl=minval(xyzful00(:,3,iFish))
-    zr=maxval(xyzful00(:,3,iFish))
-    ! center point
-    NDct(iFish)   =minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xCT)**2+(xyzful00(1:nND(iFish),2,iFish)-yCT)**2),1)
-    ! edge points
-    NDtl(1,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xr )**2+(xyzful00(1:nND(iFish),2,iFish)-         yl)**2),1)
-    NDtl(2,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xr )**2+(xyzful00(1:nND(iFish),2,iFish)-0.5*(yl+yr))**2),1)
-    NDtl(3,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xr )**2+(xyzful00(1:nND(iFish),2,iFish)-         yr)**2),1)
-    NDtl(4,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-0.5*(xl+xr) )**2+(xyzful00(1:nND(iFish),2,iFish)-yl)**2),1)
-    NDtl(5,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-0.5*(xl+xr) )**2+(xyzful00(1:nND(iFish),2,iFish)-yr)**2),1)
-
-    NDhd(1,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xl )**2+(xyzful00(1:nND(iFish),2,iFish)-         yl)**2),1)
-    NDhd(2,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xl )**2+(xyzful00(1:nND(iFish),2,iFish)-0.5*(yl+yr))**2),1)
-    NDhd(3,iFish)=minloc(dsqrt((xyzful00(1:nND(iFish),1,iFish)-xl )**2+(xyzful00(1:nND(iFish),2,iFish)-         yr)**2),1)
-    enddo
 !   loading boundary type*******************************************************************************
     do  iFish=1,nFish
     do    iND=1,nND(iFish)
@@ -467,9 +440,6 @@
     enddo
     enddo
     enddo
-    !uuu(1:zDim,1:yDim,1:xDim,1) = uuuIn(1)
-    !uuu(1:zDim,1:yDim,1:xDim,2) = uuuIn(2)
-    !uuu(1:zDim,1:yDim,1:xDim,3) = uuuIn(3)
     den(1:zDim,1:yDim,1:xDim)   = denIn
     prs(1:zDim,1:yDim,1:xDim)   = Cs2*(den(1:zDim,1:yDim,1:xDim)-denIn)
 !   initial disturbance***************************************************************************************
@@ -593,11 +563,17 @@
         nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*2.D0 !Park 2017 pof
         enddo
         Uref = MAXVAL(nUref(1:nFish))
-    else
-        Uref = 1.d0
+    !else
+        !Uref = 1.0d0
     endif
 
-    Tref = Lref / Uref
+    if(RefTime==0) then
+        Tref = Lref / Uref
+    elseif(RefTime==1) then
+        Tref = 1 / maxval(Freq(:))
+    !else
+    endif
+
     do iFish=1,nFish
         St(iFish) = Lref * Freq(iFish) / Uref
     enddo
@@ -642,8 +618,8 @@
 
     Aref=Uref/Tref
     Fref=0.5*denIn*Uref**2*Asfac
-    Eref=denIn*Uref**2*Lref**2*Lref
-    Pref=denIn*Uref**2*Lref**2*Uref
+    Eref=0.5*denIn*Uref**2*Asfac*Lref
+    Pref=0.5*denIn*Uref**2*Asfac*Uref
     !calculate material parameters
     do iFish=1,nFish
     nt(iFish)=ele(1,4,iFish)

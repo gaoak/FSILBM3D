@@ -12,7 +12,7 @@
     implicit none
     integer:: iND,isubstep,iFish,x,y,z,icount
     real(8), allocatable:: FishInfo(:,:)
-    real(8):: temp(3),Pbetatemp,CPUtime
+    real(8):: Pbetatemp,CPUtime
     logical alive
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
@@ -29,7 +29,6 @@
     write(*,*)'npsize=', npsize
 
     if(isRelease==1)then
-        timeOutInfo=timeOutInfo*2
         write(*,*)'Release'
     endif
     Pbetatemp=Pbeta
@@ -61,7 +60,10 @@
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
-    CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
+    CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
+    if (maxval(Nspan).ne.0) then
+        CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
+    endif
 !==================================================================================================
 !==================================================================================================
 !==================================================================================================
@@ -160,15 +162,14 @@
         call packxyzIB
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
-            if    (Nspan .eq. 0) then
-                CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dx,dy,dz,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+            if    (maxval(Nspan(:)) .eq. 0) then
+                CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                         xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)
             else
                 CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,Nspan,dspan,boundaryConditions)
+                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,maxval(Nspan(:)),maxval(theta(:)),maxval(dspan(:)),boundaryConditions)
             endif
         elseif(iForce2Body==2)then   !stress force
-            CALL cptStrs(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,dx,dy,dz,mu,2.50d0,uuu,prs,xGrid,yGrid,zGrid,xyzful_all,extful_all)
         endif
 
         !compute volume force exerted on fluids
@@ -196,7 +197,7 @@
         if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
 
         call date_and_time(VALUES=values0)
-        call cptForceR(dxmin,dymin,dzmin,nND,nND_max,nEL,nEL_max,ele,xyzful,repful,nFish)
+        call cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,dspan,Nspan)
         call date_and_time(VALUES=values1)
         write(*,*)'time for Lubforce :',CPUtime(values1)-CPUtime(values0)
 
@@ -303,7 +304,6 @@
             do iFish=1,nFish
                 write(*,'(A,I5.5)')' Fish number: ',iFish
                 write(*,'(A,3D15.5)')" forceDre: ",sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
-                !write(*,'(A,3D15.5)')" forceStress:",sum(extful2(1:nND,1:3),1)/Fref
                 write(*,'(A,3D15.5)')" accCentM: ",sum(accful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Aref
                 write(*,'(A,3D15.5)')" velCentM: ",sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref
                 write(*,'(A,3D15.5)')" xyzCentM: ",sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref
@@ -316,12 +316,11 @@
             CALL write_checkpoint_file()
         endif
 
-        if((timeOutFlBg .le. time/Tref) .and. (time/Tref .le. timeOutFlEd)) then
+        if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
-                if (Nspan.ne.0) then
+                CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
+                if (maxval(Nspan).ne.0) then
                     CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
-                else
-                    CALL write_solid_field(xyzful/Lref  ,velful/Uref,accful/Aref,extful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
                 endif
                 if (Palpha.gt.0.d0) then
                     CALL write_solidIB_field(xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,nFish)
@@ -329,6 +328,7 @@
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
                 CALL write_flow_fast()
+                !CALL write_flow_field(1)
             endif
         endif
 
