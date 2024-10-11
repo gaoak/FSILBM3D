@@ -29,7 +29,6 @@
     write(*,*)'npsize=', npsize
 
     if(isRelease==1)then
-        timeOutInfo=timeOutInfo
         write(*,*)'Release'
     endif
     Pbetatemp=Pbeta
