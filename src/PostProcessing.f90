@@ -203,18 +203,17 @@
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    write structure field, tecplot binary format
-!    copyright@ RuNanHua
+!    write structure field, tecplot ASCII format
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,repful,time,nND,nND_max,nFish)
+    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,repful,ele,time,nND,nEL,nND_max,nEL_max,nFish)
     implicit none
-    integer:: nND_max,nFish
-    integer:: nND(nFish)
+    integer:: nND_max,nEL_max,nFish
+    integer:: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
     real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish),repful(1:nND_max,1:6,nFish)
     real(8):: time
 !   -------------------------------------------------------
 
-    integer:: i,iFish
+    integer:: i,iFish,ElmType
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileName,idstr
     !==================================================================================================
@@ -229,16 +228,51 @@
     END DO
 
     do iFish=1,nFish
+
+        ElmType = ele(1,4,iFish)
+
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
+        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(fileName)//'.dat')
+        
+        ! Write header information
+        write(idfile, '(A)') 'TITLE    = "ASCII File."'
         write(idfile, '(A)', advance='no') 'variables= '
         do i=1,numVar-1
-            write(idfile, '(2A)', advance='no') trim(varname(i)), ','
+            write(idfile, '(3A)', advance='no') '"', trim(varname(i)), '" '
         enddo
         write(idfile, '(A)') varname(numVar)
+
+        write(idfile, '(A)') 'ZONE    T= "ZONE 1"'
+        write(idfile, '(A)') ' STRANDID=0, SOLUTIONTIME=0'
+        write(idfile, '(A,I8,A,I8,A)', advance='no') ' Nodes=',nND(iFish),', Elements=',nEL(iFish),', ZONETYPE='
+        if(ElmType.eq.2) then
+            write(idfile, '(A)') 'FELINESEG'
+        elseif (ElmType.eq.3) then
+            write(idfile, '(A)') 'FETRIANGLE'
+        endif
+        write(idfile, '(A)') ' DATAPACKING=POINT'
+        write(idfile, '(A)', advance='no') ' DT=('
+        do i=1,numVar-1
+            write(idfile, '(A)', advance='no') 'SINGLE '
+        enddo
+        write(idfile, '(A)') 'SINGLE )'
+
+        ! Write node data
         do i=1,nND(iFish)
             write(idfile, '(10E28.18 )')   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish)),real(repful(i,1:3,iFish))
         enddo
+
+        ! Write element data
+        if(ElmType.eq.2) then
+            do i = 1, nEL(iFish)
+                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish)
+            enddo
+        elseif (ElmType.eq.3) then
+            do i = 1, nEL(iFish)
+                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
+            enddo
+        endif
+
         close(idfile)
     enddo
 !   =============================================
@@ -275,7 +309,7 @@
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
         OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
         !   I. The header section.
-        write(idfile, '(A)') 'variables = x, y, z'
+        write(idfile, '(A)') 'variables = "x" "y" "z"'
         write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan(iFish),', DATAPACKING=POINT, ZONETYPE='
         if(ElmType.eq.2) then
             write(idfile, '(A)') 'FELINESEG'
@@ -286,19 +320,19 @@
         endif
         do  i=1,nND(iFish)
             do j=1,Nspanpts
-                write(idfile,*)   xyzfulIB(j,iFish,i,1:3)
+                write(idfile, *)   xyzfulIB(j,iFish,i,1:3)
             enddo
         enddo
         do  i=1,nEL(iFish)
             if(ElmType.eq.2) then
-                write(idfile) ele(i,1,iFish),ele(i,2,iFish)
+                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish)
             elseif(ElmType.eq.3) then
-                write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
+                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
             else
                 do j=1,Nspan(iFish)
                     off1 = (ele(i,1,iFish)-1) * Nspanpts + j
                     off2 = (ele(i,2,iFish)-1) * Nspanpts + j
-                    write(idfile,*) off1, off1+1, off2+1, off2
+                    write(idfile, *) off1, off1+1, off2+1, off2
                 enddo
             endif
         enddo
@@ -338,8 +372,8 @@
             ElmType = 4
         endif
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBody/BodySpan'//trim(idstr)//'_'//trim(filename)//'.dat')
-        write(idfile, '(A)') 'variables = x, y, z'
+        OPEN(idfile, FILE='./DatBodySpan/BodySpan'//trim(idstr)//'_'//trim(filename)//'.dat')
+        write(idfile, '(A)') 'variables = "x" "y" "z"'
         write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan(iFish),', DATAPACKING=POINT, ZONETYPE='
         if(ElmType.eq.2) then
             write(idfile, '(A)') 'FELINESEG'
@@ -351,19 +385,19 @@
         do  i=1,nND(iFish)
             do j=1,Nspanpts
                 Lspan = (j-1)*dspan(iFish)
-                write(idfile,*)  xyzful(i,1:2,iFish),xyzful(i,3,iFish)+Lspan/Lref
+                write(idfile, *)  xyzful(i,1:2,iFish),xyzful(i,3,iFish)+Lspan/Lref
             enddo
         enddo
         do  i=1,nEL(iFish)
             if(ElmType.eq.2) then
-                write(idfile) ele(i,1,iFish),ele(i,2,iFish)
+                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish)
             elseif(ElmType.eq.3) then
-                write(idfile) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
+                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
             else
                 do j=1,Nspan(iFish)
                     off1 = (ele(i,1,iFish)-1) * Nspanpts + j
                     off2 = (ele(i,2,iFish)-1) * Nspanpts + j
-                    write(idfile,*) off1, off1+1, off2+1, off2
+                    write(idfile, *) off1, off1+1, off2+1, off2
                 enddo
             endif
         enddo
@@ -430,6 +464,7 @@
         write(111,'(A,3F20.10)') 'dxmax,dymax,dzmax       :',dxmax, dymax, dzmax
         write(111,'(A,3F20.10)') 'cptxMin,cptyMin,cptzMin :',cptxMin, cptyMin, cptzMin
         write(111,'(A,3F20.10)') 'cptxMax,cptyMax,cptzMax :',cptxMax, cptyMax, cptzMax
+        write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(elmin(1:nFish)), maxval(elmax(1:nFish))
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Re   =',Re
         write(111,'(A,F20.10)')'Lref =',Lref

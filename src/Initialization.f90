@@ -298,8 +298,8 @@
     USE simParam
     USE ImmersedBoundary
     implicit none
-    integer:: iEL,iND,iFish
-    real(8):: lentemp
+    integer:: iEL,iND,iFish,maxN
+    real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:),lentemp(:)
     if(nFish==0) return
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
 
@@ -372,17 +372,35 @@
         endif
     enddo
 !   ===============================================================================================
-    iFish = 1
-    Lchod   = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
-    lentemp = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
-    if(lentemp .gt. Lchod) Lchod = lentemp
+!   calculate area
+    allocate(elmax(1:nFish),elmin(1:nFish))
+    allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish),lentemp(1:nFish))
+    do iFish=1,nFish
+        call cptArea(areaElem00(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful00(1:nND(iFish),1:6,iFish))
+        nAsfac(iFish)=sum(areaElem00(1:nEL(iFish),iFish))
+        elmax(iFish)=maxval(areaElem00(1:nEL(iFish),iFish))
+        elmin(iFish)=minval(areaElem00(1:nEL(iFish),iFish))
+    enddo
+    !calculate spanwise length, chord length, aspect ratio
+    do iFish=1,nFish
+        nLchod(iFish)  = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
+        lentemp(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
+        if(lentemp(iFish) .gt. nLchod(iFish)) nLchod(iFish) = lentemp(iFish)
+    enddo
     if (maxval(Nspan).gt.0) then
         Lspan = maxval(dspan*Nspan)
     else
         Lspan = maxval(xyzful00(:,3,iFish))-minval(xyzful00(:,3,iFish))
     endif
-    Asfac = Lchod * Lspan
-    AR    = Lspan / Lchod
+    !Use the object with the largest area as the reference object
+    maxN  = maxloc(nAsfac, dim=1)
+    Asfac = nAsfac(maxN)
+    Lchod = nLchod(maxN)
+
+    if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
+    if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
+
+    AR    = Lspan**2/Asfac
 
 !   loading boundary type*******************************************************************************
     do  iFish=1,nFish
@@ -600,8 +618,8 @@
 
     Aref=Uref/Tref
     Fref=0.5*denIn*Uref**2*Asfac
-    Eref=denIn*Uref**2*Asfac*Lref
-    Pref=denIn*Uref**2*Asfac*Uref
+    Eref=0.5*denIn*Uref**2*Asfac*Lref
+    Pref=0.5*denIn*Uref**2*Asfac*Uref
     !calculate material parameters
     do iFish=1,nFish
     nt(iFish)=ele(1,4,iFish)

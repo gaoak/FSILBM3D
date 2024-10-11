@@ -61,10 +61,9 @@
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
+    CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
     if (maxval(Nspan).ne.0) then
         CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
-    else
-        CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,time/Tref,nND,nND_max,nFish)
     endif
 !==================================================================================================
 !==================================================================================================
@@ -164,12 +163,12 @@
         call packxyzIB
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
-            if    (Nspan(iFish) .eq. 0) then
+            if    (maxval(Nspan(:)) .eq. 0) then
                 CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                         xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)
             else
                 CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,Nspan(iFish),theta(iFish),dspan(iFish),boundaryConditions)
+                        xyzful_all,velful_all,xyzfulIB_all,Palpha,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,maxval(Nspan(:)),maxval(theta(:)),maxval(dspan(:)),boundaryConditions)
             endif
         elseif(iForce2Body==2)then   !stress force
         endif
@@ -320,18 +319,17 @@
 
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
+                CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
                 if (maxval(Nspan).ne.0) then
                     CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
-                else
-                    CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,time/Tref,nND,nND_max,nFish)
                 endif
                 if (Palpha.gt.0.d0) then
                     CALL write_solidIB_field(xyzfulIB/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,nFish)
                 endif
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
-                !CALL write_flow_fast()
-                CALL write_flow_field(1)
+                CALL write_flow_fast()
+                !CALL write_flow_field(1)
             endif
         endif
 

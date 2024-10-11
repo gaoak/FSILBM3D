@@ -37,7 +37,7 @@ Copy fluid mesh (FluidMesh.dat in examples), body mesh (Plate.dat in examples) f
 
 Create data folders in the work directory by running bash script (cleanfiles.sh)
 ```
-for folder in DatTemp DatBodyIB DatInfo DatOthe DatBody DatFlow
+for folder in DatTemp DatBodyIB DatBodySpan DatInfo DatOthe DatBody DatFlow
 do
   echo $folder 
   if [[ -d $folder ]]; then
@@ -204,11 +204,13 @@ $PBS_WDIR/$PBS_ENAME
 
 ## Output file description
 - **Output files**
-1. *DatBody* : Folder of body results
-2. *DatFlow* : Floder of flow field results
-3. *DatInfo* : Floder of force and power *et. al.* results
-4. *DatTemp* : Floder of continuation document
-5. *Check.dat* : Parameter record file
+1. *DatBody*     : Folder of body results
+2. *DatFlow*     : Floder of flow field results
+3. *DatInfo*     : Floder of force and power *et. al.* results
+4. *DatTemp*     : Floder of continuation document
+5. *DatBodyIB*   ：Folder of body results for immersed boundary method when $Palpha \gt 0$
+6. *DatBodySpan* ：Folder of spanwise-extension body results
+7. *Check.dat*   : Parameter record file
 
 - **Files description**
 1. *SampBodyAngular.plt* 
@@ -227,6 +229,7 @@ $PBS_WDIR/$PBS_ENAME
 10. *Power.plt* : The input power of the bodies
 11. *Converg.plt* : The convergence of the simulation
 12. *MaMax.plt* : The max Mach number in flow field
+13. *Area.plt* : The surface area of the bodies
 
 ## License
 Licese is owned by X-Y Lu research group. No distribution is allowed without a writing permission from Prof. Lu.

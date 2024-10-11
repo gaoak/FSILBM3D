@@ -160,10 +160,10 @@
         write(111,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
         close(111)
 
-        !call cptArea(areaElem(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1:6,iFish))
-        !open(111,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
-        !write(111,'(2E20.10)')time/Tref,sum(areaElem(:,iFish))/Asfac
-        !close(111)
+        call cptArea(areaElem(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1:6,iFish))
+        open(111,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
+        write(111,'(2E20.10)')time/Tref,sum(areaElem(:,iFish))/Asfac
+        close(111)
 
         call strain_energy_D(strainEnergy(1:nEL(iFish),1:2,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
                                 xyzful(1:nND(iFish),1,iFish), xyzful(1:nND(iFish),2,iFish), xyzful(1:nND(iFish),3,iFish),ele(1:nEL(iFish),1:5,iFish), prop(1:nMT(iFish),1:10,iFish), &

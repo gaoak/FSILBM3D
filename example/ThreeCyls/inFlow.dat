@@ -25,7 +25,7 @@
  2                                           read(111,*)     iBC      1: set 1 layer 2: set 2 layers
  FluidMesh.dat                               read(111,*)     LBmeshName
  1.000d+0                                    read(111,*)     denIn
- 1.000D-2   10                                read(111,*)     dtolLBM,ntolLBM
+ 1.000D-2   10                               read(111,*)     dtolLBM,ntolLBM
 ===================================================================================================solid number
  3          1        1                       read(111,*)     nFish,FishKind,iForce2Body
 ===================================================================================================structure property
@@ -63,7 +63,7 @@
  0.000D+0   0.000D+0                         read(111,*)     begForcDist,endForcDist               time interval
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     posiForcDist(1:SpcDim)                disturbance position
 ===================================================================================================flow field sampling
- 1         1                                  read(111,*)     numSampFlow,isFluidOutput   provide 3 coordinates
+ 1         1                                 read(111,*)     numSampFlow,isFluidOutput   provide 3 coordinates
  0.000d+0   0.000D+0   1.000D+0
 ===================================================================================================structure sampling
  1            1                              read(111,*)     numSampBody,isBodyOutput  provide node number
