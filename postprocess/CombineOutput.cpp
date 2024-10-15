@@ -11,9 +11,6 @@
 
 typedef float INREAL;
 typedef float OUTREAL;
-// void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
-//                    std::vector<OUTREAL> &ycData, std::vector<OUTREAL> &zcData,
-//                    std::vector<OUTREAL> &dcData);
 
 namespace fs = std::filesystem;
 
