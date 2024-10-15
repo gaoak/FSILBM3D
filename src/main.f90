@@ -40,7 +40,7 @@
     CALL initialize_flow()
     if(ismovegrid==1)then
         iFish = 1
-        call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(1:nND(iFish),1:3,iFish),xGrid,yGrid,zGrid,Xref,Yref,Zref)
+        call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(1:nND(iFish),1:3,iFish),xGrid,yGrid,zGrid,Xref,Yref,Zref,MoveOutputXref,MoveOutputYref,MoveOutputZref)
     endif
     if(step==0)    CALL wrtInfoTitl()
 
@@ -328,7 +328,6 @@
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
                 CALL write_flow_fast()
-                !CALL write_flow_field(1)
             endif
         endif
 

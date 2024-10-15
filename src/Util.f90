@@ -321,15 +321,18 @@
 !    copyright@ RuNanHua
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref)
+    subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref,MoveOutputXref,MoveOutputYref,MoveOutputZref)
     implicit none
     integer:: NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim
-    real(8):: xyzful(1:nND,1:3),xGrid(xDim),yGrid(yDim),zGrid(zDim),Xref,Yref,Zref
+    real(8):: xyzful(1:nND,1:3),xGrid(xDim),yGrid(yDim),zGrid(zDim),Xref,Yref,Zref,MoveOutputXref,MoveOutputYref,MoveOutputZref
 
     NDref=minloc(dsqrt((xyzful(1:nND,1)-Xref)**2+(xyzful(1:nND,2)-Yref)**2+(xyzful(1:nND,3)-Zref)**2),1)
     IXref=minloc(dabs(xyzful(NDref,1)-xGrid(1:xDim)),1)
     IYref=minloc(dabs(xyzful(NDref,2)-yGrid(1:yDim)),1)
     IZref=minloc(dabs(xyzful(NDref,3)-zGrid(1:zDim)),1)
+    MoveOutputXref=xGrid(IXref)
+    MoveOutputYref=yGrid(IYref)
+    MoveOutputZref=zGrid(IZref)
 
     end subroutine
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

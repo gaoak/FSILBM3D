@@ -141,14 +141,12 @@ namespace fs = std::filesystem;
 
 void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
                    std::vector<OUTREAL> &ycData, std::vector<OUTREAL> &zcData) {
-                  //  std::vector<OUTREAL> &dcData) {
   std::ifstream gridfile(igridfile);
   std::string line;
   std::vector<OUTREAL> Data;
   xcData.clear();
   ycData.clear();
   zcData.clear();
-  // dcData.clear();
   if (!gridfile.is_open()) {
     std::cerr << "Failed to open file: " << igridfile << std::endl;
     return;
@@ -187,12 +185,6 @@ void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
   gridfile.close();
 }
 
-// void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
-//                    std::vector<OUTREAL> &ycData, std::vector<OUTREAL> &zcData) {
-//   std::vector<OUTREAL> dcData;
-//   readGridFiles(igridfile, xcData, ycData, zcData, dcData);
-// }
-
 // void ExtractIb(std::vector<char> ibData, OUTREAL *data, int number) {
 //   for (int i = 0; i < number; ++i) {
 //     int j = i / 4;
@@ -209,8 +201,7 @@ void stackDataFromFiles(const std::string filename, const std::string mesh_file,
   std::vector<OUTREAL> zcData;
   std::vector<std::vector<OUTREAL>> tempStacks;
   int xmin, xmax, ymin, ymax, zmin, zmax;
-  int isMoveGrid, isMoveDimX, isMoveDimY, isMoveDimZ;
-  double xyzful[3];
+  float offsetMoveGrid[3];
 
   // Read files in sorted order
   // std::set<int> zids;
@@ -233,12 +224,8 @@ void stackDataFromFiles(const std::string filename, const std::string mesh_file,
   NYc = ymax - ymin + 1;
   NZc = zmax - zmin + 1;
 
-  infile.read(reinterpret_cast<char *>(&isMoveGrid), sizeof(isMoveGrid));
-  infile.read(reinterpret_cast<char *>(&isMoveDimX), sizeof(isMoveDimX));
-  infile.read(reinterpret_cast<char *>(&isMoveDimY), sizeof(isMoveDimY));
-  infile.read(reinterpret_cast<char *>(&isMoveDimZ), sizeof(isMoveDimZ));
   for (size_t i = 0; i < 3; ++i) {
-    infile.read(reinterpret_cast<char *>(&xyzful[i]), sizeof(xyzful[i]));
+    infile.read(reinterpret_cast<char *>(&offsetMoveGrid[i]), sizeof(offsetMoveGrid[i]));
   }
 
   readGridFiles(mesh_file, xcData, ycData, zcData);
@@ -251,30 +238,14 @@ void stackDataFromFiles(const std::string filename, const std::string mesh_file,
     tempStacks[i].resize(NXc * NYc * NZc);
   }
 
-
-  if (isMoveGrid==1) {
-    size_t count = 0;
-    for (size_t k = zmin - 1; k < zmax; ++k) {
-      for (size_t j = ymin - 1; j < ymax; ++j) {
-        for (size_t i = xmin - 1; i < xmax; ++i) {
-          Stacks[0][count] = xcData[i] - ((isMoveDimX == 1) ? xyzful[0] : 0.0); 
-          Stacks[1][count] = ycData[j] - ((isMoveDimY == 1) ? xyzful[1] : 0.0); 
-          Stacks[2][count] = zcData[k] - ((isMoveDimZ == 1) ? xyzful[2] : 0.0);
-          ++count;
-        }
-      }
-    }
-  }
-  else {
-    size_t count = 0;
-    for (size_t k = zmin - 1; k < zmax; ++k) {
-      for (size_t j = ymin - 1; j < ymax; ++j) {
-        for (size_t i = xmin - 1; i < xmax; ++i) {
-          Stacks[0][count] = xcData[i];
-          Stacks[1][count] = ycData[j];
-          Stacks[2][count] = zcData[k];
-          ++count;
-        }
+  size_t count = 0;
+  for (size_t k = zmin - 1; k < zmax; ++k) {
+    for (size_t j = ymin - 1; j < ymax; ++j) {
+      for (size_t i = xmin - 1; i < xmax; ++i) {
+        Stacks[0][count] = xcData[i] - offsetMoveGrid[0];
+        Stacks[1][count] = ycData[j] - offsetMoveGrid[1];
+        Stacks[2][count] = zcData[k] - offsetMoveGrid[2];
+        ++count;
       }
     }
   }
