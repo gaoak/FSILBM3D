@@ -239,9 +239,9 @@ void stackDataFromFiles(const std::string filename, const std::string mesh_file,
   for (size_t k = zmin - 1; k < zmax; ++k) {
     for (size_t j = ymin - 1; j < ymax; ++j) {
       for (size_t i = xmin - 1; i < xmax; ++i) {
-        Stacks[0][count] = xcData[i] - offsetMoveGrid[0];
-        Stacks[1][count] = ycData[j] - offsetMoveGrid[1];
-        Stacks[2][count] = zcData[k] - offsetMoveGrid[2];
+        Stacks[0][count] = xcData[i] + offsetMoveGrid[0];
+        Stacks[1][count] = ycData[j] + offsetMoveGrid[1];
+        Stacks[2][count] = zcData[k] + offsetMoveGrid[2];
         ++count;
       }
     }

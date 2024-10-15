@@ -301,15 +301,17 @@
 !    copyright@ RuNanHua
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine  cptMove(move,xB,xG,d)
+    subroutine  cptMove(move,xB,xG,d,MoveOutputXYZref)
     implicit none
     integer:: move(3),i
-    real(8):: xB(3),xG(3),d(3)
+    real(8):: xB(3),xG(3),d,MoveOutputXYZref(3)
     do  i=1,3
-        if    (xB(i)-xG(i)> d(i))then
+        if    (xB(i)-xG(i)> d)then
             move(i)=1
-        elseif(xB(i)-xG(i)<-d(i))then
+            MoveOutputXYZref(i)=MoveOutputXYZref(i)+1
+        elseif(xB(i)-xG(i)<-d)then
             move(i)=-1
+            MoveOutputXYZref(i)=MoveOutputXYZref(i)-1
         else
             move(i)=0
         endif
@@ -321,18 +323,15 @@
 !    copyright@ RuNanHua
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref,MoveOutputXref,MoveOutputYref,MoveOutputZref)
+    subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref)
     implicit none
     integer:: NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim
-    real(8):: xyzful(1:nND,1:3),xGrid(xDim),yGrid(yDim),zGrid(zDim),Xref,Yref,Zref,MoveOutputXref,MoveOutputYref,MoveOutputZref
+    real(8):: xyzful(1:nND,1:3),xGrid(xDim),yGrid(yDim),zGrid(zDim),Xref,Yref,Zref
 
     NDref=minloc(dsqrt((xyzful(1:nND,1)-Xref)**2+(xyzful(1:nND,2)-Yref)**2+(xyzful(1:nND,3)-Zref)**2),1)
     IXref=minloc(dabs(xyzful(NDref,1)-xGrid(1:xDim)),1)
     IYref=minloc(dabs(xyzful(NDref,2)-yGrid(1:yDim)),1)
     IZref=minloc(dabs(xyzful(NDref,3)-zGrid(1:zDim)),1)
-    MoveOutputXref=xGrid(IXref)
-    MoveOutputYref=yGrid(IYref)
-    MoveOutputZref=zGrid(IZref)
 
     end subroutine
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
