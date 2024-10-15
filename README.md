@@ -82,7 +82,7 @@ $PBS_WDIR/$PBS_ENAME
 ## Input file description
 
 - **inFlow.dat**     Simulation control parameters
-- **FluidMesh.dat**  Fluid mesh
+- **FluidMesh.dat**  Fluid mesh (use CRLF)
 - **BMeshNum.dat**   Body mesh info (Removed)
 - **Plate.dat**      Body mesh
 - **cleanfiles.sh**  Bash script to create/clean output directories
