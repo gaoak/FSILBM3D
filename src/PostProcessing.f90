@@ -120,6 +120,14 @@
             enddo
             enddo
             enddo
+        elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1.and. isMoveOutputZ==1))then
+            do    x=1+offsetOutput, xDim-offsetOutput
+            do    y=1+offsetOutput, yDim-offsetOutput
+            do    z=1+offsetOutput, zDim-offsetOutput
+                write(idfile) real((xGrid(x)-xyzful(NDref,1,1))/Lref),real((yGrid(y)-xyzful(NDref,2,1))/Lref),real((zGrid(z)-xyzful(NDref,3,1))/Lref),real(prs(z,y,x)/(0.5*denIn*Uref**2)),real(uuu(z,y,x,1:3)/Uref)
+            enddo
+            enddo
+            enddo
         else
             do    x=1+offsetOutput, xDim-offsetOutput
             do    y=1+offsetOutput, yDim-offsetOutput
@@ -181,6 +189,11 @@
             elseif((isMoveDimX/=1 .and. isMoveOutputX/=1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
                 do    i=1,nND(iFish)
                 write(idfile)   real(xyzful(i,1,iFish)/Lref),real((xyzful(i,2,iFish)-xyzful(NDref,2,iFish))/Lref),real((xyzful(i,3,iFish)-xyzful(NDref,3,iFish))/Lref),real(0.0), &
+                            real(velful(i,1:3,iFish)/Uref)
+                enddo
+            elseif((isMoveDimX==1 .and. isMoveOutputX==1) .and. (isMoveDimY==1 .and. isMoveOutputY==1) .and. (isMoveDimZ==1 .and. isMoveOutputZ==1))then
+                do    i=1,nND(iFish)
+                write(idfile)   real((xyzful(i,1,iFish)-xyzful(NDref,1,iFish))/Lref),real((xyzful(i,2,iFish)-xyzful(NDref,2,iFish))/Lref),real((xyzful(i,3,iFish)-xyzful(NDref,3,iFish))/Lref),real(0.0), &
                             real(velful(i,1:3,iFish)/Uref)
                 enddo
             else
@@ -478,7 +491,7 @@
         write(111,'(A,F20.10)')'Asfac=',Asfac
         write(111,'(A,F20.10)')'AR   =',AR
         write(111,'(A      )')'===================================='
-        write(111,'(A,F20.10)')'denR =',denIn
+        write(111,'(A,F20.10)')'denIn =',denIn
         write(111,'(A,F20.10)')'Aref =',Aref
         write(111,'(A,F20.10)')'Pref =',Pref
         write(111,'(A,F20.10)')'Eref =',Eref
@@ -725,7 +738,9 @@ if(pid.eq.0) then
     enddo
     open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
     WRITE(idfile) xmin,xmax,ymin,ymax,zmin,zmax
-    write(idfile)oututmp,outvtmp,outwtmp
+    WRITE(idfile) isMoveGrid,isMoveDimX,isMoveDimY,isMoveDimZ
+    WRITE(idfile) xyzful(NDref,1:3,1)
+    write(idfile) oututmp,outvtmp,outwtmp
     close(idfile)
     call myexit(0)
 endif
