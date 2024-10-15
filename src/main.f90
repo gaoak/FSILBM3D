@@ -41,7 +41,7 @@
     if(ismovegrid==1)then
         iFish = 1
         call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(1:nND(iFish),1:3,iFish),xGrid,yGrid,zGrid,Xref,Yref,Zref)
-        MoveOutputXYZref=0
+        MoveOutputIref=0
     endif
     if(step==0)    CALL wrtInfoTitl()
 
@@ -103,7 +103,7 @@
         !******************************************************************************************
         if(ismovegrid==1)then ! move fluid grid
             iFish=1
-            call cptMove(move(1:3),xyzful(NDref,1:3,iFish),[xGrid(IXref),yGrid(IYref),zGrid(IZref)],dh,MoveOutputXYZref(1:3))
+            call cptMove(move(1:3),xyzful(NDref,1:3,iFish),[xGrid(IXref),yGrid(IYref),zGrid(IZref)],dh,MoveOutputIref(1:3))
             write(*,'(A,3F10.5)')' *Grid:',[xGrid(IXref),yGrid(IYref),zGrid(IZref)]
             write(*,'(A,3F10.5)')' *Body:',xyzful(NDref,1:3,iFish)
             if(isMoveDimX==1)CALL movGrid(1,move(1))

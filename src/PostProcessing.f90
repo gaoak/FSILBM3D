@@ -515,9 +515,9 @@ enddo
 iFish=1
 offsetMoveGrid=0.0
 if(isMoveGrid==1)then
-    if(isMoveDimX==1) offsetMoveGrid(1) = dh*dble(MoveOutputXYZref(1))
-    if(isMoveDimY==1) offsetMoveGrid(2) = dh*dble(MoveOutputXYZref(2))
-    if(isMoveDimZ==1) offsetMoveGrid(3) = dh*dble(MoveOutputXYZref(3))
+    if(isMoveDimX==1) offsetMoveGrid(1) = dh*dble(MoveOutputIref(1))
+    if(isMoveDimY==1) offsetMoveGrid(2) = dh*dble(MoveOutputIref(2))
+    if(isMoveDimZ==1) offsetMoveGrid(3) = dh*dble(MoveOutputIref(3))
 endif
 call myfork(pid)
 if(pid.eq.0) then

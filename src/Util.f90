@@ -301,17 +301,17 @@
 !    copyright@ RuNanHua
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine  cptMove(move,xB,xG,d,MoveOutputXYZref)
+    subroutine  cptMove(move,xB,xG,d,MoveOutputIref)
     implicit none
     integer:: move(3),i
-    real(8):: xB(3),xG(3),d,MoveOutputXYZref(3)
+    real(8):: xB(3),xG(3),d,MoveOutputIref(3)
     do  i=1,3
         if    (xB(i)-xG(i)> d)then
             move(i)=1
-            MoveOutputXYZref(i)=MoveOutputXYZref(i)+1
+            MoveOutputIref(i)=MoveOutputIref(i)+1
         elseif(xB(i)-xG(i)<-d)then
             move(i)=-1
-            MoveOutputXYZref(i)=MoveOutputXYZref(i)-1
+            MoveOutputIref(i)=MoveOutputIref(i)-1
         else
             move(i)=0
         endif
