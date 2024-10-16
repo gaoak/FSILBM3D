@@ -1,86 +1,86 @@
 ===================================================================================================control parameters
- 16                                          	read(111,*)     npsize
- 1          1                       			read(111,*)     isRelease,isConCmpt
- 1          1                       			read(111,*)     iCollidModel,iKB
- 5          0.0157079633                   		read(111,*)     RefVelocity,Uref
- 0.020D+0   0.020D+0                        	read(111,*)     timeSimTotl,timeOutTemp
- 0.100D+0   0.100D+0   0.010D+0					read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
- 4.000D+0   8.000D+0                         	read(111,*)     timeOutBegin,timeOutEnd
- 0.000D+0   1.000D+0   1.000D+0					read(111,*)     Palpha,Pbeta,Pramp                     
+ 16                                             read(111,*)     npsize
+ 1          1                                   read(111,*)     isRelease,isConCmpt
+ 1          1                                   read(111,*)     iCollidModel,iKB
+ 5          0.0157079633                        read(111,*)     RefVelocity,Uref
+ 0.020D+0   0.020D+0                            read(111,*)     timeSimTotl,timeOutTemp
+ 0.100D+0   0.100D+0   0.010D+0                 read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
+ 4.000D+0   8.000D+0                            read(111,*)     timeOutBegin,timeOutEnd
+ 0.000D+0   1.000D+0   1.000D+0                 read(111,*)     Palpha,Pbeta,Pramp                     
 ===================================================================================================fluid information
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     uuuIn(1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     shearRateIn(1:3)     
- 302   302   200   302   304   304				read(111,*)     boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0                                           	read(111,*)     VelocityKind
- 0   0.000D+0   0.000D+0                    	read(111,*)     MovingKind1,MovingVel1,MovingFreq1
- 0   0.000D+0   0.000D+0                     	read(111,*)     MovingKind2,MovingVel2,MovingFreq2
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     uuuIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     shearRateIn(1:3)     
+ 302   302   200   302   304   304              read(111,*)     boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 0                                              read(111,*)     VelocityKind
+ 0   0.000D+0   0.000D+0                        read(111,*)     MovingKind1,MovingVel1,MovingFreq1
+ 0   0.000D+0   0.000D+0                        read(111,*)     MovingKind2,MovingVel2,MovingFreq2
 ===================================================================================================
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     VolumeForceIn(1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     VolumeForceIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
 ===================================================================================================
- 1.000D+2   0.020D+0                       		read(111,*)     Re,dt
- 1          100.0D+0       						read(111,*)     RefTime,Tref   
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     Frod(1:3)
+ 1.000D+2   0.020D+0                            read(111,*)     Re,dt
+ 1          100.0D+0                            read(111,*)     RefTime,Tref   
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     Frod(1:3)
 ===================================================================================================far field boundary condition
- 1                                           	read(111,*)     iBC      1: set 1 layer 2: set 2 layers
- FluidMesh.dat                               	read(111,*)     LBmeshName
- 1.000D+0                                    	read(111,*)     denIn  
- 0.010D+0    1                                	read(111,*)     dtolLBM,ntolLBM    
+ 1                                              read(111,*)     iBC      1: set 1 layer 2: set 2 layers
+ FluidMesh.dat                                  read(111,*)     LBmeshName(use CRLF)
+ 1.000D+0                                       read(111,*)     denIn  
+ 0.010D+0    1                                  read(111,*)     dtolLBM,ntolLBM    
 ===================================================================================================solid number
  62        2          1                         read(111,*)     nFish,FishKind,iForce2Body
 ===================================================================================================structure property
- 1          1          1                     	read(111,*)     FishNum(FishKind),NumX,NumY
- 2          Plate.dat                          	read(111,*)     iBodyModel(iFish),FEmeshName(iFish) 
- 0          1          1                     	read(111,*)     isMotionGiven(iFish,1:3)
- 1          1          1                     	read(111,*)     isMotionGiven(iFish,4:6)
- 1.000D+0   0.250D+0                         	read(111,*)     denR(iFish), psR(iFish)
- 3.500D+0   1.000D+3                         	read(111,*)     [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
- 0.020D+0   0.000D+0   50                  		read(111,*)     dspan,theta,Nspan
- 61        61        1                     		read(111,*)     FishNum(FishKind),NumX,NumY
+ 1          1          1                        read(111,*)     FishNum(FishKind),NumX,NumY
+ 2          Plate.dat                           read(111,*)     iBodyModel(iFish),FEmeshName(iFish) 
+ 0          1          1                        read(111,*)     isMotionGiven(iFish,1:3)
+ 1          1          1                        read(111,*)     isMotionGiven(iFish,4:6)
+ 1.000D+0   0.250D+0                            read(111,*)     denR(iFish), psR(iFish)
+ 3.500D+0   1.000D+3                            read(111,*)     [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
+ 0.020D+0   0.000D+0   50                       read(111,*)     dspan,theta,Nspan
+ 61        61        1                          read(111,*)     FishNum(FishKind),NumX,NumY
  2          Plants.dat                          read(111,*)     iBodyModel(iFish),FEmeshName(iFish) 
- 1          1          1                     	read(111,*)     isMotionGiven(iFish,1:3)
- 1          1          1                     	read(111,*)     isMotionGiven(iFish,4:6)
- 1.000D+0   0.250D+0                         	read(111,*)     denR(iFish), psR(iFish)
- 3.000D+0   1.000D+3                         	read(111,*)     [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
- 0.020D+0   0.000D+0   50                  	 	read(111,*)     dspan,theta,Nspan
+ 1          1          1                        read(111,*)     isMotionGiven(iFish,1:3)
+ 1          1          1                        read(111,*)     isMotionGiven(iFish,4:6)
+ 1.000D+0   0.250D+0                            read(111,*)     denR(iFish), psR(iFish)
+ 3.000D+0   1.000D+3                            read(111,*)     [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
+ 0.020D+0   0.000D+0   50                       read(111,*)     dspan,theta,Nspan
 ===================================================================================================
- 1                                           	read(111,*)     numsubstep
- 0.000D+0   0.000D+0                         	read(111,*)     dampK,dampM
- 0.500D+0   1.000D+0                         	read(111,*)     NewmarkGamma,NewmarkBeta
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     alphaf,alpham,alphap 
- 1.000D-6    1000								read(111,*)     dtolFEM,ntolFEM 
+ 1                                              read(111,*)     numsubstep
+ 0.000D+0   0.000D+0                            read(111,*)     dampK,dampM
+ 0.500D+0   1.000D+0                            read(111,*)     NewmarkGamma,NewmarkBeta
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     alphaf,alpham,alphap 
+ 1.000D-6    1000                               read(111,*)     dtolFEM,ntolFEM 
 ===================================================================================================given motion
- 0.010D+0   0.000D+0                         	read(111,*)     Freq(iFish,), St(iFish)
- 3.050D+1   1.500D+0   0.500D+0					read(111,*)     iXYZ(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     dXYZ(iFish,1:3)
- 0.000D+0   0.250D+0   0.000D+0					read(111,*)     XYZAmpl(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     XYZPhi(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     AoAo(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     AoAAmpl(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     AoAPhi(iFish,1:3)
- 0.010D+0   0.000D+0                         	read(111,*)     Freq(iFish,), St(iFish)
- 0.500D+0   0.000D+0   0.500D+0					read(111,*)     iXYZ(iFish,1:3)
- 0.500D+0   0.000D+0   0.000D+0					read(111,*)     dXYZ(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     XYZAmpl(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     XYZPhi(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     AoAo(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     AoAAmpl(iFish,1:3)
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     AoAPhi(iFish,1:3)
+ 0.010D+0   0.000D+0                            read(111,*)     Freq(iFish,), St(iFish)
+ 3.050D+1   1.500D+0   0.500D+0                 read(111,*)     iXYZ(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     dXYZ(iFish,1:3)
+ 0.000D+0   0.250D+0   0.000D+0                 read(111,*)     XYZAmpl(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     XYZPhi(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     AoAo(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     AoAAmpl(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     AoAPhi(iFish,1:3)
+ 0.010D+0   0.000D+0                            read(111,*)     Freq(iFish,), St(iFish)
+ 0.500D+0   0.000D+0   0.500D+0                 read(111,*)     iXYZ(iFish,1:3)
+ 0.500D+0   0.000D+0   0.000D+0                 read(111,*)     dXYZ(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     XYZAmpl(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     XYZPhi(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     AoAo(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     AoAAmpl(iFish,1:3)
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     AoAPhi(iFish,1:3)
 ====================================================is moving grid=====moving direction====is the output field translated==moving grid
- 0          0                                	read(111,*)     isMoveGrid,offsetOutput
- 0          0                                	read(111,*)     isMoveDimX,isMoveOutputX
- 0          0                                	read(111,*)     isMoveDimY,isMoveOutputY
- 0          0                                	read(111,*)     isMoveDimZ,isMoveOutputZ
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     Xref,Yref,Zref
+ 0          0                                   read(111,*)     isMoveGrid,offsetOutput
+ 0          0                                   read(111,*)     isMoveDimX,isMoveOutputX
+ 0          0                                   read(111,*)     isMoveDimY,isMoveOutputY
+ 0          0                                   read(111,*)     isMoveDimZ,isMoveOutputZ
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     Xref,Yref,Zref
 ===================================================================================================disturbance information
- 0.000D+0   0.000D+0   0.000D+0   0.000D+0		read(111,*)     waveInitDist,AmplInitDist(1:SpcDim)   initial disturbance
- 0.000D+0   0.000D+0   0.000D+0   0.000D+0		read(111,*)     FreqForcDist,AmplForcDist(1:SpcDim)   transient disturbance
- 0.000D+0   0.000D+0                         	read(111,*)     begForcDist,endForcDist              time interval
- 0.000D+0   0.000D+0   0.000D+0					read(111,*)     posiForcDist(1:SpcDim)                disturbance position
+ 0.000D+0   0.000D+0   0.000D+0   0.000D+0      read(111,*)     waveInitDist,AmplInitDist(1:SpcDim)   initial disturbance
+ 0.000D+0   0.000D+0   0.000D+0   0.000D+0      read(111,*)     FreqForcDist,AmplForcDist(1:SpcDim)   transient disturbance
+ 0.000D+0   0.000D+0                            read(111,*)     begForcDist,endForcDist              time interval
+ 0.000D+0   0.000D+0   0.000D+0                 read(111,*)     posiForcDist(1:SpcDim)                disturbance position
 ===================================================================================================flow field sampling
- 1           0                               	read(111,*)     numSampFlow,isFluidOutput
+ 1           0                                  read(111,*)     numSampFlow,isFluidOutput
  10.00d+0   0.250D+0   0.000D+0               
 ===================================================================================================structure sampling
- 1           0                                	read(111,*)     numSampBody,isBodyOutput
- 26                                           	read(111,*)     SampBodyNode
+ 1           0                                  read(111,*)     numSampBody,isBodyOutput
+ 26                                             read(111,*)     SampBodyNode
 ===================================================================================================

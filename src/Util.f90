@@ -298,18 +298,20 @@
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
+!    Counting the number of steps the grid has moved
+!    Determine if the grd is moving left or right
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine  cptMove(move,xB,xG,d)
+    subroutine  cptMove(move,xB,xG,d,MoveOutputIref)
     implicit none
-    integer:: move(3),i
-    real(8):: xB(3),xG(3),d(3)
+    integer:: move(3),i,MoveOutputIref(3)
+    real(8):: xB(3),xG(3),d
     do  i=1,3
-        if    (xB(i)-xG(i)> d(i))then
+        if    (xB(i)-xG(i)> d)then
             move(i)=1
-        elseif(xB(i)-xG(i)<-d(i))then
+            MoveOutputIref(i)=MoveOutputIref(i)+1
+        elseif(xB(i)-xG(i)<-d)then
             move(i)=-1
+            MoveOutputIref(i)=MoveOutputIref(i)-1
         else
             move(i)=0
         endif
