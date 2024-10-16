@@ -463,7 +463,7 @@ SUBROUTINE write_flow_fast()
 USE simParam
 USE OutFlowWorkspace
 implicit none
-integer:: x,y,z,pid,i,iFish
+integer:: x,y,z,pid,i
 integer::xmin,xmax,ymin,ymax,zmin,zmax
 integer,parameter::nameLen=10,idfile=100
 character (LEN=nameLen):: fileName
@@ -512,7 +512,6 @@ do x=xmin, xmax
     enddo
 enddo
 !$OMP END PARALLEL DO
-iFish=1
 offsetMoveGrid=0.0
 if(isMoveGrid==1)then
     if(isMoveDimX==1) offsetMoveGrid(1) = dh*dble(MoveOutputIref(1))
