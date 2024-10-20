@@ -3,36 +3,42 @@ module SolidBody
     private
     integer :: real_npts,nBeam
     character(LEN=100) :: fake_meshfile
-    public :: real_npts,Body,Beam,Beam_initialise,Beam_Load
+    real(8), allocatable :: real_xyzful0(:, :)
+    public :: Body,Beam,Beam_initialise,Beam_UpdateInfo,Beam_UpdateLoad
     type :: Body
         integer :: fake_type
-        integer, allocatable :: fake_npts, fake_nelmts
+        integer :: fake_npts, fake_nelmts
         integer :: n_h, n_r, n_t
-        real(8), allocatable :: facke_xyz(:, :)
-        integer, allocatable :: facke_ele(:, :)
-        integer, allocatable :: facke_sec(:, :)
+        real(8), allocatable :: fake_xyz0(:, :)
+        real(8), allocatable :: fake_xyz(:, :)
+        real(8), allocatable :: fake_vel(:, :)
+        real(8), allocatable :: fake_xyzIB(:, :)
+        real(8), allocatable :: fake_extful(:, :)
+        integer, allocatable :: fake_ele(:, :)
+        integer, allocatable :: fake_sec(:, :)
+        real(8), allocatable :: rotMat(:, :, :)
     contains
         private
         procedure :: StrucFakNod => Structured_Fake_Nodes
         procedure :: StrucFakEle => Structured_Fake_Elements
         procedure :: UnstrucFakNod => Unstructured_Fake_Nodes
         procedure :: UnStrucFakEle => Unstructured_Fake_Elements
+        procedure :: RotateMatrix => Section_RotateMatrix
     end type Body
     type(Body) :: Beam
-    real(8), allocatable :: real_xyzful(:, :)
   contains
     subroutine Beam_initialise(filename,realnodes,realxyzful,r,dh,tp,ifunstructured)
         implicit none
         character (LEN=100):: filename
         real(8) :: r, dh
         integer :: realnodes
-        real(8) :: realxyzful(realnodes,3)
+        real(8) :: realxyzful(realnodes,6)
         integer :: tp, ifunstructured
 
         fake_meshfile = filename
         real_npts     = realnodes
-        allocate(real_xyzful(1:real_npts,1:3))
-        real_xyzful   = realxyzful
+        allocate(real_xyzful0(1:real_npts,1:6))
+        real_xyzful0   = realxyzful
 
         if (ifunstructured.eq.0) then
             Beam%fake_type = tp
@@ -40,58 +46,68 @@ module SolidBody
         elseif (ifunstructured .eq. 1) then
             call Beam_ReadUnstructured()
         endif
-        call Beam_Section()
+        allocate(Beam%fake_sec(1:real_npts,Beam%fake_npts))
+        Beam%fake_sec = 0
+        call Beam_InitialSection()
 
+        allocate(Beam%fake_xyz(1:Beam%fake_npts,1:3))
+        Beam%fake_xyz=Beam%fake_xyz0
+        allocate(Beam%fake_extful(1:Beam%fake_npts,1:6))
+        Beam%fake_extful=0.0d0
+        allocate(Beam%rotMat(1:Beam%fake_npts,1:3,1:3))
+        Beam%rotMat=0.0d0
+        allocate(Beam%fake_vel(1:Beam%fake_npts, 1:6))
+        Beam%fake_vel=0.0d0
+        allocate(Beam%fake_xyzIB(1:Beam%fake_npts, 1:6))
+        Beam%fake_xyzIB=0.0d0
     end subroutine Beam_initialise
 
-    subroutine Beam_Section()
+    subroutine Beam_InitialSection()
         implicit none
         integer :: i,j
-        allocate(Beam%facke_sec(1:real_npts,Beam%fake_npts))
-        Beam%facke_sec = 0
         do j = 1,Beam%fake_npts
             do i = 1,real_npts
                 if ( i .eq. 1) then
-                    if ( Beam%facke_xyz(j,2) .le. ((real_xyzful(i+1,2)+real_xyzful(i,2))/2)) then
-                        Beam%facke_sec(i,j) = j
+                    if ( Beam%fake_xyz0(j,2) .le. ((real_xyzful0(i+1,2)+real_xyzful0(i,2))/2)) then
+                        Beam%fake_sec(i,j) = j
                     endif
-                endif
-                if ( Beam%facke_xyz(j,2) .le. ((real_xyzful(i+1,2)+real_xyzful(i,2))/2) .and. Beam%facke_xyz(j,2) .gt. ((real_xyzful(i,2)+real_xyzful(i-1,2))/2)) then
-                    Beam%facke_sec(i,j) = j
-                endif
-                if ( i .eq. real_npts) then
-                    if ( Beam%facke_xyz(j,2) .gt. ((real_xyzful(i,2)+real_xyzful(i-1,2))/2)) then
-                        Beam%facke_sec(i,j) = j
+                elseif ( i .eq. real_npts) then
+                    if ( Beam%fake_xyz0(j,2) .gt. ((real_xyzful0(i,2)+real_xyzful0(i-1,2))/2)) then
+                        Beam%fake_sec(i,j) = j
+                    endif
+                else
+                    if ( Beam%fake_xyz0(j,2) .le. ((real_xyzful0(i+1,2)+real_xyzful0(i,2))/2) .and. Beam%fake_xyz0(j,2) .gt. ((real_xyzful0(i,2)+real_xyzful0(i-1,2))/2)) then
+                        Beam%fake_sec(i,j) = j
                     endif
                 endif
             enddo
         enddo
-    end subroutine
+    end subroutine Beam_InitialSection
 
-    subroutine Beam_ReadPoints()
-        implicit none
-        integer :: fileiD = 111, num, i
-        character(LEN=1000) :: buffer
-        character (LEN=100):: filename
+    ! subroutine Beam_ReadPoints()
+    !     implicit none
+    !     integer :: fileiD = 111, num, i
+    !     character(LEN=1000) :: buffer
+    !     character (LEN=100):: filename
         
-        open(unit=fileiD, file = filename )
-            read(fileiD,*) buffer
-            read(fileiD,*) real_npts
-        close(fileiD)
-        ! load points data
-        allocate(real_xyzful(1:real_npts,1:3))
-        open(unit=fileiD, file = filename )
-            do i=1,10000
-                read(fileiD,*) buffer
-                buffer = trim(buffer)
-                if(buffer(1:5) .eq. 'POINT') exit
-            enddo
-            read(fileiD,*) buffer
-            do i = 1,real_npts
-                read(fileiD,*)num,real_xyzful(i,1),real_xyzful(i,2),real_xyzful(i,3)
-            enddo
-        close(fileiD)
-    end subroutine Beam_ReadPoints
+    !     open(unit=fileiD, file = filename )
+    !         read(fileiD,*) buffer
+    !         read(fileiD,*) real_npts
+    !     close(fileiD)
+    !     ! load points data
+    !     allocate(real_xyzful0(1:real_npts,1:3))
+    !     open(unit=fileiD, file = filename )
+    !         do i=1,10000
+    !             read(fileiD,*) buffer
+    !             buffer = trim(buffer)
+    !             if(buffer(1:5) .eq. 'POINT') exit
+    !         enddo
+    !         read(fileiD,*) buffer
+    !         do i = 1,real_npts
+    !             read(fileiD,*)num,real_xyzful0(i,1),real_xyzful0(i,2),real_xyzful0(i,3)
+    !         enddo
+    !     close(fileiD)
+    ! end subroutine Beam_ReadPoints
 
     subroutine Beam_BuildStructured(r,dh)
         implicit none
@@ -105,20 +121,131 @@ module SolidBody
         call Beam%UnstrucFakNod()
         call Beam%UnstrucFakEle()
     end subroutine Beam_ReadUnstructured
-    
-    subroutine Beam_Load(ThreeDextful,TwoDextful)
-        real(8), intent(in) :: ThreeDextful(Beam%fake_npts,6)
-        real(8), intent(out):: TwoDextful(real_npts,6)
+
+    subroutine Beam_UpdateInfo(updaterealxyzful,updaterealvelful,updaterealxyzIBful)
+        implicit none
+        real(8), intent(in) :: updaterealxyzful(real_npts,6),updaterealvelful(real_npts,6),updaterealxyzIBful(real_npts,6)
+        call Beam_Updatexyz(updaterealxyzful)
+        call Beam_Updatevel(updaterealvelful)
+        call Beam_UpdatexyzIB(updaterealxyzIBful)
+    end subroutine Beam_UpdateInfo
+
+    subroutine Beam_Updatexyz(updaterealxyzful)
+        implicit none
+        real(8), intent(in):: updaterealxyzful(real_npts,6)
+        integer :: i,j
+        real(8) :: dxyz(3),xlmn(3),dl,temp(3),tempdxyz(3)
+        do j = 1,Beam%fake_npts
+            do i = 1,real_npts
+                if (Beam%fake_sec(i,j) .ne. 0) then
+                    if ( i .eq. 1) then
+                        dxyz(1:3) = updaterealxyzful(i+1,1:3)-updaterealxyzful(i,1:3)
+                    elseif ( i .eq. real_npts) then
+                        dxyz(1:3) = updaterealxyzful(i,1:3)-updaterealxyzful(i-1,1:3)
+                    else
+                        dxyz(1:3) = updaterealxyzful(i+1,1:3)-updaterealxyzful(i-1,1:3)
+                    endif
+                    dl        = dsqrt(dxyz(1)**2+dxyz(2)**2+dxyz(3)**2)
+                    xlmn(1:3) = dxyz(1:3)/dl
+                    call Beam%RotateMatrix(i,xlmn(1),xlmn(2),xlmn(3))
+                    temp(1:3) = matmul((/Beam%fake_xyz0(j,1), 0.0d0, Beam%fake_xyz0(j,3)/), Beam%rotMat(i,:,:))
+                    tempdxyz(1:3) = updaterealxyzful(i,1:3) - real_xyzful0(i,1:3)
+                    Beam%fake_xyz(j,1:3) = temp(1:3)+tempdxyz(1:3)
+                endif
+            enddo
+        enddo
+    end subroutine Beam_Updatexyz
+
+    subroutine Beam_Updatevel(updaterealvelful)
+        real(8), intent(in) :: updaterealvelful(real_npts,6)
+        integer :: i,j
+        do j = 1,Beam%fake_npts
+            do i = 1,real_npts
+                if (Beam%fake_sec(i,j) .ne. 0) then
+                    Beam%fake_vel(j,1:6) = updaterealvelful(i,1:6)
+                endif
+            enddo
+        enddo
+    end subroutine Beam_Updatevel
+
+    subroutine Beam_UpdatexyzIB(updaterealxyzIBful)
+        real(8), intent(in) :: updaterealxyzIBful(real_npts,6)
+        integer :: i,j
+        do j = 1,Beam%fake_npts
+            do i = 1,real_npts
+                if (Beam%fake_sec(i,j) .ne. 0) then
+                    Beam%fake_xyzIB(j,1:6) = updaterealxyzIBful(i,1:6)
+                endif
+            enddo
+        enddo
+    end subroutine Beam_UpdatexyzIB
+
+    subroutine Beam_UpdateLoad(TwoDextful)
+        real(8), intent(inout):: TwoDextful(real_npts,6)
         integer :: i,j
         TwoDextful = 0.0d0
         do j = 1,Beam%fake_npts
             do i = 1,real_npts
-                if (Beam%facke_sec(i,j) .ne. 0) then
-                    TwoDextful(i,1:6) = TwoDextful(i,1:6) + ThreeDextful(j,6)
+                if (Beam%fake_sec(i,j) .ne. 0) then
+                    TwoDextful(i,1:6) = TwoDextful(i,1:6) + Beam%fake_extful(j,1:6)
                 endif
             enddo
         enddo
-    end subroutine
+    end subroutine Beam_UpdateLoad
+
+    subroutine Section_RotateMatrix(this,i,l,m,n)
+        ! The three rotations of the standard quaternion rotation matrix are all clockwise or counterclockwise.
+        ! In order to correspond to doyle's angular rotation matrix, one rotation is changed to the opposite 
+        ! direction of the other two rotations, and the resulting quaternion rotation matrix is added with 
+        ! a negative sign in the non-diagonal position.
+        
+        ! First rotation in the positive (counterclockwise) direction of the Z-axis
+        ! Second rotation in the negative (clockwise) direction of the Y-axis
+        ! Third rotation in the positive (counterclockwise) direction of the X-axis
+        implicit none
+        class(Body), intent(inout) :: this
+        real(8):: l,m,n
+        real(8):: v_0(3),e1(3),e2(3),e3(3),r1(3,3)
+        integer:: i,min_index
+        v_0 = 0.0
+        e1 = (/l,m,n/)
+        e2 = 0.0
+        e3 = 0.0
+        min_index = MINLOC(abs(e1),dim=1)
+        select case (min_index)
+        case (1)
+          v_0 = (/1.0, 0.0, 0.0/)
+        case (2)
+          v_0 = (/0.0, 1.0, 0.0/)
+        case (3)
+          v_0 = (/0.0, 0.0, 1.0/)
+        end select
+        call normal_vector(v_0,e1,e2)
+        call normal_vector(e1,e2,e3)
+        r1(1,1)  =   e1(1)
+        r1(1,2)  =   e1(2)
+        r1(1,3)  =   e1(3)
+        r1(2,1)  =   e2(1)
+        r1(2,2)  =   e2(2)
+        r1(2,3)  =   e2(3)
+        r1(3,1)  =   e3(1)
+        r1(3,2)  =   e3(2)
+        r1(3,3)  =   e3(3)
+        this%rotMat(i,:,:) = r1
+        contains
+        subroutine normal_vector(A,B,C)
+            real(8):: A(3),B(3),C(3)
+            real(8) :: norm_C
+            C(1)=A(2)*B(3) - A(3)*B(2)
+            C(2)=A(3)*B(1) - A(1)*B(3)
+            C(3)=A(1)*B(2) - A(2)*B(1)
+            norm_C = sqrt(C(1)**2 + C(2)**2 + C(3)**2)
+            if (abs(norm_C - 0.0d0).gt.1e-10) then
+                C = C / norm_C
+            endif
+            return
+        end subroutine normal_vector
+    end subroutine Section_RotateMatrix
 
     subroutine Unstructured_Fake_Nodes(this)
         implicit none
@@ -134,15 +261,15 @@ module SolidBody
         enddo
         read(fileiD,*) num
         this%fake_npts = num
-        allocate(this%facke_xyz(1:this%fake_npts, 1:3))
+        allocate(this%fake_xyz0(1:this%fake_npts, 1:3))
         do i = 1,this%fake_npts
             read(fileiD,*)num,x,y,z
-            this%facke_xyz(i,1) = x
-            this%facke_xyz(i,2) = y
-            this%facke_xyz(i,3) = z
+            this%fake_xyz0(i,1) = x
+            this%fake_xyz0(i,2) = y
+            this%fake_xyz0(i,3) = z
         enddo
         close(fileiD)
-    end subroutine
+    end subroutine Unstructured_Fake_Nodes
     subroutine Unstructured_Fake_Elements(this)
         implicit none
         class(Body), intent(inout) :: this
@@ -176,14 +303,15 @@ module SolidBody
             do i=1,temp_nelmts-this%fake_nelmts
                 read(fileiD,*) buffer
             enddo
-            allocate(this%facke_ele(1:this%fake_nelmts, 1:4))
+            allocate(this%fake_ele(1:this%fake_nelmts, 1:5))
             do i = 1,this%fake_nelmts
                 read(fileiD,*)num,prop(1:4),l,m,n
-                this%facke_ele(i,1) = l
-                this%facke_ele(i,2) = m
-                this%facke_ele(i,3) = n
+                this%fake_ele(i,1) = l
+                this%fake_ele(i,2) = m
+                this%fake_ele(i,3) = n
             enddo
-            this%facke_ele(i,4) = 3
+            this%fake_ele(:,4) = 3
+            this%fake_ele(:,5) = 1
         close(fileiD)
     end subroutine Unstructured_Fake_Elements
     subroutine Structured_Fake_Nodes(this,r,dh)
@@ -201,7 +329,7 @@ module SolidBody
                 write(*, *) 'undefined body shape ', this%fake_type
                 stop
         end select
-    end subroutine
+    end subroutine Structured_Fake_Nodes
     subroutine Structured_Fake_Elements(this)
         implicit none
         class(Body), intent(inout) :: this
@@ -240,29 +368,29 @@ module SolidBody
         n_rectangle = (n_height - 2) * n_theta ! Node number on side surface (rectangle) of cylinder
         this%fake_npts = n_circle * 2 + n_rectangle ! Total node number
 
-        allocate(this%facke_xyz(1:this%fake_npts, 1:3))
+        allocate(this%fake_xyz0(1:this%fake_npts, 1:3))
     
-        ! Given node facke_xyz coordinate value
+        ! Given node fake_xyz0 coordinate value
         num = 1
-        this%facke_xyz(num,:)=0.0d0
+        this%fake_xyz0(num,:)=0.0d0
         num = num+1
         do j = 1, n_radius-1
             do i = 1, n_theta
                 theta = (i - 1) * 2.0 * pi / n_theta
                 rho = j * r / (n_radius-1)
-                this%facke_xyz(num,1) = rho * cos(theta)
-                this%facke_xyz(num,2) = rho * sin(theta)
-                this%facke_xyz(num,3) = 0.0d0
+                this%fake_xyz0(num,1) = rho * cos(theta)
+                this%fake_xyz0(num,2) = rho * sin(theta)
+                this%fake_xyz0(num,3) = 0.0d0
                 num = num+1
             end do
         enddo
         do k = 1, n_height-2
-            ztemp = real_xyzful(k+1,3)
+            ztemp = real_xyzful0(k+1,3)
             do i = 1, n_theta
                 theta = (i - 1) * 2.0 * pi / n_theta
-                this%facke_xyz(num,1) = r * cos(theta)
-                this%facke_xyz(num,2) = r * sin(theta)
-                this%facke_xyz(num,3) = ztemp
+                this%fake_xyz0(num,1) = r * cos(theta)
+                this%fake_xyz0(num,2) = r * sin(theta)
+                this%fake_xyz0(num,3) = ztemp
                 num = num+1
             end do
         end do
@@ -270,17 +398,17 @@ module SolidBody
             do i = 1, n_theta
                 theta = (i - 1) * 2.0 * pi / n_theta
                 rho = (n_radius-j)* r / (n_radius-1)
-                this%facke_xyz(num,1) = rho * cos(theta)
-                this%facke_xyz(num,2) = rho * sin(theta)
-                this%facke_xyz(num,3) = real_xyzful(real_npts,3)
+                this%fake_xyz0(num,1) = rho * cos(theta)
+                this%fake_xyz0(num,2) = rho * sin(theta)
+                this%fake_xyz0(num,3) = real_xyzful0(real_npts,3)
                 num = num+1
             end do
         enddo
-        this%facke_xyz(num,1) = 0.0d0
-        this%facke_xyz(num,2) = 0.0d0
-        this%facke_xyz(num,3) = real_xyzful(real_npts,3)
+        this%fake_xyz0(num,1) = 0.0d0
+        this%fake_xyz0(num,2) = 0.0d0
+        this%fake_xyz0(num,3) = real_xyzful0(real_npts,3)
         
-    end subroutine
+    end subroutine Cylinder_Nodes
     subroutine Cylinder_Elements(this)
         implicit none
         class(Body), intent(inout) :: this
@@ -294,56 +422,57 @@ module SolidBody
 
         n_longitude = n_height + n_radius*2 - 2 ! Node number on one longitude line (include top and bottom node)
         this%fake_nelmts = n_theta + n_theta * (n_longitude - 2 - 1) * 2 + n_theta ! Total element number
-        allocate(this%facke_ele(1:this%fake_nelmts, 1:4))
+        allocate(this%fake_ele(1:this%fake_nelmts, 1:5))
     
         
         ! Given and output triangle element number (element face normal direction outward)
         
         num = 1
         do i = 1, n_theta-1
-            this%facke_ele(num,1) = 1
-            this%facke_ele(num,2) = i+2
-            this%facke_ele(num,3) = i+1
+            this%fake_ele(num,1) = 1
+            this%fake_ele(num,2) = i+2
+            this%fake_ele(num,3) = i+1
             num = num+1 ! Element around bottom circle center
         enddo
-        this%facke_ele(num,1) = 1
-        this%facke_ele(num,2) = 2
-        this%facke_ele(num,3) = n_theta+1
+        this%fake_ele(num,1) = 1
+        this%fake_ele(num,2) = 2
+        this%fake_ele(num,3) = n_theta+1
         num = num+1 ! Element around bottom circle center
         do j = 1, n_longitude-3
             do i = 1, n_theta-1
-                this%facke_ele(num,1) = 1+((j-1)*n_theta+i)
-                this%facke_ele(num,2) = 1+((j-1)*n_theta+i+1)
-                this%facke_ele(num,3) = 1+( j   *n_theta+i)
+                this%fake_ele(num,1) = 1+((j-1)*n_theta+i)
+                this%fake_ele(num,2) = 1+((j-1)*n_theta+i+1)
+                this%fake_ele(num,3) = 1+( j   *n_theta+i)
                 num = num+1 ! Lower triangula
-                this%facke_ele(num,1) = 1+((j-1)*n_theta+i+1)
-                this%facke_ele(num,2) = 1+( j   *n_theta+i+1)
-                this%facke_ele(num,3) = 1+( j   *n_theta+i)
+                this%fake_ele(num,1) = 1+((j-1)*n_theta+i+1)
+                this%fake_ele(num,2) = 1+( j   *n_theta+i+1)
+                this%fake_ele(num,3) = 1+( j   *n_theta+i)
                 num = num+1 ! Upper triangular
             enddo
-            this%facke_ele(num,1) = 1+((j-1)*n_theta+n_theta)
-            this%facke_ele(num,2) = 1+((j-1)*n_theta+1)
-            this%facke_ele(num,3) = 1+( j   *n_theta+n_theta)
+            this%fake_ele(num,1) = 1+((j-1)*n_theta+n_theta)
+            this%fake_ele(num,2) = 1+((j-1)*n_theta+1)
+            this%fake_ele(num,3) = 1+( j   *n_theta+n_theta)
             num = num+1 ! Lower triangula
-            this%facke_ele(num,1) = 1+((j-1)*n_theta+1)
-            this%facke_ele(num,2) = 1+( j   *n_theta+1)
-            this%facke_ele(num,3) = 1+( j   *n_theta+n_theta)
+            this%fake_ele(num,1) = 1+((j-1)*n_theta+1)
+            this%fake_ele(num,2) = 1+( j   *n_theta+1)
+            this%fake_ele(num,3) = 1+( j   *n_theta+n_theta)
             num = num+1 ! Upper triangular
         enddo
         do i = 1, n_theta - 1
-            this%facke_ele(num,1) = this%fake_npts
-            this%facke_ele(num,2) = this%fake_npts-(n_theta-1-i)-2
-            this%facke_ele(num,3) = this%fake_npts-(n_theta-1-i)-1
+            this%fake_ele(num,1) = this%fake_npts
+            this%fake_ele(num,2) = this%fake_npts-(n_theta-1-i)-2
+            this%fake_ele(num,3) = this%fake_npts-(n_theta-1-i)-1
             num = num+1 ! Element around top circle center
         enddo
-            this%facke_ele(num,1) = this%fake_npts
-            this%facke_ele(num,2) = this%fake_npts-1
-            this%facke_ele(num,3) = this%fake_npts-n_theta
+            this%fake_ele(num,1) = this%fake_npts
+            this%fake_ele(num,2) = this%fake_npts-1
+            this%fake_ele(num,3) = this%fake_npts-n_theta
         num = num+1 ! Element around top circle center
 
-        this%facke_ele(:,4) = 3
+        this%fake_ele(:,4) = 3
+        this%fake_ele(:,5) = 1
 
-    end subroutine
+    end subroutine Cylinder_Elements
 
 end module SolidBody
 
@@ -371,7 +500,7 @@ end module SolidBody
 !    allocate(triDextful(1:Beam%fake_npts,1:6),biDextful(1:real_npts,1:6))
 !    triDextful(:,1:3) = 1.0d0
 !    triDextful(:,4:6) = 0.0d0
-!    call Beam_Load(triDextful,biDextful)
+!    call Beam_UpdateLoad(triDextful,biDextful)
 !    open(unit=444, file = '3.dat' )
 !     do i = 1,real_npts
 !         write(444,*)biDextful(i,1:6)
