@@ -77,69 +77,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot binary
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solidIB_field(xyzfulIB,ele,time,nND,nEL,nND_max,nEL_max,Nspan,nFish)
-    implicit none
-    integer,intent(in):: nND_max,nEL_max,nFish,Nspan(nFish)
-    integer,intent(in):: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
-    real(8),intent(in):: xyzfulIB(1:maxval(Nspan)+1,nFish,nND_max,6)
-    real(8),intent(in):: time
-    !   -------------------------------------------------------
-    integer:: i,j,iFish,Nspanpts,ElmType,off1, off2
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileName,idstr
-    integer,parameter:: idfile=100
-    !==========================================================================
-    write(fileName,'(I10)') nint(time*1d5)
-    fileName = adjustr(fileName)
-    DO  I=1,nameLen
-        if(fileName(i:i)==' ')fileName(i:i)='0'
-    END DO
-    do iFish=1,nFish
-        if(Nspan(iFish).eq.0) then
-            Nspanpts = 1
-            ElmType = ele(1,4,iFish)
-        else
-            Nspanpts = Nspan(iFish) + 1
-            ElmType = 4
-        endif
-        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBodyIB/Body'//trim(idstr)//'_'//trim(filename)//'.dat')
-        !   I. The header section.
-        write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan(iFish),', DATAPACKING=POINT, ZONETYPE='
-        if(ElmType.eq.2) then
-            write(idfile, '(A)') 'FELINESEG'
-        elseif (ElmType.eq.3) then
-            write(idfile, '(A)') 'FETRIANGLE'
-        elseif(ElmType.eq.4) then
-            write(idfile, '(A)') 'FEQUADRILATERAL'
-        endif
-        do  i=1,nND(iFish)
-            do j=1,Nspanpts
-                write(idfile, *)   xyzfulIB(j,iFish,i,1:3)
-            enddo
-        enddo
-        do  i=1,nEL(iFish)
-            if(ElmType.eq.2) then
-                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish)
-            elseif(ElmType.eq.3) then
-                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
-            else
-                do j=1,Nspan(iFish)
-                    off1 = (ele(i,1,iFish)-1) * Nspanpts + j
-                    off2 = (ele(i,2,iFish)-1) * Nspanpts + j
-                    write(idfile, *) off1, off1+1, off2+1, off2
-                enddo
-            endif
-        enddo
-        close(idfile)
-    enddo
-    !   =============================================
-    END SUBROUTINE
-
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    write structure field, tecplot binary
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_solid_span_field(xyzful,ele,time,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
     implicit none
     integer,intent(in):: nND_max,nEL_max,nFish,Nspan(nFish)

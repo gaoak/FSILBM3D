@@ -124,7 +124,6 @@
     MODULE ImmersedBoundary
         integer, allocatable:: Nspan(:)
         real(8), allocatable:: dspan(:), theta(:)
-        real(8), allocatable:: xyzfulIB_all(:,:,:),xyzfulIB(:,:,:,:)
     END MODULE
 
     MODULE OutFlowWorkspace
