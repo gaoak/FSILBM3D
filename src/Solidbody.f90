@@ -127,7 +127,8 @@ module SolidBody
                     temp(1:3) = matmul(Beam%rotMat(i,:,:), (/Beam%fake_xyz0(j,1), 0.0d0, Beam%fake_xyz0(j,3)/))
                     ! Default The fake point on the plane (Beam%fake_xyz0(j,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(real_xyzful0(i,1:3) = (0,y,0)).
                     tempdxyz(1:3) = updaterealxyzful(i,1:3) - real_xyzful0(i,1:3)
-                    Beam%fake_xyz(j,1:3) = temp(1:3)+tempdxyz(1:3)+real_xyzful0(i,1:3)
+                    Beam%fake_xyz(j,1:3) = temp(1:3)+tempdxyz(1:3)
+                    Beam%fake_xyz(j,2) = Beam%fake_xyz(j,2) + Beam%fake_xyz0(j,2)
                 endif
             enddo
         enddo
