@@ -140,19 +140,38 @@ module SolidBody
     subroutine Beam_Updatevel(updaterealvelful)
         real(8), intent(in) :: updaterealvelful(real_npts,6)
         integer :: i,j
-        
+        do j = 1,Beam%fake_npts
+            do i = 1,real_npts
+                if (Beam%fake_sec(i,j) .ne. 0) then
+                    Beam%fake_vel(j,1:6) = updaterealvelful(i,1:6)
+                endif
+            enddo
+        enddo
     end subroutine Beam_Updatevel
 
     subroutine Beam_UpdatexyzIB(updaterealxyzIBful)
         real(8), intent(in) :: updaterealxyzIBful(real_npts,6)
         integer :: i,j
-        
+        do j = 1,Beam%fake_npts
+            do i = 1,real_npts
+                if (Beam%fake_sec(i,j) .ne. 0) then
+                    Beam%fake_xyzIB(j,1:6) = updaterealxyzIBful(i,1:6)
+                endif
+            enddo
+        enddo
     end subroutine Beam_UpdatexyzIB
 
     subroutine Beam_UpdateLoad(TwoDextful)
         real(8), intent(inout):: TwoDextful(real_npts,6)
         integer :: i,j
-        
+        TwoDextful = 0.0d0
+        do j = 1,Beam%fake_npts
+            do i = 1,real_npts
+                if (Beam%fake_sec(i,j) .ne. 0) then
+                    TwoDextful(i,1:6) = TwoDextful(i,1:6) + Beam%fake_extful(j,1:6)
+                endif
+            enddo
+        enddo
     end subroutine Beam_UpdateLoad
 
     subroutine Section_RotateMatrix(this,i,l0,m0,n0,l,m,n)
