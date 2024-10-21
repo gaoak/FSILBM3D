@@ -155,7 +155,22 @@ module SolidBody
         integer :: fileiD = 111, num, i
         character(LEN=1000) :: buffer
         real(8) :: x,y,z
-        
+        open(unit=fileiD, file = fake_meshfile )
+        do i=1,10000
+            read(fileiD,*) buffer
+            buffer = trim(buffer)
+            if(buffer(1:6) .eq. '$Nodes') exit
+        enddo
+        read(fileiD,*) num
+        this%fake_npts = num
+        allocate(this%fake_xyz0(1:this%fake_npts, 1:3))
+        do i = 1,this%fake_npts
+            read(fileiD,*)num,x,y,z
+            this%fake_xyz0(i,1) = x
+            this%fake_xyz0(i,2) = y
+            this%fake_xyz0(i,3) = z
+        enddo
+        close(fileiD)
     end subroutine Unstructured_Fake_Nodes
     subroutine Unstructured_Fake_Elements(this)
         implicit none
@@ -163,7 +178,43 @@ module SolidBody
         integer :: fileiD = 111, num, i, temp_nelmts, prop(4)
         character(LEN=1000) :: buffer
         integer :: l,m,n
-        
+        open(unit=fileiD, file = fake_meshfile )
+            do i=1,10000
+                read(fileiD,*) buffer
+                buffer = trim(buffer)
+                if(buffer(1:9) .eq. '$Elements') exit
+            enddo
+            read(fileiD,*) num
+            temp_nelmts = num
+            do i = 1,temp_nelmts
+                read(fileiD,*)num,prop(1:4)
+                if((prop(1)==2) .and. (prop(2)==2) .and. (prop(3)==0)) then
+                    this%fake_nelmts = temp_nelmts-num+1
+                    exit
+                endif
+            enddo
+        close(fileiD)
+
+        open(unit=fileiD, file = fake_meshfile )
+            do i=1,10000
+                read(fileiD,*) buffer
+                buffer = trim(buffer)
+                if(buffer(1:9) .eq. '$Elements') exit
+            enddo
+            read(fileiD,*) buffer
+            do i=1,temp_nelmts-this%fake_nelmts
+                read(fileiD,*) buffer
+            enddo
+            allocate(this%fake_ele(1:this%fake_nelmts, 1:5))
+            do i = 1,this%fake_nelmts
+                read(fileiD,*)num,prop(1:4),l,m,n
+                this%fake_ele(i,1) = l
+                this%fake_ele(i,2) = m
+                this%fake_ele(i,3) = n
+            enddo
+            this%fake_ele(:,4) = 3
+            this%fake_ele(:,5) = 1
+        close(fileiD)
     end subroutine Unstructured_Fake_Elements
     subroutine Structured_Fake_Nodes(this,r,dh)
         implicit none
