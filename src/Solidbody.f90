@@ -35,12 +35,53 @@ module SolidBody
         real(8) :: realxyzful(realnodes,6)
         integer :: tp, ifunstructured
 
+        fake_meshfile = filename
+        real_npts     = realnodes
+        allocate(real_xyzful0(1:real_npts,1:6))
+        real_xyzful0   = realxyzful
+
+        if (ifunstructured.eq.0) then
+            Beam%fake_type = tp
+            call Beam_BuildStructured(r,dh)
+        elseif (ifunstructured .eq. 1) then
+            call Beam_ReadUnstructured()
+        endif
+        allocate(Beam%fake_sec(1:real_npts,Beam%fake_npts))
+        Beam%fake_sec = 0
+        call Beam_InitialSection()
+
+        allocate(Beam%fake_xyz(1:Beam%fake_npts,1:3))
+        Beam%fake_xyz=Beam%fake_xyz0
+        allocate(Beam%fake_extful(1:Beam%fake_npts,1:6))
+        Beam%fake_extful=0.0d0
+        allocate(Beam%rotMat(1:Beam%fake_npts,1:3,1:3))
+        Beam%rotMat=0.0d0
+        allocate(Beam%fake_vel(1:Beam%fake_npts, 1:6))
+        Beam%fake_vel=0.0d0
+        allocate(Beam%fake_xyzIB(1:Beam%fake_npts, 1:6))
+        Beam%fake_xyzIB=0.0d0
     end subroutine Beam_initialise
 
     subroutine Beam_InitialSection()
         implicit none
         integer :: i,j
-        
+        do j = 1,Beam%fake_npts
+            do i = 1,real_npts
+                if ( i .eq. 1) then
+                    if ( Beam%fake_xyz0(j,2) .le. ((real_xyzful0(i+1,2)+real_xyzful0(i,2))/2)) then
+                        Beam%fake_sec(i,j) = j
+                    endif
+                elseif ( i .eq. real_npts) then
+                    if ( Beam%fake_xyz0(j,2) .gt. ((real_xyzful0(i,2)+real_xyzful0(i-1,2))/2)) then
+                        Beam%fake_sec(i,j) = j
+                    endif
+                else
+                    if ( Beam%fake_xyz0(j,2) .le. ((real_xyzful0(i+1,2)+real_xyzful0(i,2))/2) .and. Beam%fake_xyz0(j,2) .gt. ((real_xyzful0(i,2)+real_xyzful0(i-1,2))/2)) then
+                        Beam%fake_sec(i,j) = j
+                    endif
+                endif
+            enddo
+        enddo
     end subroutine Beam_InitialSection
 
     subroutine Beam_BuildStructured(r,dh)
