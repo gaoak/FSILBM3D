@@ -338,12 +338,32 @@ module SolidBody
         implicit none
         class(Body), intent(inout) :: this
         real(8), intent(in) :: r,dh
-        
+        select case(this%fake_type)
+            case(1)
+                call Cylinder_Nodes(this,r,dh)
+            case(2)
+                ! call triangular_Nodes(this,r,dh)
+            case(3)
+                ! call quadrangular_Nodes(this,r,dh)
+            case default
+                write(*, *) 'undefined body shape ', this%fake_type
+                stop
+        end select
     end subroutine Structured_Fake_Nodes
     subroutine Structured_Fake_Elements(this)
         implicit none
         class(Body), intent(inout) :: this
-        
+        select case(this%fake_type)
+            case(1)
+                call Cylinder_Elements(this)
+            case(2)
+                ! call triangular_Elements(this)
+            case(3)
+                ! call quadrangular_Elements(this)
+            case default
+                write(*, *) 'undefined body shape ', this%fake_type
+                stop
+        end select
     end subroutine
     subroutine Cylinder_Nodes(this,r,dh)
         implicit none
@@ -354,7 +374,60 @@ module SolidBody
         integer :: n_height,n_theta,n_radius
         integer :: i,j,k,num
         integer :: n_circle, n_rectangle
-           
+        pi=4.0d0*datan(1.0d0)
+        n_height = real_npts
+        n_radius = floor(r/dh)+1
+        n_theta  = floor(2*pi*r/dh)
+        if (n_radius == 1) n_radius = 2
+
+        this%n_h = n_height
+        this%n_r = n_radius
+        this%n_t = n_theta
+
+        n_circle = ((n_radius-1) * n_theta) + 1 ! Node number on top(bottom) surface (circle) of cylinder
+        n_rectangle = (n_height - 2) * n_theta ! Node number on side surface (rectangle) of cylinder
+        this%fake_npts = n_circle * 2 + n_rectangle ! Total node number
+
+        allocate(this%fake_xyz0(1:this%fake_npts, 1:3))
+    
+        ! Given node fake_xyz0 coordinate value
+        num = 1
+        this%fake_xyz0(num,:)=0.0d0
+        num = num+1
+        do j = 1, n_radius-1
+            do i = 1, n_theta
+                theta = (i - 1) * 2.0 * pi / n_theta
+                rho = j * r / (n_radius-1)
+                this%fake_xyz0(num,1) = rho * cos(theta)
+                this%fake_xyz0(num,2) = rho * sin(theta)
+                this%fake_xyz0(num,3) = 0.0d0
+                num = num+1
+            end do
+        enddo
+        do k = 1, n_height-2
+            ztemp = real_xyzful0(k+1,3)
+            do i = 1, n_theta
+                theta = (i - 1) * 2.0 * pi / n_theta
+                this%fake_xyz0(num,1) = r * cos(theta)
+                this%fake_xyz0(num,2) = r * sin(theta)
+                this%fake_xyz0(num,3) = ztemp
+                num = num+1
+            end do
+        end do
+        do j = 1, n_radius-1
+            do i = 1, n_theta
+                theta = (i - 1) * 2.0 * pi / n_theta
+                rho = (n_radius-j)* r / (n_radius-1)
+                this%fake_xyz0(num,1) = rho * cos(theta)
+                this%fake_xyz0(num,2) = rho * sin(theta)
+                this%fake_xyz0(num,3) = real_xyzful0(real_npts,3)
+                num = num+1
+            end do
+        enddo
+        this%fake_xyz0(num,1) = 0.0d0
+        this%fake_xyz0(num,2) = 0.0d0
+        this%fake_xyz0(num,3) = real_xyzful0(real_npts,3)
+        
     end subroutine Cylinder_Nodes
     subroutine Cylinder_Elements(this)
         implicit none
@@ -362,6 +435,62 @@ module SolidBody
         integer :: n_height,n_theta,n_radius
         integer :: i,j,num
         integer :: n_longitude
+
+        n_height = this%n_h
+        n_radius = this%n_r
+        n_theta  = this%n_t
+
+        n_longitude = n_height + n_radius*2 - 2 ! Node number on one longitude line (include top and bottom node)
+        this%fake_nelmts = n_theta + n_theta * (n_longitude - 2 - 1) * 2 + n_theta ! Total element number
+        allocate(this%fake_ele(1:this%fake_nelmts, 1:5))
+    
+        
+        ! Given and output triangle element number (element face normal direction outward)
+        
+        num = 1
+        do i = 1, n_theta-1
+            this%fake_ele(num,1) = 1
+            this%fake_ele(num,2) = i+2
+            this%fake_ele(num,3) = i+1
+            num = num+1 ! Element around bottom circle center
+        enddo
+        this%fake_ele(num,1) = 1
+        this%fake_ele(num,2) = 2
+        this%fake_ele(num,3) = n_theta+1
+        num = num+1 ! Element around bottom circle center
+        do j = 1, n_longitude-3
+            do i = 1, n_theta-1
+                this%fake_ele(num,1) = 1+((j-1)*n_theta+i)
+                this%fake_ele(num,2) = 1+((j-1)*n_theta+i+1)
+                this%fake_ele(num,3) = 1+( j   *n_theta+i)
+                num = num+1 ! Lower triangula
+                this%fake_ele(num,1) = 1+((j-1)*n_theta+i+1)
+                this%fake_ele(num,2) = 1+( j   *n_theta+i+1)
+                this%fake_ele(num,3) = 1+( j   *n_theta+i)
+                num = num+1 ! Upper triangular
+            enddo
+            this%fake_ele(num,1) = 1+((j-1)*n_theta+n_theta)
+            this%fake_ele(num,2) = 1+((j-1)*n_theta+1)
+            this%fake_ele(num,3) = 1+( j   *n_theta+n_theta)
+            num = num+1 ! Lower triangula
+            this%fake_ele(num,1) = 1+((j-1)*n_theta+1)
+            this%fake_ele(num,2) = 1+( j   *n_theta+1)
+            this%fake_ele(num,3) = 1+( j   *n_theta+n_theta)
+            num = num+1 ! Upper triangular
+        enddo
+        do i = 1, n_theta - 1
+            this%fake_ele(num,1) = this%fake_npts
+            this%fake_ele(num,2) = this%fake_npts-(n_theta-1-i)-2
+            this%fake_ele(num,3) = this%fake_npts-(n_theta-1-i)-1
+            num = num+1 ! Element around top circle center
+        enddo
+            this%fake_ele(num,1) = this%fake_npts
+            this%fake_ele(num,2) = this%fake_npts-1
+            this%fake_ele(num,3) = this%fake_npts-n_theta
+        num = num+1 ! Element around top circle center
+
+        this%fake_ele(:,4) = 3
+        this%fake_ele(:,5) = 1
 
     end subroutine Cylinder_Elements
 
