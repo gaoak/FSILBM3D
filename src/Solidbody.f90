@@ -12,7 +12,6 @@ module SolidBody
         real(8), allocatable :: fake_xyz0(:, :)
         real(8), allocatable :: fake_xyz(:, :)
         real(8), allocatable :: fake_vel(:, :)
-        real(8), allocatable :: fake_xyzIB(:, :)
         real(8), allocatable :: fake_extful(:, :)
         integer, allocatable :: fake_ele(:, :)
         integer, allocatable :: fake_sec(:, :)
@@ -58,8 +57,6 @@ module SolidBody
         Beam%rotMat=0.0d0
         allocate(Beam%fake_vel(1:Beam%fake_npts, 1:6))
         Beam%fake_vel=0.0d0
-        allocate(Beam%fake_xyzIB(1:Beam%fake_npts, 1:6))
-        Beam%fake_xyzIB=0.0d0
     end subroutine Beam_initialise
 
     subroutine Beam_InitialSection()
@@ -97,12 +94,11 @@ module SolidBody
         call Beam%UnstrucFakEle()
     end subroutine Beam_ReadUnstructured
 
-    subroutine Beam_UpdateInfo(updaterealxyzful,updaterealvelful,updaterealxyzIBful)
+    subroutine Beam_UpdateInfo(updaterealxyzful,updaterealvelful)
         implicit none
-        real(8), intent(in) :: updaterealxyzful(real_npts,6),updaterealvelful(real_npts,6),updaterealxyzIBful(real_npts,6)
+        real(8), intent(in) :: updaterealxyzful(real_npts,6),updaterealvelful(real_npts,6)
         call Beam_Updatexyz(updaterealxyzful)
         call Beam_Updatevel(updaterealvelful)
-        call Beam_UpdatexyzIB(updaterealxyzIBful)
     end subroutine Beam_UpdateInfo
 
     subroutine Beam_Updatexyz(updaterealxyzful)
@@ -148,18 +144,6 @@ module SolidBody
             enddo
         enddo
     end subroutine Beam_Updatevel
-
-    subroutine Beam_UpdatexyzIB(updaterealxyzIBful)
-        real(8), intent(in) :: updaterealxyzIBful(real_npts,6)
-        integer :: i,j
-        do j = 1,Beam%fake_npts
-            do i = 1,real_npts
-                if (Beam%fake_sec(i,j) .ne. 0) then
-                    Beam%fake_xyzIB(j,1:6) = updaterealxyzIBful(i,1:6)
-                endif
-            enddo
-        enddo
-    end subroutine Beam_UpdatexyzIB
 
     subroutine Beam_UpdateLoad(TwoDextful)
         real(8), intent(inout):: TwoDextful(real_npts,6)
