@@ -9,19 +9,24 @@
     USE simParam
     use omp_lib
     USE ImmersedBoundary
+    USE SolidBody
     implicit none
     integer:: iND,isubstep,iFish,x,y,z,icount
     real(8), allocatable:: FishInfo(:,:)
     real(8):: Pbetatemp,CPUtime
+    integer:: fake
     logical alive
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
+    character (LEN=100):: filename1
+    filename1 = 'Cylinder.msh'
     CALL read_file()
     CALL allocate_solid_memory()
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()
     CALL write_params()
     CALL calculate_MRTM_params()
+    call Beam_initialise(filename1, nND(1), xyzful00(1:nND(1),1:6,1), 1.0d0, 1.0d0, 1, 1)
 
     allocate(FishInfo(1:3,1:nFish))
 
@@ -161,6 +166,13 @@
         enddo
         !$OMP END PARALLEL DO
         !compute force exerted on fluids
+        fake = 1
+        if (fake == 1) then
+            call Beam_UpdateInfo(xyzful_all,velful_all)
+            CALL calculate_interaction_force(zDim,yDim,xDim,Beam%fake_nelmts,Beam%fake_npts,Beam%fake_ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                        Beam%fake_xyz,Beam%fake_vel,Pbeta,ntolLBM,dtolLBM,force,Beam%fake_extful,isUniformGrid)
+            call Beam_UpdateLoad(extful_all)
+        else
         if    (iForce2Body==1)then   !Same force as flow
             if    (maxval(Nspan(:)) .eq. 0) then
                 CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
@@ -170,6 +182,7 @@
                         xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,maxval(Nspan(:)),maxval(theta(:)),maxval(dspan(:)),boundaryConditions)
             endif
         elseif(iForce2Body==2)then   !stress force
+        endif
         endif
 
         !compute volume force exerted on fluids
