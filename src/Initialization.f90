@@ -522,7 +522,6 @@
 
         iCount = iCount + nND(iFish)
     enddo
-    call initializexyzIB
     END SUBROUTINE initialize_solid
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -748,7 +747,6 @@
     write(13) nFish, nND_max
     write(13) IXref,IYref,IZref,NDref
     write(13) xyzful0,xyzful,dspful,velful,accful,extful,mss,mssful,grav
-    if(Palpha.gt.0.d0) write(13) xyzfulIB
     write(13) triad_nn,triad_ee,triad_e0
     write(13) triad_n1,triad_n2,triad_n3
     write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
@@ -773,7 +771,6 @@
     if((tmpnfish .eq. nFish) .and. (tmpND_max .eq. nND_max)) then
         read(13) IXref,IYref,IZref,NDref
         read(13) xyzful0,xyzful,dspful,velful,accful,extful,mss,mssful,grav
-        if(Palpha.gt.0.d0) read(13) xyzfulIB
         read(13) triad_nn,triad_ee,triad_e0
         read(13) triad_n1,triad_n2,triad_n3
         read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
