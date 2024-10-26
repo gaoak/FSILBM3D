@@ -330,6 +330,9 @@
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
                 CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
+                if (fake .eq. 1) then
+                    call write_solid_fake_field(Beam%fake_xyz/Lref,Beam%fake_ele,time/Tref,Beam%fake_npts,Beam%fake_nelmts,Beam%fake_npts,Beam%fake_nelmts,1)
+                endif
                 if (maxval(Nspan).ne.0) then
                     CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
                 endif
