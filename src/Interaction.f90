@@ -292,21 +292,6 @@ enddo
 !$OMP END PARALLEL DO
 
 !**************************************************************************************************
-!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-do x = 1, xDim
-    force(:,:,x,1)=0.0d0
-enddo
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-do x = 1, xDim
-    force(:,:,x,2)=0.0d0
-enddo
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-do x = 1, xDim
-    force(:,:,x,3)=0.0d0
-enddo
-!$OMP END PARALLEL DO
 !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL)
 do iEL = 1, nEL
     forceElem(:,iEL,1:3)=0.0d0

@@ -10,7 +10,7 @@
     use omp_lib
     USE ImmersedBoundary
     implicit none
-    integer:: iND,isubstep,iFish,x,y,z,icount
+    integer:: iND,isubstep,iFish,x,y,z
     real(8), allocatable:: FishInfo(:,:)
     real(8):: Pbetatemp,CPUtime
     logical alive
@@ -145,50 +145,22 @@
         enddo
         !$OMP END PARALLEL DO
 
-        !package n Fish to one
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
-        do iFish=1,nFish
-            if(iFish.eq.1)then
-                icount = 0
-            elseif(iFish.ge.2)then
-                icount = sum(nND(1:iFish-1))
-            endif
-            do iND=1,nND(iFish)
-                xyzful_all(iND+icount,1:6)  =  xyzful(iND,1:6,iFish)
-                velful_all(iND+icount,1:6)  =  velful(iND,1:6,iFish)
-                extful_all(iND+icount,1:6)  =  extful(iND,1:6,iFish)
-            enddo
-        enddo
-        !$OMP END PARALLEL DO
+        do iFish = 1,nFish
         !compute force exerted on fluids
-        if    (iForce2Body==1)then   !Same force as flow
-            if    (maxval(Nspan(:)) .eq. 0) then
-                CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)
-            else
-                CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,maxval(Nspan(:)),maxval(theta(:)),maxval(dspan(:)),boundaryConditions)
+            if    (iForce2Body==1)then   !Same force as flow
+                if    (Nspan(iFish) .eq. 0) then
+                    CALL calculate_interaction_force(zDim,yDim,xDim,nEL(iFish),nND(iFish),ele(1:nEL(iFish),1:5,iFish),dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                            xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish),Pbeta,ntolLBM,dtolLBM,force,extful(1:nND(iFish),1:6,iFish),isUniformGrid)
+                else
+                    CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL(iFish),nND(iFish),ele(1:nEL(iFish),1:5,iFish),dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                            xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish),Pbeta,ntolLBM,dtolLBM,force,extful(1:nND(iFish),1:6,iFish),isUniformGrid,Nspan(iFish),theta(iFish),dspan(iFish),boundaryConditions)
+                endif
+            elseif(iForce2Body==2)then   !stress force
             endif
-        elseif(iForce2Body==2)then   !stress force
-        endif
+        enddo !do iFish=1,nFish
 
         !compute volume force exerted on fluids
         CALL addVolumForc()
-
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
-        do iFish=1,nFish
-            if(iFish.eq.1)then
-                icount = 0
-            else
-                icount = sum(nND(1:iFish-1))
-            endif
-            do iND=1,nND(iFish)
-                xyzful(iND,1:6,iFish) = xyzful_all(iND + icount,1:6)
-                velful(iND,1:6,iFish) = velful_all(iND + icount,1:6)
-                extful(iND,1:6,iFish) = extful_all(iND+icount,1:6)
-            enddo
-        enddo
-        !$OMP END PARALLEL DO
 
         call date_and_time(VALUES=values1)
         write(*,*)'time for IBM step : ',CPUtime(values1)-CPUtime(values0)
