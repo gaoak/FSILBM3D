@@ -145,19 +145,16 @@
         enddo
         !$OMP END PARALLEL DO
 
-        do iFish = 1,nFish
+        
         !compute force exerted on fluids
-            if    (iForce2Body==1)then   !Same force as flow
-                if    (Nspan(iFish) .eq. 0) then
-                    CALL calculate_interaction_force(zDim,yDim,xDim,nEL(iFish),nND(iFish),ele(1:nEL(iFish),1:5,iFish),dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                            xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish),Pbeta,ntolLBM,dtolLBM,force,extful(1:nND(iFish),1:6,iFish),isUniformGrid)
-                else
-                    CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL(iFish),nND(iFish),ele(1:nEL(iFish),1:5,iFish),dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                            xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish),Pbeta,ntolLBM,dtolLBM,force,extful(1:nND(iFish),1:6,iFish),isUniformGrid,Nspan(iFish),theta(iFish),dspan(iFish),boundaryConditions)
-                endif
-            elseif(iForce2Body==2)then   !stress force
+        if    (iForce2Body==1)then   !Same force as flow
+            if    (maxval(Nspan) .eq. 0) then
+                CALL calculate_interaction_force()
+            else
+                CALL calculate_interaction_force_quad()
             endif
-        enddo !do iFish=1,nFish
+        elseif(iForce2Body==2)then   !stress force
+        endif
 
         !compute volume force exerted on fluids
         CALL addVolumForc()
