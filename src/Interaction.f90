@@ -145,10 +145,10 @@ SUBROUTINE calculate_interaction_force()
             do iEL=1,nEL(iFish)
                 dmaxLBM=dmaxLBM+dsqrt(sum((velElem(iEL,1:3,iFish)-velElemIB(iEL,1:3,iFish))**2))
             enddo
-            dmaxLBM=dmaxLBM/dsum
-            iterLBM=iterLBM+1
     !   ***********************************************************************************************
         enddo
+        dmaxLBM=dmaxLBM/dsum
+        iterLBM=iterLBM+1
     enddo
     !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
     !**************************************************************************************************
@@ -334,10 +334,10 @@ SUBROUTINE calculate_interaction_force_quad()
                 dmaxLBM=dmaxLBM+dsqrt(sum((velElem(s,iEL,1:3,iFish)-velElemIB(s,iEL,1:3,iFish))**2))
             enddo
         enddo
-        dmaxLBM=dmaxLBM/dsum
-        iterLBM=iterLBM+1
     !***********************************************************************************************
         enddo
+        dmaxLBM=dmaxLBM/dsum
+        iterLBM=iterLBM+1
     enddo
     !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
     !**************************************************************************************************
