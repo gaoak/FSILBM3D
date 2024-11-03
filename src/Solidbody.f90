@@ -17,6 +17,7 @@ module FakeBody
         integer, allocatable :: fake_ele(:, :)
         integer, allocatable :: fake_sec(:, :)
         real(8), allocatable :: rotMat(:, :, :)
+        real(8), allocatable :: self_rotMat(:, :, :)
     contains
         procedure :: Initialise => Beam_Initialise
         procedure :: BuildStructured => Beam_BuildStructured
@@ -24,8 +25,7 @@ module FakeBody
         procedure :: InitialSection => Beam_InitialSection
         
         procedure :: UpdateInfo => Beam_UpdateInfo
-        procedure :: Updatexyz => Beam_Updatexyz
-        procedure :: Updatevel => Beam_Updatevel
+        procedure :: Update_xyz_vel => Beam_Update_xyz_vel
         procedure :: UpdateLoad => Beam_UpdateLoad
 
         procedure :: StrucFakNod => Structured_Fake_Nodes
@@ -36,14 +36,15 @@ module FakeBody
         procedure :: UnstrucFakNod => Unstructured_Fake_Nodes
         procedure :: UnStrucFakEle => Unstructured_Fake_Elements
         procedure :: RotateMatrix => Section_RotateMatrix
+        procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
     end type Body
   contains
-    subroutine Beam_Initialise(this,FakeBeamMeshName,realnodes,realxyzful,fake_r,fake_dh,fake_tp,ifUnstructured)
+    subroutine Beam_Initialise(this,FakeBeamMeshName,realnodes,realxyzful,realXYZ,fake_r,fake_dh,fake_tp,ifUnstructured)
         implicit none
         class(Body), intent(inout) :: this
         character (LEN=100), intent(in):: FakeBeamMeshName
         integer, intent(in) :: realnodes
-        real(8), intent(in) :: realxyzful(realnodes,6)
+        real(8), intent(in) :: realxyzful(realnodes,6),realXYZ(3)
         real(8), intent(in) :: fake_r, fake_dh
         integer, intent(in) :: fake_tp, ifUnstructured
 
@@ -64,13 +65,16 @@ module FakeBody
         call this%InitialSection()
 
         allocate(this%fake_xyz(1:this%fake_npts,1:6))
-        this%fake_xyz=this%fake_xyz0
+        this%fake_xyz(:,1:3)=this%fake_xyz0(:,1:3)+realXYZ(1:3)
+        this%fake_xyz(:,4:6)=this%fake_xyz0(:,4:6)
         allocate(this%fake_vel(1:this%fake_npts,1:6))
         this%fake_vel=0.0d0
         allocate(this%fake_ext(1:this%fake_npts,1:6))
         this%fake_ext=0.0d0
         allocate(this%rotMat(1:this%fake_npts,1:3,1:3))
         this%rotMat=0.0d0
+        allocate(this%self_rotMat(1:this%fake_npts,1:3,1:3))
+        this%self_rotMat=0.0d0
     end subroutine Beam_Initialise
 
     subroutine Beam_InitialSection(this)
@@ -115,19 +119,20 @@ module FakeBody
         implicit none
         class(Body), intent(inout) :: this
         real(8), intent(in) :: updaterealxyzful(this%real_npts,6),updaterealvelful(this%real_npts,6)
-        call this%Updatexyz(updaterealxyzful)
-        call this%Updatevel(updaterealvelful)
+        call this%Update_xyz_vel(updaterealxyzful,updaterealvelful)
     end subroutine Beam_UpdateInfo
 
-    subroutine Beam_Updatexyz(this,updaterealxyzful)
+    subroutine Beam_Update_xyz_vel(this,updaterealxyzful,updaterealvelful)
         implicit none
         class(Body), intent(inout) :: this
-        real(8) :: updaterealxyzful(this%real_npts,6)
+        real(8) :: updaterealxyzful(this%real_npts,6),updaterealvelful(this%real_npts,6)
         integer :: i,j
-        real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp(3),tempdxyz(3)
+        real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
+        real(8) :: self_rot_omega(3),temp_vel(3)
         do j = 1,this%fake_npts
             do i = 1,this%real_npts
                 if (this%fake_sec(i,j) .ne. 0) then
+                    ! update xyz
                     if ( i .eq. 1) then
                         dxyz0(1:3)= this%real_xyz0(i+1,1:3)-this%real_xyz0(i,1:3)
                         dxyz(1:3) = updaterealxyzful(i+1,1:3)-updaterealxyzful(i,1:3)
@@ -142,30 +147,23 @@ module FakeBody
                     dl        = dsqrt(dxyz(1)**2+dxyz(2)**2+dxyz(3)**2)
                     xlmn0(1:3)= dxyz0(1:3)/dl0
                     xlmn(1:3) = dxyz(1:3)/dl
-                    call this%RotateMatrix(i,xlmn0(1),xlmn0(2),xlmn0(3),xlmn(1),xlmn(2),xlmn(3))
-                    temp(1:3) = matmul(this%rotMat(i,:,:), (/this%fake_xyz0(j,1), 0.0d0, this%fake_xyz0(j,3)/))
+                    call this%RotateMatrix(i,xlmn0,xlmn)
+                    temp_xyz(1:3) = matmul(this%rotMat(i,:,:), (/this%fake_xyz0(j,1), 0.0d0, this%fake_xyz0(j,3)/))
+                    call this%Self_RotateMatrix(i,updaterealxyzful(i,4),xlmn)
+                    temp_xyz(1:3) = matmul(this%self_rotMat(i,:,:), temp_xyz)
                     ! Default The fake point on the plane (this%fake_xyz0(j,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(this%real_xyz0(i,1:3) = (0,y,0)).
-                    tempdxyz(1:3) = updaterealxyzful(i,1:3) - this%real_xyz0(i,1:3)
-                    this%fake_xyz(j,1:3) = temp(1:3)+tempdxyz(1:3)
+                    temp_xyzoffset(1:3) = updaterealxyzful(i,1:3) - this%real_xyz0(i,1:3)
+                    this%fake_xyz(j,1:3) = temp_xyz(1:3)+temp_xyzoffset(1:3)
                     this%fake_xyz(j,2) = this%fake_xyz(j,2) + this%fake_xyz0(j,2)
-                endif
-            enddo
-        enddo
-    end subroutine Beam_Updatexyz
 
-    subroutine Beam_Updatevel(this,updaterealvelful)
-        implicit none
-        class(Body), intent(inout) :: this
-        real(8) :: updaterealvelful(this%real_npts,6)
-        integer :: i,j
-        do j = 1,this%fake_npts
-            do i = 1,this%real_npts
-                if (this%fake_sec(i,j) .ne. 0) then
-                    this%fake_vel(j,1:6) = updaterealvelful(i,1:6)
+                    ! update vel
+                    self_rot_omega(1:3) = updaterealvelful(i,4)*xlmn(1:3)
+                    call cross_product(self_rot_omega,temp_xyz,temp_vel)
+                    this%fake_vel(j,1:3) = temp_vel(1:3)+updaterealvelful(i,1:3)
                 endif
             enddo
         enddo
-    end subroutine Beam_Updatevel
+    end subroutine Beam_Update_xyz_vel
 
     subroutine Beam_UpdateLoad(this,updaterealextful)
         implicit none
@@ -182,7 +180,7 @@ module FakeBody
         enddo
     end subroutine Beam_UpdateLoad
 
-    subroutine Section_RotateMatrix(this,i,l0,m0,n0,l,m,n)
+    subroutine Section_RotateMatrix(this,i,lmn0,lmn)
         ! The three rotations of the standard quaternion rotation matrix are all clockwise or counterclockwise.
         ! In order to correspond to doyle's angular rotation matrix, one rotation is changed to the opposite 
         ! direction of the other two rotations, and the resulting quaternion rotation matrix is added with 
@@ -193,12 +191,12 @@ module FakeBody
         ! Third rotation in the positive (counterclockwise) direction of the X-axis
         implicit none
         class(Body), intent(inout) :: this
-        integer:: i
-        ! real(8):: l0,m0,n0,l,m,n,angle,pi
+        integer, intent(in) :: i
+        ! real(8):: lmn0(3),lmn(3),angle,pi
         ! real(8):: v_0(3),e1(3),e2(3),e3(3),r1(3,3)
         ! pi=4.0*datan(1.0d0)
-        ! v_0= (/l0,m0,n0/)
-        ! e1 = (/l,m,n/)
+        ! v_0= lmn0
+        ! e1 = lmn
         ! e2 = 0.0d0
         ! e3 = 0.0d0
         ! call angle_between_vectors(v_0,e1)
@@ -221,30 +219,18 @@ module FakeBody
         ! r1(3,3)  =   e3(3)
         ! this%rotMat(i,:,:) = r1
         ! contains
-        real(8):: l0,m0,n0,l,m,n,angle,pi
-        real(8):: v_1(3),v_2(3),lamda(0:3),nn(3),r1(3,3)
+        real(8), intent(in):: lmn0(3),lmn(3)
+        real(8):: angle,pi
+        real(8):: v_1(3),v_2(3),nn(3),r1(3,3)
         pi=4.0*datan(1.0d0)
-        v_1=(/l0,m0,n0/)
-        v_2=(/l,m,n/)
+        v_1=lmn0
+        v_2=lmn
         nn=0.0d0
-        lamda=0.0d0
         angle=0.0d0
         call angle_between_vectors(v_1,v_2)
         if (angle .gt. 1e-3) then
             call normal_vector(v_1,v_2,nn)
-            lamda(0)=cos(angle*0.5)
-            lamda(1)=nn(1)*sin(angle*0.5)
-            lamda(2)=nn(2)*sin(angle*0.5)
-            lamda(3)=nn(3)*sin(angle*0.5)
-            r1(1,1) = 2*(lamda(0)**2+lamda(1)**2)-1
-            r1(1,2) = 2*(lamda(1)*lamda(2)-lamda(0)*lamda(3))
-            r1(1,3) = 2*(lamda(1)*lamda(3)+lamda(0)*lamda(2))
-            r1(2,1) = 2*(lamda(2)*lamda(1)+lamda(0)*lamda(3))
-            r1(2,2) = 2*(lamda(0)**2+lamda(2)**2)-1
-            r1(2,3) = 2*(lamda(2)*lamda(3)-lamda(0)*lamda(1))
-            r1(3,1) = 2*(lamda(3)*lamda(1)-lamda(0)*lamda(2))
-            r1(3,2) = 2*(lamda(3)*lamda(2)+lamda(0)*lamda(1))
-            r1(3,3) = 2*(lamda(0)**2+lamda(3)**2)-1
+            call quaternion_rotate(angle,nn,r1)
         else
             r1(1,:) = (/1.0d0,0.0d0,0.0d0/)
             r1(2,:) = (/0.0d0,1.0d0,0.0d0/)
@@ -253,11 +239,10 @@ module FakeBody
         this%rotMat(i,:,:) = r1
         contains
         subroutine normal_vector(A,B,C)
+            implicit none
             real(8):: A(3),B(3),C(3)
             real(8) :: norm_C
-            C(1)=A(2)*B(3) - A(3)*B(2)
-            C(2)=A(3)*B(1) - A(1)*B(3)
-            C(3)=A(1)*B(2) - A(2)*B(1)
+            call cross_product(A,B,C)
             norm_C = sqrt(C(1)**2 + C(2)**2 + C(3)**2)
             if (abs(norm_C - 0.0d0).gt.1e-10) then
                 C = C / norm_C
@@ -265,6 +250,7 @@ module FakeBody
             return
         end subroutine normal_vector
         subroutine angle_between_vectors(A,B)
+            implicit none
             real(8) :: A(3),B(3)
             real(8) :: dot_product, magnitude1, magnitude2
             dot_product = A(1)*B(1)+A(2)*B(2)+A(3)*B(3)
@@ -274,6 +260,40 @@ module FakeBody
             return
         end subroutine angle_between_vectors
     end subroutine Section_RotateMatrix
+    subroutine Section_Self_RotateMatrix(this,i,angle,lmn)
+        implicit none
+        class(Body), intent(inout) :: this
+        real(8), intent(in):: angle,lmn(3)
+        integer, intent(in):: i
+        call quaternion_rotate(angle,lmn,this%rotMat(i,:,:))
+    end subroutine Section_Self_RotateMatrix
+    subroutine quaternion_rotate(angle,nn,r1)
+        implicit none
+        real(8), intent(in) :: angle,nn(3)
+        real(8), intent(out) :: r1(3,3)
+        real(8) :: lamda(0:3)
+        lamda(0)=cos(angle*0.5)
+        lamda(1)=nn(1)*sin(angle*0.5)
+        lamda(2)=nn(2)*sin(angle*0.5)
+        lamda(3)=nn(3)*sin(angle*0.5)
+        r1(1,1) = 2*(lamda(0)**2+lamda(1)**2)-1
+        r1(1,2) = 2*(lamda(1)*lamda(2)-lamda(0)*lamda(3))
+        r1(1,3) = 2*(lamda(1)*lamda(3)+lamda(0)*lamda(2))
+        r1(2,1) = 2*(lamda(2)*lamda(1)+lamda(0)*lamda(3))
+        r1(2,2) = 2*(lamda(0)**2+lamda(2)**2)-1
+        r1(2,3) = 2*(lamda(2)*lamda(3)-lamda(0)*lamda(1))
+        r1(3,1) = 2*(lamda(3)*lamda(1)-lamda(0)*lamda(2))
+        r1(3,2) = 2*(lamda(3)*lamda(2)+lamda(0)*lamda(1))
+        r1(3,3) = 2*(lamda(0)**2+lamda(3)**2)-1
+    end subroutine quaternion_rotate
+    subroutine cross_product(w,r,v)
+        implicit none
+        real(8), intent(in) :: w(3), r(3)
+        real(8), intent(out) :: v(3)
+        v(1) = w(2)*r(3) - w(3)*r(2)
+        v(2) = w(3)*r(1) - w(1)*r(3)
+        v(3) = w(1)*r(2) - w(2)*r(1)
+    end subroutine cross_product
 
     subroutine Unstructured_Fake_Nodes(this)
         implicit none

@@ -25,7 +25,7 @@
     CALL calculate_MRTM_params()
     do iFish = 1,nFish
         if (isFake_all(iFish) .eq. 1) then
-            call Beam(iFish)%Initialise(FakeBeamMeshName_all(iFish), nND(iFish), xyzful00(1:nND(iFish),1:6,iFish), &
+            call Beam(iFish)%Initialise(FakeBeamMeshName_all(iFish), nND(iFish), xyzful00(1:nND(iFish),1:6,iFish), XYZ(1:3,iFish), &
             fake_r_all(iFish),fake_dh_all(iFish),fake_tp_all(iFish),ifUnstructured_all(iFish))
         endif
     enddo
