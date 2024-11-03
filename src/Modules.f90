@@ -39,6 +39,7 @@
     MODULE simParam
     USE LBModel
     USE BoundCondParams
+    USE FakeBody
     integer:: npsize
     real(8), parameter:: Pi=3.141592653589793d0,eps=1.0d-5
 !   ***********************************************************************************************
@@ -113,6 +114,7 @@
     real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
     real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
 !   ***********************************************************************************************
+    type(Body), allocatable:: Beam(:)
     END MODULE simParam
 
     MODULE PartitionXDim
@@ -130,3 +132,9 @@
         real(4), allocatable:: oututmp(:,:,:),outvtmp(:,:,:),outwtmp(:,:,:)
         real(4):: offsetMoveGrid(1:3)
     END MODULE
+
+    MODULE FakeBodyspace
+        character (LEN=100), allocatable:: FakeBeamMeshName_all(:)
+        integer, allocatable:: isFake_all(:),ifUnstructured_all(:),fake_tp_all(:)
+        real(8), allocatable:: fake_r_all(:),fake_dh_all(:)
+    END MODULE 
