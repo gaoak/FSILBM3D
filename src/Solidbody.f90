@@ -2,6 +2,7 @@ MODULE FakeBodyspace
     character (LEN=100), allocatable:: FakeBeamMeshName_ful(:)
     integer, allocatable:: isFake_ful(:),ifUnstructured_ful(:),fake_tp_ful(:)
     real(8), allocatable:: fake_r_ful(:),fake_dh_ful(:)
+    integer :: Beam_nND_max,Beam_nEL_max
     integer, allocatable:: Beam_nND(:),Beam_nEL(:),Beam_ele(:,:,:)
     real(8), allocatable:: Beam_xyzful(:,:,:),Beam_velful(:,:,:),Beam_extful(:,:,:)
 END MODULE
@@ -608,8 +609,10 @@ module FakeBody
         implicit none
         integer :: nFish
         integer :: iFish
-        allocate(Beam_nND(nFish),Beam_nEL(nFish),Beam_ele(maxval(Beam%fake_nelmts),5,nFish))
-        allocate(Beam_xyzful(maxval(Beam%fake_npts),6,nFish),Beam_velful(maxval(Beam%fake_npts),6,nFish),Beam_extful(maxval(Beam%fake_npts),6,nFish))
+        Beam_nND_max = maxval(Beam%fake_npts)
+        Beam_nEL_max = maxval(Beam%fake_nelmts)
+        allocate(Beam_nND(nFish),Beam_nEL(nFish),Beam_ele(Beam_nEL_max,5,nFish))
+        allocate(Beam_xyzful(Beam_nND_max,6,nFish),Beam_velful(Beam_nND_max,6,nFish),Beam_extful(Beam_nND_max,6,nFish))
         do iFish = 1,nFish
             Beam_nND(iFish) = Beam(iFish)%fake_npts
             Beam_nEL(iFish) = Beam(iFish)%fake_nelmts
