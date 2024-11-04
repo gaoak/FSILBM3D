@@ -139,55 +139,6 @@
     !   =============================================
     END SUBROUTINE
 
-    SUBROUTINE write_solid_fake_field(xyzful,ele,time,nND,nEL,iFish)
-        implicit none
-        integer,intent(in):: iFish
-        integer,intent(in):: nND,nEL
-        integer,intent(in):: ele(nEL,5)
-        real(8),intent(in):: xyzful(nND,6)
-        real(8),intent(in):: time
-        !   -------------------------------------------------------
-        integer:: i,ElmType
-        integer,parameter::nameLen=10
-        character (LEN=nameLen):: fileName,idstr
-        integer,parameter:: idfile=100
-        !==========================================================================
-        write(fileName,'(I10)') nint(time*1d5)
-        fileName = adjustr(fileName)
-        do  I=1,nameLen
-            if(fileName(i:i)==' ')fileName(i:i)='0'
-        enddo
-    
-        ElmType = ele(nEL,4)
-
-        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
-        write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND,', E=',nEL,', DATAPACKING=POINT, ZONETYPE='
-        if(ElmType.eq.2) then
-            write(idfile, '(A)') 'FELINESEG'
-        elseif (ElmType.eq.3) then
-            write(idfile, '(A)') 'FETRIANGLE'
-        elseif(ElmType.eq.4) then
-            write(idfile, '(A)') 'FEQUADRILATERAL'
-        endif
-        do  i=1,nND
-            write(idfile, *)  xyzful(i,1:3)
-        enddo
-        do  i=1,nEL
-            if(ElmType.eq.2) then
-                write(idfile, *) ele(i,1),ele(i,2)
-            elseif(ElmType.eq.3) then
-                write(idfile, *) ele(i,1),ele(i,2),ele(i,3)
-            ! elseif(ElmType.eq.4) then
-            !     write(idfile, *) ele(i,1),ele(i,2),ele(i,3),ele(i,4)
-            else
-            endif
-        enddo
-        close(idfile)
-        !   =============================================
-        END SUBROUTINE
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write parameters for checking
 !    copyright@ RuNanHua

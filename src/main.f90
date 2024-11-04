@@ -342,7 +342,7 @@
                 CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
                 do iFish = 1,nFish
                 if (isFake_all(iFish) .eq. 1) then
-                    call write_solid_fake_field(Beam(iFish)%fake_xyz/Lref,Beam(iFish)%fake_ele,time/Tref,Beam(iFish)%fake_npts,Beam(iFish)%fake_nelmts,iFish)
+                    call Beam(iFish)%write_solid_fake_field(time,Tref,iFish)
                 endif
                 enddo
                 if (maxval(Nspan).ne.0) then

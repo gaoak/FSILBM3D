@@ -517,4 +517,54 @@ module FakeBody
 
     end subroutine Structured_Cylinder_Elements
 
+    SUBROUTINE write_solid_fake_field(this,Lref,time,Tref,iFish)
+        implicit none
+        class(Body), intent(inout) :: this
+        integer,intent(in) :: iFish
+        real(8),intent(in) :: time,Lref,Tref
+        !   -------------------------------------------------------
+        real(8):: timeTref
+        integer:: i,ElmType
+        integer,parameter::nameLen=10
+        character (LEN=nameLen):: fileName,idstr
+        integer,parameter:: idfile=100
+        !==========================================================================
+        timeTref = time/Tref
+        !==========================================================================
+        write(fileName,'(I10)') nint(timeTref*1d5)
+        fileName = adjustr(fileName)
+        do  I=1,nameLen
+            if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+    
+        ElmType = this%fake_ele(1,4)
+
+        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
+        open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
+        write(idfile, '(A)') 'variables = "x" "y" "z"'
+        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',this%fake_npts,', E=',this%fake_nelmts,', DATAPACKING=POINT, ZONETYPE='
+        if(ElmType.eq.2) then
+            write(idfile, '(A)') 'FELINESEG'
+        elseif (ElmType.eq.3) then
+            write(idfile, '(A)') 'FETRIANGLE'
+        elseif(ElmType.eq.4) then
+            write(idfile, '(A)') 'FEQUADRILATERAL'
+        endif
+        do  i=1,this%fake_npts
+            write(idfile, *)  this%fake_xyz(i,1:3)/Lref
+        enddo
+        do  i=1,this%fake_nelmts
+            if(ElmType.eq.2) then
+                write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2)
+            elseif(ElmType.eq.3) then
+                write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3)
+            ! elseif(ElmType.eq.4) then
+            !     write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3),this%fake_ele(i,4)
+            else
+            endif
+        enddo
+        close(idfile)
+        !   =============================================
+        END SUBROUTINE
+
 end module FakeBody
