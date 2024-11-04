@@ -39,6 +39,8 @@ module FakeBody
         procedure :: UnStrucFakEle => Unstructured_Fake_Elements
         procedure :: RotateMatrix => Section_RotateMatrix
         procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
+
+        procedure :: write_solid_fake_field => Beam_write_solid_fake_field
     end type Body
   contains
     subroutine Beam_Initialise(this,FakeBeamMeshName,realnodes,realxyzful,realXYZ,fake_r,fake_dh,fake_tp,ifUnstructured)
@@ -49,6 +51,7 @@ module FakeBody
         real(8), intent(in) :: realxyzful(realnodes,6),realXYZ(3)
         real(8), intent(in) :: fake_r, fake_dh
         integer, intent(in) :: fake_tp, ifUnstructured
+        integer :: i
 
         this%fake_meshfile = FakeBeamMeshName
         this%real_npts     = realnodes
@@ -69,7 +72,9 @@ module FakeBody
         call this%InitialSection()
 
         allocate(this%fake_xyz(1:this%fake_npts,1:6))
-        this%fake_xyz(:,1:3)=this%fake_xyz0(:,1:3)+realXYZ(1:3)
+        do i = 1,this%fake_npts
+        this%fake_xyz(i,1:3)=this%fake_xyz0(i,1:3)+realXYZ(1:3)
+        enddo
         this%fake_xyz(:,4:6)=this%fake_xyz0(:,4:6)
         allocate(this%fake_vel(1:this%fake_npts,1:6))
         this%fake_vel=0.0d0
@@ -523,7 +528,7 @@ module FakeBody
 
     end subroutine Structured_Cylinder_Elements
 
-    SUBROUTINE write_solid_fake_field(this,Lref,time,Tref,iFish)
+    subroutine Beam_write_solid_fake_field(this,Lref,time,Tref,iFish)
         implicit none
         class(Body), intent(inout) :: this
         integer,intent(in) :: iFish
@@ -571,6 +576,6 @@ module FakeBody
         enddo
         close(idfile)
         !   =============================================
-        END SUBROUTINE
+    end subroutine
 
 end module FakeBody
