@@ -67,8 +67,7 @@
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(dspan(1:nFish),theta(1:nFish),Nspan(1:nFish))
-        allocate(Beam(1:nFish))
-        allocate(FakeBeamMeshName_all(1:nFish),isFake_all(1:nFish),ifUnstructured_all(1:nFish),fake_r_all(1:nFish),fake_dh_all(1:nFish),fake_tp_all(1:nFish))
+        allocate(FakeBeamMeshName_ful(1:nFish),isFake_ful(1:nFish),ifUnstructured_ful(1:nFish),fake_r_ful(1:nFish),fake_dh_ful(1:nFish),fake_tp_ful(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -106,12 +105,12 @@
             dspan(iFish) = ndspan
             theta(iFish) = ntheta
             Nspan(iFish) = nNspan
-            FakeBeamMeshName_all(iFish) = nFakeBeamMeshName
-            isFake_all(iFish) = nisFake
-            ifUnstructured_all(iFish) = nifUnstructured
-            fake_r_all(iFish) = nfake_r
-            fake_dh_all(iFish) = nfake_dh
-            fake_tp_all(iFish) = nfake_tp
+            FakeBeamMeshName_ful(iFish) = nFakeBeamMeshName
+            isFake_ful(iFish) = nisFake
+            ifUnstructured_ful(iFish) = nifUnstructured
+            fake_r_ful(iFish) = nfake_r
+            fake_dh_ful(iFish) = nfake_dh
+            fake_tp_ful(iFish) = nfake_tp
         enddo
     enddo
 

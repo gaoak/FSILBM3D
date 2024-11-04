@@ -1,7 +1,15 @@
+MODULE FakeBodyspace
+    character (LEN=100), allocatable:: FakeBeamMeshName_ful(:)
+    integer, allocatable:: isFake_ful(:),ifUnstructured_ful(:),fake_tp_ful(:)
+    real(8), allocatable:: fake_r_ful(:),fake_dh_ful(:)
+    integer, allocatable:: Beam_nND(:),Beam_nEL(:),Beam_ele(:,:,:)
+    real(8), allocatable:: Beam_xyzful(:,:,:),Beam_velful(:,:,:),Beam_extful(:,:,:)
+END MODULE
+
 module FakeBody
     implicit none
     private
-    public :: Body
+    public :: Body,Beam_Initial,Beam_update_package,Beam_unpackage,Beam_write_solid_fake_field
     type :: Body
         character(LEN=100) :: fake_meshfile
         integer :: real_npts
@@ -40,8 +48,9 @@ module FakeBody
         procedure :: RotateMatrix => Section_RotateMatrix
         procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
 
-        procedure :: write_solid_fake_field => Beam_write_solid_fake_field
+        procedure :: write_solid_fake_field => Beam_Output
     end type Body
+    type(Body), allocatable :: Beam(:)
   contains
     subroutine Beam_Initialise(this,FakeBeamMeshName,realnodes,realxyzful,realXYZ,fake_r,fake_dh,fake_tp,ifUnstructured)
         implicit none
@@ -73,7 +82,7 @@ module FakeBody
 
         allocate(this%fake_xyz(1:this%fake_npts,1:6))
         do i = 1,this%fake_npts
-        this%fake_xyz(i,1:3)=this%fake_xyz0(i,1:3)+realXYZ(1:3)
+            this%fake_xyz(i,1:3)=this%fake_xyz0(i,1:3)+realXYZ(1:3)
         enddo
         this%fake_xyz(:,4:6)=this%fake_xyz0(:,4:6)
         allocate(this%fake_vel(1:this%fake_npts,1:6))
@@ -528,7 +537,7 @@ module FakeBody
 
     end subroutine Structured_Cylinder_Elements
 
-    subroutine Beam_write_solid_fake_field(this,Lref,time,Tref,iFish)
+    subroutine Beam_Output(this,Lref,time,Tref,iFish)
         implicit none
         class(Body), intent(inout) :: this
         integer,intent(in) :: iFish
@@ -577,5 +586,73 @@ module FakeBody
         close(idfile)
         !   =============================================
     end subroutine
+
+    subroutine Beam_Initial(nFish,nND,xyzful00,XYZ)
+        use FakeBodyspace
+        implicit none
+        integer :: nFish
+        integer :: nND(nFish)
+        real(8) :: xyzful00(maxval(nND),6,nFish), XYZ(3,nFish)
+        integer :: iFish
+        allocate(Beam(nFish))
+        if (maxval(isFake_ful) .eq. 1) then
+            do iFish = 1,nFish
+                call Beam(iFish)%Initialise(FakeBeamMeshName_ful(iFish), nND(iFish), xyzful00(1:nND(iFish),1:6,iFish), XYZ(1:3,iFish), &
+                fake_r_ful(iFish),fake_dh_ful(iFish),fake_tp_ful(iFish),ifUnstructured_ful(iFish))
+            enddo
+            call Beam_Initial_package(nFish)
+        endif
+    end subroutine Beam_Initial
+    subroutine Beam_Initial_package(nFish)
+        use FakeBodyspace
+        implicit none
+        integer :: nFish
+        integer :: iFish
+        allocate(Beam_nND(nFish),Beam_nEL(nFish),Beam_ele(maxval(Beam%fake_nelmts),5,nFish))
+        allocate(Beam_xyzful(maxval(Beam%fake_npts),6,nFish),Beam_velful(maxval(Beam%fake_npts),6,nFish),Beam_extful(maxval(Beam%fake_npts),6,nFish))
+        do iFish = 1,nFish
+            Beam_nND(iFish) = Beam(iFish)%fake_npts
+            Beam_nEL(iFish) = Beam(iFish)%fake_nelmts
+            Beam_ele(1:Beam(iFish)%fake_nelmts,1:5,iFish) = Beam(iFish)%fake_ele
+            Beam_xyzful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_xyz
+            Beam_velful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_vel
+            Beam_extful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_ext
+        enddo
+    end subroutine Beam_Initial_package
+    subroutine Beam_update_package(nFish,nND,xyzful,velful)
+        use FakeBodyspace
+        implicit none
+        integer :: nFish,nND(nFish)
+        real(8) :: xyzful(maxval(nND),6,nFish),velful(maxval(nND),6,nFish)
+        integer :: iFish
+        do iFish = 1,nFish
+            call Beam(iFish)%UpdateInfo(xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish))
+            Beam_xyzful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_xyz
+            Beam_velful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_vel
+        enddo
+    end subroutine Beam_update_package
+    subroutine Beam_unpackage(nFish,nND,extful)
+        use FakeBodyspace
+        implicit none
+        integer :: nFish,nND(nFish)
+        real(8) :: extful(maxval(nND),6,nFish)
+        integer :: iFish
+        do iFish = 1,nFish
+            Beam(iFish)%fake_ext = Beam_extful(1:Beam(iFish)%fake_npts,1:6,iFish)
+            call Beam(iFish)%UpdateLoad(extful(1:nND(iFish),1:6,iFish))
+        enddo
+    end subroutine Beam_unpackage
+    subroutine Beam_write_solid_fake_field(nFish,Lref,time,Tref)
+        use FakeBodyspace
+        implicit none
+        integer :: nFish
+        real(8) :: Lref,time,Tref
+        integer :: iFish
+        if (maxval(isFake_ful) .eq. 1) then
+            do iFish = 1,nFish
+                call Beam(iFish)%write_solid_fake_field(Lref,time,Tref,iFish)
+            enddo
+        endif
+    end subroutine Beam_write_solid_fake_field
 
 end module FakeBody

@@ -9,6 +9,7 @@
     USE simParam
     use omp_lib
     USE ImmersedBoundary
+    USE FakeBody
     USE FakeBodyspace
     implicit none
     integer:: iND,isubstep,iFish,x,y,z,icount
@@ -23,12 +24,7 @@
     CALL calculate_LB_params()
     CALL write_params()
     CALL calculate_MRTM_params()
-    do iFish = 1,nFish
-        if (isFake_all(iFish) .eq. 1) then
-            call Beam(iFish)%Initialise(FakeBeamMeshName_all(iFish), nND(iFish), xyzful00(1:nND(iFish),1:6,iFish), XYZ(1:3,iFish), &
-            fake_r_all(iFish),fake_dh_all(iFish),fake_tp_all(iFish),ifUnstructured_all(iFish))
-        endif
-    enddo
+    call Beam_Initial(nFish,nND,xyzful00,XYZ)
 
     allocate(FishInfo(1:3,1:nFish))
 
@@ -69,11 +65,7 @@
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
     CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-    do iFish = 1,nFish
-    if (isFake_all(iFish) .eq. 1) then
-        call Beam(iFish)%write_solid_fake_field(Lref,time,Tref,iFish)
-    endif
-    enddo
+    call Beam_write_solid_fake_field(nFish,Lref,time,Tref)
     if (maxval(Nspan).ne.0) then
         CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
     endif
@@ -173,18 +165,13 @@
         enddo
         !$OMP END PARALLEL DO
         !compute force exerted on fluids
-        if (maxval(isFake_all) .eq. 1) then
-        do iFish = 1,nFish
-            if (isFake_all(iFish) .eq. 1) then
-                call Beam(iFish)%UpdateInfo(xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish))
-                CALL calculate_interaction_force(zDim,yDim,xDim,Beam(iFish)%fake_nelmts,Beam(iFish)%fake_npts,Beam(iFish)%fake_ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                            Beam(iFish)%fake_xyz,Beam(iFish)%fake_vel,Pbeta,ntolLBM,dtolLBM,force,Beam(iFish)%fake_ext,isUniformGrid)
-                call Beam(iFish)%UpdateLoad(extful(1:nND(iFish),1:6,iFish))
-            endif
-        enddo            
-        else
         if    (iForce2Body==1)then   !Same force as flow
-            if    (maxval(Nspan(:)) .eq. 0) then
+            if (maxval(isFake_ful) .eq. 1) then
+                call Beam_update_package(nFish,nND,xyzful,velful)
+                CALL calculate_interaction_force(zDim,yDim,xDim,Beam_nEL,Beam_nND,Beam_ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                            Beam_xyzful,Beam_velful,Pbeta,ntolLBM,dtolLBM,force,Beam_extful,isUniformGrid)
+                call Beam_unpackage(nFish,nND,extful)       
+            elseif    (maxval(Nspan(:)) .eq. 0) then
                 CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                         xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)
             else
@@ -192,7 +179,6 @@
                         xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,maxval(Nspan(:)),maxval(theta(:)),maxval(dspan(:)),boundaryConditions)
             endif
         elseif(iForce2Body==2)then   !stress force
-        endif
         endif
 
         !compute volume force exerted on fluids
@@ -340,11 +326,7 @@
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
                 CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-                do iFish = 1,nFish
-                if (isFake_all(iFish) .eq. 1) then
-                    call Beam(iFish)%write_solid_fake_field(Lref,time,Tref,iFish)
-                endif
-                enddo
+                call Beam_write_solid_fake_field(nFish,Lref,time,Tref)
                 if (maxval(Nspan).ne.0) then
                     CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
                 endif
