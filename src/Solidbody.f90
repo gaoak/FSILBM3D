@@ -286,7 +286,9 @@ module FakeBody
         class(Body), intent(inout) :: this
         real(8), intent(in):: angle,lmn(3)
         integer, intent(in):: i
-        call quaternion_rotate(angle,lmn,this%rotMat(i,:,:))
+        real(8):: r1(3,3)
+        call quaternion_rotate(angle,lmn,r1)
+        this%self_rotMat(i,:,:) = r1
     end subroutine Section_Self_RotateMatrix
     subroutine quaternion_rotate(angle,nn,r1)
         implicit none

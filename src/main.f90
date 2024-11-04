@@ -24,7 +24,6 @@
     CALL calculate_LB_params()
     CALL write_params()
     CALL calculate_MRTM_params()
-    call Beam_Initial(nFish,nND,xyzful00,XYZ)
 
     allocate(FishInfo(1:3,1:nFish))
 
@@ -41,6 +40,7 @@
     step=0
     CALL initialize_solid()
     CALL initialize_flow()
+    call Beam_Initial(nFish,nND,xyzful00,XYZ)
     if(ismovegrid==1)then
         iFish = 1
         call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(1:nND(iFish),1:3,iFish),xGrid,yGrid,zGrid,Xref,Yref,Zref)
@@ -168,7 +168,7 @@
         if    (iForce2Body==1)then   !Same force as flow
             if (maxval(isFake_ful) .eq. 1) then
                 call Beam_update_package(nFish,nND,xyzful,velful)
-                CALL calculate_interaction_force(zDim,yDim,xDim,Beam_nEL,Beam_nND,Beam_nEL_max,Beam_nND_max,Beam_ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                CALL calculate_interaction_force(zDim,yDim,xDim,nFish,Beam_nEL,Beam_nND,Beam_nEL_max,Beam_nND_max,Beam_ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                             Beam_xyzful,Beam_velful,Pbeta,ntolLBM,dtolLBM,force,Beam_extful,isUniformGrid)
                 call Beam_unpackage(nFish,nND,extful)       
             elseif    (maxval(Nspan(:)) .eq. 0) then
