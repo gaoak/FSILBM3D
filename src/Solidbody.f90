@@ -15,7 +15,9 @@ module FakeBody
         real(8), allocatable :: fake_vel(:, :)
         real(8), allocatable :: fake_ext(:, :)
         integer, allocatable :: fake_ele(:, :)
-        integer, allocatable :: fake_sec(:, :)
+        integer, allocatable :: faketoreal(:) !of size fake_npts
+        integer, allocatable :: realtofake(:) ! of size real_npts
+        integer, allocatable :: fakepids(:) ! of size fake_npts
         real(8), allocatable :: rotMat(:, :, :)
         real(8), allocatable :: self_rotMat(:, :, :)
     contains
@@ -60,8 +62,10 @@ module FakeBody
             call this%ReadUnstructured()
         endif
 
-        allocate(this%fake_sec(1:this%real_npts,this%fake_npts))
-        this%fake_sec = 0
+        allocate(this%faketoreal(this%fake_npts),this%realtofake(this%real_npts),this%fakepids(this%fake_npts))
+        this%faketoreal = 0
+        this%realtofake = 0
+        this%fakepids = 0
         call this%InitialSection()
 
         allocate(this%fake_xyz(1:this%fake_npts,1:6))
@@ -80,20 +84,28 @@ module FakeBody
     subroutine Beam_InitialSection(this)
         implicit none
         class(Body), intent(inout) :: this
-        integer :: i,j
-        do j = 1,this%fake_npts
-            do i = 1,this%real_npts
+        integer :: i,j,num
+        num = 1
+        do i = 1,this%real_npts
+            this%realtofake(i) = num
+            do j = 1,this%fake_npts
                 if ( i .eq. 1) then
                     if ( this%fake_xyz0(j,2) .le. ((this%real_xyz0(i+1,2)+this%real_xyz0(i,2))/2)) then
-                        this%fake_sec(i,j) = j
+                        this%faketoreal(j) = i
+                        this%fakepids(num) = j
+                        num = num + 1
                     endif
                 elseif ( i .eq. this%real_npts) then
                     if ( this%fake_xyz0(j,2) .gt. ((this%real_xyz0(i,2)+this%real_xyz0(i-1,2))/2)) then
-                        this%fake_sec(i,j) = j
+                        this%faketoreal(j) = i
+                        this%fakepids(num) = j
+                        num = num + 1
                     endif
                 else
                     if ( this%fake_xyz0(j,2) .le. ((this%real_xyz0(i+1,2)+this%real_xyz0(i,2))/2) .and. this%fake_xyz0(j,2) .gt. ((this%real_xyz0(i,2)+this%real_xyz0(i-1,2))/2)) then
-                        this%fake_sec(i,j) = j
+                        this%faketoreal(j) = i
+                        this%fakepids(num) = j
+                        num = num + 1
                     endif
                 endif
             enddo
@@ -130,8 +142,7 @@ module FakeBody
         real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
         real(8) :: self_rot_omega(3),temp_vel(3)
         do j = 1,this%fake_npts
-            do i = 1,this%real_npts
-                if (this%fake_sec(i,j) .ne. 0) then
+            i = this%faketoreal(j)
                     ! update xyz
                     if ( i .eq. 1) then
                         dxyz0(1:3)= this%real_xyz0(i+1,1:3)-this%real_xyz0(i,1:3)
@@ -160,8 +171,6 @@ module FakeBody
                     self_rot_omega(1:3) = updaterealvelful(i,4)*xlmn(1:3)
                     call cross_product(self_rot_omega,temp_xyz,temp_vel)
                     this%fake_vel(j,1:3) = temp_vel(1:3)+updaterealvelful(i,1:3)
-                endif
-            enddo
         enddo
     end subroutine Beam_Update_xyz_vel
 
@@ -172,11 +181,8 @@ module FakeBody
         integer :: i,j
         updaterealextful = 0.0d0
         do j = 1,this%fake_npts
-            do i = 1,this%real_npts
-                if (this%fake_sec(i,j) .ne. 0) then
+            i = this%faketoreal(j)
                     updaterealextful(i,1:6) = updaterealextful(i,1:6) + this%fake_ext(j,1:6)
-                endif
-            enddo
         enddo
     end subroutine Beam_UpdateLoad
 
