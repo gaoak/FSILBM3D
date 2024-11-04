@@ -672,3 +672,34 @@
             endif
         enddo
     END SUBROUTINE trimedindex
+
+    SUBROUTINE wallfriction(tau_zMin,tau_zMax,tau_yMin,tau_yMax,tau_xMin,tau_xMax)
+        USE simParam
+        implicit none
+        real(8), intent(out):: tau_zMin(yDim,xDim,1:3),tau_zMax(yDim,xDim,1:3)
+        real(8), intent(out):: tau_yMin(zDim,xDim,1:3),tau_yMax(zDim,xDim,1:3)
+        real(8), intent(out):: tau_xMin(zDim,yDim,1:3),tau_xMax(zDim,yDim,1:3)
+        integer:: x,y,z
+        real(8):: doubleinvdh
+        tau_zMin = 0.0d0
+        tau_zMax = 0.0d0
+        doubleinvdh = 1/(2*dh)
+        do y = 1,yDim
+            do x = 1,xDim
+                tau_zMin(y,x,1:3) = (uuu(3,y,x,1:3)-uuu(1,y,x,1:3))*doubleinvdh
+                tau_zMax(y,x,1:3) = (uuu(zDim,y,x,1:3)-uuu(zDim-2,y,x,1:3))*doubleinvdh
+            enddo
+        enddo
+        do z = 1,zDim
+            do x = 1,xDim
+                tau_yMin(z,x,1:3) = (uuu(z,3,x,1:3)-uuu(z,1,x,1:3))*doubleinvdh
+                tau_yMax(z,x,1:3) = (uuu(z,yDim,x,1:3)-uuu(z,yDim-2,x,1:3))*doubleinvdh
+            enddo
+        enddo
+        do z = 1,zDim
+            do y = 1,yDim
+                tau_xMin(z,y,1:3) = (uuu(z,y,3,1:3)-uuu(z,y,1,1:3))*doubleinvdh
+                tau_xMax(z,y,1:3) = (uuu(z,y,xDim,1:3)-uuu(z,y,xDim-2,1:3))*doubleinvdh
+            enddo
+        enddo
+    END SUBROUTINE wallfriction
