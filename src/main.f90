@@ -149,9 +149,11 @@
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
             if    (maxval(Nspan) .eq. 0) then
-                CALL calculate_interaction_force()
+                CALL calculate_interaction_force(zDim,yDim,xDim,nFish,nEL,nND,nEL_max,nND_max,ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                        xyzful,velful,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid)
             else
-                CALL calculate_interaction_force_quad()
+                CALL calculate_interaction_force_quad(zDim,yDim,xDim,nFish,nEL,nEL_max,nND_max,ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                        xyzful,velful,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,theta,dspan,boundaryConditions)
             endif
         elseif(iForce2Body==2)then   !stress force
         endif

@@ -73,15 +73,22 @@
 !    calculate force at element center, distribute force to three nodes
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE calculate_interaction_force()
-    USE simParam
+SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nFish,nEL,nND,nEL_max,nND_max,ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                                    xyzful,velful,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid)
     IMPLICIT NONE
+    integer,intent(in):: zDim,yDim,xDim,nFish,nEL(nFish),nND(nFish),nEL_max,nND_max,ele(nEL_max,5,nFish),ntolLBM
+    real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Pbeta
+    real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+    logical,intent(in):: isUniformGrid(1:3)
+    real(8),intent(in):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish)
+    real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
+    real(8),intent(out)::extful(nND_max,6,nFish),force(zDim,yDim,xDim,1:3)
     !==================================================================================================
     integer:: iFish
     integer:: i,j,k,iEL,nt,iterLBM
     real(8):: dmaxLBM,dsum
     real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
-    real(8):: forceElem(nEL_max,3,nFish),forceNode(nND_max,3,nFish),areaElemTemp(nEL_max,nFish)
+    real(8):: forceElem(nEL_max,3,nFish),forceNode(nND_max,3,nFish),areaElem(nEL_max,nFish)
     real(8):: posElem(nEL_max,3,nFish),velElem(nEL_max,3,nFish),velElemIB(nEL_max,3,nFish)
     !==================================================================================================
     !   compute displacement, velocity, area at surface element center
@@ -108,7 +115,7 @@ SUBROUTINE calculate_interaction_force()
                 ax =(x1-x2)
                 ay =(y1-y2)
                 az =(z1-z2)
-                areaElemTemp(iEL,iFish)=dsqrt( ax*ax + ay*ay + az*az)
+                areaElem(iEL,iFish)=dsqrt( ax*ax + ay*ay + az*az)
 
             elseif(nt==3)then
                 posElem(iEL,1:3,iFish)=(xyzful(i,1:3,iFish)+xyzful(j,1:3,iFish)+xyzful(k,1:3,iFish))/3.0d0
@@ -116,7 +123,7 @@ SUBROUTINE calculate_interaction_force()
                 ax =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0d0
                 ay =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0d0
                 az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0d0
-                areaElemTemp(iEL,iFish)=dsqrt( ax*ax + ay*ay + az*az)
+                areaElem(iEL,iFish)=dsqrt( ax*ax + ay*ay + az*az)
             else
                     write(*,*)'cell type is not defined'
             endif
@@ -138,7 +145,7 @@ SUBROUTINE calculate_interaction_force()
 
             call calculate_interaction_force_core(zDim,yDim,xDim,nEL(iFish),ele(1:nEL(iFish),1:5,iFish),dh,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
             Pbeta,force,isUniformGrid,posElem(1:nEL(iFish),1:3,iFish),velElem(1:nEL(iFish),1:3,iFish), &
-            areaElemTemp(1:nEL(iFish),iFish),forceElem(1:nEL(iFish),1:3,iFish),velElemIB(1:nEL(iFish),1:3,iFish))
+            areaElem(1:nEL(iFish),iFish),forceElem(1:nEL(iFish),1:3,iFish),velElemIB(1:nEL(iFish),1:3,iFish))
 
             dsum=dsum+Uref*nEL(iFish)
 
@@ -255,17 +262,24 @@ END SUBROUTINE
 !    symmetric body should not exceed domain
 !    the first body point should be in the domain or on the boundary
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE calculate_interaction_force_quad()
-    USE simParam
-    USE ImmersedBoundary
+SUBROUTINE calculate_interaction_force_quad(zDim,yDim,xDim,nFish,nEL,nEL_max,nND_max,ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                                            xyzful,velful,Pbeta,ntolLBM,dtolLBM,force,extful,isUniformGrid,Nspan,theta,dspan,boundaryConditions)
     use BoundCondParams
     IMPLICIT NONE
+    integer,intent(in):: zDim,yDim,xDim,nFish,nEL(nFish),nEL_max,nND_max,ele(nEL_max,5,nFish),ntolLBM,Nspan(nFish)
+    real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Pbeta,dspan(nFish),theta(nFish)
+    real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+    logical,intent(in):: isUniformGrid(1:3)
+    real(8),intent(in):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish)
+    integer,intent(in):: boundaryConditions(1:6)
+    real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
+    real(8),intent(out)::extful(nND_max,6,nFish),force(zDim,yDim,xDim,1:3)
     !==================================================================================================
     integer:: iFish
     integer:: i,j,x,s,iEL,nt,iterLBM
     real(8):: dmaxLBM,dsum
     real(8):: x1,x2,y1,y2,ax,ay
-    real(8):: forceElem(1:maxval(Nspan),nEL_max,3,nFish),areaElemTemp(nEL_max,nFish)
+    real(8):: forceElem(1:maxval(Nspan),nEL_max,3,nFish),areaElem(nEL_max,nFish)
     real(8):: posElem(1:maxval(Nspan),nEL_max,3,nFish),velElem(1:maxval(Nspan),nEL_max,3,nFish),velElemIB(1:maxval(Nspan),nEL_max,3,nFish)
     real(8)::x0(nFish),y0(nFish),z0(nFish)
     integer::i0(nFish),j0(nFish),k0(nFish)
@@ -299,7 +313,7 @@ SUBROUTINE calculate_interaction_force_quad()
             enddo
             ax =(x1-x2)
             ay =(y1-y2)
-            areaElemTemp(iEL,iFish)=dsqrt( ax*ax + ay*ay) * dspan(iFish)
+            areaElem(iEL,iFish)=dsqrt( ax*ax + ay*ay) * dspan(iFish)
         enddo
         !$OMP END PARALLEL DO
 
@@ -324,7 +338,7 @@ SUBROUTINE calculate_interaction_force_quad()
             call calculate_interaction_force_quad_core(zDim,yDim,xDim,nEL(iFish),dh,denIn,dt,uuu,den,  &
             Pbeta,force,Nspan(iFish),theta(iFish),boundaryConditions,i0(iFish),j0(iFish),k0(iFish),x0(iFish),y0(iFish),z0(iFish), &
             posElem(1:Nspan(iFish),1:nEL(iFish),1:3,iFish),velElem(1:Nspan(iFish),1:nEL(iFish),1:3,iFish), &
-            areaElemTemp(1:nEL(iFish),iFish),forceElem(1:Nspan(iFish),1:nEL(iFish),1:3,iFish),velElemIB(1:Nspan(iFish),1:nEL(iFish),1:3,iFish))
+            areaElem(1:nEL(iFish),iFish),forceElem(1:Nspan(iFish),1:nEL(iFish),1:3,iFish),velElemIB(1:Nspan(iFish),1:nEL(iFish),1:3,iFish))
 
         ! convergence test
         dsum=dsum+Uref*nEL(iFish)*Nspan(iFish)
