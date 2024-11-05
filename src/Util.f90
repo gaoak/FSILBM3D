@@ -71,6 +71,18 @@
     write(111,*)'variables= "t"  "Convergence"  '
     close(111)
 
+    open(111,file='./DatInfo/XWallFriction.plt')
+    write(111,*)'variables= "t"  "tau_xxMin"  "tau_xyMin"  "tau_xzMin"  "tau_xxMax"  "tau_xyMax"  "tau_xzMax"  '
+    close(111)
+
+    open(111,file='./DatInfo/YWallFriction.plt')
+    write(111,*)'variables= "t"  "tau_yxMin"  "tau_yyMin"  "tau_yzMin"  "tau_yxMax"  "tau_yyMax"  "tau_yzMax"  '
+    close(111)
+
+    open(111,file='./DatInfo/ZWallFriction.plt')
+    write(111,*)'variables= "t"  "tau_zxMin"  "tau_zyMin"  "tau_zzMin"  "tau_zxMax"  "tau_zyMax"  "tau_zzMax"  '
+    close(111)
+
     if(isBodyOutput==1)then
     do  i=1,numSampBody
         write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
@@ -202,6 +214,18 @@
     !                                maxval(dsqrt(velful(1:nND_max,1,1:nFish)**2+velful(1:nND_max,2,1:nFish)**2+velful(1:nND_max,3,1:nFish)**2))/Uref, &
     !                                maxval(dsqrt(accful(1:nND_max,1,1:nFish)**2+accful(1:nND_max,2,1:nFish)**2+accful(1:nND_max,3,1:nFish)**2))/Aref
     !close(111)
+
+    open(111,file='./DatInfo/XWallFriction.plt',position='append')
+    write(111,'(2E20.10)')time/Tref,tau_xMin_total(1:3),tau_xMax_total(1:3)
+    close(111)
+
+    open(111,file='./DatInfo/YWallFriction.plt',position='append')
+    write(111,'(2E20.10)')time/Tref,tau_yMin_total(1:3),tau_yMax_total(1:3)
+    close(111)
+
+    open(111,file='./DatInfo/ZWallFriction.plt',position='append')
+    write(111,'(2E20.10)')time/Tref,tau_zMin_total(1:3),tau_zMax_total(1:3)
+    close(111)
 
     if(isBodyOutput==1)then
     do  i=1,numSampBody
@@ -673,33 +697,62 @@
         enddo
     END SUBROUTINE trimedindex
 
-    SUBROUTINE wallfriction(tau_zMin,tau_zMax,tau_yMin,tau_yMax,tau_xMin,tau_xMax)
+    SUBROUTINE wallfriction()
         USE simParam
         implicit none
-        real(8), intent(out):: tau_zMin(yDim,xDim,1:3),tau_zMax(yDim,xDim,1:3)
-        real(8), intent(out):: tau_yMin(zDim,xDim,1:3),tau_yMax(zDim,xDim,1:3)
-        real(8), intent(out):: tau_xMin(zDim,yDim,1:3),tau_xMax(zDim,yDim,1:3)
         integer:: x,y,z
-        real(8):: doubleinvdh
+        real(8):: doubleinvdh,area
+        allocate(tau_zMin(yDim,xDim,1:3),tau_zMax(yDim,xDim,1:3)) 
+        allocate(tau_yMin(zDim,xDim,1:3),tau_yMax(zDim,xDim,1:3))
+        allocate(tau_xMin(zDim,yDim,1:3),tau_xMax(zDim,yDim,1:3))
         tau_zMin = 0.0d0
         tau_zMax = 0.0d0
+        tau_yMin = 0.0d0
+        tau_yMax = 0.0d0
+        tau_xMin = 0.0d0
+        tau_xMax = 0.0d0
+        tau_zMin_total = 0.0d0
+        tau_zMax_total = 0.0d0
+        tau_yMin_total = 0.0d0
+        tau_yMax_total = 0.0d0
+        tau_xMin_total = 0.0d0
+        tau_xMax_total = 0.0d0
         doubleinvdh = 1/(2*dh)
+        area = (2*dh)*(2*dh)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
         do y = 1,yDim
             do x = 1,xDim
                 tau_zMin(y,x,1:3) = (uuu(3,y,x,1:3)-uuu(1,y,x,1:3))*doubleinvdh
                 tau_zMax(y,x,1:3) = (uuu(zDim,y,x,1:3)-uuu(zDim-2,y,x,1:3))*doubleinvdh
+                tau_zMin_total(1:3) = tau_zMin_total(1:3)+tau_zMin(y,x,1:3)*area
+                tau_zMax_total(1:3) = tau_zMax_total(1:3)+tau_zMax(y,x,1:3)*area
             enddo
         enddo
+        !$OMP END PARALLEL DO
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
         do z = 1,zDim
             do x = 1,xDim
                 tau_yMin(z,x,1:3) = (uuu(z,3,x,1:3)-uuu(z,1,x,1:3))*doubleinvdh
                 tau_yMax(z,x,1:3) = (uuu(z,yDim,x,1:3)-uuu(z,yDim-2,x,1:3))*doubleinvdh
+                tau_yMin_total(1:3) = tau_yMin_total(1:3)+tau_yMin(z,x,1:3)*area
+                tau_yMax_total(1:3) = tau_yMax_total(1:3)+tau_yMax(z,x,1:3)*area
             enddo
         enddo
+        !$OMP END PARALLEL DO
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
         do z = 1,zDim
             do y = 1,yDim
                 tau_xMin(z,y,1:3) = (uuu(z,y,3,1:3)-uuu(z,y,1,1:3))*doubleinvdh
                 tau_xMax(z,y,1:3) = (uuu(z,y,xDim,1:3)-uuu(z,y,xDim-2,1:3))*doubleinvdh
+                tau_xMin_total(1:3) = tau_xMin_total(1:3)+tau_xMin(z,y,1:3)*area
+                tau_xMax_total(1:3) = tau_xMax_total(1:3)+tau_xMax(z,y,1:3)*area
             enddo
         enddo
+        !$OMP END PARALLEL DO
+        tau_zMin_total = tau_zMin_total*0.25
+        tau_zMax_total = tau_zMax_total*0.25
+        tau_yMin_total = tau_yMin_total*0.25
+        tau_yMax_total = tau_yMax_total*0.25
+        tau_xMin_total = tau_xMin_total*0.25
+        tau_xMax_total = tau_xMax_total*0.25
     END SUBROUTINE wallfriction
