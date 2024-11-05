@@ -702,9 +702,6 @@
         implicit none
         integer:: x,y,z
         real(8):: doubleinvdh,area
-        allocate(tau_zMin(yDim,xDim,1:3),tau_zMax(yDim,xDim,1:3)) 
-        allocate(tau_yMin(zDim,xDim,1:3),tau_yMax(zDim,xDim,1:3))
-        allocate(tau_xMin(zDim,yDim,1:3),tau_xMax(zDim,yDim,1:3))
         tau_zMin = 0.0d0
         tau_zMax = 0.0d0
         tau_yMin = 0.0d0

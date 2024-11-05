@@ -288,6 +288,9 @@
     allocate(edge(1:zDim,1:yDim, 1:npsize), STAT=allocatemsg)
     if(allocatemsg .ne. 0) write(*, *) 'Allocation of edge in swapx failed'
     call OMPPartition(xDim_copy, npsize_copy, partition, parindex)
+    allocate(tau_zMin(yDim,xDim,1:3),tau_zMax(yDim,xDim,1:3)) 
+    allocate(tau_yMin(zDim,xDim,1:3),tau_yMax(zDim,xDim,1:3))
+    allocate(tau_xMin(zDim,yDim,1:3),tau_xMax(zDim,yDim,1:3))
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
