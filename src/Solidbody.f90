@@ -1,13 +1,11 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    isFake_ful(:)           determine whether each solid need to be faked, 1 is do fake, 0 is undo fake
-!    ifUnstructured_ful(:)   determine whether each solid is unstructured mesh, 1 is unstructured, 0 is structured
 !    fake_tp_ful(:)          only for structured mesh, the fake body type, 1 is cylinder, 2 is triangular cylinder, 3 is quadrangular cylinder
 !    fake_r_ful(:)           only for structured mesh, the radius of fake body
 !    fake_dh_ful(:)          only for structured mesh, the mesh size along radius of fake body
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-MODULE FakeBodyspace
+MODULE BodyWorkSpace
     character (LEN=100), allocatable:: FakeBeamMeshName_ful(:)! unstructured fake mesh file
-    integer, allocatable:: isFake_ful(:),ifUnstructured_ful(:),fake_tp_ful(:)
+    integer, allocatable:: fake_tp_ful(:)
     real(8), allocatable:: fake_r_ful(:),fake_dh_ful(:)
     integer :: Beam_nND_max,Beam_nEL_max
 END MODULE
@@ -15,7 +13,8 @@ END MODULE
 module FakeBody
     implicit none
     private
-    public :: Body,Beam_Initial,Beam_write_solid_fake_field,Beam_calculate_interaction_force
+    integer:: nFish
+    public :: Body,Beam_Initial,Write_solid_body,FSInteraction_force
     type :: Body
         character(LEN=100) :: fake_meshfile
         integer :: real_npts
@@ -39,7 +38,7 @@ module FakeBody
         procedure :: BuildStructured => Beam_BuildStructured
         procedure :: ReadUnstructured => Beam_ReadUnstructured
         procedure :: InitialSection => Beam_InitialSection
-        
+
         procedure :: UpdateInfo => Beam_UpdateInfo
         procedure :: Update_xyz_vel => Beam_Update_xyz_vel
         procedure :: UpdateLoad => Beam_UpdateLoad
@@ -54,7 +53,7 @@ module FakeBody
         procedure :: RotateMatrix => Section_RotateMatrix
         procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
 
-        procedure :: write_solid_fake_field => Beam_Output
+        procedure :: write_solid_body => Beam_Output
     end type Body
     type(Body), allocatable :: Beam(:)
   contains
@@ -162,7 +161,6 @@ module FakeBody
         real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
         real(8) :: self_rot_omega(3),temp_vel(3)
         do i = 1,this%real_npts
-
             ! update rotMat and self_rotMar
             if ( i .eq. 1) then
                 dxyz0(1:3)= this%real_xyz0(i+1,1:3)-this%real_xyz0(i,1:3)
@@ -544,7 +542,7 @@ module FakeBody
 
     end subroutine Structured_Cylinder_Elements
 
-    subroutine Beam_Output(this,Lref,time,Tref,iFish)
+    subroutine Beam_Output(this,iFish,time,Lref,Tref)
         implicit none
         class(Body), intent(inout) :: this
         integer,intent(in) :: iFish
@@ -595,7 +593,7 @@ module FakeBody
     end subroutine
 
     subroutine Beam_Initial(nFish,nND,xyzful00,XYZ)
-        use FakeBodyspace
+        use BodyWorkSpace
         implicit none
         integer :: nFish
         integer :: nND(nFish)
@@ -611,20 +609,18 @@ module FakeBody
             Beam_nEL_max = maxval(Beam%fake_nelmts)
         endif
     end subroutine Beam_Initial
-    subroutine Beam_write_solid_fake_field(nFish,Lref,time,Tref)
-        use FakeBodyspace
+    subroutine Write_solid_body(time,Lref,Tref)
+        use BodyWorkSpace
         implicit none
         integer :: nFish
         real(8) :: Lref,time,Tref
         integer :: iFish
-        if (maxval(isFake_ful) .eq. 1) then
-            do iFish = 1,nFish
-                call Beam(iFish)%write_solid_fake_field(Lref,time,Tref,iFish)
-            enddo
-        endif
-    end subroutine Beam_write_solid_fake_field
+        do iFish = 1,nFish
+            call Beam(iFish)%write_solid_body(this,iFish,time,Lref,Tref) (Lref,time,Tref,iFish)
+        enddo
+    end subroutine Write_solid_body
 
-    subroutine Beam_calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+    subroutine FSInteraction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                                     Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
         implicit none
         integer,intent(in):: nFish,nND(nFish)
@@ -649,7 +645,7 @@ module FakeBody
 
     SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                                            Pbeta,ntolLBM,dtolLBM,force,isUniformGrid)
-        use FakeBodyspace
+        use BodyWorkSpace
         IMPLICIT NONE
         integer,intent(in):: zDim,yDim,xDim,nFish,ntolLBM
         real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Pbeta

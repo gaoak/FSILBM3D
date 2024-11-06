@@ -10,7 +10,7 @@
     use omp_lib
     USE ImmersedBoundary
     USE FakeBody
-    USE FakeBodyspace
+    USE BodyWorkSpace
     implicit none
     integer:: iND,isubstep,iFish,x,y,z,icount
     real(8), allocatable:: FishInfo(:,:)
@@ -65,7 +65,7 @@
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
     CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-    call Beam_write_solid_fake_field(nFish,Lref,time,Tref)
+    call Write_solid_body(nFish,Lref,time,Tref)
     if (maxval(Nspan).ne.0) then
         CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
     endif
@@ -148,37 +148,9 @@
             enddo
         enddo
         !$OMP END PARALLEL DO
-
-        !package n Fish to one
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
-        do iFish=1,nFish
-            if(iFish.eq.1)then
-                icount = 0
-            elseif(iFish.ge.2)then
-                icount = sum(nND(1:iFish-1))
-            endif
-            do iND=1,nND(iFish)
-                xyzful_all(iND+icount,1:6)  =  xyzful(iND,1:6,iFish)
-                velful_all(iND+icount,1:6)  =  velful(iND,1:6,iFish)
-                extful_all(iND+icount,1:6)  =  extful(iND,1:6,iFish)
-            enddo
-        enddo
-        !$OMP END PARALLEL DO
         !compute force exerted on fluids
-        if    (iForce2Body==1)then   !Same force as flow
-            if (maxval(isFake_ful) .eq. 1) then
-                CALL Beam_calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                            Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
-            elseif    (maxval(Nspan(:)) .eq. 0) then
-                CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)
-            else
-                CALL calculate_interaction_force_quad(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                        xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid,maxval(Nspan(:)),maxval(theta(:)),maxval(dspan(:)),boundaryConditions)
-            endif
-        elseif(iForce2Body==2)then   !stress force
-        endif
-
+        CALL FSInteraction_force(zDim,yDim,xDim,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+            Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
         !compute volume force exerted on fluids
         CALL addVolumForc()
 
@@ -324,7 +296,7 @@
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
                 CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-                call Beam_write_solid_fake_field(nFish,Lref,time,Tref)
+                call Write_solid_body(nFish,Lref,time,Tref)
                 if (maxval(Nspan).ne.0) then
                     CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
                 endif

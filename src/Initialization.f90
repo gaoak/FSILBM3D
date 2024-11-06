@@ -5,7 +5,7 @@
     SUBROUTINE read_file()
     USE simParam
     USE ImmersedBoundary
-    USE FakeBodyspace
+    USE BodyWorkSpace
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
     integer:: i,iFish,iKind,FishKind,Order0
