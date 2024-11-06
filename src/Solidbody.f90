@@ -1,5 +1,12 @@
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    isFake_ful(:)           determine whether each solid need to be faked, 1 is do fake, 0 is undo fake
+!    ifUnstructured_ful(:)   determine whether each solid is unstructured mesh, 1 is unstructured, 0 is structured
+!    fake_tp_ful(:)          only for structured mesh, the fake body type, 1 is cylinder, 2 is triangular cylinder, 3 is quadrangular cylinder
+!    fake_r_ful(:)           only for structured mesh, the radius of fake body
+!    fake_dh_ful(:)          only for structured mesh, the mesh size along radius of fake body
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 MODULE FakeBodyspace
-    character (LEN=100), allocatable:: FakeBeamMeshName_ful(:)
+    character (LEN=100), allocatable:: FakeBeamMeshName_ful(:)! unstructured fake mesh file
     integer, allocatable:: isFake_ful(:),ifUnstructured_ful(:),fake_tp_ful(:)
     real(8), allocatable:: fake_r_ful(:),fake_dh_ful(:)
     integer :: Beam_nND_max,Beam_nEL_max
@@ -153,29 +160,41 @@ module FakeBody
         implicit none
         class(Body), intent(inout) :: this
         real(8) :: updaterealxyzful(this%real_npts,6),updaterealvelful(this%real_npts,6)
-        integer :: i,j
+        integer :: i,j,index,begin,end
         real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
         real(8) :: self_rot_omega(3),temp_vel(3)
-        do j = 1,this%fake_npts
-            i = this%faketoreal(j)
+        do i = 1,this%real_npts
+
+            ! update rotMat and self_rotMar
+            if ( i .eq. 1) then
+                dxyz0(1:3)= this%real_xyz0(i+1,1:3)-this%real_xyz0(i,1:3)
+                dxyz(1:3) = updaterealxyzful(i+1,1:3)-updaterealxyzful(i,1:3)
+            elseif ( i .eq. this%real_npts) then
+                dxyz0(1:3)= this%real_xyz0(i,1:3)-this%real_xyz0(i-1,1:3)
+                dxyz(1:3) = updaterealxyzful(i,1:3)-updaterealxyzful(i-1,1:3)
+            else
+                dxyz0(1:3)= this%real_xyz0(i+1,1:3)-this%real_xyz0(i-1,1:3)
+                dxyz(1:3) = updaterealxyzful(i+1,1:3)-updaterealxyzful(i-1,1:3)
+            endif
+            dl0       = dsqrt(dxyz0(1)**2+dxyz0(2)**2+dxyz0(3)**2)
+            dl        = dsqrt(dxyz(1)**2+dxyz(2)**2+dxyz(3)**2)
+            xlmn0(1:3)= dxyz0(1:3)/dl0
+            xlmn(1:3) = dxyz(1:3)/dl
+            call this%RotateMatrix(i,xlmn0,xlmn)
+            call this%Self_RotateMatrix(i,updaterealxyzful(i,4),xlmn)
+
+            if (i .eq. this%real_npts) then
+                begin = this%realtofake(i)
+                end = this%fake_npts
+            else
+                begin = this%realtofake(i)
+                end = this%realtofake(i+1)-1
+            endif
+
+            do index = begin,end
+                j = this%fakepids(index)
                     ! update xyz
-                    if ( i .eq. 1) then
-                        dxyz0(1:3)= this%real_xyz0(i+1,1:3)-this%real_xyz0(i,1:3)
-                        dxyz(1:3) = updaterealxyzful(i+1,1:3)-updaterealxyzful(i,1:3)
-                    elseif ( i .eq. this%real_npts) then
-                        dxyz0(1:3)= this%real_xyz0(i,1:3)-this%real_xyz0(i-1,1:3)
-                        dxyz(1:3) = updaterealxyzful(i,1:3)-updaterealxyzful(i-1,1:3)
-                    else
-                        dxyz0(1:3)= this%real_xyz0(i+1,1:3)-this%real_xyz0(i-1,1:3)
-                        dxyz(1:3) = updaterealxyzful(i+1,1:3)-updaterealxyzful(i-1,1:3)
-                    endif
-                    dl0       = dsqrt(dxyz0(1)**2+dxyz0(2)**2+dxyz0(3)**2)
-                    dl        = dsqrt(dxyz(1)**2+dxyz(2)**2+dxyz(3)**2)
-                    xlmn0(1:3)= dxyz0(1:3)/dl0
-                    xlmn(1:3) = dxyz(1:3)/dl
-                    call this%RotateMatrix(i,xlmn0,xlmn)
                     temp_xyz(1:3) = matmul(this%rotMat(i,:,:), (/this%fake_xyz0(j,1), 0.0d0, this%fake_xyz0(j,3)/))
-                    call this%Self_RotateMatrix(i,updaterealxyzful(i,4),xlmn)
                     temp_xyz(1:3) = matmul(this%self_rotMat(i,:,:), temp_xyz)
                     ! Default The fake point on the plane (this%fake_xyz0(j,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(this%real_xyz0(i,1:3) = (0,y,0)).
                     temp_xyzoffset(1:3) = updaterealxyzful(i,1:3) - this%real_xyz0(i,1:3)
@@ -186,6 +205,7 @@ module FakeBody
                     self_rot_omega(1:3) = updaterealvelful(i,4)*xlmn(1:3)
                     call cross_product(self_rot_omega,temp_xyz,temp_vel)
                     this%fake_vel(j,1:3) = temp_vel(1:3)+updaterealvelful(i,1:3)
+            enddo
         enddo
     end subroutine Beam_Update_xyz_vel
 
@@ -202,14 +222,6 @@ module FakeBody
     end subroutine Beam_UpdateLoad
 
     subroutine Section_RotateMatrix(this,i,lmn0,lmn)
-        ! The three rotations of the standard quaternion rotation matrix are all clockwise or counterclockwise.
-        ! In order to correspond to doyle's angular rotation matrix, one rotation is changed to the opposite 
-        ! direction of the other two rotations, and the resulting quaternion rotation matrix is added with 
-        ! a negative sign in the non-diagonal position.
-        
-        ! First rotation in the positive (counterclockwise) direction of the Z-axis
-        ! Second rotation in the negative (clockwise) direction of the Y-axis
-        ! Third rotation in the positive (counterclockwise) direction of the X-axis
         implicit none
         class(Body), intent(inout) :: this
         integer, intent(in) :: i
@@ -249,14 +261,8 @@ module FakeBody
         nn=0.0d0
         angle=0.0d0
         call angle_between_vectors(v_1,v_2)
-        if (angle .gt. 1e-3) then
-            call normal_vector(v_1,v_2,nn)
-            call quaternion_rotate(angle,nn,r1)
-        else
-            r1(1,:) = (/1.0d0,0.0d0,0.0d0/)
-            r1(2,:) = (/0.0d0,1.0d0,0.0d0/)
-            r1(3,:) = (/0.0d0,0.0d0,1.0d0/)
-        endif
+        call normal_vector(v_1,v_2,nn)
+        call quaternion_rotate(angle,nn,r1)
         this%rotMat(i,:,:) = r1
         contains
         subroutine normal_vector(A,B,C)
