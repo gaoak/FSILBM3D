@@ -167,10 +167,8 @@
         !compute force exerted on fluids
         if    (iForce2Body==1)then   !Same force as flow
             if (maxval(isFake_ful) .eq. 1) then
-                call Beam_update_package(nFish,nND,xyzful,velful)
-                CALL calculate_interaction_force(zDim,yDim,xDim,nFish,Beam_nEL,Beam_nND,Beam_nEL_max,Beam_nND_max,Beam_ele,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                            Beam_xyzful,Beam_velful,Pbeta,ntolLBM,dtolLBM,force,Beam_extful,isUniformGrid)
-                call Beam_unpackage(nFish,nND,extful)       
+                CALL Beam_calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                            Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
             elseif    (maxval(Nspan(:)) .eq. 0) then
                 CALL calculate_interaction_force(zDim,yDim,xDim,nEL_all,nND_all,ele_all,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
                         xyzful_all,velful_all,Pbeta,ntolLBM,dtolLBM,force,extful_all,isUniformGrid)

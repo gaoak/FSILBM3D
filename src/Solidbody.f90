@@ -10,14 +10,12 @@ MODULE FakeBodyspace
     integer, allocatable:: isFake_ful(:),ifUnstructured_ful(:),fake_tp_ful(:)
     real(8), allocatable:: fake_r_ful(:),fake_dh_ful(:)
     integer :: Beam_nND_max,Beam_nEL_max
-    integer, allocatable:: Beam_nND(:),Beam_nEL(:),Beam_ele(:,:,:)
-    real(8), allocatable:: Beam_xyzful(:,:,:),Beam_velful(:,:,:),Beam_extful(:,:,:)
 END MODULE
 
 module FakeBody
     implicit none
     private
-    public :: Body,Beam_Initial,Beam_update_package,Beam_unpackage,Beam_write_solid_fake_field
+    public :: Body,Beam_Initial,Beam_write_solid_fake_field,Beam_calculate_interaction_force
     type :: Body
         character(LEN=100) :: fake_meshfile
         integer :: real_npts
@@ -607,52 +605,12 @@ module FakeBody
         if (maxval(isFake_ful) .eq. 1) then
             do iFish = 1,nFish
                 call Beam(iFish)%Initialise(FakeBeamMeshName_ful(iFish), nND(iFish), xyzful00(1:nND(iFish),1:6,iFish), XYZ(1:3,iFish), &
-                fake_r_ful(iFish),fake_dh_ful(iFish),fake_tp_ful(iFish),ifUnstructured_ful(iFish))
+                                            fake_r_ful(iFish),fake_dh_ful(iFish),fake_tp_ful(iFish),ifUnstructured_ful(iFish))
             enddo
-            call Beam_Initial_package(nFish)
+            Beam_nND_max = maxval(Beam%fake_npts)
+            Beam_nEL_max = maxval(Beam%fake_nelmts)
         endif
     end subroutine Beam_Initial
-    subroutine Beam_Initial_package(nFish)
-        use FakeBodyspace
-        implicit none
-        integer :: nFish
-        integer :: iFish
-        Beam_nND_max = maxval(Beam%fake_npts)
-        Beam_nEL_max = maxval(Beam%fake_nelmts)
-        allocate(Beam_nND(nFish),Beam_nEL(nFish),Beam_ele(Beam_nEL_max,5,nFish))
-        allocate(Beam_xyzful(Beam_nND_max,6,nFish),Beam_velful(Beam_nND_max,6,nFish),Beam_extful(Beam_nND_max,6,nFish))
-        do iFish = 1,nFish
-            Beam_nND(iFish) = Beam(iFish)%fake_npts
-            Beam_nEL(iFish) = Beam(iFish)%fake_nelmts
-            Beam_ele(1:Beam(iFish)%fake_nelmts,1:5,iFish) = Beam(iFish)%fake_ele
-            Beam_xyzful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_xyz
-            Beam_velful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_vel
-            Beam_extful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_ext
-        enddo
-    end subroutine Beam_Initial_package
-    subroutine Beam_update_package(nFish,nND,xyzful,velful)
-        use FakeBodyspace
-        implicit none
-        integer :: nFish,nND(nFish)
-        real(8) :: xyzful(maxval(nND),6,nFish),velful(maxval(nND),6,nFish)
-        integer :: iFish
-        do iFish = 1,nFish
-            call Beam(iFish)%UpdateInfo(xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish))
-            Beam_xyzful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_xyz
-            Beam_velful(1:Beam(iFish)%fake_npts,1:6,iFish) = Beam(iFish)%fake_vel
-        enddo
-    end subroutine Beam_update_package
-    subroutine Beam_unpackage(nFish,nND,extful)
-        use FakeBodyspace
-        implicit none
-        integer :: nFish,nND(nFish)
-        real(8) :: extful(maxval(nND),6,nFish)
-        integer :: iFish
-        do iFish = 1,nFish
-            Beam(iFish)%fake_ext = Beam_extful(1:Beam(iFish)%fake_npts,1:6,iFish)
-            call Beam(iFish)%UpdateLoad(extful(1:nND(iFish),1:6,iFish))
-        enddo
-    end subroutine Beam_unpackage
     subroutine Beam_write_solid_fake_field(nFish,Lref,time,Tref)
         use FakeBodyspace
         implicit none
@@ -665,5 +623,243 @@ module FakeBody
             enddo
         endif
     end subroutine Beam_write_solid_fake_field
+
+    subroutine Beam_calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                                    Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
+        implicit none
+        integer,intent(in):: nFish,nND(nFish)
+        real(8),intent(in):: xyzful(maxval(nND),6,nFish),velful(maxval(nND),6,nFish)
+        real(8),intent(out):: extful(maxval(nND),6,nFish)
+        integer,intent(in):: zDim,yDim,xDim,ntolLBM
+        real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Pbeta
+        real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+        logical,intent(in):: isUniformGrid(1:3)
+        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
+        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
+        integer :: iFish
+        do iFish = 1,nFish
+            call Beam(iFish)%UpdateInfo(xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish))
+        enddo
+        call calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                                         Pbeta,ntolLBM,dtolLBM,force,isUniformGrid)
+        do iFish = 1,nFish
+            call Beam(iFish)%UpdateLoad(extful(1:nND(iFish),1:6,iFish))
+        enddo
+    end subroutine
+
+    SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                                           Pbeta,ntolLBM,dtolLBM,force,isUniformGrid)
+        use FakeBodyspace
+        IMPLICIT NONE
+        integer,intent(in):: zDim,yDim,xDim,nFish,ntolLBM
+        real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Pbeta
+        real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+        logical,intent(in):: isUniformGrid(1:3)
+        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
+        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
+        !==================================================================================================
+        integer:: iFish
+        integer:: i,j,k,iEL,nt,iterLBM
+        real(8):: dmaxLBM,dsum
+        real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+        real(8):: forceElem(Beam_nEL_max,3,nFish),forceNode(Beam_nND_max,3,nFish),areaElem(Beam_nEL_max,nFish)
+        real(8):: posElem(Beam_nEL_max,3,nFish),velElem(Beam_nEL_max,3,nFish),velElemIB(Beam_nEL_max,3,nFish)
+        !==================================================================================================
+        !   compute displacement, velocity, area at surface element center
+        do iFish=1,nFish
+            do  iEL=1,Beam(iFish)%fake_nelmts
+                i=Beam(iFish)%fake_ele(iEL,1)
+                j=Beam(iFish)%fake_ele(iEL,2)
+                k=Beam(iFish)%fake_ele(iEL,3)
+                nt=Beam(iFish)%fake_ele(iEL,4)
+
+                x1=Beam(iFish)%fake_xyz(i,1)
+                x2=Beam(iFish)%fake_xyz(j,1)
+                x3=Beam(iFish)%fake_xyz(k,1)
+                y1=Beam(iFish)%fake_xyz(i,2)
+                y2=Beam(iFish)%fake_xyz(j,2)
+                y3=Beam(iFish)%fake_xyz(k,2)
+                z1=Beam(iFish)%fake_xyz(i,3)
+                z2=Beam(iFish)%fake_xyz(j,3)
+                z3=Beam(iFish)%fake_xyz(k,3)
+
+                if(nt==2)then
+                    posElem(iEL,1:3,iFish)=(Beam(iFish)%fake_xyz(i,1:3)+Beam(iFish)%fake_xyz(j,1:3))/2.0d0
+                    velElem(iEL,1:3,iFish)=(Beam(iFish)%fake_vel(i,1:3)+Beam(iFish)%fake_vel(j,1:3))/2.0d0
+                    ax =(x1-x2)
+                    ay =(y1-y2)
+                    az =(z1-z2)
+                    areaElem(iEL,iFish)=dsqrt( ax*ax + ay*ay + az*az)
+
+                elseif(nt==3)then
+                    posElem(iEL,1:3,iFish)=(Beam(iFish)%fake_xyz(i,1:3)+Beam(iFish)%fake_xyz(j,1:3)+Beam(iFish)%fake_xyz(k,1:3))/3.0d0
+                    velElem(iEL,1:3,iFish)=(Beam(iFish)%fake_vel(i,1:3)+Beam(iFish)%fake_vel(j,1:3)+Beam(iFish)%fake_vel(k,1:3))/3.0d0
+                    ax =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0d0
+                    ay =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0d0
+                    az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0d0
+                    areaElem(iEL,iFish)=dsqrt( ax*ax + ay*ay + az*az)
+                else
+                        write(*,*)'cell type is not defined'
+                endif
+            enddo
+        enddo
+
+        !**************************************************************************************************
+        !**************************************************************************************************
+        forceElem(1:Beam_nEL_max,1:3,1:nFish)=0.0d0
+        dmaxLBM=1.0d0
+        iterLBM=0
+        !   ***********************************************************************************************
+        do  while( iterLBM<ntolLBM .and. dmaxLBM>dtolLBM)
+
+            dmaxLBM=0.0d0
+            dsum=0.0d0
+
+            do iFish=1,nFish
+
+                call calculate_interaction_force_core(zDim,yDim,xDim,Beam(iFish)%fake_nelmts,Beam(iFish)%fake_ele,dh,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                Pbeta,force,isUniformGrid,posElem(1:Beam(iFish)%fake_nelmts,1:3,iFish),velElem(1:Beam(iFish)%fake_nelmts,1:3,iFish), &
+                areaElem(1:Beam(iFish)%fake_nelmts,iFish),forceElem(1:Beam(iFish)%fake_nelmts,1:3,iFish),velElemIB(1:Beam(iFish)%fake_nelmts,1:3,iFish))
+
+                dsum=dsum+Uref*Beam(iFish)%fake_nelmts
+
+                do iEL=1,Beam(iFish)%fake_nelmts
+                    dmaxLBM=dmaxLBM+dsqrt(sum((velElem(iEL,1:3,iFish)-velElemIB(iEL,1:3,iFish))**2))
+                enddo
+        !   ***********************************************************************************************
+            enddo
+            dmaxLBM=dmaxLBM/dsum
+            iterLBM=iterLBM+1
+        enddo
+        !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
+        !**************************************************************************************************
+        !**************************************************************************************************
+        !   element force to nodal force
+        forceNode(1:Beam_nND_max,1:3,1:nFish)=0.0d0
+        do iFish=1,nFish
+            Beam(iFish)%fake_ext(1:Beam(iFish)%fake_npts,1:6)=0.0d0
+            do    iEL=1,Beam(iFish)%fake_nelmts
+                i=Beam(iFish)%fake_ele(iEL,1)
+                j=Beam(iFish)%fake_ele(iEL,2)
+                k=Beam(iFish)%fake_ele(iEL,3)
+                nt=Beam(iFish)%fake_ele(iEL,4)
+                forceNode(i,1:3,iFish)=forceNode(i,1:3,iFish)+forceElem(iEL,1:3,iFish)/3.0d0
+                forceNode(j,1:3,iFish)=forceNode(j,1:3,iFish)+forceElem(iEL,1:3,iFish)/3.0d0
+                forceNode(k,1:3,iFish)=forceNode(k,1:3,iFish)+forceElem(iEL,1:3,iFish)/3.0d0
+            enddo
+            Beam(iFish)%fake_ext(1:Beam(iFish)%fake_npts,1:3) = forceNode(1:Beam(iFish)%fake_npts,1:3,iFish)
+            Beam(iFish)%fake_ext(1:Beam(iFish)%fake_npts,4:6) = 0.0d0
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE calculate_interaction_force_core(zDim,yDim,xDim,nEL,ele,dh,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
+                                                Pbeta,force,isUniformGrid,posElem,velElem,areaElem,forceElem,velElemIB)
+        USE, INTRINSIC :: IEEE_ARITHMETIC
+        IMPLICIT NONE
+        integer,intent(in):: zDim,yDim,xDim,nEL,ele(nEL,5)
+        real(8),intent(in):: dh,denIn,dt,Pbeta
+        real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+        logical,intent(in):: isUniformGrid(1:3)
+        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
+        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
+        !==================================================================================================
+        real(8),intent(in):: posElem(nEL,3),velElem(nEL,3)
+        real(8),intent(in):: areaElem(nEL)
+        real(8),intent(inout)::forceElem(nEL,3)
+        real(8),intent(out)::velElemIB(nEL,3)
+        !==================================================================================================
+        integer:: i,j,k,x,y,z,iEL
+        real(8):: rx,ry,rz,Phi,invdh,forcetemp(1:3)
+        real(8):: forceElemTemp(nEL,3)
+        !==================================================================================================
+        !   compute velocity and displacement at IB nodes
+        invdh = 1.D0/dh
+        !   ***********************************************************************************************
+        !   compute the velocity of IB nodes at element center
+        do  iEL=1,nEL
+            call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
+            call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
+            call my_minloc(posElem(iEL,3), zGrid, zDim, isUniformGrid(3), k)
+            velElemIB(iEL,1:3)=0.0d0
+            do x=-1+i,2+i
+                rx=Phi((posElem(iEL,1)-xGrid(x))*invdh)
+                do y=-1+j,2+j
+                    ry=Phi((posElem(iEL,2)-yGrid(y))*invdh)
+                    do z=-1+k,2+k
+                        rz=Phi((posElem(iEL,3)-zGrid(z))*invdh)
+                        velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(z,y,x,1:3)*rx*ry*rz
+                    enddo
+                enddo
+            enddo
+        enddo
+        !   ***********************************************************************************************
+        !   calculate interaction force
+        do  iEL=1,nEL
+            if(ele(iEL,4)==3) then
+                forceElemTemp(iEL,1:3) = -Pbeta* 2.0d0*denIn*(velElem(iEL,1:3)-velElemIB(iEL,1:3))/dt*areaElem(iEL)*dh
+            else
+                forceElemTemp(iEL,1:3) = 0.0d0
+            endif
+            if ((.not. IEEE_IS_FINITE(forceElemTemp(iEL,1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,3)))) then
+                write(*, *) 'Nan found in forceElemTemp', forceElemTemp
+                stop
+            endif
+        enddo
+        !   ***********************************************************************************************
+        !   calculate Eulerian body force
+        do    iEL=1,nEL
+            call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
+            call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
+            call my_minloc(posElem(iEL,3), zGrid, zDim, isUniformGrid(3), k)
+            do x=-1+i,2+i
+                rx=Phi((posElem(iEL,1)-xGrid(x))*invdh)
+                do y=-1+j,2+j
+                    ry=Phi((posElem(iEL,2)-yGrid(y))*invdh)
+                    do z=-1+k,2+k
+                        rz=Phi((posElem(iEL,3)-zGrid(z))*invdh)
+                        forcetemp(1:3) = -forceElemTemp(iEL,1:3)*rx*ry*rz*invdh*invdh*invdh
+                        ! update velocity
+                        uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5d0*dt*forceTemp(1:3)/den(z,y,x)
+                        force(z,y,x,1:3)=force(z,y,x,1:3) + forcetemp(1:3)
+                    enddo
+                enddo
+            enddo
+        enddo
+        forceElem(1:nEL,1:3) = forceElem(1:nEL,1:3)+forceElemTemp(1:nEL,1:3)
+    END SUBROUTINE
+    SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
+        implicit none
+        integer:: len, index, count, step, it
+        real(8):: x, array(len)
+        logical:: uniform
+        if (.not.uniform) then
+            if (x<array(1) .or. x>array(len)) then
+                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                stop
+            endif
+            index = 1
+            count = len
+            do while(count > 0)
+                step = count / 2
+                it = index + step
+                if (array(it) < x) then
+                    index = it + 1
+                    count = count - (step + 1)
+                else
+                    count = step
+                endif
+            enddo
+            if (array(index)>x) then
+                index = index - 1
+            endif
+        else
+            index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
+            !int -1.1 -> -1; 1.1->1; 1.9->1
+            if (index<1 .or. index>len) then
+                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                stop
+            endif
+        endif
+    END SUBROUTINE
 
 end module FakeBody
