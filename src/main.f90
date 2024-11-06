@@ -12,7 +12,7 @@
     USE FakeBody
     USE BodyWorkSpace
     implicit none
-    integer:: iND,isubstep,iFish,x,y,z,icount
+    integer:: iND,isubstep,iFish,x,y,z
     real(8), allocatable:: FishInfo(:,:)
     real(8):: Pbetatemp,CPUtime
     logical alive
@@ -153,21 +153,6 @@
             Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
         !compute volume force exerted on fluids
         CALL addVolumForc()
-
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,icount,iFish)
-        do iFish=1,nFish
-            if(iFish.eq.1)then
-                icount = 0
-            else
-                icount = sum(nND(1:iFish-1))
-            endif
-            do iND=1,nND(iFish)
-                xyzful(iND,1:6,iFish) = xyzful_all(iND + icount,1:6)
-                velful(iND,1:6,iFish) = velful_all(iND + icount,1:6)
-                extful(iND,1:6,iFish) = extful_all(iND+icount,1:6)
-            enddo
-        enddo
-        !$OMP END PARALLEL DO
 
         call date_and_time(VALUES=values1)
         write(*,*)'time for IBM step : ',CPUtime(values1)-CPUtime(values0)

@@ -98,11 +98,9 @@
     real(8), allocatable:: AoA(:,:),AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:),AoAd(:,:),WWW1(:,:),WWW2(:,:),WWW3(:,:)
     real(8), allocatable:: TTT00(:,:,:),TTT0(:,:,:),TTTnow(:,:,:),TTTnxt(:,:,:)
 !   ***********************************************************************************************
-    integer:: nFish,nEL_all,nND_all,nND_max,nEL_max,nMT_max,nEQ_max,NDref
-    integer,allocatable:: ele_all(:,:)
+    integer:: nFish,nND_max,nEL_max,nMT_max,nEQ_max,NDref
     integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:)
     integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:),isMotionGiven(:,:)
-    real(8), allocatable:: xyzful_all(:,:),velful_all(:,:),extful_all(:,:)
 !   ===============================================================================================
     integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
     real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)

@@ -312,7 +312,7 @@
     USE simParam
     USE ImmersedBoundary
     implicit none
-    integer:: iEL,iND,iFish,maxN
+    integer:: iND,iFish,maxN
     real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:),lentemp(:)
     if(nFish==0) return
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
@@ -333,11 +333,7 @@
     nEQ_max=nND_max*6
     nEQ(:)=nND(:)*6
 
-    nEL_all = sum(nEL(:))
-    nND_all = sum(nND(:))
-
 !   ===============================================================================================
-    allocate( ele_all(nEL_all,5),xyzful_all(nND_all,6),velful_all(nND_all,6),extful_all(nND_all,6))
 
     allocate( ele(nEL_max,5,1:nFish),xyzful00(nND_max,6,1:nFish),xyzful0(nND_max,6,1:nFish),mssful(nND_max,6,1:nFish),lodful(nND_max,6,1:nFish), &
               extful(nND_max,6,1:nFish),repful(nND_max,1:6,1:nFish),extful1(nND_max,6,1:nFish),extful2(nND_max,6,1:nFish),nloc(nND_max*6,1:nFish),nprof(nND_max*6,1:nFish), &
@@ -369,21 +365,6 @@
         stop
     endif
     write(*,*)'read FEMeshFile ',iFish,' end'
-    enddo
-!    ===============================================================================================
-!    package
-    do iFish=1,nFish
-        if(iFish.eq.1)then
-            do iEL=1,nEL(iFish)
-                ele_all(iEL,1:3)=ele(iEL,1:3,iFish)
-                ele_all(iEL,4:5)=ele(iEL,4:5,iFish)
-            enddo
-        else
-            do iEL=1,nEL(iFish)
-                ele_all(iEL+sum(nEL(1:iFish-1)),1:3)=ele(iEL,1:3,iFish)+sum(nND(1:iFish-1))
-                ele_all(iEL+sum(nEL(1:iFish-1)),4:5)=ele(iEL,4:5,iFish)
-            enddo
-        endif
     enddo
 !   ===============================================================================================
 !   calculate area
@@ -479,12 +460,12 @@
     USE simParam
     USE ImmersedBoundary
     implicit none
-    integer:: iND,iFish,iCount
+    integer:: iND,iFish
     if(nFish.eq.0) return
     allocate(TTT00(1:3,1:3,1:nFish),TTT0(1:3,1:3,1:nFish),TTTnow(1:3,1:3,1:nFish),TTTnxt(1:3,1:3,1:nFish))
     allocate(XYZ(1:3,1:nFish),XYZd(1:3,1:nFish),UVW(1:3,1:nFish) )
     allocate(AoA(1:3,1:nFish),AoAd(1:3,1:nFish),WWW1(1:3,1:nFish),WWW2(1:3,1:nFish),WWW3(1:3,1:nFish) )
-    iCount = 0
+
     do iFish=1,nFish
         TTT00(:,:,iFish)=0.0d0
         TTT00(1,1,iFish)=1.0d0
@@ -509,12 +490,6 @@
         dspful(1:nND(iFish),1:6,iFish)=0.0
         accful(1:nND(iFish),1:6,iFish)=0.0
 
-        do iND=1,nND(iFish)
-            xyzful_all(iND+iCount,1:6)   =xyzful(iND,1:6,iFish)
-            velful_all(iND+iCount,1:6)   =velful(iND,1:6,iFish)
-            extful_all(iND+iCount,1:6)  =0.d0
-        enddo
-
         if(ele(1,4,iFish).eq.2)then
             CALL formmass_D(ele(1:nEL(iFish),1:5,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
                             prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf)
@@ -534,7 +509,6 @@
             enddo
         endif
 
-        iCount = iCount + nND(iFish)
     enddo
     END SUBROUTINE initialize_solid
 
