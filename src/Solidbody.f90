@@ -28,7 +28,7 @@ module SolidBody
         real(8), allocatable :: rotMat(:, :, :)
         real(8), allocatable :: self_rotMat(:, :, :)
     contains
-        procedure :: Initialise => Beam_Initialise
+        procedure :: Initialise => Body_Initialise
         procedure :: BuildStructured => Beam_BuildStructured
         procedure :: ReadUnstructured => Beam_ReadUnstructured
         procedure :: InitialSection => Beam_InitialSection
@@ -51,7 +51,7 @@ module SolidBody
     end type Body
     type(Body), allocatable :: Beam(:)
   contains
-    subroutine Beam_Initialise(this,filename)
+    subroutine Body_Initialise(this,filename)
         implicit none
         class(Body), intent(inout) :: this
         character (LEN=100), intent(in):: filename
@@ -92,7 +92,7 @@ module SolidBody
         this%rotMat=0.0d0
         allocate(this%self_rotMat(1:this%fake_npts,1:3,1:3))
         this%self_rotMat=0.0d0
-    end subroutine Beam_Initialise
+    end subroutine Body_Initialise
 
     subroutine Beam_InitialSection(this)
         implicit none
@@ -586,12 +586,9 @@ module SolidBody
         !   =============================================
     end subroutine
 
-    subroutine Initialise_bodies(nFish,filenames,nND,xyzful00,XYZ)
+    subroutine Initialise_bodies(filenames)
         implicit none
-        integer,intent(in):: nFish
         character(LEN=100),intent(in):: filenames(nFish)
-        integer :: nND(nFish)
-        real(8) :: xyzful00(maxval(nND),6,nFish), XYZ(3,nFish)
         integer :: iFish
         allocate(Beam(nFish))
         if (maxval(isFake_ful) .eq. 1) then
