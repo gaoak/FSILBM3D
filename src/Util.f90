@@ -4,7 +4,6 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfoTitl()
     USE simParam
-    USE ImmersedBoundary
     implicit none
     integer:: i,iFish
     integer,parameter::nameLen=4
@@ -97,7 +96,6 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfo()
     USE simParam
-    USE ImmersedBoundary
     implicit none
     integer:: i,iEL,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend,iFish
     real(8):: EEE(2),strainEnergy(nEL_max,2,nFish)

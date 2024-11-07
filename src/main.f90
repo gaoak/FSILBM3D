@@ -8,7 +8,6 @@
     PROGRAM main
     USE simParam
     use omp_lib
-    USE ImmersedBoundary
     USE FakeBody
     USE BodyWorkSpace
     implicit none
@@ -40,7 +39,7 @@
     step=0
     CALL initialize_solid()
     CALL initialize_flow()
-    call Beam_Initial(nFish,nND,xyzful00,XYZ)
+    call Initialise_bodies(nFish,nND,xyzful00,XYZ)
     if(ismovegrid==1)then
         iFish = 1
         call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(1:nND(iFish),1:3,iFish),xGrid,yGrid,zGrid,Xref,Yref,Zref)
@@ -65,7 +64,7 @@
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
     CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-    call Write_solid_body(nFish,Lref,time,Tref)
+    call Write_solid_bodies(nFish,Lref,time,Tref)
     if (maxval(Nspan).ne.0) then
         CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
     endif
@@ -281,7 +280,7 @@
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
                 CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-                call Write_solid_body(nFish,Lref,time,Tref)
+                call Write_solid_bodies(nFish,Lref,time,Tref)
                 if (maxval(Nspan).ne.0) then
                     CALL write_solid_span_field(xyzful/Lref,ele,time/Tref,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
                 endif

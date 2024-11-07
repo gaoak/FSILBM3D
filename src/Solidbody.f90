@@ -1,22 +1,16 @@
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    fake_tp_ful(:)          only for structured mesh, the fake body type, 1 is cylinder, 2 is triangular cylinder, 3 is quadrangular cylinder
-!    fake_r_ful(:)           only for structured mesh, the radius of fake body
-!    fake_dh_ful(:)          only for structured mesh, the mesh size along radius of fake body
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-MODULE BodyWorkSpace
-    character (LEN=100), allocatable:: FakeBeamMeshName_ful(:)! unstructured fake mesh file
-    integer, allocatable:: fake_tp_ful(:)
-    real(8), allocatable:: fake_r_ful(:),fake_dh_ful(:)
-    integer :: Beam_nND_max,Beam_nEL_max
-END MODULE
-
-module FakeBody
+module SolidBody
     implicit none
     private
-    integer:: nFish
-    public :: Body,Beam_Initial,Write_solid_body,FSInteraction_force
+    ! Immersed boundary method parameters
+    integer:: nFish, maxIterIB
+    real(8):: dtolLBM, Pbeta
+    ! nFish     number of bodies
+    ! maxIterIB maximum number of iterations for IB force calculation
+    ! dtolIBM   tolerance for IB force calculation
+    ! Pbeta     coefficient in penalty force calculation
+    public :: Body,Initialise_bodies,Write_solid_bodies,FSInteraction_force
     type :: Body
-        character(LEN=100) :: fake_meshfile
+        character(LEN=100) :: filename
         integer :: real_npts
         real(8), allocatable :: real_xyz0(:, :)
 
@@ -53,14 +47,14 @@ module FakeBody
         procedure :: RotateMatrix => Section_RotateMatrix
         procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
 
-        procedure :: write_solid_body => Beam_Output
+        procedure :: write_solid_body => Body_Output
     end type Body
     type(Body), allocatable :: Beam(:)
   contains
-    subroutine Beam_Initialise(this,FakeBeamMeshName,realnodes,realxyzful,realXYZ,fake_r,fake_dh,fake_tp,ifUnstructured)
+    subroutine Beam_Initialise(this,filename)
         implicit none
         class(Body), intent(inout) :: this
-        character (LEN=100), intent(in):: FakeBeamMeshName
+        character (LEN=100), intent(in):: filename
         integer, intent(in) :: realnodes
         real(8), intent(in) :: realxyzful(realnodes,6),realXYZ(3)
         real(8), intent(in) :: fake_r, fake_dh
@@ -542,7 +536,7 @@ module FakeBody
 
     end subroutine Structured_Cylinder_Elements
 
-    subroutine Beam_Output(this,iFish,time,Lref,Tref)
+    subroutine Body_Output(this,iFish,time,Lref,Tref)
         implicit none
         class(Body), intent(inout) :: this
         integer,intent(in) :: iFish
@@ -592,10 +586,10 @@ module FakeBody
         !   =============================================
     end subroutine
 
-    subroutine Beam_Initial(nFish,nND,xyzful00,XYZ)
-        use BodyWorkSpace
+    subroutine Initialise_bodies(nFish,filenames,nND,xyzful00,XYZ)
         implicit none
-        integer :: nFish
+        integer,intent(in):: nFish
+        character(LEN=100),intent(in):: filenames(nFish)
         integer :: nND(nFish)
         real(8) :: xyzful00(maxval(nND),6,nFish), XYZ(3,nFish)
         integer :: iFish
@@ -608,28 +602,23 @@ module FakeBody
             Beam_nND_max = maxval(Beam%fake_npts)
             Beam_nEL_max = maxval(Beam%fake_nelmts)
         endif
-    end subroutine Beam_Initial
-    subroutine Write_solid_body(time,Lref,Tref)
+    end subroutine Initialise_bodies
+    subroutine Write_solid_bodies(time,Lref,Tref)
         use BodyWorkSpace
         implicit none
         integer :: nFish
         real(8) :: Lref,time,Tref
         integer :: iFish
         do iFish = 1,nFish
-            call Beam(iFish)%write_solid_body(this,iFish,time,Lref,Tref) (Lref,time,Tref,iFish)
+            call Beam(iFish)%write_solid_body(iFish,time,Lref,Tref)
         enddo
-    end subroutine Write_solid_body
+    end subroutine Write_solid_bodies
 
-    subroutine FSInteraction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                                    Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
+    subroutine FSInteraction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
         implicit none
-        integer,intent(in):: nFish,nND(nFish)
-        real(8),intent(in):: xyzful(maxval(nND),6,nFish),velful(maxval(nND),6,nFish)
-        real(8),intent(out):: extful(maxval(nND),6,nFish)
-        integer,intent(in):: zDim,yDim,xDim,ntolLBM
-        real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Pbeta
-        real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
-        logical,intent(in):: isUniformGrid(1:3)
+        real(8),intent(in):: dt,dh,denIn,Uref
+        integer,intent(in):: zDim,yDim,xDim
+        real(8),intent(in):: xGrid(xDim),yGrid(yDim),zGrid(zDim),den(zDim,yDim,xDim)
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: iFish
@@ -858,4 +847,4 @@ module FakeBody
         endif
     END SUBROUTINE
 
-end module FakeBody
+end module SolidBody

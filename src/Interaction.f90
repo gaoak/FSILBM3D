@@ -257,7 +257,6 @@ END SUBROUTINE
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 SUBROUTINE calculate_interaction_force_quad()
     USE simParam
-    USE ImmersedBoundary
     use BoundCondParams
     IMPLICIT NONE
     !==================================================================================================

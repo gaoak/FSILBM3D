@@ -119,11 +119,6 @@
         real(8), allocatable:: edge(:,:,:)
     END MODULE
 
-    MODULE ImmersedBoundary
-        integer, allocatable:: Nspan(:)
-        real(8), allocatable:: dspan(:), theta(:)
-    END MODULE
-
     MODULE OutFlowWorkspace
         real(4), allocatable:: oututmp(:,:,:),outvtmp(:,:,:),outwtmp(:,:,:)
         real(4):: offsetMoveGrid(1:3)

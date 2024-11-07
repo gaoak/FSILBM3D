@@ -4,19 +4,14 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_file()
     USE simParam
-    USE ImmersedBoundary
-    USE BodyWorkSpace
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
     integer:: i,iFish,iKind,FishKind,Order0
     integer:: FishOrder1,FishOrder2,LineX,LineY,LineZ
     integer, allocatable:: FishNum(:),NumX(:),NumY(:)
-    character(LEN=40):: nFEmeshName
+    character(LEN=40):: tmpFEmeshName
     integer:: niBodyModel,nisMotionGiven(1:6),nNspan
-    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt,ndspan,ntheta
-    character(LEN=100):: nFakeBeamMeshName
-    integer:: nisFake,nifUnstructured,nfake_tp
-    real(8):: nfake_r,nfake_dh
+    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     open(unit=111,file='inFlow.dat')
     call readequal(111)
@@ -67,7 +62,6 @@
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(dspan(1:nFish),theta(1:nFish),Nspan(1:nFish))
-        allocate(FakeBeamMeshName_ful(1:nFish),isFake_ful(1:nFish),ifUnstructured_ful(1:nFish),fake_r_ful(1:nFish),fake_dh_ful(1:nFish),fake_tp_ful(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -77,21 +71,18 @@
     call readequal(111)
     do iKind=1,FishKind
         read(111,*)     FishNum(iKind+1),NumX(iKind),NumY(iKind)
-        read(111,*)     niBodyModel, nFEmeshName
+        read(111,*)     niBodyModel, tmpFEmeshName
         read(111,*)     nisMotionGiven(1:3)
         read(111,*)     nisMotionGiven(4:6)
         read(111,*)     ndenR, npsR
         if(iKB==0) read(111,*)     nEmR, ntcR
         if(iKB==1) read(111,*)     nKB, nKS
         read(111,*)     ndspan,ntheta,nNspan
-        read(111,*)     nFakeBeamMeshName
-        read(111,*)     nisFake,nifUnstructured
-        read(111,*)     nfake_r,nfake_dh,nfake_tp
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
             iBodyModel(iFish)=niBodyModel
-            FEmeshName(iFish)=nFEmeshName
+            FEmeshName(iFish)=tmpFEmeshName
             isMotionGiven(1:6,iFish)=nisMotionGiven(1:6)
             denR(iFish)= ndenR
             psR(iFish) = npsR
@@ -102,15 +93,6 @@
             KB(iFish)  = nKB
             KS(iFish)  = nKS
             endif
-            dspan(iFish) = ndspan
-            theta(iFish) = ntheta
-            Nspan(iFish) = nNspan
-            FakeBeamMeshName_ful(iFish) = nFakeBeamMeshName
-            isFake_ful(iFish) = nisFake
-            ifUnstructured_ful(iFish) = nifUnstructured
-            fake_r_ful(iFish) = nfake_r
-            fake_dh_ful(iFish) = nfake_dh
-            fake_tp_ful(iFish) = nfake_tp
         enddo
     enddo
 
@@ -310,7 +292,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE allocate_solid_memory()
     USE simParam
-    USE ImmersedBoundary
     implicit none
     integer:: iND,iFish,maxN
     real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:),lentemp(:)
@@ -458,7 +439,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE initialize_solid()
     USE simParam
-    USE ImmersedBoundary
     implicit none
     integer:: iND,iFish
     if(nFish.eq.0) return
@@ -727,7 +707,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_checkpoint_file()
     USE simParam
-    USE ImmersedBoundary
     IMPLICIT NONE
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
     write(13) step,time
@@ -748,7 +727,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_checkpoint_file()
     USE simParam
-    USE ImmersedBoundary
     IMPLICIT NONE
     integer:: tmpnfish, tmpND_max
 

@@ -145,7 +145,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE  write_params()
     USE simParam
-    USE ImmersedBoundary
     implicit none
     integer:: iMT,i,iFish
     integer,parameter::nameLen=10
