@@ -28,13 +28,13 @@ module SolidBody
         real(8), allocatable :: rotMat(:, :, :)
         real(8), allocatable :: self_rotMat(:, :, :)
     contains
-        procedure :: Initialise => Body_Initialise
+        procedure :: Initialise => Initialise_
         procedure :: BuildStructured => Beam_BuildStructured
         procedure :: ReadUnstructured => Beam_ReadUnstructured
         procedure :: InitialSection => Beam_InitialSection
 
         procedure :: UpdateInfo => Beam_UpdateInfo
-        procedure :: Update_xyz_vel => Beam_Update_xyz_vel
+        procedure :: Update_element_vel => Update_element_vel_
         procedure :: UpdateLoad => Beam_UpdateLoad
 
         procedure :: StrucFakNod => Structured_Fake_Nodes
@@ -47,19 +47,15 @@ module SolidBody
         procedure :: RotateMatrix => Section_RotateMatrix
         procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
 
-        procedure :: write_solid_body => Body_Output
+        procedure :: Write_body => Write_body_
     end type Body
     type(Body), allocatable :: Beam(:)
   contains
-    subroutine Body_Initialise(this,filename)
+    subroutine Initialise_(this,filename)
         implicit none
         class(Body), intent(inout) :: this
         character (LEN=100), intent(in):: filename
-        integer, intent(in) :: realnodes
-        real(8), intent(in) :: realxyzful(realnodes,6),realXYZ(3)
-        real(8), intent(in) :: fake_r, fake_dh
-        integer, intent(in) :: fake_tp, ifUnstructured
-        integer :: i
+        integer :: iFish
 
         this%fake_meshfile = FakeBeamMeshName
         this%real_npts     = realnodes
@@ -92,7 +88,7 @@ module SolidBody
         this%rotMat=0.0d0
         allocate(this%self_rotMat(1:this%fake_npts,1:3,1:3))
         this%self_rotMat=0.0d0
-    end subroutine Body_Initialise
+    end subroutine Initialise_
 
     subroutine Beam_InitialSection(this)
         implicit none
@@ -140,14 +136,7 @@ module SolidBody
         call this%UnstrucFakEle()
     end subroutine Beam_ReadUnstructured
 
-    subroutine Beam_UpdateInfo(this,updaterealxyzful,updaterealvelful)
-        implicit none
-        class(Body), intent(inout) :: this
-        real(8), intent(in) :: updaterealxyzful(this%real_npts,6),updaterealvelful(this%real_npts,6)
-        call this%Update_xyz_vel(updaterealxyzful,updaterealvelful)
-    end subroutine Beam_UpdateInfo
-
-    subroutine Beam_Update_xyz_vel(this,updaterealxyzful,updaterealvelful)
+    subroutine Update_element_vel_(this,updaterealxyzful,updaterealvelful)
         implicit none
         class(Body), intent(inout) :: this
         real(8) :: updaterealxyzful(this%real_npts,6),updaterealvelful(this%real_npts,6)
@@ -197,7 +186,7 @@ module SolidBody
                     this%fake_vel(j,1:3) = temp_vel(1:3)+updaterealvelful(i,1:3)
             enddo
         enddo
-    end subroutine Beam_Update_xyz_vel
+    end subroutine Update_element_vel_
 
     subroutine Beam_UpdateLoad(this,updaterealextful)
         implicit none
@@ -536,7 +525,7 @@ module SolidBody
 
     end subroutine Structured_Cylinder_Elements
 
-    subroutine Body_Output(this,iFish,time,Lref,Tref)
+    subroutine Write_body_(this,iFish,time,Lref,Tref)
         implicit none
         class(Body), intent(inout) :: this
         integer,intent(in) :: iFish
@@ -591,14 +580,9 @@ module SolidBody
         character(LEN=100),intent(in):: filenames(nFish)
         integer :: iFish
         allocate(Beam(nFish))
-        if (maxval(isFake_ful) .eq. 1) then
-            do iFish = 1,nFish
-                call Beam(iFish)%Initialise(FakeBeamMeshName_ful(iFish), nND(iFish), xyzful00(1:nND(iFish),1:6,iFish), XYZ(1:3,iFish), &
-                                            fake_r_ful(iFish),fake_dh_ful(iFish),fake_tp_ful(iFish),ifUnstructured_ful(iFish))
-            enddo
-            Beam_nND_max = maxval(Beam%fake_npts)
-            Beam_nEL_max = maxval(Beam%fake_nelmts)
-        endif
+        do iFish = 1,nFish
+            call Beam(iFish)%Initialise(filenames(iFish))
+        enddo
     end subroutine Initialise_bodies
     subroutine Write_solid_bodies(time,Lref,Tref)
         use BodyWorkSpace
@@ -607,7 +591,7 @@ module SolidBody
         real(8) :: Lref,time,Tref
         integer :: iFish
         do iFish = 1,nFish
-            call Beam(iFish)%write_solid_body(iFish,time,Lref,Tref)
+            call Beam(iFish)%Write_body(iFish,time,Lref,Tref)
         enddo
     end subroutine Write_solid_bodies
 
@@ -620,23 +604,20 @@ module SolidBody
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: iFish
         do iFish = 1,nFish
-            call Beam(iFish)%UpdateInfo(xyzful(1:nND(iFish),1:6,iFish),velful(1:nND(iFish),1:6,iFish))
+            call Beam(iFish)%UpdateInfo(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
         enddo
-        call calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                                         Pbeta,ntolLBM,dtolLBM,force,isUniformGrid)
+        call calculate_interaction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
         do iFish = 1,nFish
-            call Beam(iFish)%UpdateLoad(extful(1:nND(iFish),1:6,iFish))
+            call Beam(iFish)%UpdateLoad(force)
         enddo
     end subroutine
 
-    SUBROUTINE calculate_interaction_force(zDim,yDim,xDim,nFish,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                                           Pbeta,ntolLBM,dtolLBM,force,isUniformGrid)
+    SUBROUTINE calculate_interaction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
         use BodyWorkSpace
         IMPLICIT NONE
-        integer,intent(in):: zDim,yDim,xDim,nFish,ntolLBM
-        real(8),intent(in):: dh,Uref,denIn,dtolLBM,dt,Pbeta
-        real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
-        logical,intent(in):: isUniformGrid(1:3)
+        real(8),intent(in):: dt,dh,denIn,Uref
+        integer,intent(in):: zDim,yDim,xDim
+        real(8),intent(in):: xGrid(xDim),yGrid(yDim),zGrid(zDim),den(zDim,yDim,xDim)
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         !==================================================================================================

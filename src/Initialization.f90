@@ -61,7 +61,6 @@
     if(nFish>0) then
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
-        allocate(dspan(1:nFish),theta(1:nFish),Nspan(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -341,10 +340,6 @@
                                       nprof2(1:nND(iFish)*6,iFish),xyzful00(1:nND(iFish),1:6,iFish),prop(1:nMT(iFish),1:10,iFish),nND(iFish), &
                                       nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),idat)
     close(idat)
-    if (maxval(Nspan).gt.0 .and. maxval(dabs(prop(1:nMT(iFish),5,iFish))).gt.1d-6) then
-        write(*,*) 'Extruded body should have zero rotation angle, gamma', prop(1:nMT(iFish),5,iFish)
-        stop
-    endif
     write(*,*)'read FEMeshFile ',iFish,' end'
     enddo
 !   ===============================================================================================
@@ -363,11 +358,6 @@
         lentemp(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
         if(lentemp(iFish) .gt. nLchod(iFish)) nLchod(iFish) = lentemp(iFish)
     enddo
-    if (maxval(Nspan).gt.0) then
-        Lspan = maxval(dspan*Nspan)
-    else
-        Lspan = maxval(xyzful00(:,3,iFish))-minval(xyzful00(:,3,iFish))
-    endif
     !Use the object with the largest area as the reference object
     maxN  = maxloc(nAsfac, dim=1)
     Asfac = nAsfac(maxN)
