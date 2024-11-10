@@ -26,7 +26,7 @@ module SolidBody
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         !calculated using central linear and angular velocities
-        integer(2),allocatable :: vtor(:)
+        integer(2),allocatable :: vtor(:,:)
     contains
         procedure :: Initialise => Initialise_
         procedure :: UpdateElmtInfo => UpdateElmtInfo_
@@ -100,7 +100,7 @@ module SolidBody
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: iFish
         do iFish = 1,nFish
-            call Beam(iFish)%UpdateElmtInfo(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den)
+            call Beam(iFish)%UpdateElmtInfo()
         enddo
         call calculate_interaction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
     end subroutine
@@ -282,31 +282,21 @@ module SolidBody
         integer:: iFish
         integer:: i,j,k,iEL,nt,iterLBM
         real(8):: dmaxLBM,dsum
-        real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
-        real(8):: forceElem(Beam_nEL_max,3,nFish),forceNode(Beam_nND_max,3,nFish),areaElem(Beam_nEL_max,nFish)
-        real(8):: posElem(Beam_nEL_max,3,nFish),velElem(Beam_nEL_max,3,nFish),velElemIB(Beam_nEL_max,3,nFish)
+        real(8)::tol,tolsum, ntol
         !================================
-        forceElem(1:Beam_nEL_max,1:3,1:nFish)=0.0d0
-        dmaxLBM=1.0d0
+        tolsum=0.d0
         iterLBM=0
         do  while( iterLBM<maxIterIB .and. dmaxLBM>dtolLBM)
             dmaxLBM=0.0d0
             dsum=0.0d0
             do iFish=1,nFish
-                call Beam(iFish)%PenaltyForce(zDim,yDim,xDim,Beam(iFish)%fake_nelmts,Beam(iFish)%fake_ele,dh,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                Pbeta,force,isUniformGrid,posElem(1:Beam(iFish)%fake_nelmts,1:3,iFish),velElem(1:Beam(iFish)%fake_nelmts,1:3,iFish), &
-                areaElem(1:Beam(iFish)%fake_nelmts,iFish),forceElem(1:Beam(iFish)%fake_nelmts,1:3,iFish),velElemIB(1:Beam(iFish)%fake_nelmts,1:3,iFish))
-
-                dsum=dsum+Uref*Beam(iFish)%fake_nelmts
-
-                do iEL=1,Beam(iFish)%fake_nelmts
-                    dmaxLBM=dmaxLBM+dsqrt(sum((velElem(iEL,1:3,iFish)-velElemIB(iEL,1:3,iFish))**2))
-                enddo
+                call Beam(iFish)%PenaltyForce(dh,dt,denIn,zDim,yDim,xDim,uuu,den,force,tol,ntol)
+                tolsum=tolsum+Uref*tol
+                dsum = dsum + ntol
             enddo
-            dmaxLBM=dmaxLBM/dsum
+            dmaxLBM=tolsum/dsum
             iterLBM=iterLBM+1
         enddo
-        !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
     END SUBROUTINE
 
     SUBROUTINE PenaltyForce_(this,dh,dt,denIn,zDim,yDim,xDim,uuu,den,force,tolerance,ntolsum)
@@ -328,9 +318,11 @@ module SolidBody
         integer::x,y,z,iEL
         !==================================================================================================
         tolerance = 0.d0
-        ntolsum = 0.d0
+        ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElemIB,forceElemTemp,forceTemp)
+        !$OMP PARALLEL DO SCHEDULE(STATIC)
+        !$OMP PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElem,velElemIB,forceElemTemp,forceTemp)
+        !$OMP REDUCTION(+:tolerance)
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(iEL,1:4)
             jy = this%v_Ei(iEL,5:8)
@@ -354,95 +346,26 @@ module SolidBody
                 stop
             endif
             tolerance = tolerance + sum((velElem(1:3)-velElemIB(1:3))**2)
+            !$OMP critical
+            ! update beam load, momentum is not included
+            this%r_force(this%vtor(iEL,1),1:3) = this%r_force(this%vtor(iEL,1),1:3) + 0.5d0 * forceElemTemp
+            this%r_force(this%vtor(iEL,2),1:3) = this%r_force(this%vtor(iEL,2),1:3) + 0.5d0 * forceElemTemp
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
                         forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
-                        ! update velocity
+                        ! correct velocity
                         uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+0.5d0*dt*forceTemp(1:3)/den(kz(z),jy(y),ix(x))
+                        ! add flow body force
                         force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
                     enddo
                 enddo
             enddo
+            !$OMP end critical
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE PenaltyForce_
 
-    SUBROUTINE calculate_interaction_force_core(zDim,yDim,xDim,nEL,ele,dh,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-                                                Pbeta,force,isUniformGrid,posElem,velElem,areaElem,forceElem,velElemIB)
-        USE, INTRINSIC :: IEEE_ARITHMETIC
-        IMPLICIT NONE
-        integer,intent(in):: zDim,yDim,xDim,nEL,ele(nEL,5)
-        real(8),intent(in):: dh,denIn,dt,Pbeta
-        real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
-        logical,intent(in):: isUniformGrid(1:3)
-        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
-        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
-        !==================================================================================================
-        real(8),intent(in):: posElem(nEL,3),velElem(nEL,3)
-        real(8),intent(in):: areaElem(nEL)
-        real(8),intent(inout)::forceElem(nEL,3)
-        real(8),intent(out)::velElemIB(nEL,3)
-        !==================================================================================================
-        integer:: i,j,k,x,y,z,iEL
-        real(8):: rx,ry,rz,Phi,invdh,forcetemp(1:3)
-        real(8):: forceElemTemp(nEL,3)
-        !==================================================================================================
-        !   compute velocity and displacement at IB nodes
-        invdh = 1.D0/dh
-        !   ***********************************************************************************************
-        !   compute the velocity of IB nodes at element center
-        do  iEL=1,nEL
-            call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
-            call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
-            call my_minloc(posElem(iEL,3), zGrid, zDim, isUniformGrid(3), k)
-            velElemIB(iEL,1:3)=0.0d0
-            do x=-1+i,2+i
-                rx=Phi((posElem(iEL,1)-xGrid(x))*invdh)
-                do y=-1+j,2+j
-                    ry=Phi((posElem(iEL,2)-yGrid(y))*invdh)
-                    do z=-1+k,2+k
-                        rz=Phi((posElem(iEL,3)-zGrid(z))*invdh)
-                        velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(z,y,x,1:3)*rx*ry*rz
-                    enddo
-                enddo
-            enddo
-        enddo
-        !   ***********************************************************************************************
-        !   calculate interaction force
-        do  iEL=1,nEL
-            if(ele(iEL,4)==3) then
-                forceElemTemp(iEL,1:3) = -Pbeta* 2.0d0*denIn*(velElem(iEL,1:3)-velElemIB(iEL,1:3))/dt*areaElem(iEL)*dh
-            else
-                forceElemTemp(iEL,1:3) = 0.0d0
-            endif
-            if ((.not. IEEE_IS_FINITE(forceElemTemp(iEL,1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,3)))) then
-                write(*, *) 'Nan found in forceElemTemp', forceElemTemp
-                stop
-            endif
-        enddo
-        !   ***********************************************************************************************
-        !   calculate Eulerian body force
-        do    iEL=1,nEL
-            call my_minloc(posElem(iEL,1), xGrid, xDim, isUniformGrid(1), i)
-            call my_minloc(posElem(iEL,2), yGrid, yDim, isUniformGrid(2), j)
-            call my_minloc(posElem(iEL,3), zGrid, zDim, isUniformGrid(3), k)
-            do x=-1+i,2+i
-                rx=Phi((posElem(iEL,1)-xGrid(x))*invdh)
-                do y=-1+j,2+j
-                    ry=Phi((posElem(iEL,2)-yGrid(y))*invdh)
-                    do z=-1+k,2+k
-                        rz=Phi((posElem(iEL,3)-zGrid(z))*invdh)
-                        forcetemp(1:3) = -forceElemTemp(iEL,1:3)*rx*ry*rz*invdh*invdh*invdh
-                        ! update velocity
-                        uuu(z,y,x,1:3)  = uuu(z,y,x,1:3)+0.5d0*dt*forceTemp(1:3)/den(z,y,x)
-                        force(z,y,x,1:3)=force(z,y,x,1:3) + forcetemp(1:3)
-                    enddo
-                enddo
-            enddo
-        enddo
-        forceElem(1:nEL,1:3) = forceElem(1:nEL,1:3)+forceElemTemp(1:nEL,1:3)
-    END SUBROUTINE
     subroutine Beam_InitialSection(this)
         implicit none
         class(BeamBody), intent(inout) :: this
@@ -827,8 +750,9 @@ module SolidBody
     end subroutine Structured_Cylinder_Elements
 
     subroutine Write_body_(this,iFish,time,Lref,Tref)
+        ! to do: generate a temporary mesh
         implicit none
-        class(Body), intent(inout) :: this
+        class(BeamBody), intent(inout) :: this
         integer,intent(in) :: iFish
         real(8),intent(in) :: time,Lref,Tref
         !   -------------------------------------------------------
