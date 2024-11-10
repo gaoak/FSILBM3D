@@ -2,8 +2,8 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
-    integer:: nFish, maxIterIB
-    real(8):: dtolLBM, Pbeta
+    integer:: m_nFish, m_maxIterIB
+    real(8):: m_dtolLBM, m_Pbeta
     integer:: boundaryConditions(1:6)
     ! nFish     number of bodies
     ! maxIterIB maximum number of iterations for IB force calculation
@@ -800,17 +800,22 @@ module SolidBody
         !   =============================================
     end subroutine
 
-    subroutine Initialise_bodies(filenames)
+    subroutine Initialise_bodies(nFish,maxIterIB,dtolLBM,Pbeta,filenames)
         implicit none
+        integer,intent(in)::nFish, maxIterIB
+        real(8),intent(in):: dtolLBM, Pbeta
         character(LEN=100),intent(in):: filenames(nFish)
         integer :: iFish
+        m_nFish = nFish
+        m_maxIterIB = maxIterIB
+        m_dtolLBM = dtolLBM
+        m_Pbeta = Pbeta
         allocate(Beam(nFish))
         do iFish = 1,nFish
             call Beam(iFish)%Initialise(filenames(iFish))
         enddo
     end subroutine Initialise_bodies
     subroutine Write_solid_bodies(time,Lref,Tref)
-        use BodyWorkSpace
         implicit none
         integer :: nFish
         real(8) :: Lref,time,Tref
