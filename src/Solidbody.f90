@@ -16,6 +16,7 @@ module SolidBody
         integer :: r_npts
         real(8), allocatable :: r_xyz0(:, :)
         real(8), allocatable :: r_xyz(:, :)
+        real(8), allocatable :: r_force(:, :)
         !!!virtual body surface
         integer :: v_nelmts
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
@@ -25,7 +26,7 @@ module SolidBody
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         !calculated using central linear and angular velocities
-        real(8), allocatable :: fake_ext(:, :)
+        integer(2),allocatable :: vtor(:)
     contains
         procedure :: Initialise => Initialise_
         procedure :: UpdateElmtInfo => UpdateElmtInfo_
@@ -189,18 +190,95 @@ module SolidBody
             this%v_Ew(iEL,5:8) = ry
             this%v_Ew(iEL,9:12) = rz
         enddo
+    
+        contains
+        ! return the array(index) <= x < array(index+1)
+        ! assum uniform grid around x(x=i0) = x0
+        SUBROUTINE minloc_fast(x, x0, i0, invdh, index, offset)
+            implicit none
+            integer, intent(in):: i0
+            real(8), intent(in):: x, x0, invdh
+            integer, intent(out):: index
+            real(8), intent(out):: offset
+            offset = (x - x0)*invdh
+            index = floor(offset)
+            offset = offset - dble(index)
+            index = index + i0
+        END SUBROUTINE
+    
+        SUBROUTINE trimedindex(i, xDim, ix, boundaryConditions)
+            USE BoundCondParams
+            implicit none
+            integer, intent(in):: boundaryConditions(1:2)
+            integer, intent(in):: i, xDim
+            integer, intent(out):: ix(-1:2)
+            integer:: k
+            do k=-1,2
+                ix(k) = i + k
+                if (ix(k)<1) then
+                    if(boundaryConditions(1).eq.Periodic) then
+                        ix(k) = ix(k) + xDim
+                    else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
+                        ix(k) = 2
+                    else
+                        write(*,*) 'index out of xmin bound', ix(k)
+                    endif
+                else if(ix(k)>xDim) then
+                    if(boundaryConditions(2).eq.Periodic) then
+                        ix(k) = ix(k) - xDim
+                    else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(2).eq.wall) .and. ix(k).eq.xDim+1) then
+                        ix(k) = xDim - 1
+                    else
+                        write(*,*) 'index out of xmax bound', ix(k)
+                    endif
+                endif
+            enddo
+        END SUBROUTINE trimedindex
+        SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
+            implicit none
+            integer:: len, index, count, step, it
+            real(8):: x, array(len)
+            logical:: uniform
+            if (.not.uniform) then
+                if (x<array(1) .or. x>array(len)) then
+                    write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                    stop
+                endif
+                index = 1
+                count = len
+                do while(count > 0)
+                    step = count / 2
+                    it = index + step
+                    if (array(it) < x) then
+                        index = it + 1
+                        count = count - (step + 1)
+                    else
+                        count = step
+                    endif
+                enddo
+                if (array(index)>x) then
+                    index = index - 1
+                endif
+            else
+                index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
+                !int -1.1 -> -1; 1.1->1; 1.9->1
+                if (index<1 .or. index>len) then
+                    write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                    stop
+                endif
+            endif
+        END SUBROUTINE
     end subroutine UpdateElmtInterp_
 
     SUBROUTINE calculate_interaction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
-        class(BeamBody), intent(inout) :: this
         real(8),intent(in):: dt,dh,denIn,Uref
         integer,intent(in):: zDim,yDim,xDim
         real(8),intent(in):: xGrid(xDim),yGrid(yDim),zGrid(zDim),den(zDim,yDim,xDim)
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
-        !==================================================================================================
+        !================================
         integer:: iFish
         integer:: i,j,k,iEL,nt,iterLBM
         real(8):: dmaxLBM,dsum
@@ -231,191 +309,63 @@ module SolidBody
         !write(*,'(A,I5,A,D20.10)')' iterLBM =',iterLBM,'    dmaxLBM =',dmaxLBM
     END SUBROUTINE
 
-    SUBROUTINE PenaltyForce_(this,zDim,yDim,xDim,nEL,ele,dh,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-            Pbeta,force,posElem,velElem,areaElem,forceElem,velElemIB)
+    SUBROUTINE PenaltyForce_(this,dh,dt,denIn,zDim,yDim,xDim,uuu,den,force,tolerance,ntolsum)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         class(BeamBody), intent(inout) :: this
-        integer,intent(in):: zDim,yDim,xDim,nEL,ele(nEL,5)
-        real(8),intent(in):: dh,denIn,dt,Pbeta
-        real(8),intent(in):: den(zDim,yDim,xDim),xGrid(xDim),yGrid(yDim),zGrid(zDim)
+        real(8),intent(in):: dh,dt,denIn
+        integer,intent(in):: zDim,yDim,xDim
+        real(8),intent(in):: den(zDim,yDim,xDim)
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
+        real(8),intent(out)::tolerance, ntolsum
         !==================================================================================================
-        real(8),intent(in):: posElem(nEL,3),velElem(nEL,3)
-        real(8),intent(in):: areaElem(nEL)
-        real(8),intent(inout)::forceElem(nEL,3)
-        real(8),intent(out)::velElemIB(nEL,3)
-        !==================================================================================================
-        integer:: i,j,k,x,y,z,iEL
-        real(8):: rx,ry,rz,Phi,invdh,forcetemp(1:3)
-        real(8):: forceElemTemp(nEL,3)
+        integer:: ix(-1:2),jy(-1:2),kz(-1:2)
+        real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,invdh,forcetemp(1:3)
+        real(8):: velElem(3),velElemIB(3),forceElemTemp(3)
         !==================================================================================================
         real(8)::x0,y0,z0,detx,dety,detz
-        integer::i0,j0,k0
+        integer::x,y,z,iEL
         !==================================================================================================
-        invdh = 1.D0/dh
-        call my_minloc(this%v_Exyz(1,1), xGrid, xDim, .false., i0)
-        call my_minloc(this%v_Exyz(1,2), yGrid, yDim, .false., j0)
-        call my_minloc(this%v_Exyz(1,3), zGrid, zDim, .false., k0)
-        x0 = xGrid(i0)
-        y0 = yGrid(j0)
-        z0 = zGrid(k0)
+        tolerance = 0.d0
+        ntolsum = 0.d0
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,s,rx,ry,rz,detx,dety,detz,ix,jy,kz)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElemIB,forceElemTemp,forceTemp)
         do  iEL=1,this%v_nelmts
-            call minloc_fast(this%v_Exyz(iEL,1), x0, i0, invdh, i, detx)
-            call minloc_fast(this%v_Exyz(iEL,2), y0, j0, invdh, j, dety)
-            call minloc_fast(this%v_Exyz(iEL,3), z0, k0, invdh, k, detz)
+            ix = this%v_Ei(iEL,1:4)
+            jy = this%v_Ei(iEL,5:8)
+            kz = this%v_Ei(iEL,9:12)
+            rx = this%v_Ew(iEL,1:4)
+            ry = this%v_Ew(iEL,5:8)
+            rz = this%v_Ew(iEL,9:12)
+            velElemIB(1:3)=0.0d0
             do x=-1,2
-                rx(x)=Phi(dble(x)-detx)
+                do y=-1,2
+                    do z=-1,2
+                        velElemIB(1:3)=velElemIB(1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
+                    enddo
+                enddo
             enddo
-            do y=-1,2
-                ry(y)=Phi(dble(y)-dety)
-            enddo
-            do z=-1,2
-                rz(z)=Phi(dble(z)-detz)
-            enddo
-            call trimedindex(i, xDim, ix, boundaryConditions(1:2))
-            call trimedindex(j, yDim, jy, boundaryConditions(3:4))
-            call trimedindex(k, zDim, kz, boundaryConditions(5:6))
-            velElemIB(s,iEL,1:3)=0.0d0
-                do x=-1,2
-                    do y=-1,2
-                        do z=-1,2
-                            velElemIB(s,iEL,1:3)=velElemIB(s,iEL,1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
-                        enddo
+            velElem = this%v_Evel(iEL,1:3)
+            forceElemTemp(1:3) = -Pbeta* 2.0d0*denIn*(velElem-velElemIB)/dt*this%v_Ea(iEL)*dh
+            if ((.not. IEEE_IS_FINITE(forceElemTemp(1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(3)))) then
+                write(*, *) 'Nan found in forceElemTemp', forceElemTemp
+                write(*, *) 'Nan found at (ix, jy, kz)', ix(0), jy(0), kz(0)
+                stop
+            endif
+            tolerance = tolerance + sum((velElem(1:3)-velElemIB(1:3))**2)
+            do x=-1,2
+                do y=-1,2
+                    do z=-1,2
+                        forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
+                        ! update velocity
+                        uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+0.5d0*dt*forceTemp(1:3)/den(kz(z),jy(y),ix(x))
+                        force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
                     enddo
                 enddo
             enddo
         enddo
         !$OMP END PARALLEL DO
-        !***********************************************************************************************
-        ! calculate interaction force
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,s)
-        do  iEL=1,nEL
-            do s=1,Nspan
-                forceElemTemp(s,iEL,1:3) = -Pbeta* 2.0d0*denIn*(velElem(s,iEL,1:3)-velElemIB(s,iEL,1:3))/dt*areaElem(iEL)*dh
-                if(Palpha.gt.0.d0) then
-                    forceElemTemp(s,iEL,1:3) = forceElemTemp(s,iEL,1:3) - Palpha*2.0d0*denIn*(posElem(s,iEL,1:3)-posElemIB(s,iEL,1:3))/dt*areaElem(iEL)*dh
-                endif
-                if ((.not. IEEE_IS_FINITE(forceElemTemp(s,iEL,1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(s,iEL,2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(s,iEL,3)))) then
-                    write(*, *) 'Nan found in forceElemTemp', forceElemTemp
-                    stop
-                endif
-            enddo
-        enddo
-        !$OMP END PARALLEL DO
-        !***********************************************************************************************
-        ! calculate Eulerian body force
-        ! no parallel to avoid write conflict to forceTemp
-        do iEL=1,nEL
-            call minloc_fast(posElem(1,iEL,1), x0, i0, invdh, i, detx)
-            call minloc_fast(posElem(1,iEL,2), y0, j0, invdh, j, dety)
-            do x=-1,2
-                rx(x)=Phi(dble(x)-detx)*invdh
-            enddo
-            do y=-1,2
-                ry(y)=Phi(dble(y)-dety)*invdh
-            enddo
-            call trimedindex(i, xDim, ix, boundaryConditions(1:2))
-            call trimedindex(j, yDim, jy, boundaryConditions(3:4))
-            do s=1,Nspan
-                call minloc_fast(posElem(s,iEL,3), z0, k0, invdh, k, detz)
-                do z=-1,2
-                    rz(z)=Phi(dble(z)-detz)*invdh
-                enddo
-                call trimedindex(k, zDim, kz, boundaryConditions(5:6))
-                do x=-1,2
-                    do y=-1,2
-                        do z=-1,2
-                            forceTemp(1:3) = -forceElemTemp(s,iEL,1:3)*rx(x)*ry(y)*rz(z)
-                            ! update velocity
-                            uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+0.5d0*dt*forceTemp(1:3)/den(kz(z),jy(y),ix(x))
-                            force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
-                        enddo
-                    enddo
-                enddo
-            enddo
-        enddo
-        forceElem(:,1:nEL,1:3) = forceElem(:,1:nEL,1:3)+forceElemTemp(:,1:nEL,1:3)
-    contains
-    ! return the array(index) <= x < array(index+1)
-    ! assum uniform grid around x(x=i0) = x0
-    SUBROUTINE minloc_fast(x, x0, i0, invdh, index, offset)
-        implicit none
-        integer, intent(in):: i0
-        real(8), intent(in):: x, x0, invdh
-        integer, intent(out):: index
-        real(8), intent(out):: offset
-        offset = (x - x0)*invdh
-        index = floor(offset)
-        offset = offset - dble(index)
-        index = index + i0
-    END SUBROUTINE
-
-    SUBROUTINE trimedindex(i, xDim, ix, boundaryConditions)
-        USE BoundCondParams
-        implicit none
-        integer, intent(in):: boundaryConditions(1:2)
-        integer, intent(in):: i, xDim
-        integer, intent(out):: ix(-1:2)
-        integer:: k
-        do k=-1,2
-            ix(k) = i + k
-            if (ix(k)<1) then
-                if(boundaryConditions(1).eq.Periodic) then
-                    ix(k) = ix(k) + xDim
-                else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
-                    ix(k) = 2
-                else
-                    write(*,*) 'index out of xmin bound', ix(k)
-                endif
-            else if(ix(k)>xDim) then
-                if(boundaryConditions(2).eq.Periodic) then
-                    ix(k) = ix(k) - xDim
-                else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(2).eq.wall) .and. ix(k).eq.xDim+1) then
-                    ix(k) = xDim - 1
-                else
-                    write(*,*) 'index out of xmax bound', ix(k)
-                endif
-            endif
-        enddo
-    END SUBROUTINE trimedindex
-    SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
-        implicit none
-        integer:: len, index, count, step, it
-        real(8):: x, array(len)
-        logical:: uniform
-        if (.not.uniform) then
-            if (x<array(1) .or. x>array(len)) then
-                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-                stop
-            endif
-            index = 1
-            count = len
-            do while(count > 0)
-                step = count / 2
-                it = index + step
-                if (array(it) < x) then
-                    index = it + 1
-                    count = count - (step + 1)
-                else
-                    count = step
-                endif
-            enddo
-            if (array(index)>x) then
-                index = index - 1
-            endif
-        else
-            index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
-            !int -1.1 -> -1; 1.1->1; 1.9->1
-            if (index<1 .or. index>len) then
-                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-                stop
-            endif
-        endif
-    END SUBROUTINE
     END SUBROUTINE PenaltyForce_
 
     SUBROUTINE calculate_interaction_force_core(zDim,yDim,xDim,nEL,ele,dh,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
