@@ -16,34 +16,38 @@ module SolidBody
         integer :: r_npts
         real(8), allocatable :: r_xyz0(:, :)
         real(8), allocatable :: r_xyz(:, :)
+        real(8), allocatable :: r_vel(:, :)
         real(8), allocatable :: r_force(:, :)
         !!!virtual body surface
-        integer :: v_nelmts
+        integer :: v_npts,v_nelmts
+        real(8), allocatable :: v_Pxyz0(:, :) ! initial Node (x0, y0, z0)
+        real(8), allocatable :: v_Pxyz(:, :) ! Node (xt, yt, zt)
+        real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z)
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
+        integer, allocatable :: v_elmt(:, :) ! element ID
         integer, allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
         real(8), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         real(8), allocatable :: v_Ea(:) ! element area
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         !calculated using central linear and angular velocities
-        integer(2),allocatable :: vtor(:,:)
+        integer(2),allocatable :: vtor(:)
+        real(8), allocatable :: rotMat(:, :, :)
+        real(8), allocatable :: self_rotMat(:, :, :)
     contains
         procedure :: Initialise => Initialise_
         procedure :: UpdateElmtInfo => UpdateElmtInfo_
         procedure :: PenaltyForce => PenaltyForce_
         procedure :: BuildStructured => Beam_BuildStructured
         procedure :: ReadUnstructured => Beam_ReadUnstructured
-        procedure :: InitialSection => Beam_InitialSection
 
-        procedure :: UpdateLoad => Beam_UpdateLoad
+        procedure :: Readreal => Readreal_
+        procedure :: Struc_Virtual_Elmts => Struc_Virtual_Elmts_
+        procedure :: Struc_Cylinder_Elmts => Struc_Cylinder_Elmts_
 
-        procedure :: StrucFakNod => Structured_Fake_Nodes
-        procedure :: StrucFakEle => Structured_Fake_Elements
-        procedure :: Cylinder_Nodes => Structured_Cylinder_Nodes
-        procedure :: Cylinder_Elements => Structured_Cylinder_Elements
+        procedure :: Unstruc_Virtual_Elmts => Unstruc_Virtual_Elmts_
 
-        procedure :: UnstrucFakNod => Unstructured_Fake_Nodes
-        procedure :: UnStrucFakEle => Unstructured_Fake_Elements
+
         procedure :: RotateMatrix => Section_RotateMatrix
         procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
 
@@ -51,44 +55,28 @@ module SolidBody
     end type BeamBody
     type(BeamBody), allocatable :: Beam(:)
   contains
-    subroutine Initialise_(this,filename)
+    subroutine Initialise_(this,filename,iBodyModel)
         ! read beam central line file and allocate memory
         implicit none
         class(BeamBody), intent(inout) :: this
         character (LEN=100), intent(in):: filename
-        integer :: iFish
+        integer :: iBodyModel
 
-        this%fake_meshfile = FakeBeamMeshName
-        this%real_npts     = realnodes
-        allocate(this%real_xyz0(1:this%real_npts,1:6))
-        this%real_xyz0   = realxyzful
+        this%filename = filename
 
-        if (ifUnstructured .eq. 0) then
-            this%fake_type = fake_tp
-            call this%BuildStructured(fake_r,fake_dh)
-        elseif (ifUnstructured .eq. 1) then
+        if (iBodyModel .eq. 2) then
+            call this%BuildStructured()
+        elseif (iBodyModel .eq. 1) then
             call this%ReadUnstructured()
         endif
 
-        allocate(this%faketoreal(this%fake_npts),this%realtofake(this%real_npts),this%fakepids(this%fake_npts))
-        this%faketoreal = 0
-        this%realtofake = 0
-        this%fakepids = 0
-        call this%InitialSection()
-
-        allocate(this%fake_xyz(1:this%fake_npts,1:6))
-        do i = 1,this%fake_npts
-            this%fake_xyz(i,1:3)=this%fake_xyz0(i,1:3)+realXYZ(1:3)
-        enddo
-        this%fake_xyz(:,4:6)=this%fake_xyz0(:,4:6)
-        allocate(this%fake_vel(1:this%fake_npts,1:6))
-        this%fake_vel=0.0d0
-        allocate(this%fake_ext(1:this%fake_npts,1:6))
-        this%fake_ext=0.0d0
-        allocate(this%rotMat(1:this%fake_npts,1:3,1:3))
+        allocate(this%rotMat(1:this%r_npts,1:3,1:3))
         this%rotMat=0.0d0
-        allocate(this%self_rotMat(1:this%fake_npts,1:3,1:3))
+        allocate(this%self_rotMat(1:this%r_npts,1:3,1:3))
         this%self_rotMat=0.0d0
+        allocate(this%v_Exyz(1:this%v_nelmts,1:6))
+        allocate(this%v_Evel(1:this%v_nelmts,1:6))
+        call this%UpdateElmtInfo()
     end subroutine Initialise_
 
     subroutine FSInteraction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
@@ -99,7 +87,7 @@ module SolidBody
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: iFish
-        do iFish = 1,nFish
+        do iFish = 1,m_nFish
             call Beam(iFish)%UpdateElmtInfo()
         enddo
         call calculate_interaction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
@@ -108,31 +96,74 @@ module SolidBody
     subroutine UpdateElmtInfo_(this) ! update element position, velocity, weight
         implicit none
         class(BeamBody), intent(inout) :: this
-        integer :: i,j,k,iEL
+        integer :: i,j,k,iEL,n_theta
+        integer :: Ea_A,Ea_B,Ea_C,Ea_D
+        real(8) :: E_left,E_right
+        real(8) :: pi
+        real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
+        real(8) :: self_rot_omega(3),temp_vel(3)
+        pi=4.0d0*datan(1.0d0)
         !   compute displacement, velocity, area at surface element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,s,nt,x1,x2,y1,y2,ax,ay)
-        do  iEL=1,this%v_nelmts
-            i=this%v_elmt(iEL,1)
-            j=ele(iEL,2)
-            nt=ele(iEL,4)
+        if (this%r_npts .eq. 1) then
+            this%v_Evel = 0.0d0
+        else
+            do i = 1,this%r_npts
 
-            x1=xyzful(i,1)
-            x2=xyzful(j,1)
-            y1=xyzful(i,2)
-            y2=xyzful(j,2)
-            if(nt/=2) write(*,*) 'only support line segments'
-            do s=1,Nspan
-                posElem(s,iEL,1)=(x1+x2)*0.5d0
-                posElem(s,iEL,2)=(y1+y2)*0.5d0
-                posElem(s,iEL,3)=xyzful(i,3) + dspan*(s-0.5)
-                velElem(s,iEL,1:2)=(velful(i,1:2)+velful(j,1:2))*0.5d0
-                velElem(s,iEL,3)=0.d0
+                ! update rotMat and self_rotMar
+                if ( i .eq. 1) then
+                    dxyz0(1:3)= this%r_xyz0(i+1,1:3)-this%r_xyz0(i,1:3)
+                    dxyz(1:3) = this%r_xyz(i+1,1:3)-this%r_xyz(i,1:3)
+                elseif ( i .eq. this%r_npts) then
+                    dxyz0(1:3)= this%r_xyz0(i,1:3)-this%r_xyz0(i-1,1:3)
+                    dxyz(1:3) = this%r_xyz(i,1:3)-this%r_xyz(i-1,1:3)
+                else
+                    dxyz0(1:3)= this%r_xyz0(i+1,1:3)-this%r_xyz0(i-1,1:3)
+                    dxyz(1:3) = this%r_xyz(i+1,1:3)-this%r_xyz(i-1,1:3)
+                endif
+                dl0       = dsqrt(dxyz0(1)**2+dxyz0(2)**2+dxyz0(3)**2)
+                dl        = dsqrt(dxyz(1)**2+dxyz(2)**2+dxyz(3)**2)
+                xlmn0(1:3)= dxyz0(1:3)/dl0
+                xlmn(1:3) = dxyz(1:3)/dl
+                call this%RotateMatrix(i,xlmn0,xlmn)
+                call this%Self_RotateMatrix(i,this%r_xyz(i,4),xlmn)
+                n_theta  = floor(2*pi*maxval(this%r_xyz0(:,4))/maxval(this%r_xyz0(:,5)))
+                if (n_theta .le. 3) n_theta = 3
             enddo
-            ax =(x1-x2)
-            ay =(y1-y2)
-            areaElem(iEL)=dsqrt( ax*ax + ay*ay) * dspan
-        enddo
-        !$OMP END PARALLEL DO
+
+            do iEL = 1,this%v_nelmts
+                i = this%vtor(iEL)
+                    ! update xyz
+                    temp_xyz(1:3) = matmul(this%rotMat(i,:,:), (/this%v_Exyz0(iEL,1), 0.0d0, this%v_Exyz0(iEL,3)/))
+                    temp_xyz(1:3) = matmul(this%self_rotMat(i,:,:), temp_xyz)
+                    ! Default The fake point on the plane (this%v_Exyz0(iEL,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(this%r_xyz0(i,1:3) = (0,y,0)).
+                    temp_xyzoffset(1:3) = this%r_xyz(i,1:3) - this%r_xyz0(i,1:3)
+                    this%v_Exyz(iEL,1:3) = temp_xyz(1:3)+temp_xyzoffset(1:3)
+                    this%v_Exyz(iEL,2) = this%v_Exyz(iEL,2) + this%v_Exyz0(iEL,2)
+
+                    ! update vel
+                    self_rot_omega(1:3) = this%r_vel(i,4)*xlmn(1:3)
+                    call cross_product(self_rot_omega,temp_xyz,temp_vel)
+                    this%v_Evel(iEL,1:3) = temp_vel(1:3)+this%r_vel(i,1:3)
+                !update area
+                if ((iEL .ne. 1) .or. (iEL .ne. this%v_nelmts)) then
+                    Ea_A = iEL-1
+                    if ((i .ne. this%vtor(iEL-1)).or.(Ea_A .eq. 1)) Ea_A = iEL+(n_theta-1)
+                    Ea_B = iEL-n_theta
+                    if (Ea_B .le. 1) Ea_B = 1
+                    Ea_C = iEL+1
+                    if ((i .ne. this%vtor(iEL+1)).or.(Ea_C .eq. this%v_nelmts)) Ea_C = iEL-(n_theta-1)
+                    Ea_D = iEL+n_theta
+                    if (Ea_D .ge. this%v_nelmts) Ea_D = this%v_nelmts
+                    call cpt_area(this%v_Exyz(Ea_A,1:3),this%v_Exyz(Ea_B,1:3),this%v_Exyz(Ea_D,1:3),E_left)
+                    call cpt_area(this%v_Exyz(Ea_B,1:3),this%v_Exyz(Ea_C,1:3),this%v_Exyz(Ea_D,1:3),E_right)
+                    this%v_Ea(iEL) = (E_left+E_right)*0.5d0
+                endif
+            enddo
+            this%v_Ea(1) = 0.d0
+            this%v_Ea(this%v_nelmts) = 0.d0
+
+
+        endif
     end subroutine UpdateElmtInfo_
 
     subroutine UpdateElmtPosVel_(this,dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
@@ -286,13 +317,17 @@ module SolidBody
         !================================
         tolsum=0.d0
         iterLBM=0
-        do  while( iterLBM<maxIterIB .and. dmaxLBM>dtolLBM)
+        do iFish=1,m_nFish
+            allocate(Beam(iFish)%r_force(Beam(iFish)%r_npts,6))
+            Beam(iFish)%r_force(:,:) = 0.0d0
+        enddo
+        do  while( iterLBM<m_maxIterIB .and. dmaxLBM>m_dtolLBM)
             dmaxLBM=0.0d0
             dsum=0.0d0
-            do iFish=1,nFish
+            do iFish=1,m_nFish
                 call Beam(iFish)%PenaltyForce(dh,dt,denIn,zDim,yDim,xDim,uuu,den,force,tol,ntol)
-                tolsum=tolsum+Uref*tol
-                dsum = dsum + ntol
+                tolsum = tolsum + tol
+                dsum = dsum + Uref*ntol
             enddo
             dmaxLBM=tolsum/dsum
             iterLBM=iterLBM+1
@@ -339,17 +374,16 @@ module SolidBody
                 enddo
             enddo
             velElem = this%v_Evel(iEL,1:3)
-            forceElemTemp(1:3) = -Pbeta* 2.0d0*denIn*(velElem-velElemIB)/dt*this%v_Ea(iEL)*dh
+            forceElemTemp(1:3) = -m_Pbeta* 2.0d0*denIn*(velElem-velElemIB)/dt*this%v_Ea(iEL)*dh
             if ((.not. IEEE_IS_FINITE(forceElemTemp(1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(3)))) then
                 write(*, *) 'Nan found in forceElemTemp', forceElemTemp
                 write(*, *) 'Nan found at (ix, jy, kz)', ix(0), jy(0), kz(0)
                 stop
             endif
-            tolerance = tolerance + sum((velElem(1:3)-velElemIB(1:3))**2)
+            tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(1:3))**2))
             !$OMP critical
             ! update beam load, momentum is not included
-            this%r_force(this%vtor(iEL,1),1:3) = this%r_force(this%vtor(iEL,1),1:3) + 0.5d0 * forceElemTemp
-            this%r_force(this%vtor(iEL,2),1:3) = this%r_force(this%vtor(iEL,2),1:3) + 0.5d0 * forceElemTemp
+            this%r_force(this%vtor(iEL),1:3) = this%r_force(this%vtor(iEL),1:3) + forceElemTemp
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
@@ -366,67 +400,26 @@ module SolidBody
         !$OMP END PARALLEL DO
     END SUBROUTINE PenaltyForce_
 
-    subroutine Beam_InitialSection(this)
+    subroutine Beam_BuildStructured(this)
         implicit none
         class(BeamBody), intent(inout) :: this
-        integer :: i,j,num
-        num = 1
-        do i = 1,this%real_npts
-            this%realtofake(i) = num
-            do j = 1,this%fake_npts
-                if ( i .eq. 1) then
-                    if ( this%fake_xyz0(j,2) .le. ((this%real_xyz0(i+1,2)+this%real_xyz0(i,2))/2)) then
-                        this%faketoreal(j) = i
-                        this%fakepids(num) = j
-                        num = num + 1
-                    endif
-                elseif ( i .eq. this%real_npts) then
-                    if ( this%fake_xyz0(j,2) .gt. ((this%real_xyz0(i,2)+this%real_xyz0(i-1,2))/2)) then
-                        this%faketoreal(j) = i
-                        this%fakepids(num) = j
-                        num = num + 1
-                    endif
-                else
-                    if ( this%fake_xyz0(j,2) .le. ((this%real_xyz0(i+1,2)+this%real_xyz0(i,2))/2) .and. this%fake_xyz0(j,2) .gt. ((this%real_xyz0(i,2)+this%real_xyz0(i-1,2))/2)) then
-                        this%faketoreal(j) = i
-                        this%fakepids(num) = j
-                        num = num + 1
-                    endif
-                endif
-            enddo
-        enddo
-    end subroutine Beam_InitialSection
-
-    subroutine Beam_BuildStructured(this,r,dh)
-        implicit none
-        class(Body), intent(inout) :: this
-        real(8), intent(in) :: r,dh
-        call this%StrucFakNod(r,dh)
-        call this%StrucFakEle()
+        call this%Readreal()
+        call this%Struc_Virtual_Elmts()
     end subroutine Beam_BuildStructured
 
     subroutine Beam_ReadUnstructured(this)
         implicit none
-        class(Body), intent(inout) :: this
-        call this%UnstrucFakNod()
-        call this%UnstrucFakEle()
+        class(BeamBody), intent(inout) :: this
+        call this%Unstruc_Virtual_Elmts()
+        this%r_npts = 1
+        allocate(this%r_xyz0(1,5))
+        this%r_xyz0(1,1:3) = this%v_Pxyz0(1,1:3)
+        this%r_xyz0(1,4:5) = 0.0d0
     end subroutine Beam_ReadUnstructured
-
-    subroutine Beam_UpdateLoad(this,updaterealextful)
-        implicit none
-        class(Body), intent(inout) :: this
-        real(8), intent(inout):: updaterealextful(this%real_npts,6)
-        integer :: i,j
-        updaterealextful = 0.0d0
-        do j = 1,this%fake_npts
-            i = this%faketoreal(j)
-                    updaterealextful(i,1:6) = updaterealextful(i,1:6) + this%fake_ext(j,1:6)
-        enddo
-    end subroutine Beam_UpdateLoad
 
     subroutine Section_RotateMatrix(this,i,lmn0,lmn)
         implicit none
-        class(Body), intent(inout) :: this
+        class(BeamBody), intent(inout) :: this
         integer, intent(in) :: i
         ! real(8):: lmn0(3),lmn(3),angle,pi
         ! real(8):: v_0(3),e1(3),e2(3),e3(3),r1(3,3)
@@ -492,7 +485,7 @@ module SolidBody
     end subroutine Section_RotateMatrix
     subroutine Section_Self_RotateMatrix(this,i,angle,lmn)
         implicit none
-        class(Body), intent(inout) :: this
+        class(BeamBody), intent(inout) :: this
         real(8), intent(in):: angle,lmn(3)
         integer, intent(in):: i
         real(8):: r1(3,3)
@@ -527,227 +520,193 @@ module SolidBody
         v(3) = w(1)*r(2) - w(2)*r(1)
     end subroutine cross_product
 
-    subroutine Unstructured_Fake_Nodes(this)
+    subroutine Unstruc_Virtual_Elmts_(this)
         implicit none
-        class(Body), intent(inout) :: this
-        integer :: fileiD = 111, num, i
-        character(LEN=1000) :: buffer
-        real(8) :: x,y,z
-        open(unit=fileiD, file = this%fake_meshfile )
-        do i=1,1000000
-            read(fileiD,*) buffer
-            buffer = trim(buffer)
-            if(buffer(1:6) .eq. '$Nodes') exit
-        enddo
-        read(fileiD,*) num
-        this%fake_npts = num
-        allocate(this%fake_xyz0(1:this%fake_npts, 1:6))
-        this%fake_xyz0 = 0.0d0
-        do i = 1,this%fake_npts
-            read(fileiD,*)num,x,y,z
-            this%fake_xyz0(i,1) = x
-            this%fake_xyz0(i,2) = y
-            this%fake_xyz0(i,3) = z
-        enddo
-        close(fileiD)
-    end subroutine Unstructured_Fake_Nodes
-    subroutine Unstructured_Fake_Elements(this)
-        implicit none
-        class(Body), intent(inout) :: this
+        class(BeamBody), intent(inout) :: this
         integer :: fileiD = 111, num, i, temp_nelmts, temp_prop(4)
         character(LEN=1000) :: buffer
-        integer :: l,m,n
-        open(unit=fileiD, file = this%fake_meshfile )
-            do i=1,1000000
-                read(fileiD,*) buffer
-                buffer = trim(buffer)
-                if(buffer(1:9) .eq. '$Elements') exit
+        open(unit=fileiD, file = this%filename )! read *.msh file
+            ! read nodes
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*) num
+            this%v_npts = num
+            allocate(this%v_Pxyz0(1:this%v_npts, 1:6))
+            this%v_Pxyz0 = 0.0d0
+            do i = 1,this%v_npts
+                read(fileiD,*)num,this%v_Pxyz0(i,1),this%v_Pxyz0(i,2),this%v_Pxyz0(i,3)
             enddo
+            ! read element
+            read(fileiD,*)
+            read(fileiD,*)
             read(fileiD,*) num
             temp_nelmts = num
             do i = 1,temp_nelmts
                 read(fileiD,*)num,temp_prop(1:4)
                 if((temp_prop(1)==2) .and. (temp_prop(2)==2) .and. (temp_prop(3)==0)) then
-                    this%fake_nelmts = temp_nelmts-num+1
+                    this%v_nelmts = temp_nelmts-num+1
                     exit
                 endif
             enddo
 
             backspace(fileiD)
 
-            allocate(this%fake_ele(1:this%fake_nelmts, 1:5))
-            this%fake_ele = 0
-            do i = 1,this%fake_nelmts
-                read(fileiD,*)num,temp_prop(1:4),l,m,n
-                this%fake_ele(i,1) = l
-                this%fake_ele(i,2) = m
-                this%fake_ele(i,3) = n
+            allocate(this%v_elmt(1:this%v_nelmts, 1:3))
+            this%v_elmt = 0
+            allocate(this%v_Ea(1:this%v_nelmts))
+            this%v_Ea = 0.0d0
+            allocate(this%v_Exyz0(1:this%v_nelmts, 1:3))
+            this%v_Exyz0 = 0.0d0
+            do i = 1,this%v_nelmts
+                read(fileiD,*)num,temp_prop(1:4),this%v_elmt(i,1),this%v_elmt(i,2),this%v_elmt(i,3)
+                call cpt_area(this%v_Pxyz0(this%v_elmt(i,1),1:3),this%v_Pxyz0(this%v_elmt(i,2),1:3),this%v_Pxyz0(this%v_elmt(i,3),1:3),this%v_Ea(i))
+                call cpt_incenter(this%v_Pxyz0(this%v_elmt(i,1),1:3),this%v_Pxyz0(this%v_elmt(i,2),1:3),this%v_Pxyz0(this%v_elmt(i,3),1:3),this%v_Exyz0(i,1:3))
             enddo
-            this%fake_ele(:,4) = 3
-            this%fake_ele(:,5) = 1
+
         close(fileiD)
-    end subroutine Unstructured_Fake_Elements
-    subroutine Structured_Fake_Nodes(this,r,dh)
+    end subroutine Unstruc_Virtual_Elmts_
+    subroutine cpt_incenter(NodeA,NodeB,NodeC,Exyz0)
         implicit none
-        class(Body), intent(inout) :: this
-        real(8), intent(in) :: r,dh
-        select case(this%fake_type)
-            case(1)
-                call this%Cylinder_Nodes(r,dh)
-            case(2)
-                ! call triangular_Nodes(this,r,dh)
-            case(3)
-                ! call quadrangular_Nodes(this,r,dh)
-            case default
-                write(*, *) 'undefined body shape ', this%fake_type
-                stop
-        end select
-    end subroutine Structured_Fake_Nodes
-    subroutine Structured_Fake_Elements(this)
+        real(8), intent(in) :: NodeA(3),NodeB(3),NodeC(3)
+        real(8), intent(out) :: Exyz0(3)
+        real(8) :: x1, x2, x3, y1, y2, y3, z1, z2, z3
+        real(8) :: a, b, c, invC
+        integer :: iEL, i, j, k
+            x1=NodeA(1)
+            x2=NodeB(1)
+            x3=NodeC(1)
+            y1=NodeA(2)
+            y2=NodeB(2)
+            y3=NodeC(2)
+            z1=NodeA(3)
+            z2=NodeB(3)
+            z3=NodeC(3)
+            a = sqrt((x2 - x3)**2 + (y2 - y3)**2 + (z2 - z3)**2)
+            b = sqrt((x3 - x1)**2 + (y3 - y1)**2 + (z3 - z1)**2)
+            c = sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+            invC = 1 / (a + b + c)
+            Exyz0(1) = (a*x1 + b*x2 + c*x3) * invC
+            Exyz0(2) = (a*y1 + b*y2 + c*y3) * invC
+            Exyz0(3) = (a*z1 + b*z2 + c*z3) * invC
+    end subroutine cpt_incenter
+    subroutine cpt_area(A,B,C,area)
         implicit none
-        class(Body), intent(inout) :: this
-        select case(this%fake_type)
-            case(1)
-                call this%Cylinder_Elements()
-            case(2)
-                ! call triangular_Elements(this)
-            case(3)
-                ! call quadrangular_Elements(this)
-            case default
-                write(*, *) 'undefined body shape ', this%fake_type
-                stop
-        end select
-    end subroutine
-    subroutine Structured_Cylinder_Nodes(this,r,dh)
+        real(8), intent(in) :: A(3),B(3),C(3)
+        real(8), intent(out) :: area
+        real(8) :: x1, x2, x3, y1, y2, y3, z1, z2, z3, ax, ay, az
+        integer :: iEL, i, j, k
+            x1=A(1)
+            x2=B(1)
+            x3=C(1)
+            y1=A(2)
+            y2=B(2)
+            y3=C(2)
+            z1=A(3)
+            z2=B(3)
+            z3=B(3)
+            ax =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))/2.0d0
+            ay =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))/2.0d0
+            az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))/2.0d0
+            area=dsqrt( ax*ax + ay*ay + az*az)
+    end subroutine cpt_area
+    subroutine Readreal_(this)
         implicit none
-        class(Body), intent(inout) :: this
-        real(8), intent(in) :: r,dh
+        class(BeamBody), intent(inout) :: this
+        integer:: i, node, fileiD = 111
+        open(unit=fileiD, file = this%filename )
+        rewind(fileiD)
+        read(fileiD,*)
+        read(fileiD,*)
+        read(fileiD,*)
+        read(fileiD,*)  this%r_npts
+        allocate(this%r_xyz0(this%r_npts,5))
+        do    i= 1, this%r_npts
+            read(fileiD,*) node,this%r_xyz0(node,1),this%r_xyz0(node,2),this%r_xyz0(node,3),this%r_xyz0(node,4),this%r_xyz0(node,5)
+        enddo
+        close(fileiD)
+    end subroutine Readreal_
+    subroutine Struc_Virtual_Elmts_(this)
+        implicit none
+        class(BeamBody), intent(inout) :: this
+        call this%Struc_Cylinder_Elmts()
+    end subroutine Struc_Virtual_Elmts_
+    subroutine Struc_Cylinder_Elmts_(this)
+        implicit none
+        class(BeamBody), intent(inout) :: this
         real(8) :: pi
-        real(8) :: theta, ztemp, rho
+        real(8) :: theta, rho, height
         integer :: n_height,n_theta,n_radius
         integer :: i,j,k,num
         integer :: n_circle, n_rectangle
         pi=4.0d0*datan(1.0d0)
-        n_height = this%real_npts
-        n_radius = floor(r/dh)+1
-        n_theta  = floor(2*pi*r/dh)
+
+        this%v_nelmts = 0
+        n_height = this%r_npts
+        n_radius = 1+floor(maxval(this%r_xyz0(:,4))/maxval(this%r_xyz0(:,5)))
+        n_theta  = floor(2*pi*maxval(this%r_xyz0(:,4))/maxval(this%r_xyz0(:,5)))
         if (n_radius .eq. 1) n_radius = 2
-        if (n_theta  .le. 3) n_radius = 3
+        if (n_theta  .le. 3) n_theta = 3
+        
+        n_circle = ((n_radius-1) * n_theta) + 1
+        n_rectangle = (n_height - 2) * n_theta
+        this%v_nelmts = n_circle * 2 + n_rectangle
 
-        this%n_h = n_height
-        this%n_r = n_radius
-        this%n_t = n_theta
+        allocate(this%v_Exyz0(1:this%v_nelmts, 1:3))
+        this%v_Exyz0 = 0.0d0
+        allocate(this%vtor(1:this%v_nelmts))
+        this%vtor = 0
 
-        n_circle = ((n_radius-1) * n_theta) + 1 ! Node number on top(bottom) surface (circle) of cylinder
-        n_rectangle = (n_height - 2) * n_theta ! Node number on side surface (rectangle) of cylinder
-        this%fake_npts = n_circle * 2 + n_rectangle ! Total node number
-
-        allocate(this%fake_xyz0(1:this%fake_npts, 1:6))
-        this%fake_xyz0 = 0.0d0
-
-        ! Given node fake_xyz0 coordinate value
+        ! Given node v_Exyz0 coordinate value
         num = 1
-        this%fake_xyz0(num,:)=0.0d0
-        num = num+1
-        do j = 1, n_radius-1
-            do i = 1, n_theta
-                theta = (i - 1) * 2.0 * pi / n_theta
-                rho = j * r / (n_radius-1)
-                this%fake_xyz0(num,1) = rho * cos(theta)
-                this%fake_xyz0(num,2) = 0.0d0
-                this%fake_xyz0(num,3) = rho * sin(theta)
-                num = num+1
-            end do
+        do i = 1, this%r_npts
+            if (i .eq. 1) then
+                this%v_Exyz0(num,2) = this%r_xyz0(i,2)
+                this%vtor(num) = i
+                num = num + 1
+                do j = 1, n_radius - 1
+                    rho = j * this%r_xyz0(i,4) / (n_radius - 1)
+                    height = this%r_xyz0(i,2)
+                    do k = 1, n_theta
+                        theta = (k - 1) * 2.0 * pi / n_theta
+                        this%v_Exyz0(num,1) = rho * cos(theta)
+                        this%v_Exyz0(num,2) = height
+                        this%v_Exyz0(num,3) = rho * sin(theta)
+                        this%vtor(num) = i
+                        num = num+1
+                    enddo
+                enddo
+            elseif (i .eq. this%r_npts) then
+                do j = 1, n_radius - 1
+                    rho = (n_radius - j) * this%r_xyz0(i,4) / (n_radius - 1)
+                    height = this%r_xyz0(i,2)
+                    do k = 1, n_theta
+                        theta = (k - 1) * 2.0 * pi / n_theta
+                        this%v_Exyz0(num,1) = rho * cos(theta)
+                        this%v_Exyz0(num,2) = height
+                        this%v_Exyz0(num,3) = rho * sin(theta)
+                        this%vtor(num) = i
+                        num = num+1
+                    enddo
+                enddo
+                this%v_Exyz0(num,2) = this%r_xyz0(i,2)
+                this%vtor(num) = i
+            else
+                rho = this%r_xyz0(i,4)
+                height = this%r_xyz0(i,2)
+                do k = 1, n_theta
+                    theta = (k - 1) * 2.0 * pi / n_theta
+                    this%v_Exyz0(num,1) = rho * cos(theta)
+                    this%v_Exyz0(num,2) = height
+                    this%v_Exyz0(num,3) = rho * sin(theta)
+                    this%vtor(num) = i
+                    num = num+1
+                enddo
+            endif
         enddo
-        do k = 1, n_height-2
-            ztemp = this%real_xyz0(k+1,2)
-            do i = 1, n_theta
-                theta = (i - 1) * 2.0 * pi / n_theta
-                this%fake_xyz0(num,1) = r * cos(theta)
-                this%fake_xyz0(num,2) = ztemp
-                this%fake_xyz0(num,3) = r * sin(theta)
-                num = num+1
-            end do
-        end do
-        do j = 1, n_radius-1
-            do i = 1, n_theta
-                theta = (i - 1) * 2.0 * pi / n_theta
-                rho = (n_radius-j)* r / (n_radius-1)
-                this%fake_xyz0(num,1) = rho * cos(theta)
-                this%fake_xyz0(num,2) = this%real_xyz0(this%real_npts,2)
-                this%fake_xyz0(num,3) = rho * sin(theta)
-                num = num+1
-            end do
-        enddo
-        this%fake_xyz0(num,1) = 0.0d0
-        this%fake_xyz0(num,2) = this%real_xyz0(this%real_npts,2)
-        this%fake_xyz0(num,3) = 0.0d0
-        
-    end subroutine Structured_Cylinder_Nodes
-    subroutine Structured_Cylinder_Elements(this)
-        implicit none
-        class(Body), intent(inout) :: this
-        integer :: n_height,n_theta,n_radius
-        integer :: i,j,num
-        integer :: n_longitude
 
-        n_height = this%n_h
-        n_radius = this%n_r
-        n_theta  = this%n_t
-
-        n_longitude = n_height + n_radius*2 - 2 ! Node number on one longitude line (include top and bottom node)
-        this%fake_nelmts = n_theta + n_theta * (n_longitude - 2 - 1) * 2 + n_theta ! Total element number
-        allocate(this%fake_ele(1:this%fake_nelmts, 1:5))
-        this%fake_ele = 0
-        
-        ! Given and output triangle element number (element face normal direction outward)
-        
-        num = 1
-        do i = 1, n_theta-1
-            this%fake_ele(num,1) = 1
-            this%fake_ele(num,2) = i+2
-            this%fake_ele(num,3) = i+1
-            num = num+1 ! Element around bottom circle center
-        enddo
-        this%fake_ele(num,1) = 1
-        this%fake_ele(num,2) = 2
-        this%fake_ele(num,3) = n_theta+1
-        num = num+1 ! Element around bottom circle center
-        do j = 1, n_longitude-3
-            do i = 1, n_theta-1
-                this%fake_ele(num,1) = 1+((j-1)*n_theta+i)
-                this%fake_ele(num,2) = 1+((j-1)*n_theta+i+1)
-                this%fake_ele(num,3) = 1+( j   *n_theta+i)
-                num = num+1 ! Lower triangula
-                this%fake_ele(num,1) = 1+((j-1)*n_theta+i+1)
-                this%fake_ele(num,2) = 1+( j   *n_theta+i+1)
-                this%fake_ele(num,3) = 1+( j   *n_theta+i)
-                num = num+1 ! Upper triangular
-            enddo
-            this%fake_ele(num,1) = 1+((j-1)*n_theta+n_theta)
-            this%fake_ele(num,2) = 1+((j-1)*n_theta+1)
-            this%fake_ele(num,3) = 1+( j   *n_theta+n_theta)
-            num = num+1 ! Lower triangula
-            this%fake_ele(num,1) = 1+((j-1)*n_theta+1)
-            this%fake_ele(num,2) = 1+( j   *n_theta+1)
-            this%fake_ele(num,3) = 1+( j   *n_theta+n_theta)
-            num = num+1 ! Upper triangular
-        enddo
-        do i = 1, n_theta - 1
-            this%fake_ele(num,1) = this%fake_npts
-            this%fake_ele(num,2) = this%fake_npts-(n_theta-1-i)-2
-            this%fake_ele(num,3) = this%fake_npts-(n_theta-1-i)-1
-            num = num+1 ! Element around top circle center
-        enddo
-            this%fake_ele(num,1) = this%fake_npts
-            this%fake_ele(num,2) = this%fake_npts-1
-            this%fake_ele(num,3) = this%fake_npts-n_theta
-        num = num+1 ! Element around top circle center
-
-        this%fake_ele(:,4) = 3
-        this%fake_ele(:,5) = 1
-
-    end subroutine Structured_Cylinder_Elements
+    end subroutine Struc_Cylinder_Elmts_
 
     subroutine Write_body_(this,iFish,time,Lref,Tref)
         ! to do: generate a temporary mesh
@@ -770,12 +729,12 @@ module SolidBody
             if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
     
-        ElmType = this%fake_ele(1,4)
+        ! ElmType = this%fake_ele(1,4)
 
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
         open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',this%fake_npts,', E=',this%fake_nelmts,', DATAPACKING=POINT, ZONETYPE='
+        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',this%v_npts,', E=',this%v_nelmts,', DATAPACKING=POINT, ZONETYPE='
         if(ElmType.eq.2) then
             write(idfile, '(A)') 'FELINESEG'
         elseif (ElmType.eq.3) then
@@ -783,26 +742,26 @@ module SolidBody
         elseif(ElmType.eq.4) then
             write(idfile, '(A)') 'FEQUADRILATERAL'
         endif
-        do  i=1,this%fake_npts
-            write(idfile, *)  this%fake_xyz(i,1:3)/Lref
+        do  i=1,this%v_nelmts
+            write(idfile, *)  this%v_Exyz(i,1:3)!/Lref
         enddo
-        do  i=1,this%fake_nelmts
-            if(ElmType.eq.2) then
-                write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2)
-            elseif(ElmType.eq.3) then
-                write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3)
-            ! elseif(ElmType.eq.4) then
-            !     write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3),this%fake_ele(i,4)
-            else
-            endif
-        enddo
+        ! do  i=1,this%v_nelmts
+        !     if(ElmType.eq.2) then
+        !         write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2)
+        !     elseif(ElmType.eq.3) then
+        !         write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3)
+        !     ! elseif(ElmType.eq.4) then
+        !     !     write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3),this%fake_ele(i,4)
+        !     else
+        !     endif
+        ! enddo
         close(idfile)
         !   =============================================
     end subroutine
 
-    subroutine Initialise_bodies(nFish,maxIterIB,dtolLBM,Pbeta,filenames)
+    subroutine Initialise_bodies(nFish,maxIterIB,dtolLBM,Pbeta,filenames,iBodyModel)
         implicit none
-        integer,intent(in)::nFish, maxIterIB
+        integer,intent(in)::nFish, maxIterIB,iBodyModel(nFish)
         real(8),intent(in):: dtolLBM, Pbeta
         character(LEN=100),intent(in):: filenames(nFish)
         integer :: iFish
@@ -812,7 +771,7 @@ module SolidBody
         m_Pbeta = Pbeta
         allocate(Beam(nFish))
         do iFish = 1,nFish
-            call Beam(iFish)%Initialise(filenames(iFish))
+            call Beam(iFish)%Initialise(filenames(iFish),iBodyModel(iFish))
         enddo
     end subroutine Initialise_bodies
     subroutine Write_solid_bodies(time,Lref,Tref)

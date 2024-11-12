@@ -8,8 +8,7 @@
     PROGRAM main
     USE simParam
     use omp_lib
-    USE FakeBody
-    USE BodyWorkSpace
+    USE SolidBody
     implicit none
     integer:: iND,isubstep,iFish,x,y,z
     real(8), allocatable:: FishInfo(:,:)
