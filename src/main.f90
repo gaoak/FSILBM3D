@@ -36,9 +36,9 @@
 !===============================================================================================
     time=0.0d0
     step=0
+    call Initialise_bodies(nFish,Lspan,ntolLBM,dtolLBM,Pbeta,FEmeshName,iBodyModel,boundaryConditions)
     CALL initialize_solid()
     CALL initialize_flow()
-    call Initialise_bodies(nFish,nND,xyzful00,XYZ)
     if(ismovegrid==1)then
         iFish = 1
         call cptIref(NDref,IXref,IYref,IZref,nND(iFish),xDim,yDim,zDim,xyzful(1:nND(iFish),1:3,iFish),xGrid,yGrid,zGrid,Xref,Yref,Zref)
@@ -63,7 +63,7 @@
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
     CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-    call Write_solid_bodies(nFish,Lref,time,Tref)
+    call Write_solid_bodies(Lref,time,Tref)
 !==================================================================================================
 !==================================================================================================
 !==================================================================================================
@@ -144,8 +144,7 @@
         enddo
         !$OMP END PARALLEL DO
         !compute force exerted on fluids
-        CALL FSInteraction_force(zDim,yDim,xDim,dh,Uref,denIn,dt,uuu,den,xGrid,yGrid,zGrid,  &
-            Pbeta,ntolLBM,dtolLBM,force,isUniformGrid,nND,xyzful,velful,extful)
+        CALL FSInteraction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
         !compute volume force exerted on fluids
         CALL addVolumForc()
 
@@ -154,7 +153,7 @@
         if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
 
         call date_and_time(VALUES=values0)
-        call cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,dspan,Nspan)
+        call cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,Lspan)
         call date_and_time(VALUES=values1)
         write(*,*)'time for Lubforce :',CPUtime(values1)-CPUtime(values0)
 
@@ -276,7 +275,7 @@
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
                 CALL write_solid_field(xyzful/Lref,velful/Uref,accful/Aref,extful/Fref,repful/Fref,ele,time/Tref,nND,nEL,nND_max,nEL_max,nFish)
-                call Write_solid_bodies(nFish,Lref,time,Tref)
+                call Write_solid_bodies(Lref,time,Tref)
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
                 CALL write_flow_fast()

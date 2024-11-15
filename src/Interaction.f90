@@ -1,14 +1,14 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    Calculate the repulsive force between solids
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,dspan,Nspan)
+    SUBROUTINE cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,Lspan)
     implicit none
-    integer:: nFish,nND_max,nND(1:nFish),Nspan(1:nFish)
+    integer:: nFish,nND_max,nND(1:nFish)
     real(8):: dxmin,dymin,dzmin
-    real(8):: xyzful(1:nND_max,1:6,1:nFish),repful(1:nND_max,1:6,1:nFish),dspan(1:nFish)
+    real(8):: xyzful(1:nND_max,1:6,1:nFish),repful(1:nND_max,1:6,1:nFish)
     !local
     integer:: iND,jND,iFish,jFish
-    real(8):: delta_h,r(1:3),ds(1:3),phi_r(1:3),SpanLength
+    real(8):: delta_h,r(1:3),ds(1:3),phi_r(1:3),Lspan(nFish)
     real(8):: minx,miny,maxx,maxy,minz,maxz
     real(8):: xmin(1:nFish),xmax(1:nFish),ymin(1:nFish),ymax(1:nFish),zmin(1:nFish),zmax(1:nFish)
 
@@ -27,10 +27,6 @@
     enddo
 
     do iFish=1,nFish
-        SpanLength=dspan(iFish)*Nspan(iFish)
-        if(Nspan(iFish).eq.0)then
-            SpanLength=1.0d0
-        endif
         do jFish=iFish+1,nFish
             minx = max(xmin(iFish),xmin(jFish))
             miny = max(ymin(iFish),ymin(jFish))
@@ -59,8 +55,8 @@
                     r(3)=(xyzful(iND,3,iFish)-xyzful(jND,3,jFish))/dzmin
                     call get_smoother_phi_r(r,phi_r)
                     delta_h=phi_r(1)*phi_r(2)*phi_r(3)/dxmin/dymin/dzmin/sqrt(r(1)*r(1)+r(2)*r(2)+r(3)*r(3))
-                    repful(iND,1:3,iFish)=repful(iND,1:3,iFish) + delta_h*r(1:3)*ds(1:3)*SpanLength ! force
-                    repful(jND,1:3,jFish)=repful(jND,1:3,jFish) - delta_h*r(1:3)*ds(1:3)*SpanLength ! reaction force
+                    repful(iND,1:3,iFish)=repful(iND,1:3,iFish) + delta_h*r(1:3)*ds(1:3)*Lspan(iFish) ! force
+                    repful(jND,1:3,jFish)=repful(jND,1:3,jFish) - delta_h*r(1:3)*ds(1:3)*Lspan(iFish) ! reaction force
                 enddo !jND=1,nND(jFish)
             enddo !iND=1,nND(iFish)
         enddo !jFish=iFish+1,nFish
