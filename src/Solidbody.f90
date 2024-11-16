@@ -128,29 +128,21 @@ module SolidBody
         real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
         real(8) :: self_rot_omega(this%r_nelmts,3),temp_vel(3)
         integer :: s
-        real(8) :: x1,x2,y1,y2,z1,z2
-        real(8) :: dspan,invl0,cos_x,cos_y,cos_z
+        real(8) :: xyz1(3),xyz2(3)
+        real(8) :: dspan,invl0,cos_xyz(3)
         pi=4.0d0*datan(1.0d0)
         !   compute displacement, velocity, area at surface element center
         if (this%v_type .eq. 0) then
             this%v_Evel = 0.0d0
         elseif ((this%v_type .eq. 1)) then
             invl0 = 1 / dsqrt(sum(this%v_dirc(1:3)**2))
-            cos_x = this%v_dirc(1) * invl0
-            cos_y = this%v_dirc(2) * invl0
-            cos_z = this%v_dirc(3) * invl0
+            cos_xyz = this%v_dirc(1:3) * invl0
             do i = 1, this%r_nelmts
                 dspan = this%r_Lspan(i)/this%r_Nspan(i)
-                x1 = this%r_xyz(this%r_elmt(i,1),1)
-                x2 = this%r_xyz(this%r_elmt(i,2),1)
-                y1 = this%r_xyz(this%r_elmt(i,1),2)
-                y2 = this%r_xyz(this%r_elmt(i,2),2)
-                z1 = this%r_xyz(this%r_elmt(i,1),3)
-                z2 = this%r_xyz(this%r_elmt(i,2),3)
+                xyz1(1:3) = this%r_xyz(this%r_elmt(i,1),1:3)
+                xyz2(1:3) = this%r_xyz(this%r_elmt(i,2),1:3)
                 do s = 1,this%r_Nspan(i)
-                    this%v_Exyz(i,1) = (x1+x2)*0.5d0 + dspan*(s-0.5)*cos_x
-                    this%v_Exyz(i,2) = (y1+y2)*0.5d0 + dspan*(s-0.5)*cos_y
-                    this%v_Exyz(i,3) = (z1+z2)*0.5d0 + dspan*(s-0.5)*cos_z
+                    this%v_Exyz(i,1:3) = (xyz1(1:3)+xyz2(1:3))*0.5d0 + dspan*(s-0.5)*cos_xyz(1:3)
                     call UpdateElmtArea_()
                 enddo
             enddo
@@ -192,7 +184,7 @@ module SolidBody
             if (this%v_type .eq. 0) then
             elseif ((this%v_type .eq. 1)) then
                 ! only rectangle
-                this%v_Ea(i) = dspan * dsqrt(((x1-x2)**2)+((y1-y2)**2)+((z1-z2)**2))
+                this%v_Ea(i) = dspan * dsqrt(((xyz1(1)-xyz2(1))**2)+((xyz1(2)-xyz2(2))**2)+((xyz1(3)-xyz2(3))**2))
             elseif ((this%v_type .eq. 2)) then
                 n_theta  = maxval(this%r_Nspan(:))
                 do iEL = 2,this%v_nelmts-1
@@ -684,30 +676,22 @@ module SolidBody
         class(BeamBody), intent(inout) :: this
         integer(2) :: i
         integer :: s,num
-        real(8) :: x1,x2,y1,y2,z1,z2
-        real(8) :: dspan,invl0,cos_x,cos_y,cos_z
+        real(8) :: xyz1(3),xyz2(3)
+        real(8) :: dspan,invl0,cos_xyz(3)
         this%v_nelmts = sum(this%r_Nspan)
         allocate(this%v_Exyz0(1:this%v_nelmts, 1:3))
         this%v_Exyz0 = 0.0d0
         allocate(this%vtor(1:this%v_nelmts,1:2))
         this%vtor = 0
         invl0 = 1 / dsqrt(sum(this%v_dirc(1:3)**2))
-        cos_x = this%v_dirc(1) * invl0
-        cos_y = this%v_dirc(2) * invl0
-        cos_z = this%v_dirc(3) * invl0
+        cos_xyz = this%v_dirc(1:3) * invl0
         num = 1
         do i = 1, this%r_nelmts
             dspan = this%r_Lspan(i)/this%r_Nspan(i)
-            x1 = this%r_xyz0(this%r_elmt(i,1),1)
-            x2 = this%r_xyz0(this%r_elmt(i,2),1)
-            y1 = this%r_xyz0(this%r_elmt(i,1),2)
-            y2 = this%r_xyz0(this%r_elmt(i,2),2)
-            z1 = this%r_xyz0(this%r_elmt(i,1),3)
-            z2 = this%r_xyz0(this%r_elmt(i,2),3)
+            xyz1(1:3) = this%r_xyz0(this%r_elmt(i,1),1:3)
+            xyz2(1:3) = this%r_xyz0(this%r_elmt(i,2),1:3)
             do s = 1,this%r_Nspan(i)
-                this%v_Exyz0(i,1) = (x1+x2)*0.5d0 + dspan*(s-0.5)*cos_x
-                this%v_Exyz0(i,2) = (y1+y2)*0.5d0 + dspan*(s-0.5)*cos_y
-                this%v_Exyz0(i,3) = (z1+z2)*0.5d0 + dspan*(s-0.5)*cos_z
+                this%v_Exyz0(i,1:3) = (xyz1(1:3)+xyz2(1:3))*0.5d0 + dspan*(s-0.5)*cos_xyz(1:3)
                 this%vtor(num,1:2) = this%r_elmt(i,1:2)
                 num = num + 1
             enddo
@@ -808,10 +792,11 @@ module SolidBody
         real(8),intent(in) :: time,Lref,Tref
         !   -------------------------------------------------------
         real(8):: pi,timeTref
-        integer:: i,ElmType,n_theta,Ea_A,Ea_B
+        integer:: i,j,r,Nspanpts,ElmType,n_theta,Ea_A,Ea_D
         integer,parameter::nameLen=10
         character (LEN=nameLen):: fileName,idstr
         integer,parameter:: idfile=100
+        real(8) :: invl0,cos_xyz(3),dspan,xyz1(3),xyz2(3),low_L(3),low_R(3),upp_R(3),upp_L(3)
         pi=4.0d0*datan(1.0d0)
         !==========================================================================
         timeTref = time/Tref
@@ -830,7 +815,7 @@ module SolidBody
         if (this%v_type .eq. 0) then
             write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%v_npts,', E=',this%v_nelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
         elseif (this%v_type .eq. 1) then
-            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%v_nelmts,', E=',this%v_nelmts,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',4*this%v_nelmts,', E=',this%v_nelmts,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
         elseif (this%v_type .eq. 2) then
             write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%v_nelmts,', E=',this%v_nelmts-2,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
         endif
@@ -856,20 +841,41 @@ module SolidBody
                 ! endif
             enddo
         elseif (this%v_type .eq. 1)then
-
+            invl0 = 1 / dsqrt(sum(this%v_dirc(1:3)**2))
+            cos_xyz(1:3) = this%v_dirc(1:3) * invl0
+            do i = 1, this%r_nelmts
+                dspan = this%r_Lspan(i)/this%r_Nspan(i)
+                Nspanpts = this%r_Nspan(i)+1
+                xyz1(1:3) = this%r_xyz(this%r_elmt(i,1),1:3)
+                xyz2(1:3) = this%r_xyz(this%r_elmt(i,2),1:3)
+                do j = 1,Nspanpts
+                    low_L(1:3) = xyz1(1:3) + dspan*(j-1)*cos_xyz(1:3)
+                    low_R(1:3) = xyz1(1:3) + dspan*(j)*cos_xyz(1:3)
+                    upp_R(1:3) = xyz2(1:3) + dspan*(j)*cos_xyz(1:3)
+                    upp_L(1:3) = xyz2(1:3) + dspan*(j-1)*cos_xyz(1:3)
+                    write(idfile, *) low_L(1:3)!/Lref
+                    write(idfile, *) low_R(1:3)!/Lref
+                    write(idfile, *) upp_R(1:3)!/Lref
+                    write(idfile, *) upp_L(1:3)!/Lref
+                enddo
+            enddo
+            do  i=1,this%v_nelmts
+                j = 4*(i-1)
+                write(idfile, *) j+1,j+2,j+3,j+4
+            enddo
         elseif (this%v_type .eq. 2)then
             do  i=1,this%v_nelmts
                 write(idfile, *)  this%v_Exyz(i,1:3)!/Lref
             enddo
-            n_theta  = floor(2*pi*maxval(this%r_xyz0(:,4))/maxval(this%r_xyz0(:,5)))
-            if (n_theta .le. 3) n_theta = 3
+            n_theta  = maxval(this%r_Nspan(:))
             do  i=2,this%v_nelmts-1
+                r = mod((i-1),n_theta)
                 Ea_A = i-1
-                if ((i .ne. this%vtor(i-1)).or.(Ea_A .eq. 1)) Ea_A = i+(n_theta-1)
-                Ea_B = i-n_theta
-                if (Ea_B .le. 1) Ea_B = 1
+                if (r.eq.1) Ea_A = i+(n_theta-1)
+                Ea_D = i+n_theta
+                if (Ea_D .ge. this%v_nelmts) Ea_D = this%v_nelmts
 
-                write(idfile, *) i,Ea_A,Ea_B
+                write(idfile, *) Ea_A,i,Ea_D
             enddo
         endif
         close(idfile)
