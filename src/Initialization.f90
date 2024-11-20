@@ -10,7 +10,7 @@
     integer:: FishOrder1,FishOrder2,LineX,LineY,LineZ
     integer, allocatable:: FishNum(:),NumX(:),NumY(:)
     character(LEN=40):: tmpFEmeshName
-    integer:: niBodyModel,nisMotionGiven(1:6),nNspan
+    integer:: niBodyModel,nisMotionGiven(1:6)
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     open(unit=111,file='inFlow.dat')
@@ -76,7 +76,6 @@
         read(111,*)     ndenR, npsR
         if(iKB==0) read(111,*)     nEmR, ntcR
         if(iKB==1) read(111,*)     nKB, nKS
-        read(111,*)     ndspan,ntheta,nNspan
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
@@ -293,7 +292,7 @@
     USE simParam
     implicit none
     integer:: iND,iFish,maxN
-    real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:),lentemp(:)
+    real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
     if(nFish==0) return
     allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
 
@@ -345,7 +344,7 @@
 !   ===============================================================================================
 !   calculate area
     allocate(elmax(1:nFish),elmin(1:nFish))
-    allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish),lentemp(1:nFish))
+    allocate(nAsfac(1:nFish),nLchod(1:nFish),lentemp(1:nFish))
     do iFish=1,nFish
         call cptArea(areaElem00(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful00(1:nND(iFish),1:6,iFish))
         nAsfac(iFish)=sum(areaElem00(1:nEL(iFish),iFish))
@@ -364,9 +363,9 @@
     Lchod = nLchod(maxN)
 
     if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
-    if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
+    if((maxval(Lspan)-1.0d0)<=1.0d-2)Lspan(maxloc(Lspan))=1.0d0
 
-    AR    = Lspan**2/Asfac
+    AR    = maxval(Lspan)**2/Asfac
 
 !   loading boundary type*******************************************************************************
     do  iFish=1,nFish

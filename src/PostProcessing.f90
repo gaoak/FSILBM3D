@@ -207,7 +207,7 @@
         write(111,'(A,F20.10)')'Freq =',maxval(Freq(:))
         write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3,1:nFish)))
         write(111,'(A,F20.10)')'Lchod=',Lchod
-        write(111,'(A,F20.10)')'Lspan=',Lspan
+        write(111,'(A,F20.10)')'Lspan=',maxval(Lspan)
         write(111,'(A,F20.10)')'Asfac=',Asfac
         write(111,'(A,F20.10)')'AR   =',AR
         write(111,'(A      )')'===================================='
@@ -231,7 +231,6 @@
         write(111,'(A,2F20.10)')'denR,psR    =',denR(iFish),psR(iFish)
         write(111,'(A,2F20.10)')'KB,  KS     =',KB(iFish),KS(iFish)
         write(111,'(A,2F20.10)')'EmR, tcR    =',EmR(iFish),tcR(iFish)
-        write(111,'(A,2F20.10)')'theta, span    =',theta(iFish),dspan(iFish) * Nspan(iFish)
         write(111,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',XYZo(1:3,iFish)
         write(111,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',XYZAmpl(1:3,iFish)
         write(111,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',XYZPhi(1:3,iFish)

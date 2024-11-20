@@ -13,15 +13,20 @@ module SolidBody
     type :: BeamBody
         character(LEN=100) :: filename
         !!!centeral line beam
-        integer :: r_npts
+        integer :: r_npts,r_nelmts
         real(8), allocatable :: r_xyz0(:, :)
         real(8), allocatable :: r_xyz(:, :)
+        integer, allocatable :: r_elmt(:, :)
+        real(8), allocatable :: r_Lspan(:)
+        integer, allocatable :: r_Nspan(:)
         real(8), allocatable :: r_vel(:, :)
         real(8), allocatable :: r_force(:, :)
+        real(8), allocatable :: r_rotMat(:, :, :)
+        real(8), allocatable :: r_self_rotMat(:, :, :)
         !!!virtual body surface
-        integer :: v_npts,v_nelmts
+        integer :: v_npts,v_nelmts,v_type
+        real(8) :: v_dirc(3)
         real(8), allocatable :: v_Pxyz0(:, :) ! initial Node (x0, y0, z0)
-        real(8), allocatable :: v_Pxyz(:, :) ! Node (xt, yt, zt)
         real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z)
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
         integer, allocatable :: v_elmt(:, :) ! element ID
@@ -31,22 +36,22 @@ module SolidBody
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         !calculated using central linear and angular velocities
-        integer(2),allocatable :: vtor(:)
-        real(8), allocatable :: rotMat(:, :, :)
-        real(8), allocatable :: self_rotMat(:, :, :)
+        integer(2),allocatable :: vtor(:,:)
+        integer,allocatable :: vtor_sec(:)
     contains
         procedure :: Initialise => Initialise_
-        procedure :: UpdateElmtInfo => UpdateElmtInfo_
-        procedure :: PenaltyForce => PenaltyForce_
-        procedure :: BuildStructured => Beam_BuildStructured
-        procedure :: ReadUnstructured => Beam_ReadUnstructured
-
+        procedure :: Beam_BuildStructured => Beam_BuildStructured_
+        procedure :: Beam_ReadUnstructured => Beam_ReadUnstructured_
         procedure :: Readreal => Readreal_
+        procedure :: Unstruc_Virtual_Elmts => Unstruc_Virtual_Elmts_
         procedure :: Struc_Virtual_Elmts => Struc_Virtual_Elmts_
+        procedure :: Struc_Rib_Elmts => Struc_Rib_Elmts_
         procedure :: Struc_Cylinder_Elmts => Struc_Cylinder_Elmts_
 
-        procedure :: Unstruc_Virtual_Elmts => Unstruc_Virtual_Elmts_
-
+        procedure :: UpdateElmtInfo => UpdateElmtInfo_
+        procedure :: UpdateElmtPosVelArea => UpdateElmtPosVelArea_
+        procedure :: UpdateElmtInterp => UpdateElmtInterp_
+        procedure :: PenaltyForce => PenaltyForce_
 
         procedure :: RotateMatrix => Section_RotateMatrix
         procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
@@ -55,28 +60,38 @@ module SolidBody
     end type BeamBody
     type(BeamBody), allocatable :: Beam(:)
   contains
-    subroutine Initialise_(this,filename,iBodyModel)
+    subroutine Initialise_(this,filename,iBodyModel,Lspan)
         ! read beam central line file and allocate memory
         implicit none
         class(BeamBody), intent(inout) :: this
         character (LEN=100), intent(in):: filename
         integer :: iBodyModel
+        real(8) :: Lspan
 
         this%filename = filename
 
         if (iBodyModel .eq. 2) then
-            call this%BuildStructured()
+            call this%Beam_BuildStructured()
+            Lspan = maxval(this%v_Pxyz0(:,3))-minval(this%v_Pxyz0(:,3))
         elseif (iBodyModel .eq. 1) then
-            call this%ReadUnstructured()
+            call this%Beam_ReadUnstructured()
+            Lspan = maxval(this%r_Lspan(:))
         endif
 
-        allocate(this%rotMat(1:this%r_npts,1:3,1:3))
-        this%rotMat=0.0d0
-        allocate(this%self_rotMat(1:this%r_npts,1:3,1:3))
-        this%self_rotMat=0.0d0
+        allocate(this%r_rotMat(1:this%r_npts,1:3,1:3))
+        this%r_rotMat=0.0d0
+        allocate(this%r_self_rotMat(1:this%r_npts,1:3,1:3))
+        this%r_self_rotMat=0.0d0
         allocate(this%v_Exyz(1:this%v_nelmts,1:6))
+        this%v_Exyz = 0.0d0
         allocate(this%v_Evel(1:this%v_nelmts,1:6))
-        call this%UpdateElmtInfo()
+        this%v_Evel = 0.0d0
+        allocate(this%v_Ei(1:this%v_nelmts,1:12))
+        this%v_Ei = 0.0d0
+        allocate(this%v_Ew(1:this%v_nelmts,1:12))
+        this%v_Ew = 0.0d0
+        allocate(this%v_Ea(1:this%v_nelmts))
+        this%v_Ea = 0.0d0
     end subroutine Initialise_
 
     subroutine FSInteraction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
@@ -88,95 +103,111 @@ module SolidBody
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: iFish
         do iFish = 1,m_nFish
-            call Beam(iFish)%UpdateElmtInfo()
+            call Beam(iFish)%UpdateElmtInfo(dh,zDim,yDim,xDim,xGrid,yGrid,zGrid)
         enddo
         call calculate_interaction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
     end subroutine
 
-    subroutine UpdateElmtInfo_(this) ! update element position, velocity, weight
+    subroutine UpdateElmtInfo_(this,dh,zDim,yDim,xDim,xGrid,yGrid,zGrid) ! update element position, velocity, weight
         implicit none
         class(BeamBody), intent(inout) :: this
-        integer :: i,j,k,iEL,n_theta
+        real(8),intent(in):: dh
+        integer,intent(in):: zDim,yDim,xDim
+        real(8),intent(in):: xGrid(xDim),yGrid(yDim),zGrid(zDim)
+        call this%UpdateElmtPosVelArea()
+        call this%UpdateElmtInterp(dh,zDim,yDim,xDim,xGrid,yGrid,zGrid)
+    end subroutine UpdateElmtInfo_
+
+    subroutine UpdateElmtPosVelArea_(this)
+        IMPLICIT NONE
+        class(BeamBody), intent(inout) :: this
+        integer :: i,iEL,n_theta
         integer :: Ea_A,Ea_B,Ea_C,Ea_D
         real(8) :: E_left,E_right
         real(8) :: pi
         real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
-        real(8) :: self_rot_omega(3),temp_vel(3)
+        real(8) :: self_rot_omega(this%r_nelmts,3),temp_vel(3)
+        integer :: s
+        real(8) :: xyz1(3),xyz2(3)
+        real(8) :: dspan,invl0,cos_xyz(3)
         pi=4.0d0*datan(1.0d0)
         !   compute displacement, velocity, area at surface element center
-        if (this%r_npts .eq. 1) then
+        if (this%v_type .eq. 0) then
             this%v_Evel = 0.0d0
-        else
-            do i = 1,this%r_npts
-
-                ! update rotMat and self_rotMar
-                if ( i .eq. 1) then
-                    dxyz0(1:3)= this%r_xyz0(i+1,1:3)-this%r_xyz0(i,1:3)
-                    dxyz(1:3) = this%r_xyz(i+1,1:3)-this%r_xyz(i,1:3)
-                elseif ( i .eq. this%r_npts) then
-                    dxyz0(1:3)= this%r_xyz0(i,1:3)-this%r_xyz0(i-1,1:3)
-                    dxyz(1:3) = this%r_xyz(i,1:3)-this%r_xyz(i-1,1:3)
-                else
-                    dxyz0(1:3)= this%r_xyz0(i+1,1:3)-this%r_xyz0(i-1,1:3)
-                    dxyz(1:3) = this%r_xyz(i+1,1:3)-this%r_xyz(i-1,1:3)
-                endif
-                dl0       = dsqrt(dxyz0(1)**2+dxyz0(2)**2+dxyz0(3)**2)
-                dl        = dsqrt(dxyz(1)**2+dxyz(2)**2+dxyz(3)**2)
+        elseif ((this%v_type .eq. 1)) then
+            invl0 = 1 / dsqrt(sum(this%v_dirc(1:3)**2))
+            cos_xyz = this%v_dirc(1:3) * invl0
+            do i = 1, this%r_nelmts
+                dspan = this%r_Lspan(i)/this%r_Nspan(i)
+                xyz1(1:3) = this%r_xyz(this%r_elmt(i,1),1:3)
+                xyz2(1:3) = this%r_xyz(this%r_elmt(i,2),1:3)
+                do s = 1,this%r_Nspan(i)
+                    this%v_Exyz(i,1:3) = (xyz1(1:3)+xyz2(1:3))*0.5d0 + dspan*(s-0.5)*cos_xyz(1:3)
+                    call UpdateElmtArea_()
+                enddo
+            enddo
+        elseif ((this%v_type .eq. 2)) then
+            do i = 1,this%r_nelmts
+                ! update r_rotMat and self_rotMar
+                dxyz0(1:3)= this%r_xyz0(this%r_elmt(i,1),1:3)-this%r_xyz0(this%r_elmt(i,2),1:3)
+                dxyz(1:3) = this%r_xyz0(this%r_elmt(i,1),1:3)-this%r_xyz0(this%r_elmt(i,2),1:3)
+                dl0       = dsqrt(sum(dxyz0(1:3)**2))
+                dl        = dsqrt(sum(dxyz(1:3)**2))
                 xlmn0(1:3)= dxyz0(1:3)/dl0
                 xlmn(1:3) = dxyz(1:3)/dl
                 call this%RotateMatrix(i,xlmn0,xlmn)
                 call this%Self_RotateMatrix(i,this%r_xyz(i,4),xlmn)
-                n_theta  = floor(2*pi*maxval(this%r_xyz0(:,4))/maxval(this%r_xyz0(:,5)))
-                if (n_theta .le. 3) n_theta = 3
+                n_theta  = maxval(this%r_Nspan(:))
+                self_rot_omega(i,1:3) = xlmn(1:3)*(this%r_vel(this%r_elmt(i,1),4)+this%r_vel(this%r_elmt(i,2),4))*0.5d0
             enddo
 
             do iEL = 1,this%v_nelmts
-                i = this%vtor(iEL)
-                    ! update xyz
-                    temp_xyz(1:3) = matmul(this%rotMat(i,:,:), (/this%v_Exyz0(iEL,1), 0.0d0, this%v_Exyz0(iEL,3)/))
-                    temp_xyz(1:3) = matmul(this%self_rotMat(i,:,:), temp_xyz)
-                    ! Default The fake point on the plane (this%v_Exyz0(iEL,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(this%r_xyz0(i,1:3) = (0,y,0)).
-                    temp_xyzoffset(1:3) = this%r_xyz(i,1:3) - this%r_xyz0(i,1:3)
-                    this%v_Exyz(iEL,1:3) = temp_xyz(1:3)+temp_xyzoffset(1:3)
-                    this%v_Exyz(iEL,2) = this%v_Exyz(iEL,2) + this%v_Exyz0(iEL,2)
+                i = this%vtor_sec(iEL)
+                ! update xyz
+                temp_xyz(1:3) = matmul(this%r_rotMat(i,:,:), (/this%v_Exyz0(iEL,1), 0.0d0, this%v_Exyz0(iEL,3)/))
+                temp_xyz(1:3) = matmul(this%r_self_rotMat(i,:,:), temp_xyz)
+                ! Default The fake point on the plane (this%v_Exyz0(iEL,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(this%r_xyz0(i,1:3) = (0,y,0)).
+                temp_xyzoffset(1:3) = (this%r_xyz(this%r_elmt(i,1),1:3)+this%r_xyz(this%r_elmt(i,2),1:3))*0.5d0 - &
+                                      (this%r_xyz0(this%r_elmt(i,1),1:3)+this%r_xyz0(this%r_elmt(i,2),1:3))*0.5d0
+                this%v_Exyz(iEL,1:3) = temp_xyz(1:3)+temp_xyzoffset(1:3)
+                this%v_Exyz(iEL,2) = this%v_Exyz(iEL,2) + this%v_Exyz0(iEL,2)
 
-                    ! update vel
-                    self_rot_omega(1:3) = this%r_vel(i,4)*xlmn(1:3)
-                    call cross_product(self_rot_omega,temp_xyz,temp_vel)
-                    this%v_Evel(iEL,1:3) = temp_vel(1:3)+this%r_vel(i,1:3)
-                !update area
-                if ((iEL .ne. 1) .or. (iEL .ne. this%v_nelmts)) then
+                ! update vel
+                call cross_product(self_rot_omega(i,:),temp_xyz,temp_vel)
+                this%v_Evel(iEL,1:3) = temp_vel(1:3)+(this%r_vel(this%r_elmt(i,1),4)+this%r_vel(this%r_elmt(i,2),4))*0.5d0
+            enddo
+        endif
+        contains
+        subroutine UpdateElmtArea_()
+            IMPLICIT NONE
+            integer :: r
+            if (this%v_type .eq. 0) then
+            elseif ((this%v_type .eq. 1)) then
+                ! only rectangle
+                this%v_Ea(i) = dspan * dsqrt(((xyz1(1)-xyz2(1))**2)+((xyz1(2)-xyz2(2))**2)+((xyz1(3)-xyz2(3))**2))
+            elseif ((this%v_type .eq. 2)) then
+                n_theta  = maxval(this%r_Nspan(:))
+                do iEL = 2,this%v_nelmts-1
+                    r = mod((iEL-1),n_theta)
+                    !update area
                     Ea_A = iEL-1
-                    if ((i .ne. this%vtor(iEL-1)).or.(Ea_A .eq. 1)) Ea_A = iEL+(n_theta-1)
+                    if (r.eq.1) Ea_A = iEL+(n_theta-1)
                     Ea_B = iEL-n_theta
                     if (Ea_B .le. 1) Ea_B = 1
                     Ea_C = iEL+1
-                    if ((i .ne. this%vtor(iEL+1)).or.(Ea_C .eq. this%v_nelmts)) Ea_C = iEL-(n_theta-1)
+                    if (r.eq.0) Ea_C = iEL-(n_theta-1)
                     Ea_D = iEL+n_theta
                     if (Ea_D .ge. this%v_nelmts) Ea_D = this%v_nelmts
+
                     call cpt_area(this%v_Exyz(Ea_A,1:3),this%v_Exyz(Ea_B,1:3),this%v_Exyz(Ea_D,1:3),E_left)
                     call cpt_area(this%v_Exyz(Ea_B,1:3),this%v_Exyz(Ea_C,1:3),this%v_Exyz(Ea_D,1:3),E_right)
                     this%v_Ea(iEL) = (E_left+E_right)*0.5d0
-                endif
-            enddo
-            this%v_Ea(1) = 0.d0
-            this%v_Ea(this%v_nelmts) = 0.d0
-
-
-        endif
-    end subroutine UpdateElmtInfo_
-
-    subroutine UpdateElmtPosVel_(this,dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
-        IMPLICIT NONE
-        class(BeamBody), intent(inout) :: this
-        real(8),intent(in):: dt,dh,denIn,Uref
-        integer,intent(in):: zDim,yDim,xDim
-        real(8),intent(in):: xGrid(xDim),yGrid(yDim),zGrid(zDim),den(zDim,yDim,xDim)
-        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
-        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
-        real(8)::x0,y0,z0,detx,dety,detz
-        integer::i0,j0,k0
-    end subroutine UpdateElmtPosVel_
+                enddo
+                this%v_Ea(1) = 0.d0
+                this%v_Ea(this%v_nelmts) = 0.d0
+            endif
+        end subroutine UpdateElmtArea_
+    end subroutine UpdateElmtPosVelArea_
 
     subroutine UpdateElmtInterp_(this,dh,zDim,yDim,xDim,xGrid,yGrid,zGrid)
         IMPLICIT NONE
@@ -221,80 +252,80 @@ module SolidBody
             this%v_Ew(iEL,5:8) = ry
             this%v_Ew(iEL,9:12) = rz
         enddo
-    
+
         contains
         ! return the array(index) <= x < array(index+1)
         ! assum uniform grid around x(x=i0) = x0
-        SUBROUTINE minloc_fast(x, x0, i0, invdh, index, offset)
+        SUBROUTINE minloc_fast(x_, x0_, i0_, invdh_, index_, offset_)
             implicit none
-            integer, intent(in):: i0
-            real(8), intent(in):: x, x0, invdh
-            integer, intent(out):: index
-            real(8), intent(out):: offset
-            offset = (x - x0)*invdh
-            index = floor(offset)
-            offset = offset - dble(index)
-            index = index + i0
+            integer, intent(in):: i0_
+            real(8), intent(in):: x_, x0_, invdh_
+            integer, intent(out):: index_
+            real(8), intent(out):: offset_
+            offset_ = (x_ - x0_)*invdh_
+            index_ = floor(offset_)
+            offset_ = offset_ - dble(index_)
+            index_ = index_ + i0_
         END SUBROUTINE
-    
-        SUBROUTINE trimedindex(i, xDim, ix, boundaryConditions)
+
+        SUBROUTINE trimedindex(i_, xDim_, ix_, boundaryConditions_)
             USE BoundCondParams
             implicit none
-            integer, intent(in):: boundaryConditions(1:2)
-            integer, intent(in):: i, xDim
-            integer, intent(out):: ix(-1:2)
-            integer:: k
-            do k=-1,2
-                ix(k) = i + k
-                if (ix(k)<1) then
-                    if(boundaryConditions(1).eq.Periodic) then
-                        ix(k) = ix(k) + xDim
-                    else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
-                        ix(k) = 2
+            integer, intent(in):: boundaryConditions_(1:2)
+            integer, intent(in):: i_, xDim_
+            integer, intent(out):: ix_(-1:2)
+            integer:: k_
+            do k_=-1,2
+                ix_(k_) = i_ + k_
+                if (ix_(k_)<1) then
+                    if(boundaryConditions_(1).eq.Periodic) then
+                        ix_(k_) = ix_(k_) + xDim_
+                    else if((boundaryConditions_(1).eq.SYMMETRIC .or. boundaryConditions_(1).eq.wall) .and. ix_(k_).eq.0) then
+                        ix_(k_) = 2
                     else
-                        write(*,*) 'index out of xmin bound', ix(k)
+                        write(*,*) 'index out of xmin bound', ix_(k_)
                     endif
-                else if(ix(k)>xDim) then
-                    if(boundaryConditions(2).eq.Periodic) then
-                        ix(k) = ix(k) - xDim
-                    else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(2).eq.wall) .and. ix(k).eq.xDim+1) then
-                        ix(k) = xDim - 1
+                else if(ix_(k_)>xDim_) then
+                    if(boundaryConditions_(2).eq.Periodic) then
+                        ix_(k_) = ix_(k_) - xDim_
+                    else if((boundaryConditions_(2).eq.SYMMETRIC .or. boundaryConditions_(2).eq.wall) .and. ix_(k_).eq.xDim_+1) then
+                        ix_(k_) = xDim_ - 1
                     else
-                        write(*,*) 'index out of xmax bound', ix(k)
+                        write(*,*) 'index out of xmax bound', ix_(k_)
                     endif
                 endif
             enddo
         END SUBROUTINE trimedindex
-        SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
+        SUBROUTINE my_minloc(x_, array_, len_, uniform_, index_) ! return the array(index) <= x < array(index+1)
             implicit none
-            integer:: len, index, count, step, it
-            real(8):: x, array(len)
-            logical:: uniform
-            if (.not.uniform) then
-                if (x<array(1) .or. x>array(len)) then
-                    write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+            integer:: len_, index_, count, step, it
+            real(8):: x_, array_(len_)
+            logical:: uniform_
+            if (.not.uniform_) then
+                if (x_<array_(1) .or. x_>array_(len_)) then
+                    write(*, *) 'index out of bounds when searching my_minloc', x_, '[', array_(1), array_(len_), ']'
                     stop
                 endif
-                index = 1
-                count = len
+                index_ = 1
+                count = len_
                 do while(count > 0)
                     step = count / 2
-                    it = index + step
-                    if (array(it) < x) then
-                        index = it + 1
+                    it = index_ + step
+                    if (array_(it) < x_) then
+                        index_ = it + 1
                         count = count - (step + 1)
                     else
                         count = step
                     endif
                 enddo
-                if (array(index)>x) then
-                    index = index - 1
+                if (array_(index_)>x_) then
+                    index_ = index_ - 1
                 endif
             else
-                index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
+                index_ = 1 + int((x_ - array_(1))/(array_(len_)-array_(1))*dble(len_-1))
                 !int -1.1 -> -1; 1.1->1; 1.9->1
-                if (index<1 .or. index>len) then
-                    write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
+                if (index_<1 .or. index_>len_) then
+                    write(*, *) 'index out of bounds when searching my_minloc', x_, '[', array_(1), array_(len_), ']'
                     stop
                 endif
             endif
@@ -326,7 +357,7 @@ module SolidBody
             dsum=0.0d0
             do iFish=1,m_nFish
                 call Beam(iFish)%PenaltyForce(dh,dt,denIn,zDim,yDim,xDim,uuu,den,force,tol,ntol)
-                tolsum = tolsum + tol
+                tolsum = tolsum + dsqrt(tol)
                 dsum = dsum + Uref*ntol
             enddo
             dmaxLBM=tolsum/dsum
@@ -380,10 +411,11 @@ module SolidBody
                 write(*, *) 'Nan found at (ix, jy, kz)', ix(0), jy(0), kz(0)
                 stop
             endif
-            tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(1:3))**2))
+            tolerance = tolerance + sum((velElem(1:3)-velElemIB(1:3))**2)
             !$OMP critical
             ! update beam load, momentum is not included
-            this%r_force(this%vtor(iEL),1:3) = this%r_force(this%vtor(iEL),1:3) + forceElemTemp
+            this%r_force(this%vtor(iEL,1),1:3) = this%r_force(this%vtor(iEL,1),1:3) + 0.5d0 * forceElemTemp
+            this%r_force(this%vtor(iEL,2),1:3) = this%r_force(this%vtor(iEL,2),1:3) + 0.5d0 * forceElemTemp
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
@@ -400,22 +432,24 @@ module SolidBody
         !$OMP END PARALLEL DO
     END SUBROUTINE PenaltyForce_
 
-    subroutine Beam_BuildStructured(this)
+    subroutine Beam_BuildStructured_(this)
         implicit none
         class(BeamBody), intent(inout) :: this
         call this%Readreal()
         call this%Struc_Virtual_Elmts()
-    end subroutine Beam_BuildStructured
+    end subroutine Beam_BuildStructured_
 
-    subroutine Beam_ReadUnstructured(this)
+    subroutine Beam_ReadUnstructured_(this)
         implicit none
         class(BeamBody), intent(inout) :: this
         call this%Unstruc_Virtual_Elmts()
+        this%v_type = 0
         this%r_npts = 1
-        allocate(this%r_xyz0(1,5))
+        allocate(this%r_xyz0(1,3))
         this%r_xyz0(1,1:3) = this%v_Pxyz0(1,1:3)
-        this%r_xyz0(1,4:5) = 0.0d0
-    end subroutine Beam_ReadUnstructured
+        this%r_Lspan = 0.0d0
+        this%r_Nspan = 0
+    end subroutine Beam_ReadUnstructured_
 
     subroutine Section_RotateMatrix(this,i,lmn0,lmn)
         implicit none
@@ -446,7 +480,7 @@ module SolidBody
         ! r1(3,1)  =   e3(1)
         ! r1(3,2)  =   e3(2)
         ! r1(3,3)  =   e3(3)
-        ! this%rotMat(i,:,:) = r1
+        ! this%r_rotMat(i,:,:) = r1
         ! contains
         real(8), intent(in):: lmn0(3),lmn(3)
         real(8):: angle,pi
@@ -459,7 +493,7 @@ module SolidBody
         call angle_between_vectors(v_1,v_2)
         call normal_vector(v_1,v_2,nn)
         call quaternion_rotate(angle,nn,r1)
-        this%rotMat(i,:,:) = r1
+        this%r_rotMat(i,:,:) = r1
         contains
         subroutine normal_vector(A,B,C)
             implicit none
@@ -490,7 +524,7 @@ module SolidBody
         integer, intent(in):: i
         real(8):: r1(3,3)
         call quaternion_rotate(angle,lmn,r1)
-        this%self_rotMat(i,:,:) = r1
+        this%r_self_rotMat(i,:,:) = r1
     end subroutine Section_Self_RotateMatrix
     subroutine quaternion_rotate(angle,nn,r1)
         implicit none
@@ -524,7 +558,6 @@ module SolidBody
         implicit none
         class(BeamBody), intent(inout) :: this
         integer :: fileiD = 111, num, i, temp_nelmts, temp_prop(4)
-        character(LEN=1000) :: buffer
         open(unit=fileiD, file = this%filename )! read *.msh file
             ! read nodes
             read(fileiD,*)
@@ -573,7 +606,6 @@ module SolidBody
         real(8), intent(out) :: Exyz0(3)
         real(8) :: x1, x2, x3, y1, y2, y3, z1, z2, z3
         real(8) :: a, b, c, invC
-        integer :: iEL, i, j, k
             x1=NodeA(1)
             x2=NodeB(1)
             x3=NodeC(1)
@@ -596,7 +628,6 @@ module SolidBody
         real(8), intent(in) :: A(3),B(3),C(3)
         real(8), intent(out) :: area
         real(8) :: x1, x2, x3, y1, y2, y3, z1, z2, z3, ax, ay, az
-        integer :: iEL, i, j, k
             x1=A(1)
             x2=B(1)
             x3=C(1)
@@ -614,98 +645,143 @@ module SolidBody
     subroutine Readreal_(this)
         implicit none
         class(BeamBody), intent(inout) :: this
-        integer:: i, node, fileiD = 111
-        open(unit=fileiD, file = this%filename )
+        integer:: i, node, fileiD = 111, temp
+        open(unit=fileiD, file = this%filename)
         rewind(fileiD)
         read(fileiD,*)
+        read(fileiD,*) this%r_npts,this%r_nelmts,this%v_type,this%v_dirc(1:3)
+        allocate(this%r_xyz0(this%r_npts,3))
+        allocate(this%r_elmt(this%r_nelmts,5))
+        allocate(this%r_Lspan(this%r_nelmts),this%r_Nspan(this%r_nelmts))
         read(fileiD,*)
         read(fileiD,*)
-        read(fileiD,*)  this%r_npts
-        allocate(this%r_xyz0(this%r_npts,5))
         do    i= 1, this%r_npts
-            read(fileiD,*) node,this%r_xyz0(node,1),this%r_xyz0(node,2),this%r_xyz0(node,3),this%r_xyz0(node,4),this%r_xyz0(node,5)
+            read(fileiD,*) node,this%r_xyz0(node,1),this%r_xyz0(node,2),this%r_xyz0(node,3)
+        enddo
+        read(fileiD,*)
+        read(fileiD,*)
+        do  i= 1, this%r_nelmts
+            read(fileiD,*) node,this%r_elmt(node,1:5),this%r_Lspan(node),this%r_Nspan(node)
         enddo
         close(fileiD)
     end subroutine Readreal_
     subroutine Struc_Virtual_Elmts_(this)
         implicit none
         class(BeamBody), intent(inout) :: this
-        call this%Struc_Cylinder_Elmts()
+        if (this%v_type .eq. 1) call this%Struc_Rib_Elmts()
+        if (this%v_type .eq. 2) call this%Struc_Cylinder_Elmts()
     end subroutine Struc_Virtual_Elmts_
+    subroutine Struc_Rib_Elmts_(this)
+        implicit none
+        class(BeamBody), intent(inout) :: this
+        integer(2) :: i
+        integer :: s,num
+        real(8) :: xyz1(3),xyz2(3)
+        real(8) :: dspan,invl0,cos_xyz(3)
+        this%v_nelmts = sum(this%r_Nspan)
+        allocate(this%v_Exyz0(1:this%v_nelmts, 1:3))
+        this%v_Exyz0 = 0.0d0
+        allocate(this%vtor(1:this%v_nelmts,1:2))
+        this%vtor = 0
+        invl0 = 1 / dsqrt(sum(this%v_dirc(1:3)**2))
+        cos_xyz = this%v_dirc(1:3) * invl0
+        num = 1
+        do i = 1, this%r_nelmts
+            dspan = this%r_Lspan(i)/this%r_Nspan(i)
+            xyz1(1:3) = this%r_xyz0(this%r_elmt(i,1),1:3)
+            xyz2(1:3) = this%r_xyz0(this%r_elmt(i,2),1:3)
+            do s = 1,this%r_Nspan(i)
+                this%v_Exyz0(i,1:3) = (xyz1(1:3)+xyz2(1:3))*0.5d0 + dspan*(s-0.5)*cos_xyz(1:3)
+                this%vtor(num,1:2) = this%r_elmt(i,1:2)
+                num = num + 1
+            enddo
+        enddo
+    end subroutine Struc_Rib_Elmts_
     subroutine Struc_Cylinder_Elmts_(this)
         implicit none
         class(BeamBody), intent(inout) :: this
         real(8) :: pi
-        real(8) :: theta, rho, height
+        real(8) :: theta, rho, height, dradius,dtheta,y1,y2
         integer :: n_height,n_theta,n_radius
-        integer :: i,j,k,num
+        integer(2) :: i
+        integer :: j,k,num
         integer :: n_circle, n_rectangle
         pi=4.0d0*datan(1.0d0)
 
-        this%v_nelmts = 0
-        n_height = this%r_npts
-        n_radius = 1+floor(maxval(this%r_xyz0(:,4))/maxval(this%r_xyz0(:,5)))
-        n_theta  = floor(2*pi*maxval(this%r_xyz0(:,4))/maxval(this%r_xyz0(:,5)))
-        if (n_radius .eq. 1) n_radius = 2
+        n_height = this%r_nelmts
+        n_theta  = maxval(this%r_Nspan(:))
         if (n_theta  .le. 3) n_theta = 3
-        
-        n_circle = ((n_radius-1) * n_theta) + 1
-        n_rectangle = (n_height - 2) * n_theta
+        n_radius = floor(this%r_Lspan(maxloc(this%r_Nspan(:),1))/(2*pi*this%r_Lspan(maxloc(this%r_Nspan(:),1))/n_theta))
+        if (n_radius .eq. 1) n_radius = 2
+        dtheta = 2.0 * pi / n_theta
+
+        n_circle = (n_radius * n_theta) + 1
+        n_rectangle = n_height * n_theta
         this%v_nelmts = n_circle * 2 + n_rectangle
 
         allocate(this%v_Exyz0(1:this%v_nelmts, 1:3))
         this%v_Exyz0 = 0.0d0
-        allocate(this%vtor(1:this%v_nelmts))
+        allocate(this%vtor(1:this%v_nelmts,1:2))
+        this%vtor = 0
+        allocate(this%vtor_sec(1:this%v_nelmts))
         this%vtor = 0
 
         ! Given node v_Exyz0 coordinate value
+        ! lower circle
         num = 1
-        do i = 1, this%r_npts
-            if (i .eq. 1) then
-                this%v_Exyz0(num,2) = this%r_xyz0(i,2)
-                this%vtor(num) = i
+        this%v_Exyz0(num,1:3) = this%r_xyz0(1,1:3)
+        this%vtor(num,1:2) = 1
+        this%vtor_sec(num) = 1
+        num = num + 1
+        dradius = this%r_Lspan(1)/n_radius
+        height = this%r_xyz0(1,2)
+        do j = 1, n_radius
+            rho = (j - 0.5) * dradius
+            do k = 1, n_theta
+                theta = (k - 0.5) * dtheta
+                this%v_Exyz0(num,1) = rho * cos(theta)
+                this%v_Exyz0(num,2) = height
+                this%v_Exyz0(num,3) = rho * sin(theta)
+                this%vtor(num,1:2) = 1
+                this%vtor_sec(num) = 1
                 num = num + 1
-                do j = 1, n_radius - 1
-                    rho = j * this%r_xyz0(i,4) / (n_radius - 1)
-                    height = this%r_xyz0(i,2)
-                    do k = 1, n_theta
-                        theta = (k - 1) * 2.0 * pi / n_theta
-                        this%v_Exyz0(num,1) = rho * cos(theta)
-                        this%v_Exyz0(num,2) = height
-                        this%v_Exyz0(num,3) = rho * sin(theta)
-                        this%vtor(num) = i
-                        num = num+1
-                    enddo
-                enddo
-            elseif (i .eq. this%r_npts) then
-                do j = 1, n_radius - 1
-                    rho = (n_radius - j) * this%r_xyz0(i,4) / (n_radius - 1)
-                    height = this%r_xyz0(i,2)
-                    do k = 1, n_theta
-                        theta = (k - 1) * 2.0 * pi / n_theta
-                        this%v_Exyz0(num,1) = rho * cos(theta)
-                        this%v_Exyz0(num,2) = height
-                        this%v_Exyz0(num,3) = rho * sin(theta)
-                        this%vtor(num) = i
-                        num = num+1
-                    enddo
-                enddo
-                this%v_Exyz0(num,2) = this%r_xyz0(i,2)
-                this%vtor(num) = i
-            else
-                rho = this%r_xyz0(i,4)
-                height = this%r_xyz0(i,2)
-                do k = 1, n_theta
-                    theta = (k - 1) * 2.0 * pi / n_theta
-                    this%v_Exyz0(num,1) = rho * cos(theta)
-                    this%v_Exyz0(num,2) = height
-                    this%v_Exyz0(num,3) = rho * sin(theta)
-                    this%vtor(num) = i
-                    num = num+1
-                enddo
-            endif
+            enddo
         enddo
-
+        ! side
+        do i = 1, this%r_nelmts
+            rho = this%r_Lspan(i)
+            y1 = this%r_xyz0(this%r_elmt(i,1),2)
+            y2 = this%r_xyz0(this%r_elmt(i,2),2)
+            height = (y1+y2)*0.5d0
+            do k = 1, n_theta
+                theta = (k - 0.5) * dtheta
+                this%v_Exyz0(num,1) = rho * cos(theta)
+                this%v_Exyz0(num,2) = height
+                this%v_Exyz0(num,3) = rho * sin(theta)
+                this%vtor(num,1) = this%r_elmt(i,1)
+                this%vtor(num,2) = this%r_elmt(i,2)
+                this%vtor_sec(num) = i
+                num = num+1
+            enddo
+        enddo
+        ! upper circle
+        dradius = this%r_Lspan(this%r_nelmts)/n_radius
+        height = this%r_xyz0(this%r_npts,2)
+        do j = 1, n_radius
+            rho = (n_radius - j + 0.5) * dradius
+            do k = 1, n_theta
+                theta = (k - 0.5) * dtheta
+                this%v_Exyz0(num,1) = rho * cos(theta)
+                this%v_Exyz0(num,2) = height
+                this%v_Exyz0(num,3) = rho * sin(theta)
+                this%vtor(num,1:2) = this%r_npts
+                this%vtor_sec(num) = this%r_nelmts
+                num = num + 1
+            enddo
+        enddo
+        this%v_Exyz0(num,1:3) = this%r_xyz0(i,1:3)
+        this%vtor(num,1:2) = this%r_npts
+        this%vtor_sec(num) = this%r_nelmts
     end subroutine Struc_Cylinder_Elmts_
 
     subroutine Write_body_(this,iFish,time,Lref,Tref)
@@ -715,11 +791,13 @@ module SolidBody
         integer,intent(in) :: iFish
         real(8),intent(in) :: time,Lref,Tref
         !   -------------------------------------------------------
-        real(8):: timeTref
-        integer:: i,ElmType
+        real(8):: pi,timeTref
+        integer:: i,j,r,Nspanpts,ElmType,n_theta,Ea_A,Ea_D
         integer,parameter::nameLen=10
         character (LEN=nameLen):: fileName,idstr
         integer,parameter:: idfile=100
+        real(8) :: invl0,cos_xyz(3),dspan,xyz1(3),xyz2(3),low_L(3),low_R(3),upp_R(3),upp_L(3)
+        pi=4.0d0*datan(1.0d0)
         !==========================================================================
         timeTref = time/Tref
         !==========================================================================
@@ -729,57 +807,103 @@ module SolidBody
             if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
     
-        ! ElmType = this%fake_ele(1,4)
+        ! ElmType = 3
 
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
         open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',this%v_npts,', E=',this%v_nelmts,', DATAPACKING=POINT, ZONETYPE='
-        if(ElmType.eq.2) then
-            write(idfile, '(A)') 'FELINESEG'
-        elseif (ElmType.eq.3) then
-            write(idfile, '(A)') 'FETRIANGLE'
-        elseif(ElmType.eq.4) then
-            write(idfile, '(A)') 'FEQUADRILATERAL'
+        if (this%v_type .eq. 0) then
+            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%v_npts,', E=',this%v_nelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
+        elseif (this%v_type .eq. 1) then
+            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',4*this%v_nelmts,', E=',this%v_nelmts,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        elseif (this%v_type .eq. 2) then
+            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%v_nelmts,', E=',this%v_nelmts-2,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
         endif
-        do  i=1,this%v_nelmts
-            write(idfile, *)  this%v_Exyz(i,1:3)!/Lref
-        enddo
-        ! do  i=1,this%v_nelmts
-        !     if(ElmType.eq.2) then
-        !         write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2)
-        !     elseif(ElmType.eq.3) then
-        !         write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3)
-        !     ! elseif(ElmType.eq.4) then
-        !     !     write(idfile, *) this%fake_ele(i,1),this%fake_ele(i,2),this%fake_ele(i,3),this%fake_ele(i,4)
-        !     else
-        !     endif
-        ! enddo
+        ! if(ElmType.eq.2) then
+        !     write(idfile, '(A)') 'FELINESEG'
+        ! elseif (ElmType.eq.3) then
+        !    write(idfile, '(A)') 'FETRIANGLE'
+        ! elseif(ElmType.eq.4) then
+        !     write(idfile, '(A)') 'FEQUADRILATERAL'
+        ! endif
+        if (this%v_type .eq. 0) then
+            do  i=1,this%v_npts
+                write(idfile, *)  this%v_Pxyz0(i,1:3)!/Lref
+            enddo
+            do  i=1,this%v_nelmts
+                ! if(ElmType.eq.2) then
+                !     write(idfile, *) this%v_elmt(i,1),this%v_elmt(i,2)
+                ! elseif(ElmType.eq.3) then
+                    write(idfile, *) this%v_elmt(i,1),this%v_elmt(i,2),this%v_elmt(i,3)
+                ! elseif(ElmType.eq.4) then
+                !     write(idfile, *) this%v_elmt(i,1),this%v_elmt(i,2),this%v_elmt(i,3),this%v_elmt(i,4)
+                ! else
+                ! endif
+            enddo
+        elseif (this%v_type .eq. 1)then
+            invl0 = 1 / dsqrt(sum(this%v_dirc(1:3)**2))
+            cos_xyz(1:3) = this%v_dirc(1:3) * invl0
+            do i = 1, this%r_nelmts
+                dspan = this%r_Lspan(i)/this%r_Nspan(i)
+                Nspanpts = this%r_Nspan(i)+1
+                xyz1(1:3) = this%r_xyz(this%r_elmt(i,1),1:3)
+                xyz2(1:3) = this%r_xyz(this%r_elmt(i,2),1:3)
+                do j = 1,Nspanpts
+                    low_L(1:3) = xyz1(1:3) + dspan*(j-1)*cos_xyz(1:3)
+                    low_R(1:3) = xyz1(1:3) + dspan*(j)*cos_xyz(1:3)
+                    upp_R(1:3) = xyz2(1:3) + dspan*(j)*cos_xyz(1:3)
+                    upp_L(1:3) = xyz2(1:3) + dspan*(j-1)*cos_xyz(1:3)
+                    write(idfile, *) low_L(1:3)!/Lref
+                    write(idfile, *) low_R(1:3)!/Lref
+                    write(idfile, *) upp_R(1:3)!/Lref
+                    write(idfile, *) upp_L(1:3)!/Lref
+                enddo
+            enddo
+            do  i=1,this%v_nelmts
+                j = 4*(i-1)
+                write(idfile, *) j+1,j+2,j+3,j+4
+            enddo
+        elseif (this%v_type .eq. 2)then
+            do  i=1,this%v_nelmts
+                write(idfile, *)  this%v_Exyz(i,1:3)!/Lref
+            enddo
+            n_theta  = maxval(this%r_Nspan(:))
+            do  i=2,this%v_nelmts-1
+                r = mod((i-1),n_theta)
+                Ea_A = i-1
+                if (r.eq.1) Ea_A = i+(n_theta-1)
+                Ea_D = i+n_theta
+                if (Ea_D .ge. this%v_nelmts) Ea_D = this%v_nelmts
+
+                write(idfile, *) Ea_A,i,Ea_D
+            enddo
+        endif
         close(idfile)
         !   =============================================
     end subroutine
 
-    subroutine Initialise_bodies(nFish,maxIterIB,dtolLBM,Pbeta,filenames,iBodyModel)
+    subroutine Initialise_bodies(nFish,Lspan,maxIterIB,dtolLBM,Pbeta,filenames,iBodyModel,BCs)
         implicit none
-        integer,intent(in)::nFish, maxIterIB,iBodyModel(nFish)
-        real(8),intent(in):: dtolLBM, Pbeta
+        integer,intent(in)::nFish,maxIterIB,iBodyModel(nFish),BCs(6)
+        real(8),intent(in):: dtolLBM,Pbeta
         character(LEN=100),intent(in):: filenames(nFish)
+        real(8), allocatable:: Lspan(:)
         integer :: iFish
         m_nFish = nFish
         m_maxIterIB = maxIterIB
         m_dtolLBM = dtolLBM
         m_Pbeta = Pbeta
-        allocate(Beam(nFish))
+        boundaryConditions(1:6) = BCs(1:6)
+        allocate(Beam(nFish),Lspan(nFish))
         do iFish = 1,nFish
-            call Beam(iFish)%Initialise(filenames(iFish),iBodyModel(iFish))
+            call Beam(iFish)%Initialise(filenames(iFish),iBodyModel(iFish),Lspan(iFish))
         enddo
     end subroutine Initialise_bodies
     subroutine Write_solid_bodies(time,Lref,Tref)
         implicit none
-        integer :: nFish
         real(8) :: Lref,time,Tref
         integer :: iFish
-        do iFish = 1,nFish
+        do iFish = 1,m_nFish
             call Beam(iFish)%Write_body(iFish,time,Lref,Tref)
         enddo
     end subroutine Write_solid_bodies

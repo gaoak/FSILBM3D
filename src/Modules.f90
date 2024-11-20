@@ -64,7 +64,8 @@
     real(8):: Re,AR,Frod(1:SpcDim)
     real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
     real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
-    real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Lspan,Asfac
+    real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Asfac
+    real(8), allocatable:: Lspan(:)
     real(8):: UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
 
     real(8):: upxc0, upxcm, upxcmm
