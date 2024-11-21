@@ -21,8 +21,6 @@ module SolidBody
         integer, allocatable :: r_Nspan(:)
         real(8), allocatable :: r_vel(:, :)
         real(8), allocatable :: r_force(:, :)
-        real(8), allocatable :: r_rotMat(:, :, :)
-        real(8), allocatable :: r_self_rotMat(:, :, :)
         !!!virtual body surface
         integer :: v_npts,v_nelmts,v_type
         real(8) :: v_dirc(3)
@@ -37,7 +35,7 @@ module SolidBody
         real(8), allocatable :: v_Evel(:, :)
         !calculated using central linear and angular velocities
         integer(2),allocatable :: vtor(:,:)
-        integer,allocatable :: vtor_sec(:)
+        integer(2),allocatable :: rtov(:)
     contains
         procedure :: Initialise => Initialise_
         procedure :: Beam_BuildStructured => Beam_BuildStructured_
@@ -52,9 +50,6 @@ module SolidBody
         procedure :: UpdateElmtPosVelArea => UpdateElmtPosVelArea_
         procedure :: UpdateElmtInterp => UpdateElmtInterp_
         procedure :: PenaltyForce => PenaltyForce_
-
-        procedure :: RotateMatrix => Section_RotateMatrix
-        procedure :: Self_RotateMatrix => Section_Self_RotateMatrix
 
         procedure :: Write_body => Write_body_
     end type BeamBody
@@ -78,10 +73,6 @@ module SolidBody
             Lspan = maxval(this%r_Lspan(:))
         endif
 
-        allocate(this%r_rotMat(1:this%r_npts,1:3,1:3))
-        this%r_rotMat=0.0d0
-        allocate(this%r_self_rotMat(1:this%r_npts,1:3,1:3))
-        this%r_self_rotMat=0.0d0
         allocate(this%v_Exyz(1:this%v_nelmts,1:6))
         this%v_Exyz = 0.0d0
         allocate(this%v_Evel(1:this%v_nelmts,1:6))
@@ -126,8 +117,9 @@ module SolidBody
         real(8) :: E_left,E_right
         real(8) :: pi
         real(8) :: dxyz0(3),dxyz(3),xlmn0(3),xlmn(3),dl0,dl,temp_xyz(3),temp_xyzoffset(3)
+        real(8) :: r_rotMat(3,3),r_self_rotMat(3,3)
         real(8) :: self_rot_omega(this%r_nelmts,3),temp_vel(3)
-        integer :: s
+        integer :: s,begin,end
         real(8) :: xyz1(3),xyz2(3)
         real(8) :: dspan,invl0,cos_xyz(3)
         pi=4.0d0*datan(1.0d0)
@@ -155,26 +147,32 @@ module SolidBody
                 dl        = dsqrt(sum(dxyz(1:3)**2))
                 xlmn0(1:3)= dxyz0(1:3)/dl0
                 xlmn(1:3) = dxyz(1:3)/dl
-                call this%RotateMatrix(i,xlmn0,xlmn)
-                call this%Self_RotateMatrix(i,this%r_xyz(i,4),xlmn)
+                call RotateMatrix(xlmn0,xlmn,r_rotMat)
+                call Self_RotateMatrix(this%r_xyz(i,4),xlmn,r_self_rotMat)
                 n_theta  = maxval(this%r_Nspan(:))
                 self_rot_omega(i,1:3) = xlmn(1:3)*(this%r_vel(this%r_elmt(i,1),4)+this%r_vel(this%r_elmt(i,2),4))*0.5d0
-            enddo
 
-            do iEL = 1,this%v_nelmts
-                i = this%vtor_sec(iEL)
-                ! update xyz
-                temp_xyz(1:3) = matmul(this%r_rotMat(i,:,:), (/this%v_Exyz0(iEL,1), 0.0d0, this%v_Exyz0(iEL,3)/))
-                temp_xyz(1:3) = matmul(this%r_self_rotMat(i,:,:), temp_xyz)
-                ! Default The fake point on the plane (this%v_Exyz0(iEL,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(this%r_xyz0(i,1:3) = (0,y,0)).
-                temp_xyzoffset(1:3) = (this%r_xyz(this%r_elmt(i,1),1:3)+this%r_xyz(this%r_elmt(i,2),1:3))*0.5d0 - &
-                                      (this%r_xyz0(this%r_elmt(i,1),1:3)+this%r_xyz0(this%r_elmt(i,2),1:3))*0.5d0
-                this%v_Exyz(iEL,1:3) = temp_xyz(1:3)+temp_xyzoffset(1:3)
-                this%v_Exyz(iEL,2) = this%v_Exyz(iEL,2) + this%v_Exyz0(iEL,2)
+                if (i .eq. this%r_nelmts) then
+                    begin = this%rtov(i)
+                    end = this%v_nelmts
+                else
+                    begin = this%rtov(i)
+                    end = this%rtov(i+1)-1
+                endif
 
-                ! update vel
-                call cross_product(self_rot_omega(i,:),temp_xyz,temp_vel)
-                this%v_Evel(iEL,1:3) = temp_vel(1:3)+(this%r_vel(this%r_elmt(i,1),4)+this%r_vel(this%r_elmt(i,2),4))*0.5d0
+                do iEL = begin,end
+                    ! update xyz
+                    temp_xyz(1:3) = matmul(r_rotMat(:,:), (/this%v_Exyz0(iEL,1), 0.0d0, this%v_Exyz0(iEL,3)/))
+                    temp_xyz(1:3) = matmul(r_self_rotMat(:,:), temp_xyz)
+                    ! Default The fake point on the plane (this%v_Exyz0(iEL,1:3) = (x,y,z)) is in the same plane as the point on the centre axis(this%r_xyz0(i,1:3) = (0,y,0)).
+                    temp_xyzoffset(1:3) = (this%r_xyz(this%r_elmt(i,1),1:3)+this%r_xyz(this%r_elmt(i,2),1:3))*0.5d0 - &
+                                        (this%r_xyz0(this%r_elmt(i,1),1:3)+this%r_xyz0(this%r_elmt(i,2),1:3))*0.5d0
+                    this%v_Exyz(iEL,1:3) = temp_xyz(1:3)+temp_xyzoffset(1:3)
+                    this%v_Exyz(iEL,2) = this%v_Exyz(iEL,2) + this%v_Exyz0(iEL,2)
+                    ! update vel
+                    call cross_product(self_rot_omega(i,:),temp_xyz,temp_vel)
+                    this%v_Evel(iEL,1:3) = temp_vel(1:3)+(this%r_vel(this%r_elmt(i,1),4)+this%r_vel(this%r_elmt(i,2),4))*0.5d0
+                    enddo
             enddo
         endif
         contains
@@ -208,6 +206,65 @@ module SolidBody
             endif
         end subroutine UpdateElmtArea_
     end subroutine UpdateElmtPosVelArea_
+    
+    FUNCTION vtor_(this,x)
+        implicit none
+        class(BeamBody), intent(inout) :: this
+        integer(2) :: vtor_(2),x
+        integer :: i
+        real(8) :: y1,y2
+        if (this%v_type .eq. 1) then
+            do i =1,this%r_nelmts
+                if ((x-sum(this%r_Nspan(1:i))) .le. 0) then
+                    vtor_(1) = i
+                    vtor_(2) = i+1
+                endif
+            enddo
+        elseif (this%v_type .eq. 2) then
+            if (dabs(this%v_Exyz0(x,2) - this%r_xyz0(1,2)) .lt. 1e-5) then
+                vtor_(1:2) = 1
+            endif
+            if (dabs(this%v_Exyz0(x,2) - this%r_xyz0(this%r_npts,2)) .lt. 1e-5) then
+                vtor_(1:2) = this%r_npts
+            endif
+            do i =1,this%r_nelmts
+                y1 = this%r_xyz0(this%r_elmt(i,1),2)
+                y2 = this%r_xyz0(this%r_elmt(i,2),2)
+                if ((this%v_Exyz0(x,2) .gt. y1) .and. (this%v_Exyz0(x,2) .lt. y2)) then
+                    vtor_(1) = i
+                    vtor_(2) = i+1
+                endif
+            enddo
+        endif
+    ENDFUNCTION vtor_
+    FUNCTION rtov_(this,x)
+        implicit none
+        class(BeamBody), intent(inout) :: this
+        integer(2) :: rtov_(2),x
+        real(8) :: pi,dspan
+        integer :: n_theta,n_radius
+        pi=4.0d0*datan(1.0d0)
+        if (this%v_type .eq. 1) then
+            rtov_(1) = sum(this%r_Nspan(1:(x-1)))+1
+            rtov_(2) = sum(this%r_Nspan(1:(x)))
+        elseif (this%v_type .eq. 2) then
+            n_theta  = maxval(this%r_Nspan(:))
+            if (n_theta  .le. 3) n_theta = 3
+            dspan = (2*pi*this%r_Lspan(maxloc(this%r_Nspan(:),1))/n_theta)
+            n_radius = floor(this%r_Lspan(maxloc(this%r_Nspan(:),1))/dspan)
+            if (n_radius .eq. 1) n_radius = 2
+            if (x .eq. 1) then
+                rtov_(1) = 1
+                rtov_(2) = n_radius*n_theta+1+n_theta
+            elseif (x .eq. this%r_nelmts) then
+                rtov_(1) = this%v_nelmts-n_radius*n_theta-n_theta
+                rtov_(2) = this%v_nelmts
+            else
+                rtov_(1) = n_radius*n_theta+1+n_theta+n_theta*(x-2)+1
+                rtov_(2) = n_radius*n_theta+1+n_theta+n_theta*(x-1)+1
+            endif
+        endif
+    ENDFUNCTION rtov_
 
     subroutine UpdateElmtInterp_(this,dh,zDim,yDim,xDim,xGrid,yGrid,zGrid)
         IMPLICIT NONE
@@ -449,12 +506,11 @@ module SolidBody
         this%r_Nspan = 0
     end subroutine Beam_ReadUnstructured_
 
-    subroutine Section_RotateMatrix(this,i,lmn0,lmn)
+    subroutine Section_RotateMatrix(lmn0,lmn,r_rotMat)
         implicit none
-        class(BeamBody), intent(inout) :: this
-        integer, intent(in) :: i
         ! real(8):: lmn0(3),lmn(3),angle,pi
         ! real(8):: v_0(3),e1(3),e2(3),e3(3),r1(3,3)
+        ! real(8):: r_rotMat(3,3)
         ! pi=4.0*datan(1.0d0)
         ! v_0= lmn0
         ! e1 = lmn
@@ -478,9 +534,10 @@ module SolidBody
         ! r1(3,1)  =   e3(1)
         ! r1(3,2)  =   e3(2)
         ! r1(3,3)  =   e3(3)
-        ! this%r_rotMat(i,:,:) = r1
+        ! r_rotMat(:,:) = r1
         ! contains
         real(8), intent(in):: lmn0(3),lmn(3)
+        real(8), intent(out):: r_rotMat(3,3)
         real(8):: angle,pi
         real(8):: v_1(3),v_2(3),nn(3),r1(3,3)
         pi=4.0*datan(1.0d0)
@@ -491,7 +548,7 @@ module SolidBody
         call angle_between_vectors(v_1,v_2)
         call normal_vector(v_1,v_2,nn)
         call quaternion_rotate(angle,nn,r1)
-        this%r_rotMat(i,:,:) = r1
+        r_rotMat(:,:) = r1(:,:)
         contains
         subroutine normal_vector(A,B,C)
             implicit none
@@ -515,14 +572,13 @@ module SolidBody
             return
         end subroutine angle_between_vectors
     end subroutine Section_RotateMatrix
-    subroutine Section_Self_RotateMatrix(this,i,angle,lmn)
+    subroutine Section_Self_RotateMatrix(angle,lmn,r_self_rotMat)
         implicit none
-        class(BeamBody), intent(inout) :: this
         real(8), intent(in):: angle,lmn(3)
-        integer, intent(in):: i
+        real(8), intent(out):: r_self_rotMat(3,3)
         real(8):: r1(3,3)
         call quaternion_rotate(angle,lmn,r1)
-        this%r_self_rotMat(i,:,:) = r1
+        r_self_rotMat(:,:) = r1(:,:)
     end subroutine Section_Self_RotateMatrix
     subroutine quaternion_rotate(angle,nn,r1)
         implicit none
@@ -699,7 +755,7 @@ module SolidBody
         implicit none
         class(BeamBody), intent(inout) :: this
         real(8) :: pi
-        real(8) :: theta, rho, height, dradius,dtheta,y1,y2
+        real(8) :: dspan, theta, rho, height, dradius,dtheta,y1,y2
         integer :: n_height,n_theta,n_radius
         integer(2) :: i
         integer :: j,k,num
@@ -709,7 +765,8 @@ module SolidBody
         n_height = this%r_nelmts
         n_theta  = maxval(this%r_Nspan(:))
         if (n_theta  .le. 3) n_theta = 3
-        n_radius = floor(this%r_Lspan(maxloc(this%r_Nspan(:),1))/(2*pi*this%r_Lspan(maxloc(this%r_Nspan(:),1))/n_theta))
+        dspan = (2*pi*this%r_Lspan(maxloc(this%r_Nspan(:),1))/n_theta)
+        n_radius = floor(this%r_Lspan(maxloc(this%r_Nspan(:),1))/dspan)
         if (n_radius .eq. 1) n_radius = 2
         dtheta = 2.0 * pi / n_theta
 
@@ -721,15 +778,14 @@ module SolidBody
         this%v_Exyz0 = 0.0d0
         allocate(this%vtor(1:this%v_nelmts,1:2))
         this%vtor = 0
-        allocate(this%vtor_sec(1:this%v_nelmts))
-        this%vtor = 0
+        allocate(this%rtov(1:this%r_nelmts))
+        this%rtov = 0
 
         ! Given node v_Exyz0 coordinate value
         ! lower circle
         num = 1
         this%v_Exyz0(num,1:3) = this%r_xyz0(1,1:3)
         this%vtor(num,1:2) = 1
-        this%vtor_sec(num) = 1
         num = num + 1
         dradius = this%r_Lspan(1)/n_radius
         height = this%r_xyz0(1,2)
@@ -741,12 +797,16 @@ module SolidBody
                 this%v_Exyz0(num,2) = height
                 this%v_Exyz0(num,3) = rho * sin(theta)
                 this%vtor(num,1:2) = 1
-                this%vtor_sec(num) = 1
                 num = num + 1
             enddo
         enddo
         ! side
         do i = 1, this%r_nelmts
+            if (i.eq.1) then
+                this%rtov(1) = 1
+            else
+                this%rtov(i) = num
+            endif
             rho = this%r_Lspan(i)
             y1 = this%r_xyz0(this%r_elmt(i,1),2)
             y2 = this%r_xyz0(this%r_elmt(i,2),2)
@@ -758,7 +818,6 @@ module SolidBody
                 this%v_Exyz0(num,3) = rho * sin(theta)
                 this%vtor(num,1) = this%r_elmt(i,1)
                 this%vtor(num,2) = this%r_elmt(i,2)
-                this%vtor_sec(num) = i
                 num = num+1
             enddo
         enddo
@@ -773,13 +832,11 @@ module SolidBody
                 this%v_Exyz0(num,2) = height
                 this%v_Exyz0(num,3) = rho * sin(theta)
                 this%vtor(num,1:2) = this%r_npts
-                this%vtor_sec(num) = this%r_nelmts
                 num = num + 1
             enddo
         enddo
         this%v_Exyz0(num,1:3) = this%r_xyz0(i,1:3)
         this%vtor(num,1:2) = this%r_npts
-        this%vtor_sec(num) = this%r_nelmts
     end subroutine Struc_Cylinder_Elmts_
 
     subroutine Write_body_(this,iFish,time,Lref,Tref)
