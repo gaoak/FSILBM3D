@@ -92,26 +92,6 @@
 !   ***********************************************************************************************
     integer, parameter:: idat=12, DOFDim=6
     character (LEN=40), allocatable:: FEmeshName(:)
-!   ***********************************************************************************************
-    real(8):: deltaT
-    real(8), allocatable:: Freq(:)
-    real(8), allocatable:: XYZ(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),XYZd(:,:),UVW(:,:)
-    real(8), allocatable:: AoA(:,:),AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:),AoAd(:,:),WWW1(:,:),WWW2(:,:),WWW3(:,:)
-    real(8), allocatable:: TTT00(:,:,:),TTT0(:,:,:),TTTnow(:,:,:),TTTnxt(:,:,:)
-!   ***********************************************************************************************
-    integer:: nFish,nND_max,nEL_max,nMT_max,nEQ_max,NDref
-    integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:)
-    integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:),isMotionGiven(:,:)
-!   ===============================================================================================
-    integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
-    real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)
-    real(8), allocatable:: lodful(:,:,:),repful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:)
-
-    real(8), allocatable:: xyzful0(:,:,:),xyzfulnxt(:,:,:),dspful(:,:,:),accful(:,:,:)
-    real(8), allocatable:: xyzful(:,:,:),velful(:,:,:)
-    real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
-    real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
-!   ***********************************************************************************************
     END MODULE simParam
 
     MODULE PartitionXDim

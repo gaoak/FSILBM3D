@@ -1,4 +1,34 @@
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+module SolidSolver
+    implicit none
+    private
+    integer:: nFish,nND_max,nEL_max,nMT_max,nEQ_max,NDref
+    public :: BeamSolver
+    type :: BeamSolver
+        real(8):: deltaT
+        real(8):: Freq
+        real(8), allocatable:: XYZ(:),XYZo(:),XYZAmpl(:),XYZPhi(:),XYZd(:),UVW(:)
+        real(8), allocatable:: AoA(:),AoAo(:),AoAAmpl(:),AoAPhi(:),AoAd(:),WWW1(:),WWW2(:),WWW3(:)
+        real(8), allocatable:: TTT00(:,:),TTT0(:,:),TTTnow(:,:),TTTnxt(:,:)
+        integer:: nND,nEL,nEQ,nMT,nBD,nSTF
+        integer, allocatable:: isMotionGiven(:)
+        integer, allocatable:: ele(:,:),jBC(:,:),nloc(:),nprof(:),nprof2(:)
+        real(8), allocatable:: xyzful00(:,:),mssful(:,:),vBC(:,:),prop(:,:),mss(:),areaElem00(:),areaElem(:)
+        real(8), allocatable:: lodful(:,:),repful(:,:),extful(:,:),extful1(:,:),extful2(:,:),grav(:,:)
+
+        real(8), allocatable:: xyzful0(:,:),xyzfulnxt(:,:),dspful(:,:),accful(:,:)
+        real(8), allocatable:: xyzful(:,:),velful(:,:)
+        real(8), allocatable:: triad_nn(:,:,:),triad_ee(:,:,:),triad_e0(:,:,:)
+        real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
+    contains
+        procedure :: Initialise => Initialise_
+        procedure :: structure_solver => structure_solver_
+    end type BeamSolver
+  contains
+    SUBROUTINE Initialise_(this)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+    end subroutine Initialise_
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    FEM code for structure
 !    input variables (at time t):
 !    xyzful0 (const), xyzful, coordinates
@@ -14,13 +44,12 @@
 !    dspful displacement at t+dt
 !
 !    workspace variables:
-!
-!
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,     &
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE structure_solver_(this,lodExteful,deltat,dampK,dampM,     &
                       triad_nn,triad_ee,triad_n1,triad_n2,nND,nEL,nEQ,nMT,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
                       dtol,iterMax,nFish,iFish,FishInfo)
     implicit none
+    class(BeamSolver), intent(inout) :: this
     integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,iFish,nFish
     integer:: jBC(nND,6),ele(nEL,5),nloc(nEQ),nprof(nEQ),nprof2(nEQ)
     real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(nMT,10)
@@ -1650,3 +1679,4 @@
 !
     return
     end
+end module SolidSolver
