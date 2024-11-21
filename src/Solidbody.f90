@@ -3,41 +3,31 @@ module SolidBody
     private
     ! Immersed boundary method parameters
     integer:: m_nFish, m_maxIterIB
-    real(8):: m_dtolLBM, m_Pbeta
-    integer:: boundaryConditions(1:6)
+    real(8):: m_dtolLBM, m_Pbeta, m_dt, m_h, m_denIn, m_Uref
+    integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
     ! maxIterIB maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
     public :: BeamBody,Initialise_bodies,Write_solid_bodies,FSInteraction_force
     type :: BeamBody
-        character(LEN=100) :: filename
-        !!!centeral line beam
+        !!!virtual infomation
         integer :: r_npts,r_nelmts
-        real(8), allocatable :: r_xyz0(:, :)
-        real(8), allocatable :: r_xyz(:, :)
-        integer, allocatable :: r_elmt(:, :)
         real(8), allocatable :: r_Lspan(:)
         integer, allocatable :: r_Nspan(:)
-        real(8), allocatable :: r_vel(:, :)
-        real(8), allocatable :: r_force(:, :)
-        real(8), allocatable :: r_rotMat(:, :, :)
-        real(8), allocatable :: r_self_rotMat(:, :, :)
         !!!virtual body surface
         integer :: v_npts,v_nelmts,v_type
         real(8) :: v_dirc(3)
-        real(8), allocatable :: v_Pxyz0(:, :) ! initial Node (x0, y0, z0)
-        real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z)
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
         integer, allocatable :: v_elmt(:, :) ! element ID
-        integer, allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
-        real(8), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+        integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
+        real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         real(8), allocatable :: v_Ea(:) ! element area
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         !calculated using central linear and angular velocities
-        integer(2),allocatable :: vtor(:,:)
-        integer,allocatable :: vtor_sec(:)
+        integer(2),allocatable :: vtor(:)!of size fake_npts
+        integer(2),allocatable :: rtov(:,:)! of size real_npts, 1:2
     contains
         procedure :: Initialise => Initialise_
         procedure :: Beam_BuildStructured => Beam_BuildStructured_
@@ -65,23 +55,16 @@ module SolidBody
         implicit none
         class(BeamBody), intent(inout) :: this
         character (LEN=100), intent(in):: filename
-        integer :: iBodyModel
-        real(8) :: Lspan
-
-        this%filename = filename
-
+        integer, intent(in) :: iBodyModel
+        real(8), intent(out) :: Lspan
         if (iBodyModel .eq. 2) then
             call this%Beam_BuildStructured()
-            Lspan = maxval(this%v_Pxyz0(:,3))-minval(this%v_Pxyz0(:,3))
+            Lspan = maxval(this%r_Lspan(:))
         elseif (iBodyModel .eq. 1) then
             call this%Beam_ReadUnstructured()
             Lspan = maxval(this%r_Lspan(:))
         endif
 
-        allocate(this%r_rotMat(1:this%r_npts,1:3,1:3))
-        this%r_rotMat=0.0d0
-        allocate(this%r_self_rotMat(1:this%r_npts,1:3,1:3))
-        this%r_self_rotMat=0.0d0
         allocate(this%v_Exyz(1:this%v_nelmts,1:6))
         this%v_Exyz = 0.0d0
         allocate(this%v_Evel(1:this%v_nelmts,1:6))
@@ -233,9 +216,9 @@ module SolidBody
             call minloc_fast(this%v_Exyz(iEL,1), x0, i0, invdh, i, detx)
             call minloc_fast(this%v_Exyz(iEL,2), y0, j0, invdh, j, dety)
             call minloc_fast(this%v_Exyz(iEL,3), z0, k0, invdh, k, detz)
-            call trimedindex(i, xDim, ix, boundaryConditions(1:2))
-            call trimedindex(j, yDim, jy, boundaryConditions(3:4))
-            call trimedindex(k, zDim, kz, boundaryConditions(5:6))
+            call trimedindex(i, xDim, ix, m_boundaryConditions(1:2))
+            call trimedindex(j, yDim, jy, m_boundaryConditions(3:4))
+            call trimedindex(k, zDim, kz, m_boundaryConditions(5:6))
             this%v_Ei(iEL,1:4) = ix
             this%v_Ei(iEL,5:8) = jy
             this%v_Ei(iEL,9:12) = kz
@@ -880,18 +863,22 @@ module SolidBody
         !   =============================================
     end subroutine
 
-    subroutine Initialise_bodies(nFish,Lspan,maxIterIB,dtolLBM,Pbeta,filenames,iBodyModel,BCs)
+    subroutine Initialise_bodies(nFish,filenames,iBodyModel,maxIterIB,dtolLBM,Pbeta,dt,h,denIn,Uref,BCs,Lspan)
         implicit none
         integer,intent(in)::nFish,maxIterIB,iBodyModel(nFish),BCs(6)
-        real(8),intent(in):: dtolLBM,Pbeta
+        real(8),intent(in):: dtolLBM,Pbeta,dt,h,denIn,Uref
         character(LEN=100),intent(in):: filenames(nFish)
-        real(8), allocatable:: Lspan(:)
+        real(8), allocatable, intent(out):: Lspan(:)
         integer :: iFish
         m_nFish = nFish
         m_maxIterIB = maxIterIB
         m_dtolLBM = dtolLBM
         m_Pbeta = Pbeta
-        boundaryConditions(1:6) = BCs(1:6)
+        m_dt = dt
+        m_h = h
+        m_denIn = denIn
+        m_Uref = Uref
+        m_boundaryConditions(1:6) = BCs(1:6)
         allocate(Beam(nFish),Lspan(nFish))
         do iFish = 1,nFish
             call Beam(iFish)%Initialise(filenames(iFish),iBodyModel(iFish),Lspan(iFish))
