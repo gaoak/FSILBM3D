@@ -1,11 +1,18 @@
 module SolidSolver
     implicit none
     private
-    integer:: nFish,nND_max,nEL_max,nMT_max,nEQ_max,NDref
-    public :: BeamSolver
+    INTEGER, PARAMETER:: SpcDim = 3
+    integer, parameter:: idat=12
+    integer:: nFish!,nND_max,nEL_max,nMT_max,nEQ_max,NDref
+    real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
+    real(8):: dtolFEM
+    integer:: ntolFEM
+    real(8):: g(3)
+    real(8):: deltaT
+    public :: BeamInfo
     type :: BeamSolver
-        real(8):: deltaT
         real(8):: Freq
+        real(8), allocatable:: elmax(:),elmin(:)
         real(8), allocatable:: XYZ(:),XYZo(:),XYZAmpl(:),XYZPhi(:),XYZd(:),UVW(:)
         real(8), allocatable:: AoA(:),AoAo(:),AoAAmpl(:),AoAPhi(:),AoAd(:),WWW1(:),WWW2(:),WWW3(:)
         real(8), allocatable:: TTT00(:,:),TTT0(:,:),TTTnow(:,:),TTTnxt(:,:)
@@ -19,88 +26,89 @@ module SolidSolver
         real(8), allocatable:: xyzful(:,:),velful(:,:)
         real(8), allocatable:: triad_nn(:,:,:),triad_ee(:,:,:),triad_e0(:,:,:)
         real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
+        real(8), allocatable:: FishInfo(:)
     contains
+        procedure :: Allocate_solid => Allocate_solid_
         procedure :: Initialise => Initialise_
-        procedure :: structure_solver => structure_solver_
+        procedure :: structure => structure_
     end type BeamSolver
+    type(BeamSolver), allocatable :: BeamInfo(:)
   contains
-    SUBROUTINE Initialise_(this)
+    SUBROUTINE Allocate_solid_(this,FEmeshName,nAsfac,nLchod,lentemp)
         implicit none
         class(BeamSolver), intent(inout) :: this
-    end subroutine Initialise_
-    !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        real(8):: nAsfac,nLchod,lentemp
+        integer:: iND
+        character (LEN=40):: FEmeshName
+        
+        write(*,'(A)') '=============================================================================='
+        open(unit=idat, file = trim(adjustl(FEmeshName)))
+        rewind(idat)
+        read(idat,*)
+        read(idat,*)this%nND,this%nEL,this%nMT
+        read(idat,*)
+
+        this%nEQ=this%nND*6
+    
+    !   ===============================================================================================
+        allocate( this%ele(this%nEL,5),this%xyzful00(this%nND,6),this%xyzful0(this%nND,6),this%mssful(this%nND,6),this%lodful(this%nND,6), &
+                  this%extful(this%nND,6),this%repful(this%nND,1:6),this%extful1(this%nND,6),this%extful2(this%nND,6),this%nloc(this%nND*6),this%nprof(this%nND*6), &
+                  this%nprof2(this%nND*6),this%jBC(this%nND,6))
+        allocate( this%grav(this%nND,6),this%vBC(this%nND,6),this%mss(this%nND*6),this%prop(this%nMT,10),this%areaElem00(this%nEL),this%areaElem(this%nEL))
+    
+        allocate( this%xyzful(this%nND,6),this%xyzfulnxt(this%nND,6),this%dspful(this%nND,6),this%velful(this%nND,6),this%accful(this%nND,6))
+        allocate( this%triad_nn(3,3,this%nND),this%triad_ee(3,3,this%nEL),this%triad_e0(3,3,this%nEL) )
+        allocate( this%triad_n1(3,3,this%nEL),this%triad_n2(3,3,this%nEL),this%triad_n3(3,3,this%nEL) )
+    
+        this%repful(:,:) =0.d0
+        this%extful1(:,:)=0.d0
+        this%extful2(:,:)=0.d0
+    
+    !   ===============================================================================================
+        call read_structural_datafile(this%jBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5),this%nloc(1:this%nND*6),this%nprof(1:this%nND*6), &
+                                      this%nprof2(1:this%nND*6),this%xyzful00(1:this%nND,1:6),this%prop(1:this%nMT,1:10),this%nND, &
+                                      this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,idat)
+        close(idat)
+
+    !   ===============================================================================================
+    !   calculate area
+        call cptArea(this%areaElem00(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful00(1:this%nND,1:6))
+        nAsfac=sum(this%areaElem00(1:this%nEL))
+        this%elmax=maxval(this%areaElem00(1:this%nEL))
+        this%elmin=minval(this%areaElem00(1:this%nEL))
+        !calculate spanwise length, chord length, aspect ratio
+        nLchod  = maxval(this%xyzful00(:,1))-minval(this%xyzful00(:,1))
+        lentemp = maxval(this%xyzful00(:,2))-minval(this%xyzful00(:,2))
+        if(lentemp .gt. nLchod) nLchod = lentemp
+    
+    !   loading boundary type*******************************************************************************
+        do    iND=1,this%nND
+            if(this%jBC(iND,1)==1) this%jBC(iND,1:6)=this%isMotionGiven(1:6)
+        enddo
+    end subroutine Allocate_solid_
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    Allocate memory for solid simulation
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE allocate_solid_memory()
         USE simParam
         implicit none
-        integer:: iND,iFish,maxN
+        integer:: iFish,maxN
         real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
         if(nFish==0) return
-        allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
-    
-        write(*,'(A)') '=============================================================================='
-        do iFish=1,nFish
-        open(unit=idat, file = trim(adjustl(FEmeshName(iFish))))
-        rewind(idat)
-        read(idat,*)
-        read(idat,*)nND(iFish),nEL(iFish),nMT(iFish)
-        read(idat,*)
-        close(idat)
-        enddo
-    
-        nND_max=maxval(nND(:))
-        nEL_max=maxval(nEL(:))
-        nMT_max=maxval(nMT(:))
-        nEQ_max=nND_max*6
-        nEQ(:)=nND(:)*6
-    
-    !   ===============================================================================================
-    
-        allocate( ele(nEL_max,5,1:nFish),xyzful00(nND_max,6,1:nFish),xyzful0(nND_max,6,1:nFish),mssful(nND_max,6,1:nFish),lodful(nND_max,6,1:nFish), &
-                  extful(nND_max,6,1:nFish),repful(nND_max,1:6,1:nFish),extful1(nND_max,6,1:nFish),extful2(nND_max,6,1:nFish),nloc(nND_max*6,1:nFish),nprof(nND_max*6,1:nFish), &
-                  nprof2(nND_max*6,1:nFish),jBC(nND_max,6,1:nFish))
-        allocate( grav(nND_max,6,1:nFish),vBC(nND_max,6,1:nFish),mss(nND_max*6,1:nFish),prop(nMT_max,10,1:nFish),areaElem00(nEL_max,1:nFish),areaElem(nEL_max,1:nFish))
-    
-        allocate( xyzful(nND_max,6,1:nFish),xyzfulnxt(nND_max,6,1:nFish),dspful(nND_max,6,1:nFish),velful(nND_max,6,1:nFish),accful(nND_max,6,1:nFish))
-        allocate( triad_nn(3,3,nND_max,1:nFish),triad_ee(3,3,nEL_max,1:nFish),triad_e0(3,3,nEL_max,1:nFish) )
-        allocate( triad_n1(3,3,nEL_max,1:nFish),triad_n2(3,3,nEL_max,1:nFish),triad_n3(3,3,nEL_max,1:nFish) )
-    
-        repful(:,:,:) =0.d0
-        extful1(:,:,:)=0.d0
-        extful2(:,:,:)=0.d0
-    
-    !   ===============================================================================================
-        do iFish=1,nFish
-        open(unit=idat, file = trim(adjustl(FEmeshName(iFish))))
-        rewind(idat)
-        read(idat,*)
-        read(idat,*)nND(iFish),nEL(iFish),nMT(iFish)
-        read(idat,*)
-    
-        call read_structural_datafile(jBC(1:nND(iFish),1:6,iFish),ele(1:nEL(iFish),1:5,iFish),nloc(1:nND(iFish)*6,iFish),nprof(1:nND(iFish)*6,iFish), &
-                                          nprof2(1:nND(iFish)*6,iFish),xyzful00(1:nND(iFish),1:6,iFish),prop(1:nMT(iFish),1:10,iFish),nND(iFish), &
-                                          nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),idat)
-        close(idat)
-        write(*,*)'read FEMeshFile ',iFish,' end'
-        enddo
-    !   ===============================================================================================
-    !   calculate area
-        allocate(elmax(1:nFish),elmin(1:nFish))
+
+        allocate(BeamInfo(nFish))
         allocate(nAsfac(1:nFish),nLchod(1:nFish),lentemp(1:nFish))
-        do iFish=1,nFish
-            call cptArea(areaElem00(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful00(1:nND(iFish),1:6,iFish))
-            nAsfac(iFish)=sum(areaElem00(1:nEL(iFish),iFish))
-            elmax(iFish)=maxval(areaElem00(1:nEL(iFish),iFish))
-            elmin(iFish)=minval(areaElem00(1:nEL(iFish),iFish))
+        
+        do iFish = 1,nFish
+            call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
+            write(*,*)'read FEMeshFile ',iFish,' end'
         enddo
-        !calculate spanwise length, chord length, aspect ratio
-        do iFish=1,nFish
-            nLchod(iFish)  = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
-            lentemp(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
-            if(lentemp(iFish) .gt. nLchod(iFish)) nLchod(iFish) = lentemp(iFish)
-        enddo
+
+        ! nND_max=maxval(BeamInfo(:)%nND)
+        ! nEL_max=maxval(BeamInfo(:)%nEL)
+        ! nMT_max=maxval(BeamInfo(:)%nMT)
+        ! nEQ_max=nND_max*6
         !Use the object with the largest area as the reference object
         maxN  = maxloc(nAsfac, dim=1)
         Asfac = nAsfac(maxN)
@@ -110,15 +118,56 @@ module SolidSolver
         if((maxval(Lspan)-1.0d0)<=1.0d-2)Lspan(maxloc(Lspan))=1.0d0
     
         AR    = maxval(Lspan)**2/Asfac
-    
-    !   loading boundary type*******************************************************************************
-        do  iFish=1,nFish
-        do    iND=1,nND(iFish)
-            if(jBC(iND,1,iFish)==1) jBC(iND,1:6,iFish)=isMotionGiven(1:6,iFish)
-        enddo
-        enddo
     END SUBROUTINE allocate_solid_memory
 
+    SUBROUTINE Initialise_(this,pi,time)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        integer:: iND
+        real(8):: pi,time
+        this%TTT00(:,:)=0.0d0
+        this%TTT00(1,1)=1.0d0
+        this%TTT00(2,2)=1.0d0
+        this%TTT00(3,3)=1.0d0
+
+        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*pi*this%Freq*time+this%XYZPhi(1:3))
+        this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*pi*this%Freq*time+this%AoAPhi(1:3))
+
+        call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))
+        call AoAtoTTT(this%AoA(1:3),this%TTTnow(1:3,1:3))
+        call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnow(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
+
+        do iND=1,this%nND
+            this%xyzful0(iND,1:3)=matmul(this%TTT0(1:3,1:3),this%xyzful00(iND,1:3))+this%XYZ(1:3)
+            this%xyzful0(iND,4:6)=this%AoAd(1:3)
+        enddo
+
+        this%xyzful(1:this%nND,1:6)=this%xyzful0(1:this%nND,1:6)
+        this%velful(1:this%nND,1:6)=0.0
+
+        this%dspful(1:this%nND,1:6)=0.0
+        this%accful(1:this%nND,1:6)=0.0
+
+        if(this%ele(1,4).eq.2)then
+            CALL formmass_D(this%ele(1:this%nEL,1:5),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
+                            this%prop(1:this%nMT,1:10),this%mss(1:this%nND*6),this%nND,this%nEL,this%nEQ,this%nMT,alphaf)
+
+            do iND = 1, this%nND
+                this%mssful(iND,1:6)= this%mss((iND-1)*6+1:(iND-1)*6+6)
+                this%grav(iND,1:6)  = this%mssful(iND,1:6)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+            enddo
+
+            CALL init_triad_D(this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1),this%xyzful(1:this%nND,2),this%xyzful(1:this%nND,3), &
+                            this%triad_nn(1:3,1:3,1:this%nND),this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
+                            this%triad_ee(1:3,1:3,1:this%nEL),this%triad_e0(1:3,1:3,1:this%nEL),this%nND,this%nEL)
+        else
+            do iND = 1, this%nND
+                this%mssful(iND,1:6)= 1.0d0 !Culculate accCentM/velCentM/xyzCentM requires mass not zero
+                this%grav(iND,1:6)  = this%mssful(iND,1:6)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+            enddo
+        endif
+
+    END SUBROUTINE Initialise_
     !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    initialize solid field
 !    copyright@ RuNanHua
@@ -126,58 +175,98 @@ module SolidSolver
     SUBROUTINE initialize_solid()
         USE simParam
         implicit none
-        integer:: iND,iFish
+        integer:: iFish
         if(nFish.eq.0) return
-        allocate(TTT00(1:3,1:3,1:nFish),TTT0(1:3,1:3,1:nFish),TTTnow(1:3,1:3,1:nFish),TTTnxt(1:3,1:3,1:nFish))
-        allocate(XYZ(1:3,1:nFish),XYZd(1:3,1:nFish),UVW(1:3,1:nFish) )
-        allocate(AoA(1:3,1:nFish),AoAd(1:3,1:nFish),WWW1(1:3,1:nFish),WWW2(1:3,1:nFish),WWW3(1:3,1:nFish) )
     
         do iFish=1,nFish
-            TTT00(:,:,iFish)=0.0d0
-            TTT00(1,1,iFish)=1.0d0
-            TTT00(2,2,iFish)=1.0d0
-            TTT00(3,3,iFish)=1.0d0
-    
-            XYZ(1:3,iFish)=XYZo(1:3,iFish)+XYZAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*time+XYZPhi(1:3,iFish))
-            AoA(1:3,iFish)=AoAo(1:3,iFish)+AoAAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*time+AoAPhi(1:3,iFish))
-    
-            call AoAtoTTT(AoA(1:3,iFish),TTT0(1:3,1:3,iFish))
-            call AoAtoTTT(AoA(1:3,iFish),TTTnow(1:3,1:3,iFish))
-            call get_angle_triad(TTT0(1:3,1:3,iFish),TTTnow(1:3,1:3,iFish),AoAd(1,iFish),AoAd(2,iFish),AoAd(3,iFish))
-    
-            do iND=1,nND(iFish)
-                xyzful0(iND,1:3,iFish)=matmul(TTT0(1:3,1:3,iFish),xyzful00(iND,1:3,iFish))+XYZ(1:3,iFish)
-                xyzful0(iND,4:6,iFish)=AoAd(1:3,iFish)
-            enddo
-    
-            xyzful(1:nND(iFish),1:6,iFish)=xyzful0(1:nND(iFish),1:6,iFish)
-            velful(1:nND(iFish),1:6,iFish)=0.0
-    
-            dspful(1:nND(iFish),1:6,iFish)=0.0
-            accful(1:nND(iFish),1:6,iFish)=0.0
-    
-            if(ele(1,4,iFish).eq.2)then
-                CALL formmass_D(ele(1:nEL(iFish),1:5,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
-                                prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf)
-    
-                do iND = 1, nND(iFish)
-                    mssful(iND,1:6,iFish)= mss((iND-1)*6+1:(iND-1)*6+6,iFish)
-                    grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
-                enddo
-    
-                CALL init_triad_D(ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1,iFish),xyzful(1:nND(iFish),2,iFish),xyzful(1:nND(iFish),3,iFish), &
-                                triad_nn(1:3,1:3,1:nND(iFish),iFish),triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
-                                triad_ee(1:3,1:3,1:nEL(iFish),iFish),triad_e0(1:3,1:3,1:nEL(iFish),iFish),nND(iFish),nEL(iFish))
-            else
-                do iND = 1, nND(iFish)
-                    mssful(iND,1:6,iFish)= 1.0d0 !Culculate accCentM/velCentM/xyzCentM requires mass not zero
-                    grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
-                enddo
-            endif
-    
+            call BeamInfo(iFish)%Initialise(pi,time)
         enddo
     END SUBROUTINE initialize_solid
 
+    SUBROUTINE solver()
+        USE simParam
+        implicit none
+        integer:: iFish,isubstep
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish)
+        do iFish=1,nFish
+            call BeamInfo(iFish)%structure(iFish,pi,time,isubstep,subdeltat,iBodyModel(iFish))
+        enddo !do iFish=1,nFish
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    SUBROUTINE structure_(this,iFish,pi,time,isubstep,subdeltat,iBodyModel)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        integer:: iFish,iND,isubstep,iBodyModel
+        real(8):: subdeltat,pi,time
+        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
+            if(iBodyModel==1)then     ! rigid body
+                !======================================================
+                !prescribed motion
+                !------------------------------------------------------
+                !translational displacement
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                !rotational displacement
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
+                call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
+                !given displacement
+                do  iND=1,this%nND
+                    this%xyzfulnxt(iND,1:3)=matmul(this%TTTnxt(1:3,1:3),this%xyzful00(iND,1:3))+this%XYZ(1:3)
+                    this%xyzfulnxt(iND,4:6)=this%AoAd(1:3)
+                enddo
+                this%xyzful(1:this%nND,1:6)=this%xyzfulnxt(1:this%nND,1:6)
+                !------------------------------------------------------
+                !translational velocity
+                this%UVW(1:3) =-2.0*pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                !rotational velocity
+                this%WWW1(1:3)=-2.0*pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
+                                 this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
+                                 this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
+                this%WWW3(1:3)=matmul(this%TTTnxt(1:3,1:3),this%WWW2(1:3))
+                !given velocity
+                do  iND=1,this%nND
+                    this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
+                                           this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
+                                           this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
+                                           + this%UVW(1:3)
+                    this%velful(iND,4:6)=this%WWW3(1:3)
+                enddo
+                !-------------------------------------------------------
+            elseif(iBodyModel==2)then !elastic model
+                !translational displacement
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                !rotational displacement
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
+                call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
+                !given displacement
+                do  iND=1,this%nND
+                    this%xyzfulnxt(iND,1:3)=matmul(this%TTTnxt(1:3,1:3),this%xyzful00(iND,1:3))+this%XYZ(1:3)
+                    this%xyzfulnxt(iND,4:6)=this%AoAd(1:3)
+                enddo
+                !-------------------------------------------------------
+                !displacement condition
+                this%vBC(1:this%nND,1:6) = this%xyzfulnxt(1:this%nND,1:6) - this%xyzful(1:this%nND,1:6)
+                !loading vector
+                this%lodful(1:this%nND,1:6) = this%extful(1:this%nND,1:6) + this%grav(1:this%nND,1:6) + this%repful(1:this%nND,1:6)
+                !-----------------------------------------
+                CALL structure_solver(this%jBC(1:this%nND,1:6),this%vBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5), &
+                                      this%nloc(1:this%nND*6),this%nprof(1:this%nND*6),this%nprof2(1:this%nND*6), &
+                                      this%prop(1:this%nMT,1:10),this%mss(1:this%nND*6), &
+                                      this%xyzful0(1:this%nND,1:6),this%xyzful(1:this%nND,1:6),this%dspful(1:this%nND,1:6), &
+                                      this%velful(1:this%nND,1:6),this%accful(1:this%nND,1:6),this%lodful(1:this%nND,1:6),  &
+                                      subdeltat,dampK,dampM,  &
+                                      this%triad_nn(1:3,1:3,1:this%nND),this%triad_ee(1:3,1:3,1:this%nEL), &
+                                      this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
+                                      this%nND,this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,    &
+                                      iFish,this%FishInfo)
+            else
+                stop 'no define body model'
+            endif
+            !$OMP END PARALLEL DO
+    END SUBROUTINE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    FEM code for structure
 !    input variables (at time t):
@@ -195,12 +284,11 @@ module SolidSolver
 !
 !    workspace variables:
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE structure_solver_(this,lodExteful,deltat,dampK,dampM,     &
+    SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,     &
                       triad_nn,triad_ee,triad_n1,triad_n2,nND,nEL,nEQ,nMT,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
-                      dtol,iterMax,nFish,iFish,FishInfo)
+                      dtol,iterMax,iFish,FishInfo)
     implicit none
-    class(BeamSolver), intent(inout) :: this
-    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,iFish,nFish
+    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,iFish
     integer:: jBC(nND,6),ele(nEL,5),nloc(nEQ),nprof(nEQ),nprof2(nEQ)
     real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(nMT,10)
     real(8):: mss(nEQ),dspful(nND,6),velful(nND,6),accful(nND,6),lodExteful(nND,6),deltat
@@ -215,7 +303,7 @@ module SolidSolver
     real(8):: Newmarkdelta,Newmarkalpha
     real(8):: a0,a1,a2,a3,a4,a5,a6,a7
     real(8):: beta0,beta,gamma,zi,z0
-    real(8):: dtol,dnorm,geoFRM(nEL),FishInfo(1:3,1:nFish)
+    real(8):: dtol,dnorm,geoFRM(nEL),FishInfo(1:3)
     integer:: i,j,iND,iEQ,iter,iterMax,iloc,ierror,maxramp,iModify,i1,i2
 !   -----------------------------------------------------------------------------------------------
     a0 = 1.0d0/(Newmarkalpha*deltat*deltat)
@@ -358,9 +446,9 @@ module SolidSolver
     enddo
 
 
-    FishInfo(1,iFish)=dble(iFish)
-    FishInfo(2,iFish)=dble(iter)
-    FishInfo(3,iFish)=dnorm
+    FishInfo(1)=dble(iFish)
+    FishInfo(2)=dble(iter)
+    FishInfo(3)=dnorm
 
     velO(1:nEQ) = vel(1:nEQ)
     accO(1:nEQ) = acc(1:nEQ)
