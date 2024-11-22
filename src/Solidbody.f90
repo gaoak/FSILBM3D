@@ -1,4 +1,5 @@
 module SolidBody
+    use SolidSolver
     implicit none
     private
     ! Immersed boundary method parameters
@@ -13,8 +14,6 @@ module SolidBody
     type :: VirtualBody
         !!!virtual infomation
         integer :: r_npts,r_nelmts
-        real(8), allocatable :: r_Lspan(:)
-        integer, allocatable :: r_Nspan(:)
         !!!virtual body surface
         integer :: v_npts,v_nelmts,v_type ! v_type 0 (solid body), 1 (plate), 2 (rod)
         real(8) :: v_dirc(3)
@@ -30,7 +29,7 @@ module SolidBody
         integer(2),allocatable :: rtov(:,:)! of size real_npts, 1:2
     contains
         procedure :: Initialise => Initialise_
-        procedure :: Beam_BuildStructured => Beam_BuildStructured_
+        procedure :: BuildPlate => BuildPlate_
         procedure :: Beam_ReadUnstructured => Beam_ReadUnstructured_
         procedure :: Readreal => Readreal_
         procedure :: Unstruc_Virtual_Elmts => Unstruc_Virtual_Elmts_
@@ -45,15 +44,14 @@ module SolidBody
 
         procedure :: Write_body => Write_body_
     end type VirtualBody
-    type(VirtualBody), allocatable :: Beam(:)
+    type(VirtualBody), allocatable :: VBodies(:)
   contains
     
-    subroutine Initialise_bodies(nFish,filenames,iBodyModel,maxIterIB,dtolLBM,Pbeta,dt,h,denIn,Uref,BCs,Lspan)
+    subroutine Initialise_bodies(nFish,iBodyModel,maxIterIB,dtolLBM,Pbeta,dt,h,denIn,Uref,BCs,beams)
         implicit none
         integer,intent(in)::nFish,maxIterIB,iBodyModel(nFish),BCs(6)
         real(8),intent(in):: dtolLBM,Pbeta,dt,h,denIn,Uref
-        character(LEN=100),intent(in):: filenames(nFish)
-        real(8), allocatable, intent(out):: Lspan(:)
+        type(BeamSolver), intent(in):: beams(nFish)
         integer :: iFish
         m_nFish = nFish
         m_maxIterIB = maxIterIB
@@ -64,22 +62,21 @@ module SolidBody
         m_denIn = denIn
         m_Uref = Uref
         m_boundaryConditions(1:6) = BCs(1:6)
-        allocate(Beam(nFish),Lspan(nFish))
+        allocate(VBodies(nFish))
         do iFish = 1,nFish
-            call Beam(iFish)%Initialise(filenames(iFish),iBodyModel(iFish),Lspan(iFish))
+            call VBodies(iFish)%Initialise(iBodyModel(iFish), beams(iFish))
         enddo
     end subroutine Initialise_bodies
 
-    subroutine Initialise_(this,filename,iBodyModel,Lspan)
+    subroutine Initialise_(this,iBodyModel,beam)
         ! read beam central line file and allocate memory
         implicit none
         class(VirtualBody), intent(inout) :: this
-        character (LEN=100), intent(in):: filename
         integer, intent(in) :: iBodyModel
-        real(8), intent(out) :: Lspan
+        type(BeamSolver), intent(in):: beam
         this%v_type = iBodyModel
         if (this%v_type .eq. 1) then
-            call this%Beam_BuildStructured()
+            call this%BuildPlate(beam)
         else
             write(*,*) 'not implemented body type', this%v_type
         endif
@@ -94,7 +91,7 @@ module SolidBody
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: iFish
         do iFish = 1,m_nFish
-            call Beam(iFish)%UpdateElmtInfo(dh,zDim,yDim,xDim,xGrid,yGrid,zGrid)
+            call VBodies(iFish)%UpdateElmtInfo(dh,zDim,yDim,xDim,xGrid,yGrid,zGrid)
         enddo
         call calculate_interaction_force(dt,dh,denIn,Uref,zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
     end subroutine
@@ -406,14 +403,14 @@ module SolidBody
         tolsum=0.d0
         iterLBM=0
         do iFish=1,m_nFish
-            allocate(Beam(iFish)%r_force(Beam(iFish)%r_npts,6))
-            Beam(iFish)%r_force(:,:) = 0.0d0
+            allocate(VBodies(iFish)%r_force(VBodies(iFish)%r_npts,6))
+            VBodies(iFish)%r_force(:,:) = 0.0d0
         enddo
         do  while( iterLBM<m_maxIterIB .and. dmaxLBM>m_dtolLBM)
             dmaxLBM=0.0d0
             dsum=0.0d0
             do iFish=1,m_nFish
-                call Beam(iFish)%PenaltyForce(dh,dt,denIn,zDim,yDim,xDim,uuu,den,force,tol,ntol)
+                call VBodies(iFish)%PenaltyForce(dh,dt,denIn,zDim,yDim,xDim,uuu,den,force,tol,ntol)
                 tolsum = tolsum + dsqrt(tol)
                 dsum = dsum + Uref*ntol
             enddo
@@ -487,12 +484,20 @@ module SolidBody
         !$OMP END PARALLEL DO
     END SUBROUTINE PenaltyForce_
 
-    subroutine Beam_BuildStructured_(this)
+    subroutine BuildPlate_(this, beam)
         implicit none
         class(VirtualBody), intent(inout) :: this
+        type(BeamSolver), intent(in):: beam
+        
+        
+        integer(2),allocatable :: vtor(:)!of size fake_npts
+        integer :: r_npts,r_nelmts
+        integer(2),allocatable :: rtov(:,:)! of size real_npts, 1:2
+
+
         call this%Readreal()
         call this%Struc_Virtual_Elmts()
-    end subroutine Beam_BuildStructured_
+    end subroutine BuildPlate_
 
     subroutine Beam_ReadUnstructured_(this)
         implicit none
@@ -955,7 +960,7 @@ module SolidBody
         real(8) :: Lref,time,Tref
         integer :: iFish
         do iFish = 1,m_nFish
-            call Beam(iFish)%Write_body(iFish,time,Lref,Tref)
+            call VBodies(iFish)%Write_body(iFish,time,Lref,Tref)
         enddo
     end subroutine Write_solid_bodies
 

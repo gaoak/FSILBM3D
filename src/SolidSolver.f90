@@ -4,6 +4,9 @@ module SolidSolver
     integer:: nFish,nND_max,nEL_max,nMT_max,nEQ_max,NDref
     public :: BeamSolver
     type :: BeamSolver
+        real(8), allocatable :: r_Lspan(:)
+        real(8), allocatable :: r_Rspan(:)
+        integer, allocatable :: r_Nspan(:)
         real(8):: deltaT
         real(8):: Freq
         real(8), allocatable:: XYZ(:),XYZo(:),XYZAmpl(:),XYZPhi(:),XYZd(:),UVW(:)
