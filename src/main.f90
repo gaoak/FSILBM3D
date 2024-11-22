@@ -9,6 +9,7 @@
     USE simParam
     use omp_lib
     USE SolidBody
+    USE SolidSolver
     implicit none
     integer:: iND,isubstep,iFish,x,y,z
     real(8), allocatable:: FishInfo(:,:)
