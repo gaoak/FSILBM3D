@@ -8,11 +8,10 @@
     PROGRAM main
     USE simParam
     use omp_lib
-    USE SolidBody
+    ! USE SolidBody
     USE SolidSolver
     implicit none
     integer:: iND,isubstep,iFish,x,y,z
-    real(8), allocatable:: FishInfo(:,:)
     real(8):: Pbetatemp,CPUtime
     logical alive
     !time_and_date
@@ -23,8 +22,6 @@
     CALL calculate_LB_params()
     CALL write_params()
     CALL calculate_MRTM_params()
-
-    allocate(FishInfo(1:3,1:nFish))
 
     call OMP_set_num_threads(npsize)
     write(*,*)'npsize=', npsize
@@ -168,75 +165,7 @@
         call date_and_time(VALUES=values0)
         subdeltat=deltat/numsubstep
         do isubstep=1,numsubstep
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND,iFish)
-        do iFish=1,nFish
-        if(iBodyModel(iFish)==1)then     ! rigid body
-            !======================================================
-            !prescribed motion
-            !------------------------------------------------------
-            !translational displacement
-            XYZ(1:3,iFish)=XYZo(1:3,iFish)+XYZAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(1:3,iFish))
-            !rotational displacement
-            AoA(1:3,iFish)=AoAo(1:3,iFish)+AoAAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(1:3,iFish))
-            call AoAtoTTT(AoA(1:3,iFish),TTTnxt(1:3,1:3,iFish))
-            call get_angle_triad(TTT0(1:3,1:3,iFish),TTTnxt(1:3,1:3,iFish),AoAd(1,iFish),AoAd(2,iFish),AoAd(3,iFish))
-            !given displacement
-            do  iND=1,nND(iFish)
-                xyzfulnxt(iND,1:3,iFish)=matmul(TTTnxt(1:3,1:3,iFish),xyzful00(iND,1:3,iFish))+XYZ(1:3,iFish)
-                xyzfulnxt(iND,4:6,iFish)=AoAd(1:3,iFish)
-            enddo
-            xyzful(1:nND(iFish),1:6,iFish)=xyzfulnxt(1:nND(iFish),1:6,iFish)
-            !------------------------------------------------------
-            !translational velocity
-            UVW(1:3,iFish) =-2.0*pi*Freq(iFish)*XYZAmpl(1:3,iFish)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(1:3,iFish))
-            !rotational velocity
-            WWW1(1:3,iFish)=-2.0*pi*Freq(iFish)*AoAAmpl(1:3,iFish)*dsin(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(1:3,iFish))
-            WWW2(1:3,iFish)=[WWW1(1,iFish)*dcos(AoA(2,iFish))+WWW1(3,iFish),    &
-                             WWW1(1,iFish)*dsin(AoA(2,iFish))*dsin(AoA(3,iFish))+WWW1(2,iFish)*dcos(AoA(3,iFish)),   &
-                             WWW1(1,iFish)*dsin(AoA(2,iFish))*dcos(AoA(3,iFish))-WWW1(2,iFish)*dsin(AoA(3,iFish))    ]
-            WWW3(1:3,iFish)=matmul(TTTnxt(1:3,1:3,iFish),WWW2(1:3,iFish))
-            !given velocity
-            do  iND=1,nND(iFish)
-                velful(iND,1:3,iFish)=[WWW3(2,iFish)*xyzful(iND,3,iFish)-WWW3(3,iFish)*xyzful(iND,2,iFish),    &
-                                       WWW3(3,iFish)*xyzful(iND,1,iFish)-WWW3(1,iFish)*xyzful(iND,3,iFish),    &
-                                       WWW3(1,iFish)*xyzful(iND,2,iFish)-WWW3(2,iFish)*xyzful(iND,1,iFish)    ]&
-                                       + UVW(1:3,iFish)
-                velful(iND,4:6,iFish)=WWW3(1:3,iFish)
-            enddo
-            !-------------------------------------------------------
-        elseif(iBodyModel(iFish)==2)then !elastic model
-            !translational displacement
-            XYZ(1:3,iFish)=XYZo(1:3,iFish)+XYZAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+XYZPhi(1:3,iFish))
-            !rotational displacement
-            AoA(1:3,iFish)=AoAo(1:3,iFish)+AoAAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*(time-deltat+isubstep*subdeltat)+AoAPhi(1:3,iFish))
-            call AoAtoTTT(AoA(1:3,iFish),TTTnxt(1:3,1:3,iFish))
-            call get_angle_triad(TTT0(1:3,1:3,iFish),TTTnxt(1:3,1:3,iFish),AoAd(1,iFish),AoAd(2,iFish),AoAd(3,iFish))
-            !given displacement
-            do  iND=1,nND(iFish)
-                xyzfulnxt(iND,1:3,iFish)=matmul(TTTnxt(1:3,1:3,iFish),xyzful00(iND,1:3,iFish))+XYZ(1:3,iFish)
-                xyzfulnxt(iND,4:6,iFish)=AoAd(1:3,iFish)
-            enddo
-            !-------------------------------------------------------
-            !displacement condition
-            vBC(1:nND(iFish),1:6,iFish) = xyzfulnxt(1:nND(iFish),1:6,iFish) - xyzful(1:nND(iFish),1:6,iFish)
-            !loading vector
-            lodful(1:nND(iFish),1:6,iFish) = extful(1:nND(iFish),1:6,iFish) + grav(1:nND(iFish),1:6,iFish) + repful(1:nND(iFish),1:6,iFish)
-            !-----------------------------------------
-            CALL structure_solver(jBC(1:nND(iFish),1:6,iFish),vBC(1:nND(iFish),1:6,iFish),ele(1:nEL(iFish),1:5,iFish), &
-                                  nloc(1:nND(iFish)*6,iFish),nprof(1:nND(iFish)*6,iFish),nprof2(1:nND(iFish)*6,iFish), &
-                                  prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish), &
-                                  xyzful0(1:nND(iFish),1:6,iFish),xyzful(1:nND(iFish),1:6,iFish),dspful(1:nND(iFish),1:6,iFish), &
-                                  velful(1:nND(iFish),1:6,iFish),accful(1:nND(iFish),1:6,iFish),lodful(1:nND(iFish),1:6,iFish),  &
-                                  subdeltat,dampK,dampM,  &
-                                  triad_nn(1:3,1:3,1:nND(iFish),iFish),triad_ee(1:3,1:3,1:nEL(iFish),iFish), &
-                                  triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
-                                  nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,    &
-                                  nFish,iFish,FishInfo)
-        else
-            stop 'no define body model'
-        endif
-        enddo !do iFish=1,nFish
-        !$OMP END PARALLEL DO
+            call solver()
         enddo !do isubstep=1,numsubstep
         call date_and_time(VALUES=values1)
         write(*,*)'time for FEM:',CPUtime(values1)-CPUtime(values0)

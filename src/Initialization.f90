@@ -60,7 +60,7 @@
     if(nFish.eq.0) iForce2Body = 0
 
     if(nFish>0) then
-        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
+        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
@@ -82,7 +82,7 @@
         do iFish=FishOrder1,FishOrder2
             iBodyModel(iFish)=niBodyModel
             FEmeshName(iFish)=tmpFEmeshName
-            isMotionGiven(1:6,iFish)=nisMotionGiven(1:6)
+            BeamInfo(iFish)%isMotionGiven(1:6)=nisMotionGiven(1:6)
             denR(iFish)= ndenR
             psR(iFish) = npsR
             if(iKB==0) then
