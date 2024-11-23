@@ -182,7 +182,7 @@ module SolidSolver
         if(nFish.eq.0) return
     
         do iFish=1,nFish
-            call BeamInfo(iFish)%Initialise(pi,time)
+            !call BeamInfo(iFish)%Initialise(pi,time)
         enddo
     END SUBROUTINE initialize_solid
 
@@ -190,11 +190,11 @@ module SolidSolver
         USE simParam
         implicit none
         integer:: iFish,isubstep
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish)
-        do iFish=1,nFish
-            call BeamInfo(iFish)%structure(iFish,pi,time,isubstep,subdeltat,iBodyModel(iFish))
-        enddo !do iFish=1,nFish
-        !$OMP END PARALLEL DO
+        !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish)
+        !do iFish=1,nFish
+        !    !call BeamInfo(iFish)%structure(iFish,pi,time,isubstep,subdeltat,iBodyModel(iFish))
+        !enddo !do iFish=1,nFish
+        !!$OMP END PARALLEL DO
     END SUBROUTINE
 
     SUBROUTINE structure_(this,iFish,pi,time,isubstep,subdeltat,iBodyModel)
@@ -202,7 +202,7 @@ module SolidSolver
         class(BeamSolver), intent(inout) :: this
         integer:: iFish,iND,isubstep,iBodyModel
         real(8):: subdeltat,pi,time
-        !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
+        !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
             if(iBodyModel==1)then     ! rigid body
                 !======================================================
                 !prescribed motion
@@ -268,7 +268,7 @@ module SolidSolver
             else
                 stop 'no define body model'
             endif
-            !$OMP END PARALLEL DO
+            !!$OMP END PARALLEL DO
     END SUBROUTINE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    FEM code for structure

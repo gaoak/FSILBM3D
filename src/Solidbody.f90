@@ -42,7 +42,7 @@ module SolidBody
         implicit none
         integer,intent(in)::zDim,yDim,xDim,nFish,maxIterIB,iBodyModel(nFish),BCs(6)
         real(8),intent(in):: dtolLBM,Pbeta,dt,h,denIn,Uref,Lref,Tref
-        character(LEN=40), intent(in):: filenames
+        character(LEN=40), intent(in):: filenames(nFish)
         integer :: iFish
         m_zDim = zDim
         m_yDim = yDim
@@ -68,12 +68,12 @@ module SolidBody
         ! read beam central line file and allocate memory
         implicit none
         class(VirtualBody), intent(inout) :: this
+        character(LEN=40), intent(in):: filename
         integer, intent(in) :: iBodyModel
-        type(BeamSolver), intent(in):: beam
-        call rbm%Allocate_solid(filename)
+        !call this%rbm%Allocate_solid(filename)
         this%v_type = iBodyModel
         if (this%v_type .eq. 1) then
-            call this%PlateBuild(beam)
+            call this%PlateBuild()
         else
             write(*,*) 'not implemented body type', this%v_type
         endif
@@ -86,7 +86,7 @@ module SolidBody
         real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
         integer :: iFish
         do iFish = 1,m_nFish
-            call VBodies(iFish)%UpdatePosVelArea(beams(iFish))
+            call VBodies(iFish)%UpdatePosVelArea()
         enddo
         call calculate_interaction_force(xGrid,yGrid,zGrid,uuu,den,force)
     end subroutine
@@ -99,19 +99,19 @@ module SolidBody
         real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3)
         real(8) :: dh, left, len, dl, ls, area
 
-        do i = 1,rbm%nEL
-            tmpxyz = 0.5d0 * (rbm%xyzful(i,1:3) + rbm%xyzful(i+1,1:3))
-            tmpvel = 0.5d0 * (rbm%velful(i,1:3) + rbm%velful(i+1,1:3))
-            left = 0.5d0 * (rbm%r_Lspan(i) - rbm%r_Lspan(i+1))
-            len = 0.5d0 * (rbm%r_Rspan(i) + rbm%r_Rspan(i+1)) - left
-            dl = len / dble(rbm%r_Nspan(i))
-            tmpdx = rbm%xyzful(i+1,1:3) - rbm%xyzful(i,1:3)
+        do i = 1,this%rbm%nEL
+            tmpxyz = 0.5d0 * (this%rbm%xyzful(i,1:3) + this%rbm%xyzful(i+1,1:3))
+            tmpvel = 0.5d0 * (this%rbm%velful(i,1:3) + this%rbm%velful(i+1,1:3))
+            left = 0.5d0 * (this%rbm%r_Lspan(i) - this%rbm%r_Lspan(i+1))
+            len = 0.5d0 * (this%rbm%r_Rspan(i) + this%rbm%r_Rspan(i+1)) - left
+            dl = len / dble(this%rbm%r_Nspan(i))
+            tmpdx = this%rbm%xyzful(i+1,1:3) - this%rbm%xyzful(i,1:3)
             dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3))
             area = dl * dh
             cnt = this%rtov(i) - 1
-            do s=1,rbm%r_Nspan(i)
+            do s=1,this%rbm%r_Nspan(i)
                 ls = left + dl * (0.5d0 + dble(s-1))
-                this%v_Exyz(cnt+s, 1:3) = tmpxyz + rbm%r_dirc*ls
+                this%v_Exyz(cnt+s, 1:3) = tmpxyz + this%rbm%r_dirc*ls
                 this%v_Evel(cnt+s,1:3) = tmpvel
                 this%v_Ea(cnt+s) = area
             enddo
@@ -122,7 +122,7 @@ module SolidBody
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         if (this%v_type .eq. 1) then
-            call this%PlateUpdatePosVelArea(rbm)
+            call this%PlateUpdatePosVelArea()
         else
             write(*,*) 'body type not implemented', this%v_type
         endif
@@ -282,7 +282,7 @@ module SolidBody
         tolsum=0.d0
         iterLBM=0
         do iFish=1,m_nFish
-            VBodies%rbm%lodful = 0.0d0
+            VBodies(iFish)%rbm%lodful = 0.0d0
         enddo
         do  while( iterLBM<m_maxIterIB .and. dmaxLBM>m_dtolLBM)
             dmaxLBM=0.0d0
@@ -342,8 +342,8 @@ module SolidBody
             tolerance = tolerance + sum((velElem(1:3)-velElemIB(1:3))**2)
             !$OMP critical
             ! update beam load, momentum is not included
-            rbm%lodful(this%vtor(iEL)  ,1:3) = rbm%lodful(this%vtor(iEL)  ,1:3) + 0.5d0 * forceElemTemp
-            rbm%lodful(this%vtor(iEL)+1,1:3) = rbm%lodful(this%vtor(iEL)+1,1:3) + 0.5d0 * forceElemTemp
+            this%rbm%lodful(this%vtor(iEL)  ,1:3) = this%rbm%lodful(this%vtor(iEL)  ,1:3) + 0.5d0 * forceElemTemp
+            this%rbm%lodful(this%vtor(iEL)+1,1:3) = this%rbm%lodful(this%vtor(iEL)+1,1:3) + 0.5d0 * forceElemTemp
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
@@ -368,11 +368,11 @@ module SolidBody
         this%v_nelmts = 0
         do i=1,this%rbm%nEL
             this%rtov(i) = this%v_nelmts + 1
-            this%v_nelmts = this%v_nelmts + beam%r_Nspan(i)
+            this%v_nelmts = this%v_nelmts + this%rbm%r_Nspan(i)
         enddo
         this%rtov(this%rbm%nEL+1) = this%v_nelmts + 1
         allocate(this%vtor(this%v_nelmts))
-        do i=1,beam%nEL
+        do i=1,this%rbm%nEL
             do j= this%rtov(i), this%rtov(i+1)-1
                 this%vtor(j) = i
             enddo
@@ -381,13 +381,13 @@ module SolidBody
         allocate(this%v_Evel(this%v_nelmts,3))
     end subroutine PlateBuild_
 
-    subroutine Write_body_(this,iFish,time,Lref,Tref)
+    subroutine Write_body_(this,iFish,time)
         implicit none
         class(VirtualBody), intent(inout) :: this
         integer,intent(in) :: iFish
-        real(8),intent(in) :: time,Lref,Tref
+        real(8),intent(in) :: time
         if(this%v_type.eq.1) then
-            call this%PlateWrite_body(iFish,time,Lref,Tref)
+            call this%PlateWrite_body(iFish,time)
         else
             write(*, *) "body type not implemented", this%v_type
         endif
@@ -421,9 +421,9 @@ module SolidBody
         write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',2*this%rbm%nND,', E=',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
 
         do i = 1,this%rbm%nNd
-            tmpxyz = rbm%xyzful(i,1:3)
-            write(idfile, *) (tmpxyz - this%rbm%r_Rspan(i) * this%rbm%m_dirc)/m_Lref
-            write(idfile, *) (tmpxyz + this%rbm%r_Lspan(i) * this%rbm%m_dirc)/m_Lref
+            tmpxyz = this%rbm%xyzful(i,1:3)
+            write(idfile, *) (tmpxyz - this%rbm%r_Rspan(i) * this%rbm%r_dirc)/m_Lref
+            write(idfile, *) (tmpxyz + this%rbm%r_Lspan(i) * this%rbm%r_dirc)/m_Lref
         enddo
         do  i=1,this%rbm%nEL
             write(idfile, *) 2*i -1, 2*i,2*i+2,2*i+1
@@ -436,7 +436,7 @@ module SolidBody
         real(8) :: Lref,time,Tref
         integer :: iFish
         do iFish = 1,m_nFish
-            call VBodies(iFish)%Write_body(iFish,time,Lref,Tref)
+            call VBodies(iFish)%Write_body(iFish,time)
         enddo
     end subroutine Write_solid_bodies
 
