@@ -151,7 +151,7 @@
         if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
 
         call date_and_time(VALUES=values0)
-        call cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,Lspan)
+        !call cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,Lspan)
         call date_and_time(VALUES=values1)
         write(*,*)'time for Lubforce :',CPUtime(values1)-CPUtime(values0)
 
