@@ -3,24 +3,25 @@ module SolidSolver
     private
     INTEGER, PARAMETER:: SpcDim = 3
     integer, parameter:: idat=12
-    integer:: nFish!,nND_max,nEL_max,nMT_max,nEQ_max,NDref
+    integer:: nFish,nND_max,nEL_max,nMT_max,nEQ_max,NDref
     real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
     real(8):: dtolFEM
     integer:: ntolFEM
     real(8):: g(3)
-    real(8):: deltaT
-    public :: BeamInfo
+    real(8):: deltat
+    public :: BeamInfo,nFish,dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap,dtolFEM,ntolFEM,g,NDref,deltat
     type :: BeamSolver
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
         integer, allocatable :: r_Nspan(:)
+        real(8), allocatable:: denR,KB,KS,EmR,psR,tcR,St
         real(8):: Freq
-        real(8), allocatable:: elmax(:),elmin(:)
-        real(8), allocatable:: XYZ(:),XYZo(:),XYZAmpl(:),XYZPhi(:),XYZd(:),UVW(:)
-        real(8), allocatable:: AoA(:),AoAo(:),AoAAmpl(:),AoAPhi(:),AoAd(:),WWW1(:),WWW2(:),WWW3(:)
-        real(8), allocatable:: TTT00(:,:),TTT0(:,:),TTTnow(:,:),TTTnxt(:,:)
+        real(8):: elmax,elmin
+        real(8):: XYZ(3),XYZo(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
+        real(8):: AoA(3),AoAo(3),AoAAmpl(3),AoAPhi(3),AoAd(3),WWW1(3),WWW2(3),WWW3(3)
+        real(8):: TTT00(3,3),TTT0(3,3),TTTnow(3,3),TTTnxt(3,3)
         integer:: nND,nEL,nEQ,nMT,nBD,nSTF
-        integer, allocatable:: isMotionGiven(:)
+        integer:: isMotionGiven(6)
         integer, allocatable:: ele(:,:),jBC(:,:),nloc(:),nprof(:),nprof2(:)
         real(8), allocatable:: xyzful00(:,:),mssful(:,:),vBC(:,:),prop(:,:),mss(:),areaElem00(:),areaElem(:)
         real(8), allocatable:: lodful(:,:),repful(:,:),extful(:,:),extful1(:,:),extful2(:,:),grav(:,:)
@@ -29,14 +30,54 @@ module SolidSolver
         real(8), allocatable:: xyzful(:,:),velful(:,:)
         real(8), allocatable:: triad_nn(:,:,:),triad_ee(:,:,:),triad_e0(:,:,:)
         real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
-        real(8), allocatable:: FishInfo(:)
+        real(8):: FishInfo(3)
     contains
         procedure :: Allocate_solid => Allocate_solid_
         procedure :: Initialise => Initialise_
+        procedure :: calculate_angle_material => calculate_angle_material_
+        procedure :: write_solid => write_solid_
+        procedure :: write_solid_temp => write_solid_temp_
+        procedure :: read_solid_temp => read_solid_temp_
+        procedure :: write_solid_params => write_solid_params_
+        procedure :: write_solid_materials => write_solid_materials_
+        procedure :: write_solid_info => write_solid_info_
         procedure :: structure => structure_
     end type BeamSolver
     type(BeamSolver), allocatable :: BeamInfo(:)
   contains
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Allocate memory for solid simulation
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE allocate_solid_memory()
+        USE simParam
+        implicit none
+        integer:: iFish,maxN
+        real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
+        if(nFish==0) return
+
+        allocate(BeamInfo(nFish))
+        allocate(nAsfac(1:nFish),nLchod(1:nFish),lentemp(1:nFish))
+        
+        do iFish = 1,nFish
+            call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
+            write(*,*)'read FEMeshFile ',iFish,' end'
+        enddo
+
+        ! nND_max=maxval(BeamInfo(:)%nND)
+        ! nEL_max=maxval(BeamInfo(:)%nEL)
+        ! nMT_max=maxval(BeamInfo(:)%nMT)
+        ! nEQ_max=nND_max*6
+        !Use the object with the largest area as the reference object
+        maxN  = maxloc(nAsfac, dim=1)
+        Asfac = nAsfac(maxN)
+        Lchod = nLchod(maxN)
+    
+        if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
+        if((maxval(Lspan)-1.0d0)<=1.0d-2)Lspan(maxloc(Lspan))=1.0d0
+    
+        AR    = maxval(Lspan)**2/Asfac
+    END SUBROUTINE allocate_solid_memory
     SUBROUTINE Allocate_solid_(this,FEmeshName,nAsfac,nLchod,lentemp)
         implicit none
         class(BeamSolver), intent(inout) :: this
@@ -89,40 +130,21 @@ module SolidSolver
             if(this%jBC(iND,1)==1) this%jBC(iND,1:6)=this%isMotionGiven(1:6)
         enddo
     end subroutine Allocate_solid_
+
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Allocate memory for solid simulation
+!    initialize solid field
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE allocate_solid_memory()
+    SUBROUTINE initialize_solid()
         USE simParam
         implicit none
-        integer:: iFish,maxN
-        real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
-        if(nFish==0) return
-
-        allocate(BeamInfo(nFish))
-        allocate(nAsfac(1:nFish),nLchod(1:nFish),lentemp(1:nFish))
-        
-        do iFish = 1,nFish
-            call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
-            write(*,*)'read FEMeshFile ',iFish,' end'
+        integer:: iFish
+        if(nFish.eq.0) return
+    
+        do iFish=1,nFish
+            call BeamInfo(iFish)%Initialise(pi,time)
         enddo
-
-        ! nND_max=maxval(BeamInfo(:)%nND)
-        ! nEL_max=maxval(BeamInfo(:)%nEL)
-        ! nMT_max=maxval(BeamInfo(:)%nMT)
-        ! nEQ_max=nND_max*6
-        !Use the object with the largest area as the reference object
-        maxN  = maxloc(nAsfac, dim=1)
-        Asfac = nAsfac(maxN)
-        Lchod = nLchod(maxN)
-    
-        if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
-        if((maxval(Lspan)-1.0d0)<=1.0d-2)Lspan(maxloc(Lspan))=1.0d0
-    
-        AR    = maxval(Lspan)**2/Asfac
-    END SUBROUTINE allocate_solid_memory
-
+    END SUBROUTINE initialize_solid
     SUBROUTINE Initialise_(this,pi,time)
         implicit none
         class(BeamSolver), intent(inout) :: this
@@ -171,20 +193,294 @@ module SolidSolver
         endif
 
     END SUBROUTINE Initialise_
-    !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    initialize solid field
+
+    SUBROUTINE calculate_angle_material_(this)
+    USE simParam
+    implicit none
+    class(BeamSolver), intent(inout) :: this
+    integer:: nt
+
+    this%St = Lref * this%Freq / Uref
+    ! angle to radian
+    this%AoAo(1:3)=this%AoAo(1:3)/180.0*pi
+    this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0*pi
+    this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0*pi
+    this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*pi
+    uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(this%xyzAmpl(1:3)))*this%Freq, &
+        2.0*pi*MAXVAL(dabs(this%AoAAmpl(1:3))*[maxval(dabs(this%xyzful00(:,2))), &
+        maxval(dabs(this%xyzful00(:,1))),maxval(dabs(this%xyzful00(:,3)))])*this%Freq])
+    !calculate material parameters
+    nt=this%ele(1,4)
+    if(iKB==0)then
+        this%prop(1:this%nMT,1) = this%EmR*denIn*Uref**2
+        this%prop(1:this%nMT,2) = this%prop(1:this%nMT,1)/2.0d0/(1.0+this%psR)
+        Lthck= this%tcR*Lref
+        this%prop(1:this%nMT,3) = this%tcR*Lref
+        this%prop(1:this%nMT,4) = this%denR*Lref*denIn/this%prop(1:this%nMT,3)
+        if    (nt==2)then   !frame
+        this%prop(1:this%nMT,7) = this%prop(1:this%nMT,3)**3/12.0d0
+        this%prop(1:this%nMT,8) = this%prop(1:this%nMT,3)**3/12.0d0
+        elseif(nt==3)then   !plate
+        this%prop(1:this%nMT,6) = this%prop(1:this%nMT,3)**3/12.0d0
+        else
+        endif
+        this%KB=this%prop(this%nMT,1)*this%prop(this%nMT,6)/(denIn*Uref**2*Lref**3)
+        this%KS=this%prop(this%nMT,1)*this%prop(this%nMT,3)/(denIn*Uref**2*Lref)
+    endif
+
+    if(iKB==1)then
+        this%prop(1:this%nMT,3) = dsqrt(this%KB/this%KS*12.0d0)*Lref
+        this%prop(1:this%nMT,4) = this%denR*Lref*denIn/this%prop(1:this%nMT,3)
+        if    (nt==2)then   !frame
+        this%prop(1:this%nMT,1) = this%KS*denIn*Uref**2*Lref/this%prop(1:this%nMT,3)
+        this%prop(1:this%nMT,2) = this%prop(1:this%nMT,1)/2.0d0/(1.0d0+this%psR)
+        this%prop(1:this%nMT,7) = this%prop(1:this%nMT,3)**3/12.0d0
+        this%prop(1:this%nMT,8) = this%prop(1:this%nMT,3)**3/12.0d0
+        elseif(nt==3)then   !plate
+        this%prop(1:this%nMT,1) = this%KS*denIn*Uref**2*Lref/this%prop(1:this%nMT,3)
+        this%prop(1:this%nMT,2) = this%prop(1:this%nMT,1)/2.0d0/(1.0d0+this%psR)
+        this%prop(1:this%nMT,6) = this%prop(1:this%nMT,3)**3/12.0d0
+        else
+        endif
+        this%EmR = this%prop(this%nMT,1)/(denIn*Uref**2)
+        this%tcR = this%prop(this%nMT,3)/Lref
+        Lthck=this%prop(this%nMT,3)
+    endif
+
+    END SUBROUTINE calculate_angle_material_
+
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write structure field, tecplot ASCII format
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE write_solid_field(Lref,Uref,Aref,Fref,time)
+    implicit none
+    real(8):: Lref,Uref,Aref,Fref,time
+!   -------------------------------------------------------
+    integer:: i,iFish
+    integer,parameter::nameLen=10
+    character (LEN=nameLen):: fileName
+    !==================================================================================================
+    write(fileName,'(I10)') nint(time*1d5)
+    fileName = adjustr(fileName)
+    DO  i=1,nameLen
+        if(fileName(i:i)==' ')fileName(i:i)='0'
+    END DO
+
+    do iFish=1,nFish
+        call BeamInfo(iFish)%write_solid(Lref,Uref,Aref,Fref,iFish,fileName)
+    enddo
+!   =============================================
+    END SUBROUTINE
+
+    SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,fileName)
+    implicit none
+    class(BeamSolver), intent(inout) :: this
+    real(8):: Lref,Uref,Aref,Fref
+!   -------------------------------------------------------
+    integer:: i,iFish,ElmType
+    integer,parameter::nameLen=10
+    character (LEN=nameLen):: fileName,idstr
+    !==================================================================================================
+    integer,parameter:: namLen=40,idfile=100,numVar=15
+    character(namLen):: varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fxi','fyi','fzi','fxr','fyr','fzr']
+    !==================================================================================================
+
+    ElmType = this%ele(1,4)
+
+    write(idstr, '(I3.3)') iFish ! assume iFish < 1000
+    OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(fileName)//'.dat')
+    
+    ! Write header information
+    write(idfile, '(A)') 'TITLE    = "ASCII File."'
+    write(idfile, '(A)', advance='no') 'variables= '
+    do i=1,numVar-1
+        write(idfile, '(3A)', advance='no') '"', trim(varname(i)), '" '
+    enddo
+    write(idfile, '(A)') varname(numVar)
+
+    write(idfile, '(A)') 'ZONE    T= "ZONE 1"'
+    write(idfile, '(A)') ' STRANDID=0, SOLUTIONTIME=0'
+    write(idfile, '(A,I8,A,I8,A)', advance='no') ' Nodes=',this%nND,', Elements=',this%nEL,', ZONETYPE='
+    if(ElmType.eq.2) then
+        write(idfile, '(A)') 'FELINESEG'
+    elseif (ElmType.eq.3) then
+        write(idfile, '(A)') 'FETRIANGLE'
+    endif
+    write(idfile, '(A)') ' DATAPACKING=POINT'
+    write(idfile, '(A)', advance='no') ' DT=('
+    do i=1,numVar-1
+        write(idfile, '(A)', advance='no') 'SINGLE '
+    enddo
+    write(idfile, '(A)') 'SINGLE )'
+
+    ! Write node data
+    do i=1,this%nND
+        write(idfile, '(10E28.18 )')   real(this%xyzful(i,1:3)/Lref),real(this%velful(i,1:3)/Uref),real(this%accful(i,1:3)/Aref),real(this%extful(i,1:3)/Fref),real(this%repful(i,1:3)/Fref)
+    enddo
+
+    ! Write element data
+    if(ElmType.eq.2) then
+        do i = 1, this%nEL
+            write(idfile, *) this%ele(i,1),this%ele(i,2)
+        enddo
+    elseif (ElmType.eq.3) then
+        do i = 1, this%nEL
+            write(idfile, *) this%ele(i,1),this%ele(i,2),this%ele(i,3)
+        enddo
+    endif
+
+    close(idfile)
+!   =============================================
+    END SUBROUTINE
+
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write check point file for restarting simulation
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE initialize_solid()
-        USE simParam
-        implicit none
-        integer:: iFish
-        if(nFish.eq.0) return
-    
-        do iFish=1,nFish
-            call BeamInfo(iFish)%Initialise(pi,time)
+    SUBROUTINE write_solid_temp_(this,fid)
+    IMPLICIT NONE
+    class(BeamSolver), intent(inout) :: this
+    integer:: fid
+        write(fid) this%xyzful0,this%xyzful,this%dspful,this%velful,this%accful,this%extful,this%mss,this%mssful,this%grav
+        write(fid) this%triad_nn,this%triad_ee,this%triad_e0
+        write(fid) this%triad_n1,this%triad_n2,this%triad_n3
+    ENDSUBROUTINE
+
+
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    read check point file for restarting simulation
+!    copyright@ RuNanHua
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE read_solid_temp_(this,fid)
+    IMPLICIT NONE
+    class(BeamSolver), intent(inout) :: this
+    integer:: fid
+        read(fid) this%xyzful0,this%xyzful,this%dspful,this%velful,this%accful,this%extful,this%mss,this%mssful,this%grav
+        read(fid) this%triad_nn,this%triad_ee,this%triad_e0
+        read(fid) this%triad_n1,this%triad_n2,this%triad_n3
+    ENDSUBROUTINE
+
+    SUBROUTINE write_solid_params_(this)
+    IMPLICIT NONE
+    class(BeamSolver), intent(inout) :: this
+        write(111,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
+        write(111,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
+        write(111,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
+        write(111,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
+        write(111,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
+        write(111,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
+        write(111,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
+        write(111,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',this%AoAo(1:3)
+        write(111,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',this%AoAAmpl(1:3)
+        write(111,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
+        write(111,'(3(A,1x,I8,2x))')'nND=',this%nND,'nEL=',this%nEL,'nEQ=',this%nEQ
+        write(111,'(3(A,1x,I8,2x))')'nMT=',this%nMT,'nBD=',this%nBD,'nSTF=',this%nSTF
+    ENDSUBROUTINE
+
+    SUBROUTINE write_solid_materials_(this,iFish)
+    IMPLICIT NONE
+    class(BeamSolver), intent(inout) :: this
+    integer:: iMT,iFish
+        do iMT=1,this%nMT
+        write(111,'(A      )')'===================================='
+        write(111,'(A,I5.5 )')'Fish number is',iFish
+        write(111,'(A,I5.5 )')'MT:',iMT
+        write(111,'(A,E20.10 )')'E    =',this%prop(iMT,1)
+        write(111,'(A,E20.10 )')'G    =',this%prop(iMT,2)
+        write(111,'(A,E20.10 )')'h    =',this%prop(iMT,3)
+        write(111,'(A,E20.10 )')'rho  =',this%prop(iMT,4)
+        write(111,'(A,E20.10 )')'gamma=',this%prop(iMT,5)
+        write(111,'(A,E20.10 )')'Ip   =',this%prop(iMT,6)
+        write(111,'(A,E20.10 )')'alpha=',this%prop(iMT,7)
+        write(111,'(A,E20.10 )')'beta =',this%prop(iMT,8)
         enddo
-    END SUBROUTINE initialize_solid
+    ENDSUBROUTINE
+
+    SUBROUTINE write_solid_info_(this,iFish)
+    USE simParam
+    IMPLICIT NONE
+    class(BeamSolver), intent(inout) :: this
+    integer:: i,iFish
+    real(8):: EEE(2),strainEnergy(nEL_max,2,nFish)
+    real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+    integer,parameter::nameLen=4
+    character (LEN=nameLen):: fileName,Nodename
+        write(fileName,'(I4)') iFish
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+             if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+
+        if    (iForce2Body==1)then   !Same force as flow
+        open(111,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
+        write(111,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        close(111)
+        elseif(iForce2Body==2)then   !stress force
+        open(111,file='./DatInfo/ForceStress'//trim(fileName)//'.plt',position='append')
+        write(111,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        close(111)
+        endif
+
+        !==============================================================================================
+        open(111,file='./DatInfo/SampBodyNodeBegin'//trim(fileName)//'.plt',position='append')
+        write(111,'(10E20.10)')time/Tref,this%xyzful(1,1:3)/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
+        close(111)
+        !===============================================================================
+        write(Nodename,'(I4.4)') this%nNd
+        open(111,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt',position='append')
+        write(111,'(10E20.10)')time/Tref,this%xyzful(this%nND,1:3)/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
+        close(111)
+
+        open(111,file='./DatInfo/SampBodyMean'//trim(fileName)//'.plt',position='append')
+        write(111,'(10E20.10)')time/Tref,sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Lref, &
+                                         sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
+                                         sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
+        close(111)
+
+        open(111,file='./DatInfo/SampBodyAngular'//trim(fileName)//'.plt',position='append')
+        write(111,'(5E20.10)')time/Tref,datan((this%xyzful(this%nND,2)-this%xyzful(1,2))/(this%xyzful(this%nND,1)-this%xyzful(1,1))),    &
+                                        this%xyzful(this%nND,2)/Lref-this%xyzful(1,2)/Lref,this%xyzful(1,2)/Lref,this%xyzful(this%nND,2)/Lref
+        close(111)
+
+        !==============================================================================================
+
+        Pax=sum(this%extful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
+        Pay=sum(this%extful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
+        Paz=sum(this%extful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
+        Paero=Pax+Pay+Paz
+        Pix=-sum(this%mssful(1:this%nND,1)*this%accful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
+        Piy=-sum(this%mssful(1:this%nND,2)*this%accful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
+        Piz=-sum(this%mssful(1:this%nND,3)*this%accful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
+        Piner=Pix+Piy+Piz
+        Ptot=Paero+Piner
+        open(111,file='./DatInfo/Power'//trim(fileName)//'.plt',position='append')
+        write(111,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+        close(111)
+
+        call cptArea(this%areaElem(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1:6))
+        open(111,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
+        write(111,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
+        close(111)
+
+        call strain_energy_D(strainEnergy(1:this%nEL,1:2,iFish),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
+                                this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nMT,1:10), &
+                                this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
+                                this%triad_ee(1:3,1:3,1:this%nEL), &
+                                this%nND,this%nEL,this%nMT)
+        EEE(1)=sum(strainEnergy(1:this%nEL,1,iFish))
+        EEE(2)=sum(strainEnergy(1:this%nEL,2,iFish))
+        Es=EEE(1)/Eref
+        Eb=EEE(2)/Eref
+        Ep=Es+Eb
+        Ew=Ew+Paero*timeOutInfo
+        Ek=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
+        Et=Ek+Ep
+
+        open(111,file='./DatInfo/Energy'//trim(fileName)//'.plt', position='append')
+        write(111,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
+        close(111)
+
+    ENDSUBROUTINE
 
     SUBROUTINE solver()
         USE simParam

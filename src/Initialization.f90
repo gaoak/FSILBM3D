@@ -61,7 +61,6 @@
 
     if(nFish>0) then
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish))
-        allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -83,14 +82,14 @@
             iBodyModel(iFish)=niBodyModel
             FEmeshName(iFish)=tmpFEmeshName
             BeamInfo(iFish)%isMotionGiven(1:6)=nisMotionGiven(1:6)
-            denR(iFish)= ndenR
-            psR(iFish) = npsR
+            BeamInfo(iFish)%denR= ndenR
+            BeamInfo(iFish)%psR = npsR
             if(iKB==0) then
-            EmR(iFish) = nEmR
-            tcR(iFish) = ntcR
+            BeamInfo(iFish)%EmR = nEmR
+            BeamInfo(iFish)%tcR = ntcR
             elseif(iKB==1) then
-            KB(iFish)  = nKB
-            KS(iFish)  = nKS
+            BeamInfo(iFish)%KB  = nKB
+            BeamInfo(iFish)%KS  = nKS
             endif
         enddo
     enddo
@@ -104,9 +103,6 @@
     call readequal(111)
 
     if(nFish>0) then
-        allocate(Freq(1:nFish),St(1:nFish))
-        allocate(XYZo(1:3,1:nFish),XYZAmpl(1:3,1:nFish),XYZPhi(1:3,1:nFish))
-        allocate(AoAo(1:3,1:nFish),AoAAmpl(1:3,1:nFish),AoAPhi(1:3,1:nFish))
         FishOrder1 =0
         FishOrder2 =0
     endif
@@ -123,21 +119,21 @@
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
-            Freq(iFish)=nFreq
-            St(iFish)  =nSt
-            XYZAmpl(1:3,iFish)=nXYZAmpl(1:3)
-            XYZPhi(1:3,iFish) =nXYZPhi(1:3)
-            AoAo(1:3,iFish)   =nAoAo(1:3)
-            AoAAmpl(1:3,iFish)=nAoAAmpl(1:3)
-            AoAPhi(1:3,iFish) =nAoAPhi(1:3)
+            BeamInfo(iFish)%Freq=nFreq
+            BeamInfo(iFish)%St  =nSt
+            BeamInfo(iFish)%XYZAmpl(1:3)=nXYZAmpl(1:3)
+            BeamInfo(iFish)%XYZPhi(1:3) =nXYZPhi(1:3)
+            BeamInfo(iFish)%AoAo(1:3)   =nAoAo(1:3)
+            BeamInfo(iFish)%AoAAmpl(1:3)=nAoAAmpl(1:3)
+            BeamInfo(iFish)%AoAPhi(1:3) =nAoAPhi(1:3)
             ! initial position distribution
             Order0 = iFish - FishOrder1
             LineX  = mod(Order0,NumX(iKind))
             LineY  = mod(Order0/NumX(iKind),NumY(iKind))
             LineZ  = Order0/(NumX(iKind)*NumY(iKind))
-            XYZo(1,iFish) = iXYZ(1) + dXYZ(1) * LineX
-            XYZo(2,iFish) = iXYZ(2) + dXYZ(2) * LineY
-            XYZo(3,iFish) = iXYZ(3) + dXYZ(3) * LineZ
+            BeamInfo(iFish)%XYZo(1) = iXYZ(1) + dXYZ(1) * LineX
+            BeamInfo(iFish)%XYZo(2) = iXYZ(2) + dXYZ(2) * LineY
+            BeamInfo(iFish)%XYZo(3) = iXYZ(3) + dXYZ(3) * LineZ
         enddo
     enddo
     call readequal(111)
@@ -340,6 +336,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE calculate_LB_params()
     USE simParam
+    USE SolidSolver
     implicit none
     integer:: nt(1:nFish),iFish
     real(8):: nUref(1:nFish)
@@ -361,15 +358,15 @@
     elseif(RefVelocity==4) then
         Uref = dabs(VelocityAmp)  !Velocity Amplitude
     elseif(RefVelocity==10) then
-        Uref = Lref * MAXVAL(Freq(1:nFish))
+        Uref = Lref * MAXVAL(BeamInfo(:)%Freq)
     elseif(RefVelocity==11) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))
+        nUref(iFish)=2.d0*pi*BeamInfo(iFish)%Freq*MAXVAL(dabs(BeamInfo(iFish)%xyzAmpl(1:3)))
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     elseif(RefVelocity==12) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*2.D0 !Park 2017 pof
+        nUref(iFish)=2.d0*pi*BeamInfo(iFish)%Freq*MAXVAL(dabs(BeamInfo(iFish)%xyzAmpl(1:3)))*2.D0 !Park 2017 pof
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     !else
@@ -379,25 +376,9 @@
     if(RefTime==0) then
         Tref = Lref / Uref
     elseif(RefTime==1) then
-        Tref = 1 / maxval(Freq(:))
+        Tref = 1 / maxval(BeamInfo(:)%Freq)
     !else
     endif
-
-    do iFish=1,nFish
-        St(iFish) = Lref * Freq(iFish) / Uref
-    enddo
-    g(1:3)=Frod(1:3) * Uref ** 2/Lref
-    uMax = 0.
-    do iFish=1,nFish
-        ! angle to radian
-        AoAo(1:3,iFish)=AoAo(1:3,iFish)/180.0*pi
-        AoAAmpl(1:3,iFish)=AoAAmpl(1:3,iFish)/180.0*pi
-        AoAPhi(1:3,iFish)=AoAPhi(1:3,iFish)/180.0*pi
-        XYZPhi(1:3,iFish)=XYZPhi(1:3,iFish)/180.0*pi
-        uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*Freq(iFish), &
-            2.0*pi*MAXVAL(dabs(AoAAmpl(1:3,iFish))*[maxval(dabs(xyzful00(:,2,iFish))), &
-            maxval(dabs(xyzful00(:,1,iFish))),maxval(dabs(xyzful00(:,3,iFish)))])*Freq(iFish)])
-    enddo
 
 !   calculate viscosity, LBM relexation time
     ratio  =  dt/dh
@@ -429,46 +410,12 @@
     Fref=0.5*denIn*Uref**2*Asfac
     Eref=0.5*denIn*Uref**2*Asfac*Lref
     Pref=0.5*denIn*Uref**2*Asfac*Uref
-    !calculate material parameters
-    do iFish=1,nFish
-    nt(iFish)=ele(1,4,iFish)
-    if(iKB==0)then
-        prop(1:nMT(iFish),1,iFish) = EmR(iFish)*denIn*Uref**2
-        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0+psR(iFish))
-        Lthck= tcR(iFish)*Lref
-        prop(1:nMT(iFish),3,iFish) = tcR(iFish)*Lref
-        prop(1:nMT(iFish),4,iFish) = denR(iFish)*Lref*denIn/prop(1:nMT(iFish),3,iFish)
-        if    (nt(iFish)==2)then   !frame
-        prop(1:nMT(iFish),7,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        prop(1:nMT(iFish),8,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        elseif(nt(iFish)==3)then   !plate
-        prop(1:nMT(iFish),6,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        else
-        endif
-        KB=prop(nMT(iFish),1,iFish)*prop(nMT(iFish),6,iFish)/(denIn*Uref**2*Lref**3)
-        KS=prop(nMT(iFish),1,iFish)*prop(nMT(iFish),3,iFish)/(denIn*Uref**2*Lref)
-    endif
 
-    if(iKB==1)then
-        prop(1:nMT(iFish),3,iFish) = dsqrt(KB(iFish)/KS(iFish)*12.0d0)*Lref
-        prop(1:nMT(iFish),4,iFish) = denR(iFish)*Lref*denIn/prop(1:nMT(iFish),3,iFish)
-        if    (nt(iFish)==2)then   !frame
-        prop(1:nMT(iFish),1,iFish) = KS(iFish)*denIn*Uref**2*Lref/prop(1:nMT(iFish),3,iFish)
-        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0d0+psR(iFish))
-        prop(1:nMT(iFish),7,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        prop(1:nMT(iFish),8,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        elseif(nt(iFish)==3)then   !plate
-        prop(1:nMT(iFish),1,iFish) = KS(iFish)*denIn*Uref**2*Lref/prop(1:nMT(iFish),3,iFish)
-        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0d0+psR(iFish))
-        prop(1:nMT(iFish),6,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        else
-        endif
-        EmR(iFish) = prop(nMT(iFish),1,iFish)/(denIn*Uref**2)
-        tcR(iFish) = prop(nMT(iFish),3,iFish)/Lref
-        Lthck=prop(nMT(iFish),3,iFish)
-    endif
+    g(1:3)=Frod(1:3) * Uref ** 2/Lref
+    uMax = 0.
+    do iFish = 1,nFish
+        call BeamInfo(iFish)%calculate_angle_material
     enddo
-
     END SUBROUTINE calculate_LB_params
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -549,15 +496,17 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_checkpoint_file()
     USE simParam
+    USE SolidSolver
     IMPLICIT NONE
+    integer:: iFish
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
     write(13) step,time
     write(13) fIn,xGrid,yGrid,zGrid
-    write(13) nFish, nND_max
+    write(13) nFish
     write(13) IXref,IYref,IZref,NDref
-    write(13) xyzful0,xyzful,dspful,velful,accful,extful,mss,mssful,grav
-    write(13) triad_nn,triad_ee,triad_e0
-    write(13) triad_n1,triad_n2,triad_n3
+    do iFish = 1,nFish
+        call BeamInfo(iFish)%write_solid_temp(13)
+    enddo
     write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
     close(13)
     ENDSUBROUTINE
@@ -569,18 +518,19 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_checkpoint_file()
     USE simParam
+    USE SolidSolver
     IMPLICIT NONE
-    integer:: tmpnfish, tmpND_max
+    integer:: tmpnfish,iFish
 
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
     read(13) step,time
     read(13) fIn,xGrid,yGrid,zGrid
-    read(13) tmpnfish, tmpND_max
-    if((tmpnfish .eq. nFish) .and. (tmpND_max .eq. nND_max)) then
+    read(13) tmpnfish
+    if((tmpnfish .eq. nFish)) then
         read(13) IXref,IYref,IZref,NDref
-        read(13) xyzful0,xyzful,dspful,velful,accful,extful,mss,mssful,grav
-        read(13) triad_nn,triad_ee,triad_e0
-        read(13) triad_n1,triad_n2,triad_n3
+        do iFish = 1,nFish
+        call BeamInfo(iFish)%read_solid_temp(13)
+    enddo
         read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
     endif
     close(13)

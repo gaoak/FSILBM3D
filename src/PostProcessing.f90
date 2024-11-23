@@ -1,144 +1,3 @@
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    write structure field, tecplot ASCII format
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_field(xyzful,velful,accful,extful,repful,ele,time,nND,nEL,nND_max,nEL_max,nFish)
-    implicit none
-    integer:: nND_max,nEL_max,nFish
-    integer:: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
-    real(8):: xyzful(nND_max,6,nFish),velful(nND_max,6,nFish),accful(nND_max,6,nFish),extful(1:nND_max,1:6,nFish),repful(1:nND_max,1:6,nFish)
-    real(8):: time
-!   -------------------------------------------------------
-
-    integer:: i,iFish,ElmType
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileName,idstr
-    !==================================================================================================
-    integer,parameter:: namLen=40,idfile=100,numVar=15
-    character(namLen):: varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fxi','fyi','fzi','fxr','fyr','fzr']
-    !==================================================================================================
-
-    write(fileName,'(I10)') nint(time*1d5)
-    fileName = adjustr(fileName)
-    DO  I=1,nameLen
-        if(fileName(i:i)==' ')fileName(i:i)='0'
-    END DO
-
-    do iFish=1,nFish
-
-        ElmType = ele(1,4,iFish)
-
-        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(fileName)//'.dat')
-        
-        ! Write header information
-        write(idfile, '(A)') 'TITLE    = "ASCII File."'
-        write(idfile, '(A)', advance='no') 'variables= '
-        do i=1,numVar-1
-            write(idfile, '(3A)', advance='no') '"', trim(varname(i)), '" '
-        enddo
-        write(idfile, '(A)') varname(numVar)
-
-        write(idfile, '(A)') 'ZONE    T= "ZONE 1"'
-        write(idfile, '(A)') ' STRANDID=0, SOLUTIONTIME=0'
-        write(idfile, '(A,I8,A,I8,A)', advance='no') ' Nodes=',nND(iFish),', Elements=',nEL(iFish),', ZONETYPE='
-        if(ElmType.eq.2) then
-            write(idfile, '(A)') 'FELINESEG'
-        elseif (ElmType.eq.3) then
-            write(idfile, '(A)') 'FETRIANGLE'
-        endif
-        write(idfile, '(A)') ' DATAPACKING=POINT'
-        write(idfile, '(A)', advance='no') ' DT=('
-        do i=1,numVar-1
-            write(idfile, '(A)', advance='no') 'SINGLE '
-        enddo
-        write(idfile, '(A)') 'SINGLE )'
-
-        ! Write node data
-        do i=1,nND(iFish)
-            write(idfile, '(10E28.18 )')   real(xyzful(i,1:3,iFish)),real(velful(i,1:3,iFish)),real(accful(i,1:3,iFish)),real(extful(i,1:3,iFish)),real(repful(i,1:3,iFish))
-        enddo
-
-        ! Write element data
-        if(ElmType.eq.2) then
-            do i = 1, nEL(iFish)
-                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish)
-            enddo
-        elseif (ElmType.eq.3) then
-            do i = 1, nEL(iFish)
-                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
-            enddo
-        endif
-
-        close(idfile)
-    enddo
-!   =============================================
-    END SUBROUTINE
-
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    write structure field, tecplot binary
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_span_field(xyzful,ele,time,nND,nEL,nND_max,nEL_max,Nspan,dspan,Lref,nFish)
-    implicit none
-    integer,intent(in):: nND_max,nEL_max,nFish,Nspan(nFish)
-    real(8),intent(in):: dspan(nFish)
-    integer,intent(in):: ele(nEL_max,5,nFish),nND(nFish),nEL(nFish)
-    real(8),intent(in):: xyzful(nND_max,6,nFish)
-    real(8),intent(in):: time
-    !   -------------------------------------------------------
-    integer:: i,j,iFish,Nspanpts,ElmType,off1, off2
-    real(8):: Lspan,Lref
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileName,idstr
-    integer,parameter:: idfile=100
-    !==========================================================================
-    write(fileName,'(I10)') nint(time*1d5)
-    fileName = adjustr(fileName)
-    DO  I=1,nameLen
-        if(fileName(i:i)==' ')fileName(i:i)='0'
-    END DO
-    do iFish=1,nFish
-        if(Nspan(iFish).eq.0) then
-            Nspanpts = 1
-            ElmType = ele(1,4,iFish)
-        else
-            Nspanpts = Nspan(iFish) + 1
-            ElmType = 4
-        endif
-        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        OPEN(idfile, FILE='./DatBodySpan/BodySpan'//trim(idstr)//'_'//trim(filename)//'.dat')
-        write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)', advance='no') 'ZONE N=',nND(iFish)*Nspanpts,', E=',nEL(iFish)*Nspan(iFish),', DATAPACKING=POINT, ZONETYPE='
-        if(ElmType.eq.2) then
-            write(idfile, '(A)') 'FELINESEG'
-        elseif (ElmType.eq.3) then
-            write(idfile, '(A)') 'FETRIANGLE'
-        elseif(ElmType.eq.4) then
-            write(idfile, '(A)') 'FEQUADRILATERAL'
-        endif
-        do  i=1,nND(iFish)
-            do j=1,Nspanpts
-                Lspan = (j-1)*dspan(iFish)
-                write(idfile, *)  xyzful(i,1:2,iFish),xyzful(i,3,iFish)+Lspan/Lref
-            enddo
-        enddo
-        do  i=1,nEL(iFish)
-            if(ElmType.eq.2) then
-                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish)
-            elseif(ElmType.eq.3) then
-                write(idfile, *) ele(i,1,iFish),ele(i,2,iFish),ele(i,3,iFish)
-            else
-                do j=1,Nspan(iFish)
-                    off1 = (ele(i,1,iFish)-1) * Nspanpts + j
-                    off2 = (ele(i,2,iFish)-1) * Nspanpts + j
-                    write(idfile, *) off1, off1+1, off2+1, off2
-                enddo
-            endif
-        enddo
-        close(idfile)
-    enddo
-    !   =============================================
-    END SUBROUTINE
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write parameters for checking
 !    copyright@ RuNanHua
@@ -147,7 +6,7 @@
     USE simParam
     USE SolidSolver
     implicit none
-    integer:: iMT,i,iFish
+    integer:: i,iFish
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileNameR,fileNameM,fileNameS,fileNameK
     write(fileNameR,'(F10.5)') Re
@@ -180,13 +39,13 @@
         else
             write(111,'(A      )')'This is a FLRXIBLE And RIGID body problem'
         endif
-        if    (minval(isMotionGiven(1,:))==0)then
+        if    (minval(BeamInfo(:)%isMotionGiven(1))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in X-direction freely'
         endif
-        if    (minval(isMotionGiven(2,:))==0)then
+        if    (minval(BeamInfo(:)%isMotionGiven(2))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in Y-direction freely'
         endif
-        if    (minval(isMotionGiven(3,:))==0)then
+        if    (minval(BeamInfo(:)%isMotionGiven(3))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in Z-direction freely'
         endif
         write(111,'(A      )')'===================================================================='
@@ -198,15 +57,15 @@
         write(111,'(A,3F20.10)') 'dxmax,dymax,dzmax       :',dxmax, dymax, dzmax
         write(111,'(A,3F20.10)') 'cptxMin,cptyMin,cptzMin :',cptxMin, cptyMin, cptzMin
         write(111,'(A,3F20.10)') 'cptxMax,cptyMax,cptzMax :',cptxMax, cptyMax, cptzMax
-        write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(elmin(1:nFish)), maxval(elmax(1:nFish))
+        write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(BeamInfo(:)%elmin), maxval(BeamInfo(:)%elmax)
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Re   =',Re
         write(111,'(A,F20.10)')'Lref =',Lref
         write(111,'(A,F20.10)')'Uref =',Uref
         write(111,'(A,F20.10)')'Tref =',Tref
         write(111,'(A      )')'===================================='
-        write(111,'(A,F20.10)')'Freq =',maxval(Freq(:))
-        write(111,'(A,F20.10)')'Ampl =',maxval(dabs(XYZAmpl(1:3,1:nFish)))
+        write(111,'(A,F20.10)')'Freq =',maxval(BeamInfo(:)%Freq)
+        write(111,'(A,F20.10)')'Ampl =',maxval([dabs(BeamInfo(:)%XYZAmpl(1)),dabs(BeamInfo(:)%XYZAmpl(2)),dabs(BeamInfo(:)%XYZAmpl(3))])
         write(111,'(A,F20.10)')'Lchod=',Lchod
         write(111,'(A,F20.10)')'Lspan=',maxval(Lspan)
         write(111,'(A,F20.10)')'Asfac=',Asfac
@@ -228,34 +87,10 @@
         write(111,'(A      )')'===================================='
         write(111,'(A,I20.10)')'Fish number is',iFish
         write(111,'(A      )')'===================================='
-        write(111,'(A,2F20.10)')'Freq,St     =',Freq(iFish),St(iFish)
-        write(111,'(A,2F20.10)')'denR,psR    =',denR(iFish),psR(iFish)
-        write(111,'(A,2F20.10)')'KB,  KS     =',KB(iFish),KS(iFish)
-        write(111,'(A,2F20.10)')'EmR, tcR    =',EmR(iFish),tcR(iFish)
-        write(111,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',XYZo(1:3,iFish)
-        write(111,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',XYZAmpl(1:3,iFish)
-        write(111,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',XYZPhi(1:3,iFish)
-        write(111,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',AoAo(1:3,iFish)
-        write(111,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',AoAAmpl(1:3,iFish)
-        write(111,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',AoAPhi(1:3,iFish)
-        write(111,'(3(A,1x,I8,2x))')'nND=',nND(iFish),'nEL=',nEL(iFish),'nEQ=',nEQ(iFish)
-        write(111,'(3(A,1x,I8,2x))')'nMT=',nMT(iFish),'nBD=',nBD(iFish),'nSTF=',nSTF(iFish)
+        call BeamInfo(iFish)%write_solid_params()
         enddo
-
         do iFish=1,nFish
-        do iMT=1,nMT(iFish)
-        write(111,'(A      )')'===================================='
-        write(111,'(A,I5.5 )')'Fish number is',iFish
-        write(111,'(A,I5.5 )')'MT:',iMT
-        write(111,'(A,E20.10 )')'E    =',prop(iMT,1,iFish)
-        write(111,'(A,E20.10 )')'G    =',prop(iMT,2,iFish)
-        write(111,'(A,E20.10 )')'h    =',prop(iMT,3,iFish)
-        write(111,'(A,E20.10 )')'rho  =',prop(iMT,4,iFish)
-        write(111,'(A,E20.10 )')'gamma=',prop(iMT,5,iFish)
-        write(111,'(A,E20.10 )')'Ip   =',prop(iMT,6,iFish)
-        write(111,'(A,E20.10 )')'alpha=',prop(iMT,7,iFish)
-        write(111,'(A,E20.10 )')'beta =',prop(iMT,8,iFish)
-        enddo
+        call BeamInfo(iFish)%write_solid_materials(iFish)
         enddo
         close(111)
     END SUBROUTINE
