@@ -9,11 +9,12 @@ module SolidSolver
     integer:: ntolFEM
     real(8):: g(3)
     real(8):: deltaT
-    public :: BeamInfo
+    public :: BeamSolver, BeamInfo
     type :: BeamSolver
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
         integer, allocatable :: r_Nspan(:)
+        real(8) :: r_dirc(3)
         real(8):: Freq
         real(8), allocatable:: elmax(:),elmin(:)
         real(8), allocatable:: XYZ(:),XYZo(:),XYZAmpl(:),XYZPhi(:),XYZd(:),UVW(:)

@@ -13,10 +13,9 @@ module SolidBody
     public :: VirtualBody,Initialise_bodies,Write_solid_bodies,FSInteraction_force
     type :: VirtualBody
         !!!virtual infomation
-        integer :: r_npts,r_nelmts
+        integer :: r_nelmts
         !!!virtual body surface
         integer :: v_npts,v_nelmts,v_type ! v_type 0 (solid body), 1 (plate), 2 (rod)
-        real(8) :: v_dirc(3)
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
         integer, allocatable :: v_elmt(:, :) ! element ID
         integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
@@ -488,10 +487,15 @@ module SolidBody
         implicit none
         class(VirtualBody), intent(inout) :: this
         type(BeamSolver), intent(in):: beam
-        
+        integer:: i
+        this%r_nelmts = 0
+        do i=1,beam%nEL
+            this%r_nelmts = this%r_nelmts + beam%r_Nspan(i)
+        enddo
+        all
         
         integer(2),allocatable :: vtor(:)!of size fake_npts
-        integer :: r_npts,r_nelmts
+        integer :: r_nelmts
         integer(2),allocatable :: rtov(:,:)! of size real_npts, 1:2
 
 
