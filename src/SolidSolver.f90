@@ -2,12 +2,12 @@ module SolidSolver
     implicit none
     private
     integer, parameter:: m_idat=12
-    integer:: m_nFish!,nND_max,nEL_max,nMT_max,nEQ_max,NDref
+    integer:: m_NDref
     real(8):: m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf
-    real(8):: m_dtolFEM
+    real(8):: m_dtolFEM,m_pi
     integer:: m_ntolFEM
     real(8):: m_g(3)
-    public :: BeamSolver
+    public :: BeamSolver,Initialise_SolidSolver
     type :: BeamSolver
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
@@ -43,39 +43,24 @@ module SolidSolver
         procedure :: structure => structure_
     end type BeamSolver
   contains
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Allocate memory for solid simulation
-!    copyright@ RuNanHua
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE allocate_solid_memory()
-        USE simParam
+    Subroutine Initialise_SolidSolver(NDref,dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g)
         implicit none
-        integer:: iFish,maxN
-        real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
-        if(m_nFish==0) return
+        real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf
+        real(8),intent(in):: dtolFEM
+        integer,intent(in):: NDref,ntolFEM
+        real(8),intent(in):: g(3)
+        m_NDref = NDref
+        m_dampK = dampK
+        m_dampM = dampM
+        m_NewmarkGamma = NewmarkGamma
+        m_NewmarkBeta = NewmarkBeta
+        m_alphaf = alphaf
+        m_dtolFEM = dtolFEM
+        m_ntolFEM = ntolFEM
+        m_g = g
+        m_pi = 3.141592653589793d0
+    ENDSUBROUTINE Initialise_SolidSolver
 
-        ! allocate(BeamInfo(m_nFish))
-        allocate(nAsfac(1:m_nFish),nLchod(1:m_nFish),lentemp(1:m_nFish))
-        
-        do iFish = 1,m_nFish
-            ! call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
-            write(*,*)'read FEMeshFile ',iFish,' end'
-        enddo
-
-        ! nND_max=maxval(BeamInfo(:)%nND)
-        ! nEL_max=maxval(BeamInfo(:)%nEL)
-        ! nMT_max=maxval(BeamInfo(:)%nMT)
-        ! nEQ_max=nND_max*6
-        !Use the object with the largest area as the reference object
-        maxN  = maxloc(nAsfac, dim=1)
-        Asfac = nAsfac(maxN)
-        Lchod = nLchod(maxN)
-    
-        if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
-        if((maxval(Lspan)-1.0d0)<=1.0d-2)Lspan(maxloc(Lspan))=1.0d0
-    
-        AR    = maxval(Lspan)**2/Asfac
-    END SUBROUTINE allocate_solid_memory
     SUBROUTINE Allocate_solid_(this,FEmeshName,nAsfac,nLchod,lentemp)
         implicit none
         class(BeamSolver), intent(inout) :: this
@@ -122,33 +107,25 @@ module SolidSolver
         nLchod  = maxval(this%xyzful00(:,1))-minval(this%xyzful00(:,1))
         lentemp = maxval(this%xyzful00(:,2))-minval(this%xyzful00(:,2))
         if(lentemp .gt. nLchod) nLchod = lentemp
-    
+
     !   loading boundary type*******************************************************************************
         do    iND=1,this%nND
             if(this%jBC(iND,1)==1) this%jBC(iND,1:6)=this%isMotionGiven(1:6)
         enddo
     end subroutine Allocate_solid_
 
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    initialize solid field
-!    copyright@ RuNanHua
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE initialize_solid()
-        USE simParam
-        implicit none
-    END SUBROUTINE initialize_solid
-    SUBROUTINE Initialise_(this,pi,time)
+    SUBROUTINE Initialise_(this,time)
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer:: iND
-        real(8):: pi,time
+        real(8):: time
         this%TTT00(:,:)=0.0d0
         this%TTT00(1,1)=1.0d0
         this%TTT00(2,2)=1.0d0
         this%TTT00(3,3)=1.0d0
 
-        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*pi*this%Freq*time+this%XYZPhi(1:3))
-        this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*pi*this%Freq*time+this%AoAPhi(1:3))
+        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3))
+        this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
 
         call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))
         call AoAtoTTT(this%AoA(1:3),this%TTTnow(1:3,1:3))
@@ -186,20 +163,20 @@ module SolidSolver
 
     END SUBROUTINE Initialise_
 
-    SUBROUTINE calculate_angle_material_(this)
-    USE simParam
+    SUBROUTINE calculate_angle_material_(this, Lref, Freq, Uref)
     implicit none
     class(BeamSolver), intent(inout) :: this
+    real(8),intent(in):: Lref, Freq, Uref
     integer:: nt
 
     this%St = Lref * this%Freq / Uref
     ! angle to radian
-    this%AoAo(1:3)=this%AoAo(1:3)/180.0*pi
-    this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0*pi
-    this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0*pi
-    this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*pi
-    uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(this%xyzAmpl(1:3)))*this%Freq, &
-        2.0*pi*MAXVAL(dabs(this%AoAAmpl(1:3))*[maxval(dabs(this%xyzful00(:,2))), &
+    this%AoAo(1:3)=this%AoAo(1:3)/180.0*m_pi
+    this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0*m_pi
+    this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0*m_pi
+    this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*m_pi
+    uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*m_pi*MAXVAL(dabs(this%xyzAmpl(1:3)))*this%Freq, &
+        2.0*m_pi*MAXVAL(dabs(this%AoAAmpl(1:3))*[maxval(dabs(this%xyzful00(:,2))), &
         maxval(dabs(this%xyzful00(:,1))),maxval(dabs(this%xyzful00(:,3)))])*this%Freq])
     !calculate material parameters
     nt=this%ele(1,4)
@@ -240,29 +217,6 @@ module SolidSolver
     endif
 
     END SUBROUTINE calculate_angle_material_
-
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    write structure field, tecplot ASCII format
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_field(Lref,Uref,Aref,Fref,time)
-    implicit none
-    real(8):: Lref,Uref,Aref,Fref,time
-!   -------------------------------------------------------
-    integer:: i,iFish
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileName
-    !==================================================================================================
-    write(fileName,'(I10)') nint(time*1d5)
-    fileName = adjustr(fileName)
-    DO  i=1,nameLen
-        if(fileName(i:i)==' ')fileName(i:i)='0'
-    END DO
-
-    do iFish=1,m_nFish
-        ! call BeamInfo(iFish)%write_solid(Lref,Uref,Aref,Fref,iFish,fileName)
-    enddo
-!   =============================================
-    END SUBROUTINE
 
     SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,fileName)
     implicit none
@@ -388,10 +342,10 @@ module SolidSolver
         enddo
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_info_(this,iFish)
-    USE simParam
+    SUBROUTINE write_solid_info_(this,iFish,Tref,Lref,Uref,Aref,Fref,Pref,Eref)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
+    real(8),intent(in) :: Tref,Lref,Uref,Aref,Fref,Pref,Eref
     integer:: i,iFish
     real(8):: EEE(2),strainEnergy(this%nEL,2)
     real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
@@ -474,17 +428,6 @@ module SolidSolver
         close(111)
 
     ENDSUBROUTINE
-
-    SUBROUTINE solver()
-        USE simParam
-        implicit none
-        integer:: iFish,isubstep
-        !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish)
-        !do iFish=1,m_nFish
-        !    !call BeamInfo(iFish)%structure(iFish,pi,time,isubstep,subdeltat,iBodyModel(iFish))
-        !enddo !do iFish=1,m_nFish
-        !!$OMP END PARALLEL DO
-    END SUBROUTINE
 
     SUBROUTINE structure_(this,iFish,pi,time,isubstep,deltat,subdeltat,iBodyModel)
         implicit none

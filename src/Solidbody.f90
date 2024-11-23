@@ -4,13 +4,14 @@ module SolidBody
     private
     ! Immersed boundary method parameters
     integer:: m_nFish, m_maxIterIB, m_zDim, m_yDim, m_xDim
-    real(8):: m_dtolLBM, m_Pbeta, m_dt, m_h, m_denIn, m_Uref, m_Lref, m_Tref
+    real(8):: m_dtolLBM, m_Pbeta, m_dt, m_h, m_denIn, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
     ! maxIterIB maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
-    public :: VirtualBody,Initialise_bodies,Write_solid_bodies,FSInteraction_force
+    public :: VirtualBody,Initialise_bodies,Write_solid_bodies,FSInteraction_force, &
+              Write_cont,Read_cont,Write_BeamChk,Write_params
     type :: VirtualBody
         type(BeamSolver):: rbm
         !!!virtual infomation
@@ -38,10 +39,11 @@ module SolidBody
     type(VirtualBody), allocatable :: VBodies(:)
   contains
     
-    subroutine Initialise_bodies(zDim,yDim,xDim,nFish,filenames,iBodyModel,maxIterIB,dtolLBM,Pbeta,dt,h,denIn,Uref,Lref,Tref,BCs)
+    subroutine Initialise_bodies(zDim,yDim,xDim,nFish,filenames,iBodyModel,maxIterIB,dtolLBM,Pbeta,dt,h,denIn,Eref,Fref,Lref,Pref,Tref,Uref,BCs)
+        USE simParam
         implicit none
         integer,intent(in)::zDim,yDim,xDim,nFish,maxIterIB,iBodyModel(nFish),BCs(6)
-        real(8),intent(in):: dtolLBM,Pbeta,dt,h,denIn,Uref,Lref,Tref
+        real(8),intent(in):: dtolLBM,Pbeta,dt,h,denIn,Eref,Fref,Lref,Pref,Tref,Uref
         character(LEN=40), intent(in):: filenames(nFish)
         integer :: iFish
         m_zDim = zDim
@@ -57,11 +59,25 @@ module SolidBody
         m_Uref = Uref
         m_Lref = Lref
         m_Tref = Tref
+        m_Eref = Eref
+        m_Fref = Fref
+        m_Lref = Lref
+        m_Pref = Pref
+        m_Tref = Tref
+        m_Uref = Uref
         m_boundaryConditions(1:6) = BCs(1:6)
         allocate(VBodies(nFish))
+        allocate(nAsfac(1:m_nFish),nLchod(1:m_nFish),lentemp(1:m_nFish))
         do iFish = 1,nFish
             call VBodies(iFish)%Initialise(filenames(iFish),iBodyModel(iFish))
+            call VBody(iFish)%rbm%Allocate_solid(this,filenames(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
         enddo
+        maxN  = maxloc(nAsfac, dim=1)
+        Asfac = nAsfac(maxN)
+        Lchod = nLchod(maxN)
+        if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
+        if((maxval(Lspan)-1.0d0)<=1.0d-2)Lspan(maxloc(Lspan))=1.0d0
+        AR    = maxval(Lspan)**2/Asfac
     end subroutine Initialise_bodies
 
     subroutine Initialise_(this,filename,iBodyModel)
@@ -440,4 +456,26 @@ module SolidBody
         enddo
     end subroutine Write_solid_bodies
 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write structure field, tecplot ASCII format
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE Write_BeamChk(time)
+        implicit none
+        real(8):: time
+    !   -------------------------------------------------------
+        integer:: i,iFish
+        integer,parameter::nameLen=10
+        character (LEN=nameLen):: fileName
+        !==================================================================================================
+        write(fileName,'(I10)') nint(time*1d5)
+        fileName = adjustr(fileName)
+        DO  i=1,nameLen
+            if(fileName(i:i)==' ')fileName(i:i)='0'
+        END DO
+    
+        do iFish=1,m_nFish
+            call VBody(iFish)%rbm%write_solid(m_Lref,m_Uref,m_Aref,m_Fref,iFish,fileName)
+        enddo
+    !   =============================================
+    END SUBROUTINE
 end module SolidBody
