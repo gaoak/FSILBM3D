@@ -168,9 +168,6 @@ module SolidSolver
     this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0*m_pi
     this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0*m_pi
     this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*m_pi
-    uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*m_pi*MAXVAL(dabs(this%xyzAmpl(1:3)))*this%Freq, &
-        2.0*m_pi*MAXVAL(dabs(this%AoAAmpl(1:3))*[maxval(dabs(this%xyzful00(:,2))), &
-        maxval(dabs(this%xyzful00(:,1))),maxval(dabs(this%xyzful00(:,3)))])*this%Freq])
     !calculate material parameters
     nt=this%ele(1,4)
     if(iKB==0)then

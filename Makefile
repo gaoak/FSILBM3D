@@ -21,7 +21,7 @@ SRCDIR = ./src
 
 ### List of files for the main code
 OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
-SRC = $(SRCDIR)/Modules.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/LatticeBoltzmannSolver.f90 (SRCDIR)/PostProcessing.f90 $$(SRCDIR)/Initialization.f90  $(SRCDIR)/Interaction.f90 $(SRCDIR)/main.f90  $(SRCDIR)/Util.f90
+SRC = $(SRCDIR)/Modules.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/LatticeBoltzmannSolver.f90 (SRCDIR)/PostProcessing.f90 $$(SRCDIR)/Initialization.f90 $(SRCDIR)/main.f90  $(SRCDIR)/Util.f90
 CSRC = $(SRCDIR)/forkthread.c
 OBJ = $(SRC:%.f90=%.o)
 COBJ = $(CSRC:%.c=%.o)
