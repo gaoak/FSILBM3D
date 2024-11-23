@@ -9,7 +9,7 @@ module SolidSolver
     integer:: ntolFEM
     real(8):: g(3)
     real(8):: deltaT
-    public :: BeamSolver, BeamInfo
+    public :: BeamSolver
     type :: BeamSolver
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
@@ -36,7 +36,6 @@ module SolidSolver
         procedure :: Initialise => Initialise_
         procedure :: structure => structure_
     end type BeamSolver
-    type(BeamSolver), allocatable :: BeamInfo(:)
   contains
     SUBROUTINE Allocate_solid_(this,FEmeshName,nAsfac,nLchod,lentemp)
         implicit none
@@ -101,11 +100,11 @@ module SolidSolver
         real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
         if(nFish==0) return
 
-        allocate(BeamInfo(nFish))
+        !allocate(BeamInfo(nFish))
         allocate(nAsfac(1:nFish),nLchod(1:nFish),lentemp(1:nFish))
         
         do iFish = 1,nFish
-            call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
+            !call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
             write(*,*)'read FEMeshFile ',iFish,' end'
         enddo
 
