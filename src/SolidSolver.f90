@@ -1,14 +1,12 @@
 module SolidSolver
     implicit none
     private
-    INTEGER, PARAMETER:: SpcDim = 3
-    integer, parameter:: idat=12
-    integer:: nFish!,nND_max,nEL_max,nMT_max,nEQ_max,NDref
-    real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
-    real(8):: dtolFEM
-    integer:: ntolFEM
-    real(8):: g(3)
-    real(8):: deltaT
+    integer, parameter:: m_idat=12
+    integer:: m_nFish!,nND_max,nEL_max,nMT_max,nEQ_max,NDref
+    real(8):: m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf
+    real(8):: m_dtolFEM
+    integer:: m_ntolFEM
+    real(8):: m_g(3)
     public :: BeamSolver
     type :: BeamSolver
         real(8), allocatable :: r_Lspan(:)
@@ -40,16 +38,16 @@ module SolidSolver
     SUBROUTINE Allocate_solid_(this,FEmeshName,nAsfac,nLchod,lentemp)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8):: nAsfac,nLchod,lentemp
+        real(8), intent(out):: nAsfac,nLchod,lentemp
         integer:: iND
         character (LEN=40):: FEmeshName
         
         write(*,'(A)') '=============================================================================='
-        open(unit=idat, file = trim(adjustl(FEmeshName)))
-        rewind(idat)
-        read(idat,*)
-        read(idat,*)this%nND,this%nEL,this%nMT
-        read(idat,*)
+        open(unit=m_idat, file = trim(adjustl(FEmeshName)))
+        rewind(m_idat)
+        read(m_idat,*)
+        read(m_idat,*)this%nND,this%nEL,this%nMT
+        read(m_idat,*)
 
         this%nEQ=this%nND*6
     
@@ -70,8 +68,8 @@ module SolidSolver
     !   ===============================================================================================
         call read_structural_datafile(this%jBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5),this%nloc(1:this%nND*6),this%nprof(1:this%nND*6), &
                                       this%nprof2(1:this%nND*6),this%xyzful00(1:this%nND,1:6),this%prop(1:this%nMT,1:10),this%nND, &
-                                      this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,idat)
-        close(idat)
+                                      this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,m_idat)
+        close(m_idat)
 
     !   ===============================================================================================
     !   calculate area
@@ -98,12 +96,12 @@ module SolidSolver
         implicit none
         integer:: iFish,maxN
         real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
-        if(nFish==0) return
+        if(m_nFish==0) return
 
-        !allocate(BeamInfo(nFish))
-        allocate(nAsfac(1:nFish),nLchod(1:nFish),lentemp(1:nFish))
+        !allocate(BeamInfo(m_nFish))
+        allocate(nAsfac(1:m_nFish),nLchod(1:m_nFish),lentemp(1:m_nFish))
         
-        do iFish = 1,nFish
+        do iFish = 1,m_nFish
             !call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
             write(*,*)'read FEMeshFile ',iFish,' end'
         enddo
@@ -153,11 +151,11 @@ module SolidSolver
 
         if(this%ele(1,4).eq.2)then
             CALL formmass_D(this%ele(1:this%nEL,1:5),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
-                            this%prop(1:this%nMT,1:10),this%mss(1:this%nND*6),this%nND,this%nEL,this%nEQ,this%nMT,alphaf)
+                            this%prop(1:this%nMT,1:10),this%mss(1:this%nND*6),this%nND,this%nEL,this%nEQ,this%nMT,m_alphaf)
 
             do iND = 1, this%nND
                 this%mssful(iND,1:6)= this%mss((iND-1)*6+1:(iND-1)*6+6)
-                this%grav(iND,1:6)  = this%mssful(iND,1:6)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+                this%grav(iND,1:6)  = this%mssful(iND,1:6)*[m_g(1),m_g(2),m_g(3),0.0d0,0.0d0,0.0d0]
             enddo
 
             CALL init_triad_D(this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1),this%xyzful(1:this%nND,2),this%xyzful(1:this%nND,3), &
@@ -166,7 +164,7 @@ module SolidSolver
         else
             do iND = 1, this%nND
                 this%mssful(iND,1:6)= 1.0d0 !Culculate accCentM/velCentM/xyzCentM requires mass not zero
-                this%grav(iND,1:6)  = this%mssful(iND,1:6)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
+                this%grav(iND,1:6)  = this%mssful(iND,1:6)*[m_g(1),m_g(2),m_g(3),0.0d0,0.0d0,0.0d0]
             enddo
         endif
 
@@ -179,9 +177,9 @@ module SolidSolver
         USE simParam
         implicit none
         integer:: iFish
-        if(nFish.eq.0) return
+        if(m_nFish.eq.0) return
     
-        do iFish=1,nFish
+        do iFish=1,m_nFish
             !call BeamInfo(iFish)%Initialise(pi,time)
         enddo
     END SUBROUTINE initialize_solid
@@ -191,9 +189,9 @@ module SolidSolver
         implicit none
         integer:: iFish,isubstep
         !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish)
-        !do iFish=1,nFish
+        !do iFish=1,m_nFish
         !    !call BeamInfo(iFish)%structure(iFish,pi,time,isubstep,subdeltat,iBodyModel(iFish))
-        !enddo !do iFish=1,nFish
+        !enddo !do iFish=1,m_nFish
         !!$OMP END PARALLEL DO
     END SUBROUTINE
 
@@ -260,10 +258,10 @@ module SolidSolver
                                       this%prop(1:this%nMT,1:10),this%mss(1:this%nND*6), &
                                       this%xyzful0(1:this%nND,1:6),this%xyzful(1:this%nND,1:6),this%dspful(1:this%nND,1:6), &
                                       this%velful(1:this%nND,1:6),this%accful(1:this%nND,1:6),this%lodful(1:this%nND,1:6),  &
-                                      subdeltat,dampK,dampM,  &
+                                      subdeltat,m_dampK,m_dampM,  &
                                       this%triad_nn(1:3,1:3,1:this%nND),this%triad_ee(1:3,1:3,1:this%nEL), &
                                       this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
-                                      this%nND,this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,    &
+                                      this%nND,this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,m_NewmarkGamma,m_NewmarkBeta,m_dtolFEM,m_ntolFEM,    &
                                       iFish,this%FishInfo)
             else
                 stop 'no define body model'
@@ -287,7 +285,7 @@ module SolidSolver
 !
 !    workspace variables:
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,     &
+    SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,m_dampK,m_dampM,     &
                       triad_nn,triad_ee,triad_n1,triad_n2,nND,nEL,nEQ,nMT,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
                       dtol,iterMax,iFish,FishInfo)
     implicit none
@@ -295,7 +293,7 @@ module SolidSolver
     integer:: jBC(nND,6),ele(nEL,5),nloc(nEQ),nprof(nEQ),nprof2(nEQ)
     real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(nMT,10)
     real(8):: mss(nEQ),dspful(nND,6),velful(nND,6),accful(nND,6),lodExteful(nND,6),deltat
-    real(8):: dampK,dampM
+    real(8):: m_dampK,m_dampM
 
     real(8):: triad_nn(3,3,nND),triad_ee(3,3,nEL)
     real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL)
@@ -354,11 +352,11 @@ module SolidSolver
 
         do    i= 1, nEQ
             lodEffe(i)=lodExte(i)-lodInte(i)+(a0*(dspt(i)-dsp(i))+a2*vel(i)+a3*acc(i))*mss(i)   &
-                                            +(a1*(dspt(i)-dsp(i))+a4*vel(i)+a5*acc(i))*dampM*mss(i)
+                                            +(a1*(dspt(i)-dsp(i))+a4*vel(i)+a5*acc(i))*m_dampM*mss(i)
         enddo
 
 
-        if    (dampK > 0.0d0) then
+        if    (m_dampK > 0.0d0) then
             do    i= 1, nEQ
                 wk1(i)= a1*(dspt(i)-dsp(i)) +a4*vel(i) +a5*acc(i)
             enddo
@@ -366,7 +364,7 @@ module SolidSolver
             call AxBCOL(stfElas,maxstiff,wk1,wk2,nEQ,nprof,nprof2,nloc)
 
             do    i= 1, nEQ
-                lodEffe(i) = lodEffe(i) + dampK*wk2(i)
+                lodEffe(i) = lodEffe(i) + m_dampK*wk2(i)
             enddo
         endif
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -382,14 +380,14 @@ module SolidSolver
             do    j= 1, nprof(i)
                 stfEffe(iloc+j-1)=stfElas(iloc+j-1)+ gamma*stfGeom(iloc+j-1)
             enddo
-            stfEffe(iloc) = stfEffe(iloc) + a0*mss(i) + a1*dampM*mss(i)
+            stfEffe(iloc) = stfEffe(iloc) + a0*mss(i) + a1*m_dampM*mss(i)
         enddo
 
-        if    (dampK .gt. 0.0d0) then
+        if    (m_dampK .gt. 0.0d0) then
             do    i= 1, nEQ
                 iloc=nloc(i)
                 do    j= 1, nprof(i)
-                    stfEffe(iloc+j-1) = stfEffe(iloc+j-1) + a1*dampK*stfElas(iloc+j-1)
+                    stfEffe(iloc+j-1) = stfEffe(iloc+j-1) + a1*m_dampK*stfElas(iloc+j-1)
                 enddo
             enddo
         endif
@@ -472,9 +470,9 @@ module SolidSolver
 !
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   READ structural DaTafile
-    subroutine read_structural_datafile(jBC,ele,nloc,nprof,nprof2,xyzful0,prop,nND,nEL,nEQ,nMT,nBD,maxstiff,idat)
+    subroutine read_structural_datafile(jBC,ele,nloc,nprof,nprof2,xyzful0,prop,nND,nEL,nEQ,nMT,nBD,maxstiff,m_idat)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,idat
+    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,m_idat
     integer:: ele(nEL,5),jBC(nND,6),nloc(nND*6),nprof(nND*6),nprof2(nND*6)
     real(8):: xyzful0(nND,6),prop(nMT,10)
 !   ---------------------------------------------------------------------------
@@ -482,39 +480,39 @@ module SolidSolver
     character (LEN=50):: endin
 !   -----------------------------------------------------------------------------------------------
 !   READ  node
-    read(idat,*)  nND
+    read(m_idat,*)  nND
     do    i= 1, nND
-        read(idat,*) node,xyzful0(node,1),xyzful0(node,2),xyzful0(node,3)
+        read(m_idat,*) node,xyzful0(node,1),xyzful0(node,2),xyzful0(node,3)
     enddo
-    read(idat,'(1a50)') endin
+    read(m_idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 !   READ elem data
     ! element number, node left, node right, node right, element type, material property index
-    read(idat,*) nEL
+    read(m_idat,*) nEL
     do  i= 1, nEL
-        read(idat,*) j,ele(j,1:5)
+        read(m_idat,*) j,ele(j,1:5)
     enddo
-    read(idat,'(1a50)') endin
+    read(m_idat,'(1a50)') endin
 
 !   -----------------------------------------------------------------------------------------------
 !    READ  bcs  default is 0=free
     jBC(1:nND,1:6) = 0
-    read(idat,*)  nbc
+    read(m_idat,*)  nbc
     do  i=1,nbc
-        read(idat,*)node,jBC(node,1),jBC(node,2),jBC(node,3), &
+        read(m_idat,*)node,jBC(node,1),jBC(node,2),jBC(node,3), &
                          jBC(node,4),jBC(node,5),jBC(node,6)
 
     enddo
-    read(idat,'(1a50)') endin
+    read(m_idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 !   READ element material properties
     ! can have nMT types of material
     ! property data will be overwritten if isKB = 0 or 1
-    read(idat,*) nMT
+    read(m_idat,*) nMT
     do    i= 1, nMT
-        read(idat,*) nmp,prop(nmp,1:8)
+        read(m_idat,*) nmp,prop(nmp,1:8)
     enddo
-    read(idat,'(1a50)') endin
+    read(m_idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 
     nEQ=nND*6
@@ -1116,7 +1114,7 @@ module SolidSolver
 !   FORM MASS matrix: only lumped
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,alphaf)
+    subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,m_alphaf)
     implicit none
     integer:: nND,nEL,nEQ,nMT
     integer:: ele(nEL,5)
@@ -1130,7 +1128,7 @@ module SolidSolver
     real(8):: a0,r0,b0,zix0,ziy0,ziz0,dx,dy,dz,xl,xll,xmm,xnn
 
     !ת���������Ӵ�С
-    real(8):: alphaf
+    real(8):: m_alphaf
 
 !   zero array before assembling
 
@@ -1157,7 +1155,7 @@ module SolidSolver
             xll=dx/xl
             xmm=dy/xl
             xnn=dz/xl
-            call elmmasFRM_D(r0,a0,xl,zix0,em12,alphaf)
+            call elmmasFRM_D(r0,a0,xl,zix0,em12,m_alphaf)
             call trans3d_D(xll,xmm,xnn,em12,b0)
             em(1:18,1:18)=0.0d0
             em(1:12,1:12)=em12(1:12,1:12)
@@ -1326,11 +1324,11 @@ module SolidSolver
 !   ELeMent MASs matrix for the FRaMe
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine elmmasFRM_D(rho,area,length,zix,em,alphaf)
+    subroutine elmmasFRM_D(rho,area,length,zix,em,m_alphaf)
     implicit none
     real(8):: rho, area, length,zix
     real(8):: em(12,12)
-    real(8):: alphaf,roal
+    real(8):: m_alphaf,roal
 
     em(1:12,1:12) = 0.0d0
     roal = rho*area*length/2.0d0
@@ -1338,8 +1336,8 @@ module SolidSolver
     em(2,2)     = roal
     em(3,3)     = roal
     em(4,4)     = roal*zix/area
-    em(5,5)     = roal*length*length*alphaf/48d0
-    em(6,6)     = roal*length*length*alphaf/48d0
+    em(5,5)     = roal*length*length*m_alphaf/48d0
+    em(6,6)     = roal*length*length*m_alphaf/48d0
     em(7,7)     = em(1,1)
     em(8,8)     = em(2,2)
     em(9,9)     = em(3,3)
