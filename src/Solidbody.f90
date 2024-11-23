@@ -39,11 +39,11 @@ module SolidBody
     type(VirtualBody), allocatable :: VBodies(:)
   contains
     
-    subroutine Initialise_bodies(zDim,yDim,xDim,nFish,filenames,iBodyModel,maxIterIB,dtolLBM,Pbeta,dt,h,denIn,Eref,Fref,Lref,Pref,Tref,Uref,BCs)
+    subroutine Initialise_bodies(time,zDim,yDim,xDim,nFish,filenames,iBodyModel,maxIterIB,dtolLBM,Pbeta,dt,h,denIn,Eref,Fref,Lref,Pref,Tref,Uref,BCs)
         USE simParam
         implicit none
         integer,intent(in)::zDim,yDim,xDim,nFish,maxIterIB,iBodyModel(nFish),BCs(6)
-        real(8),intent(in):: dtolLBM,Pbeta,dt,h,denIn,Eref,Fref,Lref,Pref,Tref,Uref
+        real(8),intent(in):: time,dtolLBM,Pbeta,dt,h,denIn,Eref,Fref,Lref,Pref,Tref,Uref
         character(LEN=40), intent(in):: filenames(nFish)
         integer :: iFish
         m_zDim = zDim
@@ -69,8 +69,8 @@ module SolidBody
         allocate(VBodies(nFish))
         allocate(nAsfac(1:m_nFish),nLchod(1:m_nFish),lentemp(1:m_nFish))
         do iFish = 1,nFish
+            call VBody(iFish)%rbm%Initialise(time,filenames(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
             call VBodies(iFish)%Initialise(filenames(iFish),iBodyModel(iFish))
-            call VBody(iFish)%rbm%Allocate_solid(this,filenames(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
         enddo
         maxN  = maxloc(nAsfac, dim=1)
         Asfac = nAsfac(maxN)

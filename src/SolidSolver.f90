@@ -31,7 +31,6 @@ module SolidSolver
         real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
         real(8):: FishInfo(3)
     contains
-        procedure :: Allocate_solid => Allocate_solid_
         procedure :: Initialise => Initialise_
         procedure :: calculate_angle_material => calculate_angle_material_
         procedure :: write_solid => write_solid_
@@ -61,10 +60,10 @@ module SolidSolver
         m_pi = 3.141592653589793d0
     ENDSUBROUTINE Initialise_SolidSolver
 
-    SUBROUTINE Allocate_solid_(this,FEmeshName,nAsfac,nLchod,lentemp)
+    SUBROUTINE Initialise_(this,time,FEmeshName,nAsfac,nLchod,lentemp)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(out):: nAsfac,nLchod,lentemp
+        real(8), intent(out):: time,nAsfac,nLchod,lentemp
         integer:: iND
         character (LEN=40):: FEmeshName
         
@@ -112,13 +111,7 @@ module SolidSolver
         do    iND=1,this%nND
             if(this%jBC(iND,1)==1) this%jBC(iND,1:6)=this%isMotionGiven(1:6)
         enddo
-    end subroutine Allocate_solid_
-
-    SUBROUTINE Initialise_(this,time)
-        implicit none
-        class(BeamSolver), intent(inout) :: this
-        integer:: iND
-        real(8):: time
+        !! compute initial values
         this%TTT00(:,:)=0.0d0
         this%TTT00(1,1)=1.0d0
         this%TTT00(2,2)=1.0d0
