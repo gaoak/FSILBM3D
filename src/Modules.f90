@@ -57,14 +57,14 @@
     real(8), allocatable:: SampFlowPint(:,:)
     real(8):: Xref,Yref,Zref
     real(8):: timeSimTotl,timeOutTemp,timeOutBody,timeOutFlow,timeOutInfo,timeOutBegin,timeOutEnd
-    real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFSI,subdeltat
+    real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFSI,deltat,subdeltat
     real(8):: uuuIn(1:SpcDim),shearRateIn(1:SpcDim),denIn
     real(8):: AmplInitDist(1:SpcDim),waveInitDist,AmplforcDist(1:SpcDim),FreqforcDist
     real(8):: posiForcDist(1:SpcDim),begForcDist,endForcDist
     real(8):: Re,AR,Frod(1:SpcDim)
     real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Asfac
     real(8), allocatable:: Lspan(:)
-    real(8):: UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
+    real(8):: UPre,UNow
 
     real(8):: upxc0, upxcm, upxcmm
     real(8):: upyc0, upycm, upycmm

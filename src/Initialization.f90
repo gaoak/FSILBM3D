@@ -507,7 +507,7 @@
     do iFish = 1,nFish
         call BeamInfo(iFish)%write_solid_temp(13)
     enddo
-    write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
+    write(13) UPre,UNow
     close(13)
     ENDSUBROUTINE
 
@@ -531,7 +531,7 @@
         do iFish = 1,nFish
         call BeamInfo(iFish)%read_solid_temp(13)
     enddo
-        read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
+        read(13) UPre,UNow
     endif
     close(13)
     ENDSUBROUTINE

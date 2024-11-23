@@ -52,13 +52,13 @@ module SolidSolver
         implicit none
         integer:: iFish,maxN
         real(8), allocatable:: nAsfac(:),nLchod(:),lentemp(:)
-        if(nFish==0) return
+        if(m_nFish==0) return
 
-        allocate(BeamInfo(nFish))
-        allocate(nAsfac(1:nFish),nLchod(1:nFish),lentemp(1:nFish))
+        ! allocate(BeamInfo(m_nFish))
+        allocate(nAsfac(1:m_nFish),nLchod(1:m_nFish),lentemp(1:m_nFish))
         
-        do iFish = 1,nFish
-            call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
+        do iFish = 1,m_nFish
+            ! call BeamInfo(iFish)%Allocate_solid(FEmeshName(iFish),nAsfac(iFish),nLchod(iFish),lentemp(iFish))
             write(*,*)'read FEMeshFile ',iFish,' end'
         enddo
 
@@ -258,8 +258,8 @@ module SolidSolver
         if(fileName(i:i)==' ')fileName(i:i)='0'
     END DO
 
-    do iFish=1,nFish
-        call BeamInfo(iFish)%write_solid(Lref,Uref,Aref,Fref,iFish,fileName)
+    do iFish=1,m_nFish
+        ! call BeamInfo(iFish)%write_solid(Lref,Uref,Aref,Fref,iFish,fileName)
     enddo
 !   =============================================
     END SUBROUTINE
@@ -393,8 +393,9 @@ module SolidSolver
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
     integer:: i,iFish
-    real(8):: EEE(2),strainEnergy(nEL_max,2,nFish)
+    real(8):: EEE(2),strainEnergy(this%nEL,2)
     real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+    real(8):: Et,Ek,Ep,Es,Eb,Ew
     integer,parameter::nameLen=4
     character (LEN=nameLen):: fileName,Nodename
         write(fileName,'(I4)') iFish
@@ -454,13 +455,13 @@ module SolidSolver
         write(111,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
         close(111)
 
-        call strain_energy_D(strainEnergy(1:this%nEL,1:2,iFish),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
+        call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
                                 this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nMT,1:10), &
                                 this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
                                 this%triad_ee(1:3,1:3,1:this%nEL), &
                                 this%nND,this%nEL,this%nMT)
-        EEE(1)=sum(strainEnergy(1:this%nEL,1,iFish))
-        EEE(2)=sum(strainEnergy(1:this%nEL,2,iFish))
+        EEE(1)=sum(strainEnergy(1:this%nEL,1))
+        EEE(2)=sum(strainEnergy(1:this%nEL,2))
         Es=EEE(1)/Eref
         Eb=EEE(2)/Eref
         Ep=Es+Eb
@@ -485,11 +486,11 @@ module SolidSolver
         !!$OMP END PARALLEL DO
     END SUBROUTINE
 
-    SUBROUTINE structure_(this,iFish,pi,time,isubstep,subdeltat,iBodyModel)
+    SUBROUTINE structure_(this,iFish,pi,time,isubstep,deltat,subdeltat,iBodyModel)
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer:: iFish,iND,isubstep,iBodyModel
-        real(8):: subdeltat,pi,time
+        real(8):: deltat,subdeltat,pi,time
         !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
             if(iBodyModel==1)then     ! rigid body
                 !======================================================
