@@ -425,7 +425,7 @@
     USE simParam
     implicit none
     integer:: x, y, z,xbgn,xend,ybgn,yend,zbgn,zend
-    real(8):: rx,ry,rz,Phi
+    real(8):: rx,ry,rz
 
     xbgn    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)-3
     xend    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)+4
@@ -446,6 +446,19 @@
     enddo
     enddo
     enddo
+    contains
+    FUNCTION Phi(x)
+        IMPLICIT NONE
+        real(8)::Phi,x,r
+        r=dabs(x)
+        if(r<1.0d0)then
+            Phi=(3.d0-2.d0*r+dsqrt( 1.d0+4.d0*r*(1.d0-r)))*0.125d0
+        elseif(r<2.0d0)then
+            Phi=(5.d0-2.d0*r-dsqrt(-7.d0+4.d0*r*(3.d0-r)))*0.125d0
+        else
+            Phi=0.0d0
+        endif
+    ENDFUNCTION Phi
     end
 
     SUBROUTINE OMPPartition(xDim, np, partition, parindex)
@@ -515,81 +528,3 @@
         integer,dimension(8) :: values
         CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
     ENDFUNCTION
-
-    SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
-        implicit none
-        integer:: len, index, count, step, it
-        real(8):: x, array(len)
-        logical:: uniform
-        if (.not.uniform) then
-            if (x<array(1) .or. x>array(len)) then
-                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-                stop
-            endif
-            index = 1
-            count = len
-            do while(count > 0)
-                step = count / 2
-                it = index + step
-                if (array(it) < x) then
-                    index = it + 1
-                    count = count - (step + 1)
-                else
-                    count = step
-                endif
-            enddo
-            if (array(index)>x) then
-                index = index - 1
-            endif
-        else
-            index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
-            !int -1.1 -> -1; 1.1->1; 1.9->1
-            if (index<1 .or. index>len) then
-                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-                stop
-            endif
-        endif
-    END SUBROUTINE
-
-    ! return the array(index) <= x < array(index+1)
-    ! assum uniform grid around x(x=i0) = x0
-    SUBROUTINE minloc_fast(x, x0, i0, invdh, index, offset)
-        implicit none
-        integer, intent(in):: i0
-        real(8), intent(in):: x, x0, invdh
-        integer, intent(out):: index
-        real(8), intent(out):: offset
-        offset = (x - x0)*invdh
-        index = floor(offset)
-        offset = offset - dble(index)
-        index = index + i0
-    END SUBROUTINE
-
-    SUBROUTINE trimedindex(i, xDim, ix, boundaryConditions)
-        USE BoundCondParams
-        implicit none
-        integer, intent(in):: boundaryConditions(1:2)
-        integer, intent(in):: i, xDim
-        integer, intent(out):: ix(-1:2)
-        integer:: k
-        do k=-1,2
-            ix(k) = i + k
-            if (ix(k)<1) then
-                if(boundaryConditions(1).eq.Periodic) then
-                    ix(k) = ix(k) + xDim
-                else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
-                    ix(k) = 2
-                else
-                    write(*,*) 'index out of xmin bound', ix(k)
-                endif
-            else if(ix(k)>xDim) then
-                if(boundaryConditions(2).eq.Periodic) then
-                    ix(k) = ix(k) - xDim
-                else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(2).eq.wall) .and. ix(k).eq.xDim+1) then
-                    ix(k) = xDim - 1
-                else
-                    write(*,*) 'index out of xmax bound', ix(k)
-                endif
-            endif
-        enddo
-    END SUBROUTINE trimedindex

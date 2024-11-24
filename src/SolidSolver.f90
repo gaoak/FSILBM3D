@@ -445,6 +445,135 @@ module SolidSolver
 
     ENDSUBROUTINE
 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    compute strain energy
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    SUBROUTINE strain_energy_D(  strainEnergy, xord0,yord0,zord0,xord,yord,zord, &
+                                 ele,prop,triad_n1,triad_n2,triad_ee, &
+                                 nND,nEL,nMT &
+                               )
+    implicit none
+    integer:: nMT,nEL,nND
+    integer:: ele(nEL,5)
+    real(8):: xord0(nND), yord0(nND), zord0(nND), strainEnergy(nEL,2)
+    real(8):: xord(nND), yord(nND), zord(nND)
+!
+    real(8):: prop(nMT,10)
+
+    real(8):: ekb12(12,12),ekb12Strech(12,12),ekb12BendTor(12,12)
+!
+    real(8):: triad_ee(3,3,nEL)
+    real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL)
+
+    real(8):: triad_00(3,3),triad_11(3,3),triad_22(3,3)
+    real(8):: ub(18),dl
+!
+    real(8):: dx0,dy0,dz0,du,dv,dw,dx,dy,dz,xl0
+    real(8):: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
+
+    real(8):: e0,g0,a0,b0,r0,zix0,ziy0,ziz0,xl
+    integer:: i,j,n,i1,j1,k1,mat,nELt
+
+!   For each element, calculate the nodal forces
+    do    n=1,nEL
+
+        i1  = ele(n,1)
+        j1  = ele(n,2)
+        k1  = ele(n,3)
+        nELt= ele(n,4)
+        mat = ele(n,5)
+        if    ( nELt == 2) then
+!           frame
+            e0  =prop(mat,1)
+            g0  =prop(mat,2)
+            a0  =prop(mat,3)
+            r0  =prop(mat,4)
+            b0  =prop(mat,5)
+            zix0=prop(mat,6)
+            ziy0=prop(mat,7)
+            ziz0=prop(mat,8)
+
+            dx0 = xord0(j1) - xord0(i1)
+            dy0 = yord0(j1) - yord0(i1)
+            dz0 = zord0(j1) - zord0(i1)
+            xl0 = dsqrt(dx0*dx0+dy0*dy0+dz0*dz0)
+!
+!           orientation
+            du = (xord(j1)-xord0(j1))-(xord(i1)-xord0(i1))
+            dv = (yord(j1)-yord0(j1))-(yord(i1)-yord0(i1))
+            dw = (zord(j1)-zord0(j1))-(zord(i1)-zord0(i1))
+
+            dx = dx0 + du
+            dy = dy0 + dv
+            dz = dz0 + dw
+            xl =dsqrt(dx*dx+dy*dy+dz*dz)
+!
+            dl = ( (2*dx0+du)*du +(2*dy0+dv)*dv +(2*dz0+dw)*dw )/ (xl+xl0)
+!           get twisting angles
+            do    i=1,3
+            do    j=1,3
+                triad_00(i,j)=triad_ee(i,j,n)
+                triad_11(i,j)=triad_ee(i,j,n)
+                triad_22(i,j)=triad_n1(i,j,n)
+            enddo
+            enddo
+            call get_angle_triad(triad_11,triad_22,tx,ty,tz)
+            call global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
+!
+            do    i=1,3
+            do    j=1,3
+                triad_11(i,j)=triad_ee(i,j,n)
+                triad_22(i,j)=triad_n2(i,j,n)
+            enddo
+            enddo
+            call get_angle_triad(triad_11,triad_22,tx,ty,tz)
+            call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
+
+!            non-zero ty1 tz1 u2 tx2 ty2 tz2
+            ub(1)=0.0d0
+            ub(2)=0.0d0
+            ub(3)=0.0d0
+            ub(4)=tx1
+            ub(5)=ty1
+            ub(6)=tz1
+!
+            ub(7)=dl
+            ub(8)=0.0d0
+            ub(9)=0.0d0
+            ub(10)=tx2
+            ub(11)=ty2
+            ub(12)=tz2
+
+!
+!
+!           get current stiffness in local coords. use L0
+
+            call elmstfFRM_D(xl0,zix0,ziy0,ziz0,a0,e0,g0,ekb12,nELt )
+
+            ekb12Strech(1:12,1:12)=0.0d0
+            ekb12Strech(1,1)=ekb12(1,1)
+            ekb12Strech(1,7)=ekb12(1,7)
+            ekb12Strech(7,7)=ekb12(7,7)
+            ekb12Strech(7,1)=ekb12(7,1)
+
+            ekb12BendTor(1:12,1:12)=ekb12(1:12,1:12)
+            ekb12BendTor(1,1)=0.0d0
+            ekb12BendTor(1,7)=0.0d0
+            ekb12BendTor(7,7)=0.0d0
+            ekb12BendTor(7,1)=0.0d0
+
+!           nodal forces in local coords
+            strainEnergy(n,1)=0.5d0*sum(matmul(ekb12Strech(1:12,1:12),ub(1:12))*ub(1:12))
+            strainEnergy(n,2)=0.5d0*sum(matmul(ekb12BendTor(1:12,1:12),ub(1:12))*ub(1:12))
+        else
+            !write(*,*)'not this nELt:',nELt
+            !stop
+            strainEnergy(n,:) = 0.0d0
+        endif
+    enddo
+    ENDSUBROUTINE strain_energy_D
+
+
     SUBROUTINE structure_(this,iFish,time,isubstep,deltat,subdeltat)
         implicit none
         class(BeamSolver), intent(inout) :: this
@@ -795,11 +924,9 @@ module SolidSolver
 
     !write(*,'(3(A,1x,I8,2x))')'nND=',nND,'nEL=',nEL,'nEQ=',nEQ
     !write(*,'(3(A,1x,I8,2x))')'nMT=',nMT,'nBD=',nBD,'maxstiff=',maxstiff
-    return
-    end
+    end subroutine read_structural_datafile
 
-
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -852,7 +979,7 @@ module SolidSolver
     nBD=ihfbnd+1
 
     return
-    end
+    end subroutine maxbnd
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   set angle of initial triads
@@ -1417,7 +1544,7 @@ module SolidSolver
         endif
     enddo
     return
-    end
+    end subroutine formmass_D
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   FORM STIFfness matrix  [K]
@@ -1496,7 +1623,7 @@ module SolidSolver
     enddo
 
     return
-    end
+    end subroutine formstif_s
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   FORM GEOMetric stiffness matrices  [KGx],[KGy],[KGxy]
@@ -1569,7 +1696,7 @@ module SolidSolver
     enddo
 
     return
-    end
+    end subroutine formgeom_s
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ELeMent MASs matrix for the FRaMe
@@ -1596,7 +1723,7 @@ module SolidSolver
     em(11,11)   = em(5,5)
     em(12,12)   = em(6,6)
     return
-    end
+    end subroutine elmmasFRM_D
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ELeMent STiFfness for FRaMe
@@ -1671,7 +1798,7 @@ module SolidSolver
     enddo
 !
     return
-    end
+    end subroutine elmstfFRM_D
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   ELeMent GEOMetric stiffness matrix for a FRaMe
@@ -1738,7 +1865,7 @@ module SolidSolver
     enddo
 !
     return
-    end
+    end subroutine elmgeomFRM_D
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1789,7 +1916,7 @@ module SolidSolver
     enddo
 !
     return
-    end
+    end subroutine assembCOL
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -1817,7 +1944,7 @@ module SolidSolver
     enddo
 !
     return
-    end
+    end subroutine assembLUM
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -1847,7 +1974,7 @@ module SolidSolver
     enddo
 !
     return
-    end
+    end subroutine assembFOR
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1930,7 +2057,7 @@ module SolidSolver
     enddo
 
     return
-    end
+    end subroutine trans3d_D
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1972,7 +2099,7 @@ module SolidSolver
 
 
     return
-    end
+    end subroutine AxBCOL
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -2078,7 +2205,7 @@ module SolidSolver
 !
 !
     return
-    end
+    end subroutine uduCOL_D
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -2168,5 +2295,5 @@ module SolidSolver
     enddo
 !
     return
-    end
+    end subroutine bakCOL_D
 end module SolidSolver

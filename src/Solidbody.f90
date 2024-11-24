@@ -298,7 +298,7 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim)
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
-        real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi
+        real(8):: rx(-1:2),ry(-1:2),rz(-1:2)
         real(8)::x0,y0,z0,detx,dety,detz,invdh
         integer::i0,j0,k0,iEL,x,y,z,i,j,k
         !==================================================================================================
@@ -349,7 +349,18 @@ module SolidBody
             offset_ = offset_ - dble(index_)
             index_ = index_ + i0_
         END SUBROUTINE
-
+        FUNCTION Phi(x)
+            IMPLICIT NONE
+            real(8)::Phi,x,r
+            r=dabs(x)
+            if(r<1.0d0)then
+                Phi=(3.d0-2.d0*r+dsqrt( 1.d0+4.d0*r*(1.d0-r)))*0.125d0
+            elseif(r<2.0d0)then
+                Phi=(5.d0-2.d0*r-dsqrt(-7.d0+4.d0*r*(3.d0-r)))*0.125d0
+            else
+                Phi=0.0d0
+            endif
+        ENDFUNCTION Phi
         SUBROUTINE trimedindex(i_, xDim_, ix_, boundaryConditions_)
             USE BoundCondParams
             implicit none
@@ -457,7 +468,7 @@ module SolidBody
         real(8),intent(out)::tolerance, ntolsum
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
-        real(8):: rx(-1:2),ry(-1:2),rz(-1:2),Phi,invdh,forcetemp(1:3)
+        real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: velElem(3),velElemIB(3),forceElemTemp(3)
         !==================================================================================================
         real(8)::x0,y0,z0,detx,dety,detz
