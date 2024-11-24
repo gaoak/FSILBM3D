@@ -6,7 +6,7 @@
     USE simParam
     USE SolidBody
     implicit none
-    integer:: i,iFish
+    integer:: i
     integer,parameter::nameLen=10
     character (LEN=nameLen):: fileNameR,fileNameM,fileNameS,fileNameK
     write(fileNameR,'(F10.5)') Re

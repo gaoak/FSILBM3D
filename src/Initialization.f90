@@ -338,7 +338,7 @@
     USE simParam
     USE SolidBody
     implicit none
-    integer:: nt(1:nFish),iFish
+    integer:: iFish
     real(8):: nUref(1:nFish)
 !   reference values: length, velocity, time
     if(nFish.eq.0) then

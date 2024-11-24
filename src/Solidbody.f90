@@ -55,7 +55,7 @@ module SolidBody
         Asfac = nAsfac(maxN)
         Lchod = nLchod(maxN)
         if (VBodies(maxN)%v_type.eq.1) then
-            Lspan = sum(VBodies(maxN)%rbm%r_Lspan(:))/size(VBodies(maxN)%rbm%r_Lspan(:))
+            Lspan = sum(VBodies(maxN)%rbm%r_Lspan(:)+VBodies(maxN)%rbm%r_Rspan(:))/dble(VBodies(maxN)%rbm%nND)
         else
             Lspan = maxval(VBodies(maxN)%rbm%xyzful00(:,3))-minval(VBodies(maxN)%rbm%xyzful00(:,3))
         endif
@@ -64,14 +64,13 @@ module SolidBody
         AR    = Lspan**2/Asfac
     end subroutine allocate_solid_memory
 
-    subroutine Initialise_bodies(time,zDim,yDim,xDim,nFish,filenames,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,BCs, &
+    subroutine Initialise_bodies(time,zDim,yDim,xDim,nFish,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,BCs, &
                                  dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
         implicit none
         integer,intent(in):: zDim,yDim,xDim,nFish,ntolLBM,BCs(6)
         real(8),intent(in):: time,dtolLBM,Pbeta,dt,dh,denIn
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,g(3)
         integer,intent(in):: ntolFEM,iForce2Body,iKB
-        character(LEN=40), intent(in):: filenames(nFish)
         integer :: iFish
         m_zDim = zDim
         m_yDim = yDim
@@ -87,17 +86,15 @@ module SolidBody
         CALL Initialise_SolidSolver(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
         do iFish = 1,nFish
             call VBodies(iFish)%rbm%Initialise(time)
-            call VBodies(iFish)%Initialise(filenames(iFish),VBodies(iFish)%rbm%iBodyType)
+            call VBodies(iFish)%Initialise(VBodies(iFish)%rbm%iBodyType)
         enddo
     end subroutine Initialise_bodies
 
-    subroutine Initialise_(this,filename,iBodyType)
+    subroutine Initialise_(this,iBodyType)
         ! read beam central line file and allocate memory
         implicit none
         class(VirtualBody), intent(inout) :: this
-        character(LEN=40), intent(in):: filename
         integer, intent(in) :: iBodyType
-        !call this%rbm%Allocate_solid(filename)
         this%v_type = iBodyType
         if (this%v_type .eq. 1) then
             call this%PlateBuild()
@@ -433,7 +430,7 @@ module SolidBody
         real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
         !================================
         integer:: iFish
-        integer:: i,j,k,iEL,nt,iterLBM
+        integer:: iterLBM
         real(8):: dmaxLBM,dsum
         real(8)::tol,tolsum, ntol
         !================================
@@ -471,7 +468,6 @@ module SolidBody
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: velElem(3),velElemIB(3),forceElemTemp(3)
         !==================================================================================================
-        real(8)::x0,y0,z0,detx,dety,detz
         integer::x,y,z,iEL
         !==================================================================================================
         tolerance = 0.d0
@@ -562,7 +558,7 @@ module SolidBody
         real(8),intent(in) :: time
         !   -------------------------------------------------------
         real(8):: timeTref
-        integer:: i,j,r
+        integer:: i
         real(8) :: tmpxyz(3)
         integer,parameter::nameLen=10
         character (LEN=nameLen):: fileName,idstr
