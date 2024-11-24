@@ -11,7 +11,7 @@ module SolidBody
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
     public :: VBodies,Initialise_bodies,allocate_solid_memory,Write_solid_v_bodies,FSInteraction_force, &
-              Initialise_Calculate_Solid_params,Solver,Write_cont,Read_cont,write_solid_field,Write_solid_Check,Write_solid_Data
+              Initialise_Calculate_Solid_params,Solver,Write_cont,Read_cont,write_solid_field,Write_solid_Check,Write_solid_Data,Write_SampBodyNode
     type :: VirtualBody
         type(BeamSolver):: rbm
         !!!virtual infomation
@@ -225,6 +225,25 @@ module SolidBody
             call VBodies(iFish)%rbm%write_solid_info(fid,iFish,time,timeOutInfo,m_Tref,m_Lref,m_Uref,m_Aref,m_Fref,m_Pref,m_Eref,Asfac)
         enddo
     end subroutine
+
+    subroutine Write_SampBodyNode(fid,time,numSampBody,SampBodyNode,Tref,Lref,Uref,Aref)
+        implicit none
+        integer,intent(in):: fid,numSampBody,SampBodyNode(numSampBody,m_nFish)
+        real(8),intent(in):: time,Tref,Lref,Uref,Aref
+        integer:: iFish,i
+        integer,parameter::nameLen=4
+        character (LEN=nameLen):: fileName,Nodename
+        do iFish=1,m_nFish
+            do  i=1,numSampBody
+                write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
+                open(fid,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
+                write(fid,'(10E20.10)')time/Tref, VBodies(iFish)%rbm%xyzful(SampBodyNode(i,iFish),1:3)/Lref, &
+                                                  VBodies(iFish)%rbm%velful(SampBodyNode(i,iFish),1:3)/Uref, &
+                                                  VBodies(iFish)%rbm%accful(SampBodyNode(i,iFish),1:3)/Aref
+                close(fid)
+            enddo
+        enddo !nFish
+    end subroutine
     
     subroutine FSInteraction_force(xGrid,yGrid,zGrid,uuu,den,force)
         implicit none
@@ -346,10 +365,10 @@ module SolidBody
             offset_ = offset_ - dble(index_)
             index_ = index_ + i0_
         END SUBROUTINE
-        FUNCTION Phi(x)
+        FUNCTION Phi(x_)
             IMPLICIT NONE
-            real(8)::Phi,x,r
-            r=dabs(x)
+            real(8)::Phi,x_,r
+            r=dabs(x_)
             if(r<1.0d0)then
                 Phi=(3.d0-2.d0*r+dsqrt( 1.d0+4.d0*r*(1.d0-r)))*0.125d0
             elseif(r<2.0d0)then

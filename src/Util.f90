@@ -101,10 +101,10 @@
     USE simParam
     USE SolidBody
     implicit none
-    integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend,iFish
+    integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend
     real(8):: convergence,MaMax,weightm,velocity(1:3),Pressure
     integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName,Nodename
+    character (LEN=nameLen):: fileName
 
     call Write_solid_Data(111,time,timeOutInfo,Asfac)
 
@@ -127,14 +127,7 @@
     !close(111)
 
     if(isBodyOutput==1)then
-        do iFish=1,nFish
-            do  i=1,numSampBody
-                write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-                open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-                write(111,'(10E20.10)')time/Tref, xyzful(SampBodyNode(i,iFish),1:3,iFish)/Lref,velful(SampBodyNode(i,iFish),1:3,iFish)/Uref,accful(SampBodyNode(i,iFish),1:3,iFish)/Aref
-                close(111)
-            enddo
-        enddo !nFish
+        call Write_SampBodyNode(111,time,numSampBody,SampBodyNode,Tref,Lref,Uref,Aref)
     endif
 
     if(isFluidOutput==1)then
@@ -449,10 +442,10 @@
     enddo
     enddo
     contains
-    FUNCTION Phi(x)
+    FUNCTION Phi(x_)
         IMPLICIT NONE
-        real(8)::Phi,x,r
-        r=dabs(x)
+        real(8)::Phi,x_,r
+        r=dabs(x_)
         if(r<1.0d0)then
             Phi=(3.d0-2.d0*r+dsqrt( 1.d0+4.d0*r*(1.d0-r)))*0.125d0
         elseif(r<2.0d0)then
