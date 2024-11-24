@@ -72,12 +72,14 @@
     close(111)
 
     if(isBodyOutput==1)then
-    do  i=1,numSampBody
-        write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-        open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-    enddo
+        do iFish=1,nFish
+            do  i=1,numSampBody
+                write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
+                open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
+                write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
+                close(111)
+            enddo
+        enddo !iFish
     endif
 
     if(isFluidOutput==1)then
@@ -125,12 +127,14 @@
     !close(111)
 
     if(isBodyOutput==1)then
-    do  i=1,numSampBody
-        write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-        open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref, VBodies(iFish)%rbm%xyzful(SampBodyNode(i,iFish),1:3)/Lref,VBodies(iFish)%rbm%velful(SampBodyNode(i,iFish),1:3)/Uref,VBodies(iFish)%rbm%accful(SampBodyNode(i,iFish),1:3)/Aref
-        close(111)
-    enddo
+        do iFish=1,nFish
+            do  i=1,numSampBody
+                write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
+                open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
+                write(111,'(10E20.10)')time/Tref, xyzful(SampBodyNode(i,iFish),1:3,iFish)/Lref,velful(SampBodyNode(i,iFish),1:3,iFish)/Uref,accful(SampBodyNode(i,iFish),1:3,iFish)/Aref
+                close(111)
+            enddo
+        enddo !nFish
     endif
 
     if(isFluidOutput==1)then
