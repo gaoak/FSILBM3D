@@ -156,6 +156,8 @@
         elseif(iForce2Body==2)then   !stress force
         endif
 
+        CALL wallfriction()
+
         !compute volume force exerted on fluids
         CALL addVolumForc()
 

@@ -111,6 +111,12 @@
     real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
     real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
 !   ***********************************************************************************************
+    real(8), allocatable:: tau_zMin(:,:,:),tau_zMax(:,:,:)
+    real(8), allocatable:: tau_yMin(:,:,:),tau_yMax(:,:,:)
+    real(8), allocatable:: tau_xMin(:,:,:),tau_xMax(:,:,:)
+    real(8):: tau_zMin_total(1:3),tau_zMax_total(1:3)
+    real(8):: tau_yMin_total(1:3),tau_yMax_total(1:3)
+    real(8):: tau_xMin_total(1:3),tau_xMax_total(1:3)
     END MODULE simParam
 
     MODULE PartitionXDim
