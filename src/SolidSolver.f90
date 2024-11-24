@@ -4,8 +4,8 @@ module SolidSolver
     integer, parameter:: m_idat=12
     real(8):: m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf
     real(8):: m_dtolFEM,m_pi
-    integer:: m_ntolFEM
-    real(8):: m_g(3),m_iForce2Body,m_iKB
+    integer:: m_ntolFEM,m_iForce2Body,m_iKB
+    real(8):: m_g(3)
     public :: BeamSolver,Initialise_SolidSolver
     type :: BeamSolver
         integer:: iBodyModel,iBodyType

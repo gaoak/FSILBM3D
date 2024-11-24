@@ -21,8 +21,8 @@ module SolidBody
         real(8), allocatable :: v_Ea(:) ! element area
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
-        integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
-        real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+        integer(4), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
+        real(8), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)!of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
@@ -562,12 +562,11 @@ module SolidBody
         real(8),intent(in) :: time
         !   -------------------------------------------------------
         real(8):: timeTref
-        integer:: i,j,r,Nspanpts,ElmType,n_theta,Ea_A,Ea_D
+        integer:: i,j,r
         real(8) :: tmpxyz(3)
         integer,parameter::nameLen=10
         character (LEN=nameLen):: fileName,idstr
         integer,parameter:: idfile=100
-        real(8) :: invl0,cos_xyz(3),dspan,xyz1(3),xyz2(3),low_L(3),low_R(3),upp_R(3),upp_L(3)
         !==========================================================================
         timeTref = time/m_Tref
         write(fileName,'(I10)') nint(timeTref*1d5)
