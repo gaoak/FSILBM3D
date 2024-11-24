@@ -413,7 +413,7 @@
 
     g(1:3)=Frod(1:3) * Uref ** 2/Lref
     uMax = 0.
-    call Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,Lthck)
+    call Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,Lthck)
     END SUBROUTINE calculate_LB_params
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

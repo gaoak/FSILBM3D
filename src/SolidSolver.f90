@@ -30,6 +30,7 @@ module SolidSolver
         real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
         real(8):: FishInfo(3)
     contains
+        procedure :: Allocate_solid => Allocate_solid_
         procedure :: Initialise => Initialise_
         procedure :: calculate_angle_material => calculate_angle_material_
         procedure :: write_solid => write_solid_
@@ -45,8 +46,8 @@ module SolidSolver
         implicit none
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf
         real(8),intent(in):: dtolFEM
-        integer,intent(in):: ntolFEM
-        real(8),intent(in):: g(3),iForce2Body,iKB
+        integer,intent(in):: ntolFEM,iForce2Body,iKB
+        real(8),intent(in):: g(3)
         m_dampK = dampK
         m_dampM = dampM
         m_NewmarkGamma = NewmarkGamma
@@ -60,10 +61,9 @@ module SolidSolver
         m_iKB = iKB
     ENDSUBROUTINE Initialise_SolidSolver
 
-    SUBROUTINE Initialise_(this,time,FEmeshName,iBodyModel,nAsfac,nLchod)
+    SUBROUTINE Allocate_solid_(this,FEmeshName,iBodyModel,nAsfac,nLchod)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(in):: time
         real(8), intent(out):: nAsfac,nLchod
         integer:: iND,iBodyModel
         character (LEN=40):: FEmeshName
@@ -122,7 +122,13 @@ module SolidSolver
         do    iND=1,this%nND
             if(this%jBC(iND,1)==1) this%jBC(iND,1:6)=this%isMotionGiven(1:6)
         enddo
+    END SUBROUTINE Allocate_solid_
 
+    SUBROUTINE Initialise_(this,time)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        real(8), intent(in):: time
+        integer:: iND
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !   initialize solid field
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

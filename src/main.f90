@@ -16,8 +16,7 @@
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
     CALL read_file()
-    CALL Initialise_bodies(time,zDim,yDim,xDim,nFish,FEmeshName,iBodyModel,ntolLBM,dtolLBM,Pbeta, &
-                           dt,dh,denIn,boundaryConditions,Asfac,Lchod,Lspan,AR)
+    CALL allocate_solid_memory(nFish,FEmeshName,iBodyModel,Asfac,Lchod,Lspan,AR)
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()
     CALL write_params()
@@ -34,6 +33,8 @@
 !===============================================================================================
     time=0.0d0
     step=0
+    CALL Initialise_bodies(time,zDim,yDim,xDim,nFish,FEmeshName,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,boundaryConditions, &
+                           dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
     CALL initialize_flow()
     if(ismovegrid==1)then
         iFish = 1
@@ -140,7 +141,7 @@
         enddo
         !$OMP END PARALLEL DO
         !compute force exerted on fluids
-        CALL FSInteraction_force(zDim,yDim,xDim,xGrid,yGrid,zGrid,uuu,den,force)
+        CALL FSInteraction_force(xGrid,yGrid,zGrid,uuu,den,force)
         !compute volume force exerted on fluids
         CALL addVolumForc()
 
@@ -163,7 +164,7 @@
         call date_and_time(VALUES=values0)
         subdeltat=deltat/numsubstep
         do isubstep=1,numsubstep
-            call solver(time,isubstep,deltat,subdeltat)
+            call Solver(time,isubstep,deltat,subdeltat)
         enddo !do isubstep=1,numsubstep
         call date_and_time(VALUES=values1)
         write(*,*)'time for FEM:',CPUtime(values1)-CPUtime(values0)

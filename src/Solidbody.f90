@@ -10,8 +10,8 @@ module SolidBody
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
-    public :: VBodies,Initialise_bodies,Write_solid_v_bodies,FSInteraction_force, &
-              Calculate_Solid_params,Write_cont,Read_cont,write_solid_field,Write_solid_Check,Write_solid_Data
+    public :: VBodies,Initialise_bodies,allocate_solid_memory,Write_solid_v_bodies,FSInteraction_force, &
+              Initialise_Calculate_Solid_params,Solver,Write_cont,Read_cont,write_solid_field,Write_solid_Check,Write_solid_Data
     type :: VirtualBody
         type(BeamSolver):: rbm
         !!!virtual infomation
@@ -38,30 +38,17 @@ module SolidBody
     end type VirtualBody
     type(VirtualBody), allocatable :: VBodies(:)
   contains
-    
-    subroutine Initialise_bodies(time,zDim,yDim,xDim,nFish,filenames,iBodyModel,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,BCs,Asfac,Lchod,Lspan,AR)
-        implicit none
-        integer,intent(in)::zDim,yDim,xDim,nFish,ntolLBM,iBodyModel(nFish),BCs(6)
-        real(8),intent(in):: time,dtolLBM,Pbeta,dt,dh,denIn
+    subroutine allocate_solid_memory(nFish,filenames,iBodyModel,Asfac,Lchod,Lspan,AR)
+        integer,intent(in)::nFish,iBodyModel(nFish)
         character(LEN=40), intent(in):: filenames(nFish)
-        real(8),intent(out):: Asfac,Lchod,Lspan,AR
         integer :: iFish,maxN
+        real(8),intent(out):: Asfac,Lchod,Lspan,AR
         real(8) :: nAsfac(nFish),nLchod(nFish)
-        m_zDim = zDim
-        m_yDim = yDim
-        m_xDim = xDim
-        m_nFish = nFish
-        m_ntolLBM = ntolLBM
-        m_dtolLBM = dtolLBM
-        m_Pbeta = Pbeta
-        m_dt = dt
-        m_dh = dh
-        m_denIn = denIn
-        m_boundaryConditions(1:6) = BCs(1:6)
+
         allocate(VBodies(nFish))
+
         do iFish = 1,nFish
-            call VBodies(iFish)%rbm%Initialise(time,filenames(iFish),iBodyModel(iFish),nAsfac(iFish),nLchod(iFish))
-            call VBodies(iFish)%Initialise(filenames(iFish),VBodies(iFish)%rbm%iBodyType)
+            call VBodies(iFish)%rbm%Allocate_solid(filenames(iFish),iBodyModel(iFish),nAsfac(iFish),nLchod(iFish))
         enddo
         !Use the object with the largest area as the reference object
         maxN  = maxloc(nAsfac, dim=1)
@@ -75,6 +62,33 @@ module SolidBody
         if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
         if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
         AR    = Lspan**2/Asfac
+    end subroutine allocate_solid_memory
+
+    subroutine Initialise_bodies(time,zDim,yDim,xDim,nFish,filenames,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,BCs, &
+                                 dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
+        implicit none
+        integer,intent(in):: zDim,yDim,xDim,nFish,ntolLBM,BCs(6)
+        real(8),intent(in):: time,dtolLBM,Pbeta,dt,dh,denIn
+        real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,g(3)
+        integer,intent(in):: ntolFEM,iForce2Body,iKB
+        character(LEN=40), intent(in):: filenames(nFish)
+        integer :: iFish
+        m_zDim = zDim
+        m_yDim = yDim
+        m_xDim = xDim
+        m_nFish = nFish
+        m_ntolLBM = ntolLBM
+        m_dtolLBM = dtolLBM
+        m_Pbeta = Pbeta
+        m_dt = dt
+        m_dh = dh
+        m_denIn = denIn
+        m_boundaryConditions(1:6) = BCs(1:6)
+        CALL Initialise_SolidSolver(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
+        do iFish = 1,nFish
+            call VBodies(iFish)%rbm%Initialise(time)
+            call VBodies(iFish)%Initialise(filenames(iFish),VBodies(iFish)%rbm%iBodyType)
+        enddo
     end subroutine Initialise_bodies
 
     subroutine Initialise_(this,filename,iBodyType)
@@ -92,7 +106,7 @@ module SolidBody
         endif
     end subroutine Initialise_
 
-    subroutine Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,Lthck)
+    subroutine Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,Lthck)
         implicit none
         real(8),intent(in):: Aref,Eref,Fref,Lref,Pref,Tref,Uref
         real(8),intent(out):: Lthck
@@ -109,7 +123,7 @@ module SolidBody
             call VBodies(iFish)%rbm%calculate_angle_material(m_Lref, m_Uref, m_denIn, nLthck(iFish))
         enddo
         Lthck = maxval(nLthck)
-    end subroutine Calculate_Solid_params
+    end subroutine Initialise_Calculate_Solid_params
 
     SUBROUTINE Solver(time,isubstep,deltat,subdeltat)
         implicit none
