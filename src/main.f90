@@ -8,8 +8,7 @@
     PROGRAM main
     USE simParam
     use omp_lib
-    ! ! USE SolidBody
-    USE SolidSolver
+    USE SolidBody
     implicit none
     integer:: iND,isubstep,iFish,x,y,z
     real(8):: Pbetatemp,CPUtime
@@ -17,7 +16,8 @@
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
     CALL read_file()
-    CALL allocate_solid_memory()
+    CALL Initialise_bodies(time,zDim,yDim,xDim,nFish,FEmeshName,iBodyModel,ntolLBM,dtolLBM,Pbeta, &
+                           dt,dh,denIn,boundaryConditions,Asfac,Lchod,Lspan,AR)
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()
     CALL write_params()
@@ -34,12 +34,10 @@
 !===============================================================================================
     time=0.0d0
     step=0
-    call Initialise_bodies(nFish,Lspan,ntolLBM,dtolLBM,Pbeta,FEmeshName,iBodyModel,boundaryConditions)
-    CALL initialize_solid()
     CALL initialize_flow()
     if(ismovegrid==1)then
         iFish = 1
-        call cptIref(NDref,IXref,IYref,IZref,BeamInfo(iFish)%nND,xDim,yDim,zDim,BeamInfo(iFish)%xyzful(1:BeamInfo(iFish)%nND,1:3),xGrid,yGrid,zGrid,Xref,Yref,Zref)
+        call cptIref(NDref,IXref,IYref,IZref,VBodies(iFish)%rbm%nND,xDim,yDim,zDim,VBodies(iFish)%rbm%xyzful(1:VBodies(iFish)%rbm%nND,1:3),xGrid,yGrid,zGrid,Xref,Yref,Zref)
         MoveOutputIref=0
     endif
     if(step==0)    CALL wrtInfoTitl()
@@ -60,8 +58,8 @@
     CALL updateVolumForc()
     CALL calculate_macro_quantities()
     CALL write_flow_fast()
-    CALL write_solid_field(Lref,Uref,Aref,Fref,time/Tref)
-    call Write_solid_bodies(Lref,time,Tref)
+    CALL write_solid_field(time)
+    call Write_solid_v_bodies(time)
 !==================================================================================================
 !==================================================================================================
 !==================================================================================================
@@ -100,9 +98,9 @@
         !******************************************************************************************
         if(ismovegrid==1)then ! move fluid grid
             iFish=1
-            call cptMove(move(1:3),BeamInfo(iFish)%xyzful(NDref,1:3),[xGrid(IXref),yGrid(IYref),zGrid(IZref)],dh,MoveOutputIref(1:3))
+            call cptMove(move(1:3),VBodies(iFish)%rbm%xyzful(NDref,1:3),[xGrid(IXref),yGrid(IYref),zGrid(IZref)],dh,MoveOutputIref(1:3))
             write(*,'(A,3F10.5)')' *Grid:',[xGrid(IXref),yGrid(IYref),zGrid(IZref)]
-            write(*,'(A,3F10.5)')' *Body:',BeamInfo(iFish)%xyzful(NDref,1:3)
+            write(*,'(A,3F10.5)')' *Body:',VBodies(iFish)%rbm%xyzful(NDref,1:3)
             if(isMoveDimX==1)CALL movGrid(1,move(1))
             if(isMoveDimY==1)CALL movGrid(2,move(2))
             if(isMoveDimZ==1)CALL movGrid(3,move(3))
@@ -165,7 +163,7 @@
         call date_and_time(VALUES=values0)
         subdeltat=deltat/numsubstep
         do isubstep=1,numsubstep
-            call solver()
+            call solver(time,isubstep,deltat,subdeltat)
         enddo !do isubstep=1,numsubstep
         call date_and_time(VALUES=values1)
         write(*,*)'time for FEM:',CPUtime(values1)-CPUtime(values0)
@@ -175,8 +173,8 @@
         !******************************************************************************************
         if(isRelease/=1)then
             do iFish=1,nFish
-                write(*,'(A,I5.5)')' Fish number: ', int(BeamInfo(iFish)%FishInfo(1))
-                write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(BeamInfo(iFish)%FishInfo(2)),'    dmaxFEM = ',BeamInfo(iFish)%FishInfo(3)
+                write(*,'(A,I5.5)')' Fish number: ', int(VBodies(iFish)%rbm%FishInfo(1))
+                write(*,'(A,I5.5,A,E20.10)')' iterFEM = ',int(VBodies(iFish)%rbm%FishInfo(2)),'    dmaxFEM = ',VBodies(iFish)%rbm%FishInfo(3)
             enddo
         endif
         write(*,'(A)')' --------------------------------------------------------'
@@ -189,10 +187,10 @@
         if(isRelease/=1)then
             do iFish=1,nFish
                 write(*,'(A,I5.5)')' Fish number: ',iFish
-                write(*,'(A,3D15.5)')" forceDre: ",sum(BeamInfo(iFish)%extful(1:BeamInfo(iFish)%nND,1:3),1)/Fref
-                write(*,'(A,3D15.5)')" accCentM: ",sum(BeamInfo(iFish)%accful(1:BeamInfo(iFish)%nND,1:3)*BeamInfo(iFish)%mssful(1:BeamInfo(iFish)%nND,1:3),1)/sum(BeamInfo(iFish)%mssful(1:BeamInfo(iFish)%nND,1:3),1)/Aref
-                write(*,'(A,3D15.5)')" velCentM: ",sum(BeamInfo(iFish)%velful(1:BeamInfo(iFish)%nND,1:3)*BeamInfo(iFish)%mssful(1:BeamInfo(iFish)%nND,1:3),1)/sum(BeamInfo(iFish)%mssful(1:BeamInfo(iFish)%nND,1:3),1)/Uref
-                write(*,'(A,3D15.5)')" xyzCentM: ",sum(BeamInfo(iFish)%xyzful(1:BeamInfo(iFish)%nND,1:3)*BeamInfo(iFish)%mssful(1:BeamInfo(iFish)%nND,1:3),1)/sum(BeamInfo(iFish)%mssful(1:BeamInfo(iFish)%nND,1:3),1)/Lref
+                write(*,'(A,3D15.5)')" forceDre: ",sum(VBodies(iFish)%rbm%extful(1:VBodies(iFish)%rbm%nND,1:3),1)/Fref
+                write(*,'(A,3D15.5)')" accCentM: ",sum(VBodies(iFish)%rbm%accful(1:VBodies(iFish)%rbm%nND,1:3)*VBodies(iFish)%rbm%mssful(1:VBodies(iFish)%rbm%nND,1:3),1)/sum(VBodies(iFish)%rbm%mssful(1:VBodies(iFish)%rbm%nND,1:3),1)/Aref
+                write(*,'(A,3D15.5)')" velCentM: ",sum(VBodies(iFish)%rbm%velful(1:VBodies(iFish)%rbm%nND,1:3)*VBodies(iFish)%rbm%mssful(1:VBodies(iFish)%rbm%nND,1:3),1)/sum(VBodies(iFish)%rbm%mssful(1:VBodies(iFish)%rbm%nND,1:3),1)/Uref
+                write(*,'(A,3D15.5)')" xyzCentM: ",sum(VBodies(iFish)%rbm%xyzful(1:VBodies(iFish)%rbm%nND,1:3)*VBodies(iFish)%rbm%mssful(1:VBodies(iFish)%rbm%nND,1:3),1)/sum(VBodies(iFish)%rbm%mssful(1:VBodies(iFish)%rbm%nND,1:3),1)/Lref
             enddo
         endif
         !******************************************************************************************
@@ -204,8 +202,8 @@
 
         if((timeOutBegin .le. time/Tref) .and. (time/Tref .le. timeOutEnd)) then
             if(DABS(time/Tref-timeOutBody*NINT(time/Tref/timeOutBody)) <= 0.5*dt/Tref)then
-                CALL write_solid_field(Lref,Uref,Aref,Fref,time/Tref)
-                call Write_solid_bodies(Lref,time,Tref)
+                CALL write_solid_field(time)
+                call Write_solid_v_bodies(time)
             endif
             if(DABS(time/Tref-timeOutFlow*NINT(time/Tref/timeOutFlow)) <= 0.5*dt/Tref)then
                 CALL write_flow_fast()

@@ -4,7 +4,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_file()
     USE simParam
-    USE SolidSolver
+    USE SolidBody
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
     integer:: i,iFish,iKind,FishKind,Order0
@@ -81,15 +81,15 @@
         do iFish=FishOrder1,FishOrder2
             iBodyModel(iFish)=niBodyModel
             FEmeshName(iFish)=tmpFEmeshName
-            BeamInfo(iFish)%isMotionGiven(1:6)=nisMotionGiven(1:6)
-            BeamInfo(iFish)%denR= ndenR
-            BeamInfo(iFish)%psR = npsR
+            VBodies(iFish)%rbm%isMotionGiven(1:6)=nisMotionGiven(1:6)
+            VBodies(iFish)%rbm%denR= ndenR
+            VBodies(iFish)%rbm%psR = npsR
             if(iKB==0) then
-            BeamInfo(iFish)%EmR = nEmR
-            BeamInfo(iFish)%tcR = ntcR
+            VBodies(iFish)%rbm%EmR = nEmR
+            VBodies(iFish)%rbm%tcR = ntcR
             elseif(iKB==1) then
-            BeamInfo(iFish)%KB  = nKB
-            BeamInfo(iFish)%KS  = nKS
+            VBodies(iFish)%rbm%KB  = nKB
+            VBodies(iFish)%rbm%KS  = nKS
             endif
         enddo
     enddo
@@ -119,21 +119,21 @@
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
-            BeamInfo(iFish)%Freq=nFreq
-            BeamInfo(iFish)%St  =nSt
-            BeamInfo(iFish)%XYZAmpl(1:3)=nXYZAmpl(1:3)
-            BeamInfo(iFish)%XYZPhi(1:3) =nXYZPhi(1:3)
-            BeamInfo(iFish)%AoAo(1:3)   =nAoAo(1:3)
-            BeamInfo(iFish)%AoAAmpl(1:3)=nAoAAmpl(1:3)
-            BeamInfo(iFish)%AoAPhi(1:3) =nAoAPhi(1:3)
+            VBodies(iFish)%rbm%Freq=nFreq
+            VBodies(iFish)%rbm%St  =nSt
+            VBodies(iFish)%rbm%XYZAmpl(1:3)=nXYZAmpl(1:3)
+            VBodies(iFish)%rbm%XYZPhi(1:3) =nXYZPhi(1:3)
+            VBodies(iFish)%rbm%AoAo(1:3)   =nAoAo(1:3)
+            VBodies(iFish)%rbm%AoAAmpl(1:3)=nAoAAmpl(1:3)
+            VBodies(iFish)%rbm%AoAPhi(1:3) =nAoAPhi(1:3)
             ! initial position distribution
             Order0 = iFish - FishOrder1
             LineX  = mod(Order0,NumX(iKind))
             LineY  = mod(Order0/NumX(iKind),NumY(iKind))
             LineZ  = Order0/(NumX(iKind)*NumY(iKind))
-            BeamInfo(iFish)%XYZo(1) = iXYZ(1) + dXYZ(1) * LineX
-            BeamInfo(iFish)%XYZo(2) = iXYZ(2) + dXYZ(2) * LineY
-            BeamInfo(iFish)%XYZo(3) = iXYZ(3) + dXYZ(3) * LineZ
+            VBodies(iFish)%rbm%XYZo(1) = iXYZ(1) + dXYZ(1) * LineX
+            VBodies(iFish)%rbm%XYZo(2) = iXYZ(2) + dXYZ(2) * LineY
+            VBodies(iFish)%rbm%XYZo(3) = iXYZ(3) + dXYZ(3) * LineZ
         enddo
     enddo
     call readequal(111)
@@ -336,7 +336,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE calculate_LB_params()
     USE simParam
-    USE SolidSolver
+    USE SolidBody
     implicit none
     integer:: nt(1:nFish),iFish
     real(8):: nUref(1:nFish)
@@ -358,15 +358,15 @@
     elseif(RefVelocity==4) then
         Uref = dabs(VelocityAmp)  !Velocity Amplitude
     elseif(RefVelocity==10) then
-        Uref = Lref * MAXVAL(BeamInfo(:)%Freq)
+        Uref = Lref * MAXVAL(VBodies(:)%rbm%Freq)
     elseif(RefVelocity==11) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*BeamInfo(iFish)%Freq*MAXVAL(dabs(BeamInfo(iFish)%xyzAmpl(1:3)))
+        nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     elseif(RefVelocity==12) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*BeamInfo(iFish)%Freq*MAXVAL(dabs(BeamInfo(iFish)%xyzAmpl(1:3)))*2.D0 !Park 2017 pof
+        nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))*2.D0 !Park 2017 pof
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     !else
@@ -376,7 +376,7 @@
     if(RefTime==0) then
         Tref = Lref / Uref
     elseif(RefTime==1) then
-        Tref = 1 / maxval(BeamInfo(:)%Freq)
+        Tref = 1 / maxval(VBodies(:)%rbm%Freq)
     !else
     endif
 
@@ -413,9 +413,7 @@
 
     g(1:3)=Frod(1:3) * Uref ** 2/Lref
     uMax = 0.
-    do iFish = 1,nFish
-        call BeamInfo(iFish)%calculate_angle_material
-    enddo
+    call Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,Lthck)
     END SUBROUTINE calculate_LB_params
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -492,21 +490,17 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write check point file for restarting simulation
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_checkpoint_file()
     USE simParam
-    USE SolidSolver
+    USE SolidBody
     IMPLICIT NONE
-    integer:: iFish
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
     write(13) step,time
     write(13) fIn,xGrid,yGrid,zGrid
     write(13) nFish
     write(13) IXref,IYref,IZref,NDref
-    do iFish = 1,nFish
-        call BeamInfo(iFish)%write_solid_temp(13)
-    enddo
+    call Write_cont(13)
     write(13) UPre,UNow
     close(13)
     ENDSUBROUTINE
@@ -514,13 +508,12 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    read check point file for restarting simulation
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_checkpoint_file()
     USE simParam
-    USE SolidSolver
+    USE SolidBody
     IMPLICIT NONE
-    integer:: tmpnfish,iFish
+    integer:: tmpnfish
 
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
     read(13) step,time
@@ -528,9 +521,7 @@
     read(13) tmpnfish
     if((tmpnfish .eq. nFish)) then
         read(13) IXref,IYref,IZref,NDref
-        do iFish = 1,nFish
-        call BeamInfo(iFish)%read_solid_temp(13)
-    enddo
+        call Read_cont(13)
         read(13) UPre,UNow
     endif
     close(13)

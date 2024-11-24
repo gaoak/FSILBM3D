@@ -49,21 +49,22 @@
     integer:: move(1:SpcDim),offsetOutput
     integer:: isMoveGrid,isMoveDimX,isMoveOutputX,isMoveDimY,isMoveOutputY,isMoveDimZ,isMoveOutputZ,MoveOutputIref(1:3)
     logical:: isUniformGrid(1:SpcDim)
-    integer:: IXref,IYref,IZref,ntolLBM,ntolFSI,numsubstep,numSampFlow,numSampBody
+    integer:: IXref,IYref,IZref,ntolLBM,ntolFEM,ntolFSI,numsubstep,numSampFlow,numSampBody
     integer:: boundaryConditions(1:6),MovingKind1,MovingKind2,VelocityKind
     real(8):: VelocityAmp,VelocityFreq,VelocityPhi,MovingVel1,MovingVel2,MovingFreq1,MovingFreq2
     real(8):: VolumeForce(1:SpcDim),VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpcDim)
     integer, allocatable:: SampBodyNode(:,:), iBodyModel(:)
     real(8), allocatable:: SampFlowPint(:,:)
+    integer:: nFish,NDref
     real(8):: Xref,Yref,Zref
     real(8):: timeSimTotl,timeOutTemp,timeOutBody,timeOutFlow,timeOutInfo,timeOutBegin,timeOutEnd
-    real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFSI,deltat,subdeltat
-    real(8):: uuuIn(1:SpcDim),shearRateIn(1:SpcDim),denIn
+    real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFEM,dtolFSI,deltat,subdeltat
+    real(8):: uuuIn(1:SpcDim),shearRateIn(1:SpcDim),denIn,g(1:SpcDim)
     real(8):: AmplInitDist(1:SpcDim),waveInitDist,AmplforcDist(1:SpcDim),FreqforcDist
     real(8):: posiForcDist(1:SpcDim),begForcDist,endForcDist
     real(8):: Re,AR,Frod(1:SpcDim)
-    real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Asfac
-    real(8), allocatable:: Lspan(:)
+    real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
+    real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Lspan,Asfac
     real(8):: UPre,UNow
 
     real(8):: upxc0, upxcm, upxcmm

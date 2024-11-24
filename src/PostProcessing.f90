@@ -4,7 +4,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE  write_params()
     USE simParam
-    USE SolidSolver
+    USE SolidBody
     implicit none
     integer:: i,iFish
     integer,parameter::nameLen=10
@@ -39,13 +39,13 @@
         else
             write(111,'(A      )')'This is a FLRXIBLE And RIGID body problem'
         endif
-        if    (minval(BeamInfo(:)%isMotionGiven(1))==0)then
+        if    (minval(VBodies(:)%rbm%isMotionGiven(1))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in X-direction freely'
         endif
-        if    (minval(BeamInfo(:)%isMotionGiven(2))==0)then
+        if    (minval(VBodies(:)%rbm%isMotionGiven(2))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in Y-direction freely'
         endif
-        if    (minval(BeamInfo(:)%isMotionGiven(3))==0)then
+        if    (minval(VBodies(:)%rbm%isMotionGiven(3))==0)then
             write(111,'(A      )')'This FLRXIBLE body can move in Z-direction freely'
         endif
         write(111,'(A      )')'===================================================================='
@@ -57,17 +57,17 @@
         write(111,'(A,3F20.10)') 'dxmax,dymax,dzmax       :',dxmax, dymax, dzmax
         write(111,'(A,3F20.10)') 'cptxMin,cptyMin,cptzMin :',cptxMin, cptyMin, cptzMin
         write(111,'(A,3F20.10)') 'cptxMax,cptyMax,cptzMax :',cptxMax, cptyMax, cptzMax
-        write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(BeamInfo(:)%elmin), maxval(BeamInfo(:)%elmax)
+        write(111,'(A,2F20.10)') 'elmin,elmax             :',minval(VBodies(:)%rbm%elmin), maxval(VBodies(:)%rbm%elmax)
         write(111,'(A      )')'===================================='
         write(111,'(A,F20.10)')'Re   =',Re
         write(111,'(A,F20.10)')'Lref =',Lref
         write(111,'(A,F20.10)')'Uref =',Uref
         write(111,'(A,F20.10)')'Tref =',Tref
         write(111,'(A      )')'===================================='
-        write(111,'(A,F20.10)')'Freq =',maxval(BeamInfo(:)%Freq)
-        write(111,'(A,F20.10)')'Ampl =',maxval([dabs(BeamInfo(:)%XYZAmpl(1)),dabs(BeamInfo(:)%XYZAmpl(2)),dabs(BeamInfo(:)%XYZAmpl(3))])
+        write(111,'(A,F20.10)')'Freq =',maxval(VBodies(:)%rbm%Freq)
+        write(111,'(A,F20.10)')'Ampl =',maxval([dabs(VBodies(:)%rbm%XYZAmpl(1)),dabs(VBodies(:)%rbm%XYZAmpl(2)),dabs(VBodies(:)%rbm%XYZAmpl(3))])
         write(111,'(A,F20.10)')'Lchod=',Lchod
-        write(111,'(A,F20.10)')'Lspan=',maxval(Lspan)
+        write(111,'(A,F20.10)')'Lspan=',Lspan
         write(111,'(A,F20.10)')'Asfac=',Asfac
         write(111,'(A,F20.10)')'AR   =',AR
         write(111,'(A      )')'===================================='
@@ -83,15 +83,7 @@
         write(111,'(A,F20.10)')'Nu   =',Nu
         write(111,'(A,F20.10)')'Mu   =',Mu
 
-        do iFish=1,nFish
-        write(111,'(A      )')'===================================='
-        write(111,'(A,I20.10)')'Fish number is',iFish
-        write(111,'(A      )')'===================================='
-        call BeamInfo(iFish)%write_solid_params()
-        enddo
-        do iFish=1,nFish
-        call BeamInfo(iFish)%write_solid_materials(iFish)
-        enddo
+        call Write_solid_Check(111)
         close(111)
     END SUBROUTINE
 

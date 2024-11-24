@@ -4,7 +4,7 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfoTitl()
     USE simParam
-    USE SolidSolver
+    USE SolidBody
     implicit none
     integer:: i,iFish
     integer,parameter::nameLen=4
@@ -33,7 +33,7 @@
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
         !===============================================================================
-        write(Nodename,'(I4.4)') BeamInfo(iFish)%nNd
+        write(Nodename,'(I4.4)') VBodies(iFish)%rbm%nNd
         open(111,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
@@ -97,16 +97,14 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfo()
     USE simParam
-    USE SolidSolver
+    USE SolidBody
     implicit none
     integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend,iFish
     real(8):: convergence,MaMax,weightm,velocity(1:3),Pressure
     integer,parameter::nameLen=4
     character (LEN=nameLen):: fileName,Nodename
 
-    do iFish=1,nFish
-        call BeamInfo(iFish)%write_solid_info(iFish)
-    enddo !nFish
+    call Write_solid_Data(111,time,timeOutInfo,Asfac)
 
     UNow=sum(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))
     convergence=dabs(UNow-UPre)/UNow
@@ -130,7 +128,7 @@
     do  i=1,numSampBody
         write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
         open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref, BeamInfo(iFish)%xyzful(SampBodyNode(i,iFish),1:3)/Lref,BeamInfo(iFish)%velful(SampBodyNode(i,iFish),1:3)/Uref,BeamInfo(iFish)%accful(SampBodyNode(i,iFish),1:3)/Aref
+        write(111,'(10E20.10)')time/Tref, VBodies(iFish)%rbm%xyzful(SampBodyNode(i,iFish),1:3)/Lref,VBodies(iFish)%rbm%velful(SampBodyNode(i,iFish),1:3)/Uref,VBodies(iFish)%rbm%accful(SampBodyNode(i,iFish),1:3)/Aref
         close(111)
     enddo
     endif

@@ -2,19 +2,18 @@ module SolidSolver
     implicit none
     private
     integer, parameter:: m_idat=12
-    integer:: m_NDref
     real(8):: m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf
     real(8):: m_dtolFEM,m_pi
     integer:: m_ntolFEM
-    real(8):: m_g(3)
+    real(8):: m_g(3),m_iForce2Body,m_iKB
     public :: BeamSolver,Initialise_SolidSolver
     type :: BeamSolver
+        integer:: iBodyModel,iBodyType
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
         integer, allocatable :: r_Nspan(:)
-        real(8), allocatable:: denR,KB,KS,EmR,psR,tcR,St
-        real(8) :: r_dirc(3)
-        real(8):: Freq
+        real(8):: r_dirc(3)
+        real(8):: Freq,denR,KB,KS,EmR,psR,tcR,St
         real(8):: elmax,elmin
         real(8):: XYZ(3),XYZo(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
         real(8):: AoA(3),AoAo(3),AoAAmpl(3),AoAPhi(3),AoAd(3),WWW1(3),WWW2(3),WWW3(3)
@@ -42,13 +41,12 @@ module SolidSolver
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine Initialise_SolidSolver(NDref,dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g)
+    Subroutine Initialise_SolidSolver(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
         implicit none
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf
         real(8),intent(in):: dtolFEM
-        integer,intent(in):: NDref,ntolFEM
-        real(8),intent(in):: g(3)
-        m_NDref = NDref
+        integer,intent(in):: ntolFEM
+        real(8),intent(in):: g(3),iForce2Body,iKB
         m_dampK = dampK
         m_dampM = dampM
         m_NewmarkGamma = NewmarkGamma
@@ -58,40 +56,52 @@ module SolidSolver
         m_ntolFEM = ntolFEM
         m_g = g
         m_pi = 3.141592653589793d0
+        m_iForce2Body = iForce2Body
+        m_iKB = iKB
     ENDSUBROUTINE Initialise_SolidSolver
 
-    SUBROUTINE Initialise_(this,time,FEmeshName,nAsfac,nLchod,lentemp)
+    SUBROUTINE Initialise_(this,time,FEmeshName,iBodyModel,nAsfac,nLchod)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(out):: time,nAsfac,nLchod,lentemp
-        integer:: iND
+        real(8), intent(in):: time
+        real(8), intent(out):: nAsfac,nLchod
+        integer:: iND,iBodyModel
         character (LEN=40):: FEmeshName
-        
+        real(8):: lentemp
+
+        this%iBodyModel = iBodyModel
+
+    !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !    Allocate memory for solid simulation
+    !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         write(*,'(A)') '=============================================================================='
         open(unit=m_idat, file = trim(adjustl(FEmeshName)))
         rewind(m_idat)
         read(m_idat,*)
-        read(m_idat,*)this%nND,this%nEL,this%nMT
+        read(m_idat,*)this%nND,this%nEL,this%nMT,this%iBodyType,this%r_dirc(1:3)
         read(m_idat,*)
 
         this%nEQ=this%nND*6
-    
+
     !   ===============================================================================================
         allocate( this%ele(this%nEL,5),this%xyzful00(this%nND,6),this%xyzful0(this%nND,6),this%mssful(this%nND,6),this%lodful(this%nND,6), &
                   this%extful(this%nND,6),this%repful(this%nND,1:6),this%extful1(this%nND,6),this%extful2(this%nND,6),this%nloc(this%nND*6),this%nprof(this%nND*6), &
                   this%nprof2(this%nND*6),this%jBC(this%nND,6))
         allocate( this%grav(this%nND,6),this%vBC(this%nND,6),this%mss(this%nND*6),this%prop(this%nMT,10),this%areaElem00(this%nEL),this%areaElem(this%nEL))
-    
+
         allocate( this%xyzful(this%nND,6),this%xyzfulnxt(this%nND,6),this%dspful(this%nND,6),this%velful(this%nND,6),this%accful(this%nND,6))
         allocate( this%triad_nn(3,3,this%nND),this%triad_ee(3,3,this%nEL),this%triad_e0(3,3,this%nEL) )
         allocate( this%triad_n1(3,3,this%nEL),this%triad_n2(3,3,this%nEL),this%triad_n3(3,3,this%nEL) )
-    
+
         this%repful(:,:) =0.d0
         this%extful1(:,:)=0.d0
         this%extful2(:,:)=0.d0
-    
+
+        allocate( this%r_Lspan(this%nND),this%r_Rspan(this%nND),this%r_Nspan(this%nEL) )
+
     !   ===============================================================================================
-        call read_structural_datafile(this%jBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5),this%nloc(1:this%nND*6),this%nprof(1:this%nND*6), &
+        call read_structural_datafile(this%r_Lspan(1:this%nND),this%r_Rspan(1:this%nND),this%r_Nspan(1:this%nEL), &
+                                      this%jBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5),this%nloc(1:this%nND*6),this%nprof(1:this%nND*6), &
                                       this%nprof2(1:this%nND*6),this%xyzful00(1:this%nND,1:6),this%prop(1:this%nMT,1:10),this%nND, &
                                       this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,m_idat)
         close(m_idat)
@@ -107,10 +117,15 @@ module SolidSolver
         lentemp = maxval(this%xyzful00(:,2))-minval(this%xyzful00(:,2))
         if(lentemp .gt. nLchod) nLchod = lentemp
 
-    !   loading boundary type*******************************************************************************
+    !   ===============================================================================================
+    !   loading boundary type
         do    iND=1,this%nND
             if(this%jBC(iND,1)==1) this%jBC(iND,1:6)=this%isMotionGiven(1:6)
         enddo
+
+    !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !   initialize solid field
+    !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !! compute initial values
         this%TTT00(:,:)=0.0d0
         this%TTT00(1,1)=1.0d0
@@ -156,10 +171,11 @@ module SolidSolver
 
     END SUBROUTINE Initialise_
 
-    SUBROUTINE calculate_angle_material_(this, Lref, Freq, Uref)
+    SUBROUTINE calculate_angle_material_(this, Lref, Uref, denIn, nLthck)
     implicit none
     class(BeamSolver), intent(inout) :: this
-    real(8),intent(in):: Lref, Freq, Uref
+    real(8),intent(in):: Lref, Uref, denIn
+    real(8),intent(out):: nLthck
     integer:: nt
 
     this%St = Lref * this%Freq / Uref
@@ -170,10 +186,10 @@ module SolidSolver
     this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*m_pi
     !calculate material parameters
     nt=this%ele(1,4)
-    if(iKB==0)then
+    if(m_iKB==0)then
         this%prop(1:this%nMT,1) = this%EmR*denIn*Uref**2
         this%prop(1:this%nMT,2) = this%prop(1:this%nMT,1)/2.0d0/(1.0+this%psR)
-        Lthck= this%tcR*Lref
+        nLthck= this%tcR*Lref
         this%prop(1:this%nMT,3) = this%tcR*Lref
         this%prop(1:this%nMT,4) = this%denR*Lref*denIn/this%prop(1:this%nMT,3)
         if    (nt==2)then   !frame
@@ -187,7 +203,7 @@ module SolidSolver
         this%KS=this%prop(this%nMT,1)*this%prop(this%nMT,3)/(denIn*Uref**2*Lref)
     endif
 
-    if(iKB==1)then
+    if(m_iKB==1)then
         this%prop(1:this%nMT,3) = dsqrt(this%KB/this%KS*12.0d0)*Lref
         this%prop(1:this%nMT,4) = this%denR*Lref*denIn/this%prop(1:this%nMT,3)
         if    (nt==2)then   !frame
@@ -203,11 +219,14 @@ module SolidSolver
         endif
         this%EmR = this%prop(this%nMT,1)/(denIn*Uref**2)
         this%tcR = this%prop(this%nMT,3)/Lref
-        Lthck=this%prop(this%nMT,3)
+        nLthck=this%prop(this%nMT,3)
     endif
 
     END SUBROUTINE calculate_angle_material_
 
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    write structure field, tecplot ASCII format
+!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,fileName)
     implicit none
     class(BeamSolver), intent(inout) :: this
@@ -271,12 +290,11 @@ module SolidSolver
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write check point file for restarting simulation
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_solid_temp_(this,fid)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
-    integer:: fid
+    integer,intent(in) :: fid
         write(fid) this%xyzful0,this%xyzful,this%dspful,this%velful,this%accful,this%extful,this%mss,this%mssful,this%grav
         write(fid) this%triad_nn,this%triad_ee,this%triad_e0
         write(fid) this%triad_n1,this%triad_n2,this%triad_n3
@@ -285,57 +303,59 @@ module SolidSolver
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    read check point file for restarting simulation
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_solid_temp_(this,fid)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
-    integer:: fid
+    integer,intent(in) :: fid
         read(fid) this%xyzful0,this%xyzful,this%dspful,this%velful,this%accful,this%extful,this%mss,this%mssful,this%grav
         read(fid) this%triad_nn,this%triad_ee,this%triad_e0
         read(fid) this%triad_n1,this%triad_n2,this%triad_n3
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_params_(this)
+    SUBROUTINE write_solid_params_(this,fid)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
-        write(111,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
-        write(111,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
-        write(111,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
-        write(111,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
-        write(111,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
-        write(111,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
-        write(111,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
-        write(111,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',this%AoAo(1:3)
-        write(111,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',this%AoAAmpl(1:3)
-        write(111,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
-        write(111,'(3(A,1x,I8,2x))')'nND=',this%nND,'nEL=',this%nEL,'nEQ=',this%nEQ
-        write(111,'(3(A,1x,I8,2x))')'nMT=',this%nMT,'nBD=',this%nBD,'nSTF=',this%nSTF
+    integer,intent(in) :: fid
+        write(fid,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
+        write(fid,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
+        write(fid,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
+        write(fid,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
+        write(fid,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
+        write(fid,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
+        write(fid,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
+        write(fid,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',this%AoAo(1:3)
+        write(fid,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',this%AoAAmpl(1:3)
+        write(fid,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
+        write(fid,'(3(A,1x,I8,2x))')'nND=',this%nND,'nEL=',this%nEL,'nEQ=',this%nEQ
+        write(fid,'(3(A,1x,I8,2x))')'nMT=',this%nMT,'nBD=',this%nBD,'nSTF=',this%nSTF
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_materials_(this,iFish)
+    SUBROUTINE write_solid_materials_(this,fid,iFish)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
-    integer:: iMT,iFish
+    integer,intent(in) :: fid,iFish
+    integer:: iMT
         do iMT=1,this%nMT
-        write(111,'(A      )')'===================================='
-        write(111,'(A,I5.5 )')'Fish number is',iFish
-        write(111,'(A,I5.5 )')'MT:',iMT
-        write(111,'(A,E20.10 )')'E    =',this%prop(iMT,1)
-        write(111,'(A,E20.10 )')'G    =',this%prop(iMT,2)
-        write(111,'(A,E20.10 )')'h    =',this%prop(iMT,3)
-        write(111,'(A,E20.10 )')'rho  =',this%prop(iMT,4)
-        write(111,'(A,E20.10 )')'gamma=',this%prop(iMT,5)
-        write(111,'(A,E20.10 )')'Ip   =',this%prop(iMT,6)
-        write(111,'(A,E20.10 )')'alpha=',this%prop(iMT,7)
-        write(111,'(A,E20.10 )')'beta =',this%prop(iMT,8)
+        write(fid,'(A      )')'===================================='
+        write(fid,'(A,I5.5 )')'Fish number is',iFish
+        write(fid,'(A,I5.5 )')'MT:',iMT
+        write(fid,'(A,E20.10 )')'E    =',this%prop(iMT,1)
+        write(fid,'(A,E20.10 )')'G    =',this%prop(iMT,2)
+        write(fid,'(A,E20.10 )')'h    =',this%prop(iMT,3)
+        write(fid,'(A,E20.10 )')'rho  =',this%prop(iMT,4)
+        write(fid,'(A,E20.10 )')'gamma=',this%prop(iMT,5)
+        write(fid,'(A,E20.10 )')'Ip   =',this%prop(iMT,6)
+        write(fid,'(A,E20.10 )')'alpha=',this%prop(iMT,7)
+        write(fid,'(A,E20.10 )')'beta =',this%prop(iMT,8)
         enddo
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_info_(this,iFish,Tref,Lref,Uref,Aref,Fref,Pref,Eref)
+    SUBROUTINE write_solid_info_(this,fid,iFish,time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref,Asfac)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
-    real(8),intent(in) :: Tref,Lref,Uref,Aref,Fref,Pref,Eref
+    integer,intent(in) :: fid
+    real(8),intent(in) :: time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref,Asfac
     integer:: i,iFish
     real(8):: EEE(2),strainEnergy(this%nEL,2)
     real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
@@ -348,36 +368,36 @@ module SolidSolver
              if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
 
-        if    (iForce2Body==1)then   !Same force as flow
-        open(111,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
-        write(111,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
-        close(111)
-        elseif(iForce2Body==2)then   !stress force
-        open(111,file='./DatInfo/ForceStress'//trim(fileName)//'.plt',position='append')
-        write(111,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
-        close(111)
+        if    (m_iForce2Body==1)then   !Same force as flow
+        open(fid,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
+        write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        close(fid)
+        elseif(m_iForce2Body==2)then   !stress force
+        open(fid,file='./DatInfo/ForceStress'//trim(fileName)//'.plt',position='append')
+        write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        close(fid)
         endif
 
         !==============================================================================================
-        open(111,file='./DatInfo/SampBodyNodeBegin'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,this%xyzful(1,1:3)/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
-        close(111)
+        open(fid,file='./DatInfo/SampBodyNodeBegin'//trim(fileName)//'.plt',position='append')
+        write(fid,'(10E20.10)')time/Tref,this%xyzful(1,1:3)/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
+        close(fid)
         !===============================================================================
         write(Nodename,'(I4.4)') this%nNd
-        open(111,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,this%xyzful(this%nND,1:3)/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
-        close(111)
+        open(fid,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt',position='append')
+        write(fid,'(10E20.10)')time/Tref,this%xyzful(this%nND,1:3)/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
+        close(fid)
 
-        open(111,file='./DatInfo/SampBodyMean'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Lref, &
+        open(fid,file='./DatInfo/SampBodyMean'//trim(fileName)//'.plt',position='append')
+        write(fid,'(10E20.10)')time/Tref,sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Lref, &
                                          sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
                                          sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
-        close(111)
+        close(fid)
 
-        open(111,file='./DatInfo/SampBodyAngular'//trim(fileName)//'.plt',position='append')
-        write(111,'(5E20.10)')time/Tref,datan((this%xyzful(this%nND,2)-this%xyzful(1,2))/(this%xyzful(this%nND,1)-this%xyzful(1,1))),    &
+        open(fid,file='./DatInfo/SampBodyAngular'//trim(fileName)//'.plt',position='append')
+        write(fid,'(5E20.10)')time/Tref,datan((this%xyzful(this%nND,2)-this%xyzful(1,2))/(this%xyzful(this%nND,1)-this%xyzful(1,1))),    &
                                         this%xyzful(this%nND,2)/Lref-this%xyzful(1,2)/Lref,this%xyzful(1,2)/Lref,this%xyzful(this%nND,2)/Lref
-        close(111)
+        close(fid)
 
         !==============================================================================================
 
@@ -390,14 +410,14 @@ module SolidSolver
         Piz=-sum(this%mssful(1:this%nND,3)*this%accful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
         Piner=Pix+Piy+Piz
         Ptot=Paero+Piner
-        open(111,file='./DatInfo/Power'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
-        close(111)
+        open(fid,file='./DatInfo/Power'//trim(fileName)//'.plt',position='append')
+        write(fid,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+        close(fid)
 
         call cptArea(this%areaElem(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1:6))
-        open(111,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
-        write(111,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
-        close(111)
+        open(fid,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
+        write(fid,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
+        close(fid)
 
         call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
                                 this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nMT,1:10), &
@@ -413,26 +433,26 @@ module SolidSolver
         Ek=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
         Et=Ek+Ep
 
-        open(111,file='./DatInfo/Energy'//trim(fileName)//'.plt', position='append')
-        write(111,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
-        close(111)
+        open(fid,file='./DatInfo/Energy'//trim(fileName)//'.plt', position='append')
+        write(fid,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
+        close(fid)
 
     ENDSUBROUTINE
 
-    SUBROUTINE structure_(this,iFish,pi,time,isubstep,deltat,subdeltat,iBodyModel)
+    SUBROUTINE structure_(this,iFish,time,isubstep,deltat,subdeltat)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        integer:: iFish,iND,isubstep,iBodyModel
-        real(8):: deltat,subdeltat,pi,time
+        integer:: iFish,iND,isubstep
+        real(8):: deltat,subdeltat,time
         !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
-            if(iBodyModel==1)then     ! rigid body
+            if(this%iBodyModel==1)then     ! rigid body
                 !======================================================
                 !prescribed motion
                 !------------------------------------------------------
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
                 !rotational displacement
-                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
                 call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
@@ -443,9 +463,9 @@ module SolidSolver
                 this%xyzful(1:this%nND,1:6)=this%xyzfulnxt(1:this%nND,1:6)
                 !------------------------------------------------------
                 !translational velocity
-                this%UVW(1:3) =-2.0*pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
                 !rotational velocity
-                this%WWW1(1:3)=-2.0*pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
                                  this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
                                  this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
@@ -459,11 +479,11 @@ module SolidSolver
                     this%velful(iND,4:6)=this%WWW3(1:3)
                 enddo
                 !-------------------------------------------------------
-            elseif(iBodyModel==2)then !elastic model
+            elseif(this%iBodyModel==2)then !elastic model
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
                 !rotational displacement
-                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
                 call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
@@ -509,7 +529,7 @@ module SolidSolver
 !
 !    workspace variables:
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,m_dampK,m_dampM,     &
+    SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,     &
                       triad_nn,triad_ee,triad_n1,triad_n2,nND,nEL,nEQ,nMT,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
                       dtol,iterMax,iFish,FishInfo)
     implicit none
@@ -517,7 +537,7 @@ module SolidSolver
     integer:: jBC(nND,6),ele(nEL,5),nloc(nEQ),nprof(nEQ),nprof2(nEQ)
     real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(nMT,10)
     real(8):: mss(nEQ),dspful(nND,6),velful(nND,6),accful(nND,6),lodExteful(nND,6),deltat
-    real(8):: m_dampK,m_dampM
+    real(8):: dampK,dampM
 
     real(8):: triad_nn(3,3,nND),triad_ee(3,3,nEL)
     real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL)
@@ -576,11 +596,11 @@ module SolidSolver
 
         do    i= 1, nEQ
             lodEffe(i)=lodExte(i)-lodInte(i)+(a0*(dspt(i)-dsp(i))+a2*vel(i)+a3*acc(i))*mss(i)   &
-                                            +(a1*(dspt(i)-dsp(i))+a4*vel(i)+a5*acc(i))*m_dampM*mss(i)
+                                            +(a1*(dspt(i)-dsp(i))+a4*vel(i)+a5*acc(i))*dampM*mss(i)
         enddo
 
 
-        if    (m_dampK > 0.0d0) then
+        if    (dampK > 0.0d0) then
             do    i= 1, nEQ
                 wk1(i)= a1*(dspt(i)-dsp(i)) +a4*vel(i) +a5*acc(i)
             enddo
@@ -588,7 +608,7 @@ module SolidSolver
             call AxBCOL(stfElas,maxstiff,wk1,wk2,nEQ,nprof,nprof2,nloc)
 
             do    i= 1, nEQ
-                lodEffe(i) = lodEffe(i) + m_dampK*wk2(i)
+                lodEffe(i) = lodEffe(i) + dampK*wk2(i)
             enddo
         endif
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -604,14 +624,14 @@ module SolidSolver
             do    j= 1, nprof(i)
                 stfEffe(iloc+j-1)=stfElas(iloc+j-1)+ gamma*stfGeom(iloc+j-1)
             enddo
-            stfEffe(iloc) = stfEffe(iloc) + a0*mss(i) + a1*m_dampM*mss(i)
+            stfEffe(iloc) = stfEffe(iloc) + a0*mss(i) + a1*dampM*mss(i)
         enddo
 
-        if    (m_dampK .gt. 0.0d0) then
+        if    (dampK .gt. 0.0d0) then
             do    i= 1, nEQ
                 iloc=nloc(i)
                 do    j= 1, nprof(i)
-                    stfEffe(iloc+j-1) = stfEffe(iloc+j-1) + a1*m_dampK*stfElas(iloc+j-1)
+                    stfEffe(iloc+j-1) = stfEffe(iloc+j-1) + a1*dampK*stfElas(iloc+j-1)
                 enddo
             enddo
         endif
@@ -694,49 +714,50 @@ module SolidSolver
 !
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   READ structural DaTafile
-    subroutine read_structural_datafile(jBC,ele,nloc,nprof,nprof2,xyzful0,prop,nND,nEL,nEQ,nMT,nBD,maxstiff,m_idat)
+    subroutine read_structural_datafile(r_Lspan,r_Rspan,r_Nspan,jBC,ele,nloc,nprof,nprof2, &
+                                        xyzful00,prop,nND,nEL,nEQ,nMT,nBD,maxstiff,idat)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,m_idat
-    integer:: ele(nEL,5),jBC(nND,6),nloc(nND*6),nprof(nND*6),nprof2(nND*6)
-    real(8):: xyzful0(nND,6),prop(nMT,10)
+    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,idat
+    integer:: ele(nEL,5),jBC(nND,6),nloc(nND*6),nprof(nND*6),nprof2(nND*6),r_Nspan(nEL)
+    real(8):: xyzful00(nND,6),prop(nMT,10),r_Lspan(nND),r_Rspan(nND)
 !   ---------------------------------------------------------------------------
     integer:: i,j,nbc,node,nmp,ibandh,iend,ibandv,ji1
     character (LEN=50):: endin
 !   -----------------------------------------------------------------------------------------------
 !   READ  node
-    read(m_idat,*)  nND
+    read(idat,*)  nND
     do    i= 1, nND
-        read(m_idat,*) node,xyzful0(node,1),xyzful0(node,2),xyzful0(node,3)
+        read(idat,*) node,xyzful00(node,1),xyzful00(node,2),xyzful00(node,3),r_Lspan(node),r_Rspan(node)
     enddo
-    read(m_idat,'(1a50)') endin
+    read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 !   READ elem data
     ! element number, node left, node right, node right, element type, material property index
-    read(m_idat,*) nEL
+    read(idat,*) nEL
     do  i= 1, nEL
-        read(m_idat,*) j,ele(j,1:5)
+        read(idat,*) j,ele(j,1:5),r_Nspan(j)
     enddo
-    read(m_idat,'(1a50)') endin
+    read(idat,'(1a50)') endin
 
 !   -----------------------------------------------------------------------------------------------
 !    READ  bcs  default is 0=free
     jBC(1:nND,1:6) = 0
-    read(m_idat,*)  nbc
+    read(idat,*)  nbc
     do  i=1,nbc
-        read(m_idat,*)node,jBC(node,1),jBC(node,2),jBC(node,3), &
+        read(idat,*)node,jBC(node,1),jBC(node,2),jBC(node,3), &
                          jBC(node,4),jBC(node,5),jBC(node,6)
 
     enddo
-    read(m_idat,'(1a50)') endin
+    read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 !   READ element material properties
     ! can have nMT types of material
     ! property data will be overwritten if isKB = 0 or 1
-    read(m_idat,*) nMT
+    read(idat,*) nMT
     do    i= 1, nMT
-        read(m_idat,*) nmp,prop(nmp,1:8)
+        read(idat,*) nmp,prop(nmp,1:8)
     enddo
-    read(m_idat,'(1a50)') endin
+    read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
 
     nEQ=nND*6
@@ -1338,7 +1359,7 @@ module SolidSolver
 !   FORM MASS matrix: only lumped
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,m_alphaf)
+    subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,alphaf)
     implicit none
     integer:: nND,nEL,nEQ,nMT
     integer:: ele(nEL,5)
@@ -1352,7 +1373,7 @@ module SolidSolver
     real(8):: a0,r0,b0,zix0,ziy0,ziz0,dx,dy,dz,xl,xll,xmm,xnn
 
     !ת���������Ӵ�С
-    real(8):: m_alphaf
+    real(8):: alphaf
 
 !   zero array before assembling
 
@@ -1379,7 +1400,7 @@ module SolidSolver
             xll=dx/xl
             xmm=dy/xl
             xnn=dz/xl
-            call elmmasFRM_D(r0,a0,xl,zix0,em12,m_alphaf)
+            call elmmasFRM_D(r0,a0,xl,zix0,em12,alphaf)
             call trans3d_D(xll,xmm,xnn,em12,b0)
             em(1:18,1:18)=0.0d0
             em(1:12,1:12)=em12(1:12,1:12)
@@ -1548,11 +1569,11 @@ module SolidSolver
 !   ELeMent MASs matrix for the FRaMe
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine elmmasFRM_D(rho,area,length,zix,em,m_alphaf)
+    subroutine elmmasFRM_D(rho,area,length,zix,em,alphaf)
     implicit none
     real(8):: rho, area, length,zix
     real(8):: em(12,12)
-    real(8):: m_alphaf,roal
+    real(8):: alphaf,roal
 
     em(1:12,1:12) = 0.0d0
     roal = rho*area*length/2.0d0
@@ -1560,8 +1581,8 @@ module SolidSolver
     em(2,2)     = roal
     em(3,3)     = roal
     em(4,4)     = roal*zix/area
-    em(5,5)     = roal*length*length*m_alphaf/48d0
-    em(6,6)     = roal*length*length*m_alphaf/48d0
+    em(5,5)     = roal*length*length*alphaf/48d0
+    em(6,6)     = roal*length*length*alphaf/48d0
     em(7,7)     = em(1,1)
     em(8,8)     = em(2,2)
     em(9,9)     = em(3,3)
