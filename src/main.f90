@@ -10,7 +10,7 @@
     use omp_lib
     USE SolidBody
     implicit none
-    integer:: iND,isubstep,iFish,x,y,z
+    integer:: isubstep,iFish,x,y,z
     real(8):: Pbetatemp,CPUtime
     logical alive
     !time_and_date
@@ -33,7 +33,7 @@
 !===============================================================================================
     time=0.0d0
     step=0
-    CALL Initialise_bodies(time,zDim,yDim,xDim,nFish,FEmeshName,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,boundaryConditions, &
+    CALL Initialise_bodies(time,zDim,yDim,xDim,nFish,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,boundaryConditions, &
                            dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
     CALL initialize_flow()
     if(ismovegrid==1)then
