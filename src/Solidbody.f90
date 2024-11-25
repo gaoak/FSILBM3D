@@ -10,7 +10,7 @@ module SolidBody
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
-    public :: VBodies,Initialise_bodies,allocate_solid_memory,Write_solid_v_bodies,FSInteraction_force, &
+    public :: VBodies,read_solid_file,Initialise_bodies,allocate_solid_memory,Write_solid_v_bodies,FSInteraction_force, &
               Initialise_Calculate_Solid_params,Solver,Write_cont,Read_cont,write_solid_field,Write_solid_Check,Write_solid_Data,Write_SampBodyNode
     type :: VirtualBody
         type(BeamSolver):: rbm
@@ -40,7 +40,7 @@ module SolidBody
   contains
     subroutine read_solid_file(nFish,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
                                Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
-                               zDim,yDim,xDim,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,uuuIn,boundaryConditions, &
+                               ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
                                dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
         integer,intent(in):: nFish
         character (LEN=40),intent(in):: FEmeshName(nFish)
@@ -49,25 +49,23 @@ module SolidBody
         real(8),intent(in):: Freq(nFish)
         real(8),intent(in):: XYZo(3,nFish),XYZAmpl(3,nFish),XYZPhi(3,nFish)
         real(8),intent(in):: AoAo(3,nFish),AoAAmpl(3,nFish),AoAPhi(3,nFish)
-        integer,intent(in):: zDim,yDim,xDim,ntolLBM,boundaryConditions(6)
-        real(8),intent(in):: dtolLBM,Pbeta,dt,dh,denIn,uuuIn(3)
+        integer,intent(in):: ntolLBM,boundaryConditions(6)
+        real(8),intent(in):: dtolLBM,Pbeta,dt,denIn,uuuIn(3)
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM
         integer,intent(in):: ntolFEM,iForce2Body,iKB
         integer:: iFish
         
         m_nFish = nFish
 
-        m_zDim = zDim
-        m_yDim = yDim
-        m_xDim = xDim
         m_ntolLBM = ntolLBM
         m_dtolLBM = dtolLBM
         m_Pbeta = Pbeta
         m_dt = dt
-        m_dh = dh
         m_denIn = denIn
         m_uuuIn = uuuIn
         m_boundaryConditions(1:6) = boundaryConditions(1:6)
+
+        allocate(VBodies(m_nFish))
 
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Read_inFlow(FEmeshName(iFish),iBodyModel(iFish),isMotionGiven(1:6,iFish), &
@@ -78,13 +76,11 @@ module SolidBody
 
         CALL Read_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
     end subroutine read_solid_file
+
     subroutine allocate_solid_memory(Asfac,Lchod,Lspan,AR)
         integer :: iFish,maxN
         real(8),intent(out):: Asfac,Lchod,Lspan,AR
         real(8) :: nAsfac(m_nFish),nLchod(m_nFish)
-
-        allocate(VBodies(m_nFish))
-
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
         enddo
@@ -102,10 +98,15 @@ module SolidBody
         AR    = Lspan**2/Asfac
     end subroutine allocate_solid_memory
 
-    subroutine Initialise_bodies(time,g)
+    subroutine Initialise_bodies(time,zDim,yDim,xDim,dh,g)
         implicit none
-        real(8),intent(in):: time,g(3)
+        real(8),intent(in):: time,dh,g(3)
+        integer,intent(in):: zDim,yDim,xDim
         integer :: iFish
+        m_zDim = zDim
+        m_yDim = yDim
+        m_xDim = xDim
+        m_dh = dh
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Initialise(time,g)
             call VBodies(iFish)%Initialise(VBodies(iFish)%rbm%iBodyType)
@@ -290,7 +291,7 @@ module SolidBody
             area = dl * dh
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%r_Nspan(i)
-                ls = left + dl * (0.5d0 + dble(s-1))
+                ls = left - dl * (0.5d0 + dble(s-1))
                 this%v_Exyz(cnt+s, 1:3) = tmpxyz + this%rbm%r_dirc*ls
                 this%v_Evel(cnt+s,1:3) = tmpvel
                 this%v_Ea(cnt+s) = area
@@ -364,6 +365,7 @@ module SolidBody
             this%v_Ew(iEL,5:8) = ry
             this%v_Ew(iEL,9:12) = rz
         enddo
+        !$OMP END PARALLEL DO
 
         contains
         ! return the array(index) <= x < array(index+1)
@@ -407,6 +409,7 @@ module SolidBody
                         ix_(k_) = 2
                     else
                         write(*,*) 'index out of xmin bound', ix_(k_)
+                        stop
                     endif
                 else if(ix_(k_)>xDim_) then
                     if(boundaryConditions_(2).eq.Periodic) then
@@ -415,6 +418,7 @@ module SolidBody
                         ix_(k_) = xDim_ - 1
                     else
                         write(*,*) 'index out of xmax bound', ix_(k_)
+                        stop
                     endif
                 endif
             enddo
@@ -568,7 +572,7 @@ module SolidBody
             enddo
         enddo
         allocate(this%v_Exyz(this%v_nelmts,3), this%v_Ea(this%v_nelmts))
-        allocate(this%v_Evel(this%v_nelmts,3))
+        allocate(this%v_Evel(this%v_nelmts,3), this%v_Ei(this%v_nelmts,12), this%v_Ew(this%v_nelmts,12))
     end subroutine PlateBuild_
 
     subroutine Write_body_(this,iFish,time)

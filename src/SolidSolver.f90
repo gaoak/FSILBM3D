@@ -45,34 +45,34 @@ module SolidSolver
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine Read_inFlow_(this,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
-                            Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi)
+    Subroutine Read_inFlow_(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
+                            Freq_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        character (LEN=40),intent(in):: FEmeshName
-        integer,intent(in):: iBodyModel,isMotionGiven(6)
-        real(8),intent(in):: denR,KB,KS,EmR,psR,tcR,St
-        real(8),intent(in):: Freq
-        real(8),intent(in):: XYZo(3),XYZAmpl(3),XYZPhi(3)
-        real(8),intent(in):: AoAo(3),AoAAmpl(3),AoAPhi(3)
+        character (LEN=40),intent(in):: FEmeshName_
+        integer,intent(in):: iBodyModel_,isMotionGiven_(6)
+        real(8),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
+        real(8),intent(in):: Freq_
+        real(8),intent(in):: XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
+        real(8),intent(in):: AoAo_(3),AoAAmpl_(3),AoAPhi_(3)
         
-        this%FEmeshName = FEmeshName
-        this%iBodyModel = iBodyModel
-        this%isMotionGiven(1:6)=isMotionGiven(1:6)
-        this%denR= denR
-        this%psR = psR
-        this%EmR = EmR
-        this%tcR = tcR
-        this%KB  = KB
-        this%KS  = KS
-        this%Freq=Freq
-        this%St  =St
-        this%XYZo(1) = XYZo(1)
-        this%XYZAmpl(1:3)=XYZAmpl(1:3)
-        this%XYZPhi(1:3) =XYZPhi(1:3)
-        this%AoAo(1:3)   =AoAo(1:3)
-        this%AoAAmpl(1:3)=AoAAmpl(1:3)
-        this%AoAPhi(1:3) =AoAPhi(1:3)
+        this%FEmeshName = FEmeshName_
+        this%iBodyModel = iBodyModel_
+        this%isMotionGiven(1:6)=isMotionGiven_(1:6)
+        this%denR= denR_
+        this%psR = psR_
+        this%EmR = EmR_
+        this%tcR = tcR_
+        this%KB  = KB_
+        this%KS  = KS_
+        this%Freq=Freq_
+        this%St  =St_
+        this%XYZo(1:3) = XYZo_(1:3)
+        this%XYZAmpl(1:3)=XYZAmpl_(1:3)
+        this%XYZPhi(1:3) =XYZPhi_(1:3)
+        this%AoAo(1:3)   =AoAo_(1:3)
+        this%AoAAmpl(1:3)=AoAAmpl_(1:3)
+        this%AoAPhi(1:3) =AoAPhi_(1:3)
     ENDSUBROUTINE Read_inFlow_
     Subroutine Read_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
         implicit none

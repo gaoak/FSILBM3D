@@ -33,7 +33,7 @@
 !===============================================================================================
     time=0.0d0
     step=0
-    CALL Initialise_bodies(time,g)
+    CALL Initialise_bodies(time,zDim,yDim,xDim,dh,g)
     CALL initialize_flow()
     if(ismovegrid==1)then
         iFish = 1

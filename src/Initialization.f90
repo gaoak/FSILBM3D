@@ -129,21 +129,21 @@
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
-            VBodies(iFish)%rbm%Freq=nFreq
-            VBodies(iFish)%rbm%St  =nSt
-            VBodies(iFish)%rbm%XYZAmpl(1:3)=nXYZAmpl(1:3)
-            VBodies(iFish)%rbm%XYZPhi(1:3) =nXYZPhi(1:3)
-            VBodies(iFish)%rbm%AoAo(1:3)   =nAoAo(1:3)
-            VBodies(iFish)%rbm%AoAAmpl(1:3)=nAoAAmpl(1:3)
-            VBodies(iFish)%rbm%AoAPhi(1:3) =nAoAPhi(1:3)
+            Freq(iFish)=nFreq
+            St(iFish)  =nSt
+            XYZAmpl(1:3,iFish)=nXYZAmpl(1:3)
+            XYZPhi(1:3,iFish) =nXYZPhi(1:3)
+            AoAo(1:3,iFish)   =nAoAo(1:3)
+            AoAAmpl(1:3,iFish)=nAoAAmpl(1:3)
+            AoAPhi(1:3,iFish) =nAoAPhi(1:3)
             ! initial position distribution
             Order0 = iFish - FishOrder1
             LineX  = mod(Order0,NumX(iKind))
             LineY  = mod(Order0/NumX(iKind),NumY(iKind))
             LineZ  = Order0/(NumX(iKind)*NumY(iKind))
-            VBodies(iFish)%rbm%XYZo(1) = iXYZ(1) + dXYZ(1) * LineX
-            VBodies(iFish)%rbm%XYZo(2) = iXYZ(2) + dXYZ(2) * LineY
-            VBodies(iFish)%rbm%XYZo(3) = iXYZ(3) + dXYZ(3) * LineZ
+            XYZo(1,iFish) = iXYZ(1) + dXYZ(1) * LineX
+            XYZo(2,iFish) = iXYZ(2) + dXYZ(2) * LineY
+            XYZo(3,iFish) = iXYZ(3) + dXYZ(3) * LineZ
         enddo
     enddo
     call readequal(111)
@@ -182,7 +182,7 @@
 
     call read_solid_file(nFish,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
                          Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
-                         zDim,yDim,xDim,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,uuuIn,boundaryConditions, &
+                         ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
                          dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
     END SUBROUTINE
 
