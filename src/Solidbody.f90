@@ -38,8 +38,9 @@ module SolidBody
     end type VirtualBody
     type(VirtualBody), allocatable :: VBodies(:)
   contains
-    subroutine read_solid_file(nFish,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St,Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
-                               zDim,yDim,xDim,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,uuuIn,BCs, &
+    subroutine read_solid_file(nFish,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
+                               Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
+                               zDim,yDim,xDim,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,uuuIn,boundaryConditions, &
                                dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
         integer,intent(in):: nFish
         character (LEN=40),intent(in):: FEmeshName(nFish)
@@ -48,7 +49,7 @@ module SolidBody
         real(8),intent(in):: Freq(nFish)
         real(8),intent(in):: XYZo(3,nFish),XYZAmpl(3,nFish),XYZPhi(3,nFish)
         real(8),intent(in):: AoAo(3,nFish),AoAAmpl(3,nFish),AoAPhi(3,nFish)
-        integer,intent(in):: zDim,yDim,xDim,ntolLBM,BCs(6)
+        integer,intent(in):: zDim,yDim,xDim,ntolLBM,boundaryConditions(6)
         real(8),intent(in):: dtolLBM,Pbeta,dt,dh,denIn,uuuIn(3)
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM
         integer,intent(in):: ntolFEM,iForce2Body,iKB
@@ -66,7 +67,7 @@ module SolidBody
         m_dh = dh
         m_denIn = denIn
         m_uuuIn = uuuIn
-        m_boundaryConditions(1:6) = BCs(1:6)
+        m_boundaryConditions(1:6) = boundaryConditions(1:6)
 
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Read_inFlow(FEmeshName(iFish),iBodyModel(iFish),isMotionGiven(1:6,iFish), &

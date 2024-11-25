@@ -179,6 +179,11 @@
     endif
     call readequal(111)
     close(111)
+
+    call read_solid_file(nFish,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
+                         Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
+                         zDim,yDim,xDim,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,uuuIn,boundaryConditions, &
+                         dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
     END SUBROUTINE
 
     SUBROUTINE readequal(ifile)
