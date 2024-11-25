@@ -6,8 +6,9 @@ module SolidSolver
     real(8):: m_dtolFEM,m_pi
     integer:: m_ntolFEM,m_iForce2Body,m_iKB
     real(8):: m_g(3)
-    public :: BeamSolver,Initialise_SolidSolver
+    public :: BeamSolver,Read_SolidSolver_Params
     type :: BeamSolver
+        character (LEN=40):: FEmeshName
         integer:: iBodyModel,iBodyType
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
@@ -30,6 +31,7 @@ module SolidSolver
         real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
         real(8):: FishInfo(3)
     contains
+        procedure :: Read_inFlow => Read_inFlow_
         procedure :: Allocate_solid => Allocate_solid_
         procedure :: Initialise => Initialise_
         procedure :: calculate_angle_material => calculate_angle_material_
@@ -39,15 +41,44 @@ module SolidSolver
         procedure :: write_solid_params => write_solid_params_
         procedure :: write_solid_materials => write_solid_materials_
         procedure :: write_solid_info => write_solid_info_
+        procedure :: write_solid_SampBodyNode => write_solid_SampBodyNode_
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine Initialise_SolidSolver(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
+    Subroutine Read_inFlow_(this,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
+                            Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        character (LEN=40),intent(in):: FEmeshName
+        integer,intent(in):: iBodyModel,isMotionGiven(6)
+        real(8),intent(in):: denR,KB,KS,EmR,psR,tcR,St
+        real(8),intent(in):: Freq
+        real(8),intent(in):: XYZo(3),XYZAmpl(3),XYZPhi(3)
+        real(8),intent(in):: AoAo(3),AoAAmpl(3),AoAPhi(3)
+        
+        this%FEmeshName = FEmeshName
+        this%iBodyModel = iBodyModel
+        this%isMotionGiven(1:6)=isMotionGiven(1:6)
+        this%denR= denR
+        this%psR = psR
+        this%EmR = EmR
+        this%tcR = tcR
+        this%KB  = KB
+        this%KS  = KS
+        this%Freq=Freq
+        this%St  =St
+        this%XYZo(1) = XYZo(1)
+        this%XYZAmpl(1:3)=XYZAmpl(1:3)
+        this%XYZPhi(1:3) =XYZPhi(1:3)
+        this%AoAo(1:3)   =AoAo(1:3)
+        this%AoAAmpl(1:3)=AoAAmpl(1:3)
+        this%AoAPhi(1:3) =AoAPhi(1:3)
+    ENDSUBROUTINE Read_inFlow_
+    Subroutine Read_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
         implicit none
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf
         real(8),intent(in):: dtolFEM
         integer,intent(in):: ntolFEM,iForce2Body,iKB
-        real(8),intent(in):: g(3)
         m_dampK = dampK
         m_dampM = dampM
         m_NewmarkGamma = NewmarkGamma
@@ -55,27 +86,22 @@ module SolidSolver
         m_alphaf = alphaf
         m_dtolFEM = dtolFEM
         m_ntolFEM = ntolFEM
-        m_g = g
         m_pi = 3.141592653589793d0
         m_iForce2Body = iForce2Body
         m_iKB = iKB
-    ENDSUBROUTINE Initialise_SolidSolver
-
-    SUBROUTINE Allocate_solid_(this,FEmeshName,iBodyModel,nAsfac,nLchod)
+    ENDSUBROUTINE Read_SolidSolver_Params
+    SUBROUTINE Allocate_solid_(this,nAsfac,nLchod)
         implicit none
         class(BeamSolver), intent(inout) :: this
         real(8), intent(out):: nAsfac,nLchod
-        integer:: iND,iBodyModel
-        character (LEN=40):: FEmeshName
+        integer:: iND
         real(8):: lentemp
-
-        this%iBodyModel = iBodyModel
 
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !    Allocate memory for solid simulation
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         write(*,'(A)') '=============================================================================='
-        open(unit=m_idat, file = trim(adjustl(FEmeshName)))
+        open(unit=m_idat, file = trim(adjustl(this%FEmeshName)))
         rewind(m_idat)
         read(m_idat,*)
         read(m_idat,*)this%nND,this%nEL,this%nMT,this%iBodyType,this%r_dirc(1:3)
@@ -124,11 +150,12 @@ module SolidSolver
         enddo
     END SUBROUTINE Allocate_solid_
 
-    SUBROUTINE Initialise_(this,time)
+    SUBROUTINE Initialise_(this,time,g)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(in):: time
+        real(8), intent(in):: time,g(3)
         integer:: iND
+        m_g = g
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !   initialize solid field
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -177,10 +204,11 @@ module SolidSolver
 
     END SUBROUTINE Initialise_
 
-    SUBROUTINE calculate_angle_material_(this, Lref, Uref, denIn, nLthck)
+    SUBROUTINE calculate_angle_material_(this, Lref, Uref, denIn, uMax, uuuIn, nLthck)
     implicit none
     class(BeamSolver), intent(inout) :: this
-    real(8),intent(in):: Lref, Uref, denIn
+    real(8),intent(in):: Lref, Uref, denIn, uuuIn(3)
+    real(8),intent(inout):: uMax
     real(8),intent(out):: nLthck
     integer:: nt
 
@@ -190,6 +218,9 @@ module SolidSolver
     this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0*m_pi
     this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0*m_pi
     this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*m_pi
+    uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*m_pi*MAXVAL(dabs(this%xyzAmpl(1:3)))*this%Freq, &
+            2.0*m_pi*MAXVAL(dabs(this%AoAAmpl(1:3))*[maxval(dabs(this%xyzful00(:,2))), &
+            maxval(dabs(this%xyzful00(:,1))),maxval(dabs(this%xyzful00(:,3)))])*this%Freq])
     !calculate material parameters
     nt=this%ele(1,4)
     if(m_iKB==0)then
@@ -573,6 +604,28 @@ module SolidSolver
     enddo
     ENDSUBROUTINE strain_energy_D
 
+    subroutine write_solid_SampBodyNode_(this,fid,iFish,time,numSampBody,SampBodyNode,Tref,Lref,Uref,Aref)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        integer,intent(in):: fid,iFish,numSampBody,SampBodyNode(numSampBody)
+        real(8),intent(in):: time,Tref,Lref,Uref,Aref
+        integer:: i
+        integer,parameter::nameLen=4
+        character (LEN=nameLen):: fileName,Nodename
+        write(fileName,'(I4)') iFish
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+             if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+        do  i=1,numSampBody
+            write(Nodename,'(I4.4)') SampBodyNode(i)
+            open(fid,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
+            write(fid,'(10E20.10)')time/Tref, this%xyzful(SampBodyNode(i),1:3)/Lref, &
+                                              this%velful(SampBodyNode(i),1:3)/Uref, &
+                                              this%accful(SampBodyNode(i),1:3)/Aref
+            close(fid)
+        enddo
+    end subroutine
 
     SUBROUTINE structure_(this,iFish,time,isubstep,deltat,subdeltat)
         implicit none

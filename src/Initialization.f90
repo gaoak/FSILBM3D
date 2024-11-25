@@ -14,6 +14,12 @@
     integer:: niBodyModel,nisMotionGiven(1:6)
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
+    character (LEN=40), allocatable:: FEmeshName(:)
+    integer, allocatable:: isMotionGiven(:,:)
+    real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
+    real(8), allocatable:: Freq(:)
+    real(8), allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:)
+    real(8), allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
     open(unit=111,file='inFlow.dat')
     call readequal(111)
     read(111,*)     npsize
@@ -60,7 +66,8 @@
     if(nFish.eq.0) iForce2Body = 0
 
     if(nFish>0) then
-        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish))
+        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
+        allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -81,15 +88,15 @@
         do iFish=FishOrder1,FishOrder2
             iBodyModel(iFish)=niBodyModel
             FEmeshName(iFish)=tmpFEmeshName
-            VBodies(iFish)%rbm%isMotionGiven(1:6)=nisMotionGiven(1:6)
-            VBodies(iFish)%rbm%denR= ndenR
-            VBodies(iFish)%rbm%psR = npsR
+            isMotionGiven(1:6,iFish)=nisMotionGiven(1:6)
+            denR(iFish)= ndenR
+            psR(iFish) = npsR
             if(iKB==0) then
-            VBodies(iFish)%rbm%EmR = nEmR
-            VBodies(iFish)%rbm%tcR = ntcR
+            EmR(iFish) = nEmR
+            tcR(iFish) = ntcR
             elseif(iKB==1) then
-            VBodies(iFish)%rbm%KB  = nKB
-            VBodies(iFish)%rbm%KS  = nKS
+            KB(iFish)  = nKB
+            KS(iFish)  = nKS
             endif
         enddo
     enddo
@@ -103,6 +110,9 @@
     call readequal(111)
 
     if(nFish>0) then
+        allocate(Freq(1:nFish),St(1:nFish))
+        allocate(XYZo(1:3,1:nFish),XYZAmpl(1:3,1:nFish),XYZPhi(1:3,1:nFish))
+        allocate(AoAo(1:3,1:nFish),AoAAmpl(1:3,1:nFish),AoAPhi(1:3,1:nFish))
         FishOrder1 =0
         FishOrder2 =0
     endif
@@ -412,8 +422,7 @@
     Pref=0.5*denIn*Uref**2*Asfac*Uref
 
     g(1:3)=Frod(1:3) * Uref ** 2/Lref
-    uMax = 0.
-    call Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,Lthck)
+    call Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,uMax,Lthck)
     END SUBROUTINE calculate_LB_params
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

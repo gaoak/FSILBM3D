@@ -73,6 +73,11 @@
 
     if(isBodyOutput==1)then
         do iFish=1,nFish
+            write(fileName,'(I4)') iFish
+            fileName = adjustr(fileName)
+            do  i=1,nameLen
+                if(fileName(i:i)==' ')fileName(i:i)='0'
+            enddo
             do  i=1,numSampBody
                 write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
                 open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
@@ -127,7 +132,7 @@
     !close(111)
 
     if(isBodyOutput==1)then
-        call Write_SampBodyNode(111,time,numSampBody,SampBodyNode,Tref,Lref,Uref,Aref)
+        call Write_SampBodyNode(111,time,numSampBody,SampBodyNode)
     endif
 
     if(isFluidOutput==1)then

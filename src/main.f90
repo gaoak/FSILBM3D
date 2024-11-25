@@ -16,7 +16,7 @@
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
     CALL read_file()
-    CALL allocate_solid_memory(nFish,FEmeshName,iBodyModel,Asfac,Lchod,Lspan,AR)
+    CALL allocate_solid_memory(Asfac,Lchod,Lspan,AR)
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()
     CALL write_params()
@@ -33,8 +33,7 @@
 !===============================================================================================
     time=0.0d0
     step=0
-    CALL Initialise_bodies(time,zDim,yDim,xDim,nFish,ntolLBM,dtolLBM,Pbeta,dt,dh,denIn,boundaryConditions, &
-                           dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,g,iForce2Body,iKB)
+    CALL Initialise_bodies(time,g)
     CALL initialize_flow()
     if(ismovegrid==1)then
         iFish = 1
