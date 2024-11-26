@@ -144,7 +144,7 @@ $PBS_WDIR/$PBS_ENAME
     - 301 : Dirichlet boundary (DirecletUU)
     - 302 : Neumann boundary (Advection1)
     - 303 : Neumann boundary (Advection2)
-    - 304 : Periodic boundary (When calculating infinite bodies, the fluid grid should be one grid less than the solid grid)
+    - 304 : Periodic boundary (When calculating infinite bodies, the fluid grid should be one grid less than the solid grid, i.e. fluid grid containes one end whereas solid grid contains both ends)
 3. *VelocityKind* : Especially for Direclet velocity conditions on the left and right boundaries
     - 0, Uniform or uniform shear flow, the boundary velocity is 
     $[uIn(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)]$;
