@@ -139,7 +139,7 @@ module SolidBody
         m_Pref = Pref
         m_Tref = Tref
         m_Uref = Uref
-        uMax = 0.
+        uMax = 0.d0
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%calculate_angle_material(m_Lref, m_Uref, m_denIn, uMax, m_uuuIn, nLthck(iFish))
         enddo
@@ -293,7 +293,7 @@ module SolidBody
             area = dl * dh
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%r_Nspan(i)
-                ls = left + dl * (0.5d0 + dble(s-1))
+                ls = dl * (0.5d0 + dble(s-1)) - left
                 this%v_Exyz(cnt+s, 1:3) = tmpxyz + this%rbm%r_dirc*ls
                 this%v_Evel(cnt+s,1:3) = tmpvel
                 this%v_Ea(cnt+s) = area
@@ -471,25 +471,25 @@ module SolidBody
         integer:: iFish
         integer:: iterLBM
         real(8):: dmaxLBM,dsum
-        real(8)::tol,tolsum, ntol
+        real(8)::tol, ntol
         !================================
         do iFish = 1, m_nFish
             call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
         enddo
-        tolsum=0.d0
-        iterLBM=0
         do iFish=1,m_nFish
             VBodies(iFish)%rbm%lodful = 0.0d0
         enddo
+        iterLBM=0
+        dmaxLBM=1d10
         do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
-            dmaxLBM=0.0d0
+            dmaxLBM = 0.d0
             dsum=0.0d0
             do iFish=1,m_nFish
                 call VBodies(iFish)%PenaltyForce(uuu,den,force,tol,ntol)
-                tolsum = tolsum + dsqrt(tol)
-                dsum = dsum + m_Uref*ntol
+                dmaxLBM = dmaxLBM + tol
+                dsum = dsum + ntol
             enddo
-            dmaxLBM=tolsum/dsum
+            dmaxLBM=dmaxLBM/(dsum * m_Uref)
             iterLBM=iterLBM+1
         enddo
     END SUBROUTINE
@@ -505,10 +505,11 @@ module SolidBody
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
-        real(8):: velElem(3),velElemIB(3),forceElemTemp(3)
+        real(8):: velElem(3),velElemIB(3),forceElemTemp(3),invh3
         !==================================================================================================
-        integer::x,y,z,iEL
+        integer::x,y,z,iEL,i1,i2
         !==================================================================================================
+        invh3 = (1.d0/m_dh)**3
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
@@ -529,17 +530,20 @@ module SolidBody
                 enddo
             enddo
             velElem = this%v_Evel(iEL,1:3)
-            forceElemTemp(1:3) = -m_Pbeta* 2.0d0*m_denIn*(velElem-velElemIB)/m_dt*this%v_Ea(iEL)*m_dh
+            forceElemTemp(1:3) = -m_Pbeta* 2.0d0*m_denIn*(velElem-velElemIB)*this%v_Ea(iEL)
             if ((.not. IEEE_IS_FINITE(forceElemTemp(1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(3)))) then
                 write(*, *) 'Nan found in forceElemTemp', forceElemTemp
                 write(*, *) 'Nan found at (ix, jy, kz)', ix(0), jy(0), kz(0)
                 stop
             endif
-            tolerance = tolerance + sum((velElem(1:3)-velElemIB(1:3))**2)
+            tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(1:3))**2))
             !$OMP critical
             ! update beam load, momentum is not included
-            this%rbm%lodful(this%vtor(iEL)  ,1:3) = this%rbm%lodful(this%vtor(iEL)  ,1:3) + 0.5d0 * forceElemTemp
-            this%rbm%lodful(this%vtor(iEL)+1,1:3) = this%rbm%lodful(this%vtor(iEL)+1,1:3) + 0.5d0 * forceElemTemp
+            i1=this%rbm%ele(this%vtor(iEL),1)
+            i2=this%rbm%ele(this%vtor(iEL),2)
+            this%rbm%lodful(i1,1:3) = this%rbm%lodful(i1,1:3) + 0.5d0 * forceElemTemp
+            this%rbm%lodful(i2,1:3) = this%rbm%lodful(i2,1:3) + 0.5d0 * forceElemTemp
+            forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
                     do z=-1,2

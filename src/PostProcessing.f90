@@ -3,32 +3,18 @@
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE  write_params()
-    USE simParam
-    USE SolidBody
-    implicit none
-    integer:: i
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileNameR,fileNameM,fileNameS,fileNameK
-    write(fileNameR,'(F10.5)') Re
+        USE simParam
+        USE SolidBody
+        implicit none
+        integer:: i
+        integer,parameter::nameLen=10
+        character (LEN=nameLen):: fileNameR
+        write(fileNameR,'(F10.5)') Re
 
-    fileNameR = adjustr(fileNameR)
-    do  i=1,nameLen
-        if(fileNameR(i:i)==' ')fileNameR(i:i)='0'
-    enddo
-    fileNameM = adjustr(fileNameM)
-    do  i=1,nameLen
-        if(fileNameM(i:i)==' ')fileNameM(i:i)='0'
-    enddo
-    fileNameS = adjustr(fileNameS)
-    do  i=1,nameLen
-        if(fileNameS(i:i)==' ')fileNameS(i:i)='0'
-    enddo
-    fileNameK = adjustr(fileNameK)
-    do  i=1,nameLen
-        if(fileNameK(i:i)==' ')fileNameK(i:i)='0'
-    enddo
-    open(111,file='./R'//trim(fileNameR)//'M'//trim(fileNameM)//'S'//trim(fileNameS)//'K'//trim(fileNameK))
-    close(111)
+        fileNameR = adjustr(fileNameR)
+        do  i=1,nameLen
+            if(fileNameR(i:i)==' ')fileNameR(i:i)='0'
+        enddo
 
         open(111,file='./Check.dat')
         write(111,'(A      )')'===================================='
