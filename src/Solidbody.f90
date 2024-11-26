@@ -513,7 +513,6 @@ module SolidBody
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElem,velElemIB,forceElemTemp,forceTemp)  REDUCTION(+:tolerance)
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(iEL,1:4)
             jy = this%v_Ei(iEL,5:8)
@@ -537,7 +536,6 @@ module SolidBody
                 stop
             endif
             tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(1:3))**2))
-            !$OMP critical
             ! update beam load, momentum is not included
             i1=this%rbm%ele(this%vtor(iEL),1)
             i2=this%rbm%ele(this%vtor(iEL),2)
@@ -555,9 +553,7 @@ module SolidBody
                     enddo
                 enddo
             enddo
-            !$OMP end critical
         enddo
-        !$OMP END PARALLEL DO
     END SUBROUTINE PenaltyForce_
 
     subroutine PlateBuild_(this)
