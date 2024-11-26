@@ -10,7 +10,7 @@ else ifeq ($(CMP),gcc)
 FC = gfortran
 FFLAGS = -O3
 ifeq ($(BUILD),debug)
-FFLAGS = -cpp -g3 -Og
+FFLAGS = -cpp -g -O0
 FFLAGS += -ffpe-trap=invalid,zero -fbacktrace -Wall -Wextra -pedantic -Warray-bounds -fbacktrace  -fbounds-check
 endif
 FFLAGS += -Wconversion -Wconversion-extra -ffree-form -ffree-line-length-none -fopenmp -fimplicit-none -finit-real=zero -std=f2003 #-fdefault-real-4 -fdefault-double-8

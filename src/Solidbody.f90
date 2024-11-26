@@ -276,22 +276,24 @@ module SolidBody
         !   compute displacement, velocity, area at surface element center
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        integer :: i,s,cnt
+        integer :: i,s,cnt,i1,i2
         real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3)
         real(8) :: dh, left, len, dl, ls, area
 
         do i = 1,this%rbm%nEL
-            tmpxyz = 0.5d0 * (this%rbm%xyzful(i,1:3) + this%rbm%xyzful(i+1,1:3))
-            tmpvel = 0.5d0 * (this%rbm%velful(i,1:3) + this%rbm%velful(i+1,1:3))
-            left = 0.5d0 * (this%rbm%r_Lspan(i) + this%rbm%r_Lspan(i+1))
-            len = 0.5d0 * (this%rbm%r_Rspan(i) + this%rbm%r_Rspan(i+1)) + left
+            i1 = this%rbm%ele(i,1)
+            i2 = this%rbm%ele(i,2)
+            tmpxyz = 0.5d0 * (this%rbm%xyzful(i1,1:3) + this%rbm%xyzful(i2,1:3))
+            tmpvel = 0.5d0 * (this%rbm%velful(i1,1:3) + this%rbm%velful(i2,1:3))
+            left = 0.5d0 * (this%rbm%r_Lspan(i1) + this%rbm%r_Lspan(i2))
+            len = 0.5d0 * (this%rbm%r_Rspan(i1) + this%rbm%r_Rspan(i2)) + left
             dl = len / dble(this%rbm%r_Nspan(i))
-            tmpdx = this%rbm%xyzful(i+1,1:3) - this%rbm%xyzful(i,1:3)
+            tmpdx = this%rbm%xyzful(i2,1:3) - this%rbm%xyzful(i1,1:3)
             dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3))
             area = dl * dh
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%r_Nspan(i)
-                ls = left - dl * (0.5d0 + dble(s-1))
+                ls = left + dl * (0.5d0 + dble(s-1))
                 this%v_Exyz(cnt+s, 1:3) = tmpxyz + this%rbm%r_dirc*ls
                 this%v_Evel(cnt+s,1:3) = tmpvel
                 this%v_Ea(cnt+s) = area
@@ -595,7 +597,7 @@ module SolidBody
         real(8),intent(in) :: time
         !   -------------------------------------------------------
         real(8):: timeTref
-        integer:: i
+        integer:: i, i1, i2
         real(8) :: tmpxyz(3)
         integer,parameter::nameLen=10
         character (LEN=nameLen):: fileName,idstr
@@ -619,7 +621,9 @@ module SolidBody
             write(idfile, *) (tmpxyz + this%rbm%r_Lspan(i) * this%rbm%r_dirc)/m_Lref
         enddo
         do  i=1,this%rbm%nEL
-            write(idfile, *) 2*i -1, 2*i,2*i+2,2*i+1
+            i1 = this%rbm%ele(i,1)
+            i2 = this%rbm%ele(i,2)
+            write(idfile, *) 2*i1 -1, 2*i1,2*i2,2*i2-1
         enddo
         close(idfile)
     end subroutine PlateWrite_body_

@@ -155,7 +155,13 @@
         else
                 zbgn=z-1;zend=z
         endif
-
+        if(zend.eq.zDim+1) then
+            zbgn = zDim - 1
+            zend = zDim
+        else if(zbgn.eq.0) then
+            zbgn = 1
+            zend = 2
+        endif
 
         velocity(1:3)=0.0d0
         Pressure=0.0d0
