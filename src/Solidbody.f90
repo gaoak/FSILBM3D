@@ -557,7 +557,7 @@ module SolidBody
         !==================================================================================================
         integer::x,y,z,iEL,i1,i2
         !==================================================================================================
-        invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3
+        invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3/m_denIn
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
@@ -591,7 +591,7 @@ module SolidBody
                 do y=-1,2
                     do z=-1,2
                         forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
-                        uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+forceTemp(1:3)/den(kz(z),jy(y),ix(x))
+                        uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+forceTemp(1:3)
                     enddo
                 enddo
             enddo
