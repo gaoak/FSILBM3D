@@ -21,6 +21,7 @@ module SolidBody
         real(8), allocatable :: v_Ea(:) ! element area
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
+        real(8), allocatable :: v_Eforce(:, :) ! element center (x, y, z)
         integer(4), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
         real(8), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
@@ -35,6 +36,7 @@ module SolidBody
         procedure :: PlateWrite_body => PlateWrite_body_
         procedure :: UpdateElmtInterp => UpdateElmtInterp_
         procedure :: PenaltyForce => PenaltyForce_
+        procedure :: FluidVolumeForce => FluidVolumeForce_
     end type VirtualBody
     type(VirtualBody), allocatable :: VBodies(:)
   contains
@@ -471,36 +473,82 @@ module SolidBody
         integer:: iFish
         integer:: iterLBM
         real(8):: dmaxLBM,dsum
-        real(8)::tol, ntol
-        !================================
+        real(8)::tol,ntol
+        ! update virtual body shape and velocity
         do iFish = 1, m_nFish
             call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
+            VBodies(iFish)%v_Eforce = 0.0d0
         enddo
-        do iFish=1,m_nFish
-            VBodies(iFish)%rbm%lodful = 0.0d0
-        enddo
+        ! calculate interaction force using immersed-boundary method
         iterLBM=0
         dmaxLBM=1d10
         do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
             dmaxLBM = 0.d0
             dsum=0.0d0
             do iFish=1,m_nFish
-                call VBodies(iFish)%PenaltyForce(uuu,den,force,tol,ntol)
+                call VBodies(iFish)%PenaltyForce(uuu,den,tol,ntol)
                 dmaxLBM = dmaxLBM + tol
                 dsum = dsum + ntol
             enddo
             dmaxLBM=dmaxLBM/(dsum * m_Uref)
             iterLBM=iterLBM+1
         enddo
+        ! update body load and fluid force
+        do iFish=1,m_nFish
+            VBodies(iFish)%rbm%lodful = 0.0d0
+            ! to do, consider gravity
+        enddo
+        do iFish=1,m_nFish
+            call VBodies(iFish)%FluidVolumeForce(force)
+        enddo
     END SUBROUTINE
 
-    SUBROUTINE PenaltyForce_(this,uuu,den,force,tolerance,ntolsum)
+    SUBROUTINE FluidVolumeForce_(this,force)
+        USE, INTRINSIC :: IEEE_ARITHMETIC
+        IMPLICIT NONE
+        class(VirtualBody), intent(inout) :: this
+        real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
+        !==================================================================================================
+        integer:: ix(-1:2),jy(-1:2),kz(-1:2)
+        real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
+        real(8):: forceElemTemp(3),invh3
+        !==================================================================================================
+        integer::x,y,z,iEL,i1,i2
+        !==================================================================================================
+        invh3 = (1.d0/m_dh)**3
+        ! compute the velocity of IB nodes at element center
+        do  iEL=1,this%v_nelmts
+            ix = this%v_Ei(iEL,1:4)
+            jy = this%v_Ei(iEL,5:8)
+            kz = this%v_Ei(iEL,9:12)
+            rx = this%v_Ew(iEL,1:4)
+            ry = this%v_Ew(iEL,5:8)
+            rz = this%v_Ew(iEL,9:12)
+            forceElemTemp = this%v_Eforce(iEL,1:3)
+            ! update beam load, momentum is not included
+            i1=this%rbm%ele(this%vtor(iEL),1)
+            i2=this%rbm%ele(this%vtor(iEL),2)
+            this%rbm%lodful(i1,1:3) = this%rbm%lodful(i1,1:3) + 0.5d0 * forceElemTemp
+            this%rbm%lodful(i2,1:3) = this%rbm%lodful(i2,1:3) + 0.5d0 * forceElemTemp
+            forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
+            do x=-1,2
+                do y=-1,2
+                    do z=-1,2
+                        forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
+                        ! add flow body force
+                        force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
+                    enddo
+                enddo
+            enddo
+        enddo
+    END SUBROUTINE FluidVolumeForce_
+
+    SUBROUTINE PenaltyForce_(this,uuu,den,tolerance,ntolsum)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         real(8),intent(in):: den(m_zDim,m_yDim,m_xDim)
         real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
-        real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
         real(8),intent(out)::tolerance, ntolsum
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
@@ -509,7 +557,7 @@ module SolidBody
         !==================================================================================================
         integer::x,y,z,iEL,i1,i2
         !==================================================================================================
-        invh3 = (1.d0/m_dh)**3
+        invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
@@ -536,20 +584,14 @@ module SolidBody
                 stop
             endif
             tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(1:3))**2))
-            ! update beam load, momentum is not included
-            i1=this%rbm%ele(this%vtor(iEL),1)
-            i2=this%rbm%ele(this%vtor(iEL),2)
-            this%rbm%lodful(i1,1:3) = this%rbm%lodful(i1,1:3) + 0.5d0 * forceElemTemp
-            this%rbm%lodful(i2,1:3) = this%rbm%lodful(i2,1:3) + 0.5d0 * forceElemTemp
+            this%v_Eforce(iEL,1:3) = this%v_Eforce(iEL,1:3) + forceElemTemp
+            ! correct velocity
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
                         forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
-                        ! correct velocity
-                        uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+0.5d0*m_dt*forceTemp(1:3)/den(kz(z),jy(y),ix(x))
-                        ! add flow body force
-                        force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
+                        uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+forceTemp(1:3)/den(kz(z),jy(y),ix(x))
                     enddo
                 enddo
             enddo
@@ -573,7 +615,7 @@ module SolidBody
                 this%vtor(j) = i
             enddo
         enddo
-        allocate(this%v_Exyz(this%v_nelmts,3), this%v_Ea(this%v_nelmts))
+        allocate(this%v_Exyz(this%v_nelmts,3), this%v_Ea(this%v_nelmts), this%v_Eforce(this%v_nelmts,3))
         allocate(this%v_Evel(this%v_nelmts,3), this%v_Ei(this%v_nelmts,12), this%v_Ew(this%v_nelmts,12))
     end subroutine PlateBuild_
 
