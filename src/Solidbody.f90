@@ -658,8 +658,8 @@ module SolidBody
 
         do i = 1,this%rbm%nNd
             tmpxyz = this%rbm%xyzful(i,1:3)
-            write(idfile, *) (tmpxyz - this%rbm%r_Rspan(i) * this%rbm%r_dirc)/m_Lref
-            write(idfile, *) (tmpxyz + this%rbm%r_Lspan(i) * this%rbm%r_dirc)/m_Lref
+            write(idfile, *) (tmpxyz - this%rbm%r_Lspan(i) * this%rbm%r_dirc)/m_Lref
+            write(idfile, *) (tmpxyz + this%rbm%r_Rspan(i) * this%rbm%r_dirc)/m_Lref
         enddo
         do  i=1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)

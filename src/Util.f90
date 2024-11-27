@@ -143,11 +143,25 @@
         else
                 xbgn=x-1;xend=x
         endif
+        if(xend.eq.xDim+1) then
+            xbgn = xDim - 1
+            xend = xDim
+        else if(xbgn.eq.0) then
+            xbgn = 1
+            xend = 2
+        endif
         y=minloc(dabs(SampFlowPint(i,2)-yGrid(1:yDim)),1)
         if(SampFlowPint(i,2)-yGrid(y)>0.0d0)then
                 ybgn=y; yend=y+1
         else
                 ybgn=y-1;yend=y
+        endif
+        if(yend.eq.yDim+1) then
+            ybgn = yDim - 1
+            yend = yDim
+        else if(ybgn.eq.0) then
+            ybgn = 1
+            yend = 2
         endif
         z=minloc(dabs(SampFlowPint(i,3)-zGrid(1:zDim)),1)
         if(SampFlowPint(i,3)-zGrid(z)>0.0d0)then
