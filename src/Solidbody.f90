@@ -262,16 +262,16 @@ module SolidBody
         enddo !nFish
     end subroutine
     
-    subroutine FSInteraction_force(xGrid,yGrid,zGrid,uuu,den,force)
+    subroutine FSInteraction_force(xGrid,yGrid,zGrid,uuu,force)
         implicit none
-        real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim),den(m_zDim,m_yDim,m_xDim)
+        real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim)
         real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
         real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
         integer :: iFish
         do iFish = 1,m_nFish
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
-        call calculate_interaction_force(xGrid,yGrid,zGrid,uuu,den,force)
+        call calculate_interaction_force(xGrid,yGrid,zGrid,uuu,force)
     end subroutine
 
     subroutine PlateUpdatePosVelArea_(this)
@@ -463,10 +463,10 @@ module SolidBody
         END SUBROUTINE
     end subroutine UpdateElmtInterp_
 
-    SUBROUTINE calculate_interaction_force(xGrid,yGrid,zGrid,uuu,den,force)
+    SUBROUTINE calculate_interaction_force(xGrid,yGrid,zGrid,uuu,force)
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
-        real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim),den(m_zDim,m_yDim,m_xDim)
+        real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim)
         real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
         real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
         !================================
@@ -486,7 +486,7 @@ module SolidBody
             dmaxLBM = 0.d0
             dsum=0.0d0
             do iFish=1,m_nFish
-                call VBodies(iFish)%PenaltyForce(uuu,den,tol,ntol)
+                call VBodies(iFish)%PenaltyForce(uuu,tol,ntol)
                 dmaxLBM = dmaxLBM + tol
                 dsum = dsum + ntol
             enddo
@@ -543,11 +543,10 @@ module SolidBody
         enddo
     END SUBROUTINE FluidVolumeForce_
 
-    SUBROUTINE PenaltyForce_(this,uuu,den,tolerance,ntolsum)
+    SUBROUTINE PenaltyForce_(this,uuu,tolerance,ntolsum)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        real(8),intent(in):: den(m_zDim,m_yDim,m_xDim)
         real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
         real(8),intent(out)::tolerance, ntolsum
         !==================================================================================================

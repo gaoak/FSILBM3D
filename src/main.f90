@@ -140,7 +140,7 @@
         enddo
         !$OMP END PARALLEL DO
         !compute force exerted on fluids
-        CALL FSInteraction_force(xGrid,yGrid,zGrid,uuu,den,force)
+        CALL FSInteraction_force(xGrid,yGrid,zGrid,uuu,force)
         !compute volume force exerted on fluids
         CALL addVolumForc()
 
