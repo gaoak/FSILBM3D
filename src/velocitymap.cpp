@@ -15,7 +15,7 @@ void setumap(int64_t & index, double* value) {
 }
 
 void getumap(int64_t & index, double* value) {
-    umap[index] = *value;
+    *value = umap[index];
 }
 
 void clearumap() {
