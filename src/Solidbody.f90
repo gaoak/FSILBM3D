@@ -3,6 +3,16 @@ module SolidBody
     implicit none
     private
     interface
+        subroutine initumap(np) bind (c)
+            use iso_c_binding
+            integer(4):: np
+        end subroutine initumap
+        subroutine thread_setumap(p, ind, val) bind (c)
+            use iso_c_binding
+            integer(4):: p
+            integer(8):: ind
+            real(8)::val
+        end subroutine thread_setumap
         subroutine setumap(ind, val) bind (c)
             use iso_c_binding
             integer(8):: ind
@@ -13,9 +23,9 @@ module SolidBody
             integer(8):: ind
             real(8)::val
         end subroutine getumap
-        subroutine clearumap() bind (c)
+        subroutine mergeumap() bind (c)
             use iso_c_binding
-        end subroutine clearumap
+        end subroutine mergeumap
         subroutine printumap() bind (c)
             use iso_c_binding
         end subroutine printumap
