@@ -15,7 +15,8 @@ FFLAGS += -ffpe-trap=invalid,zero -fbacktrace -Wall -Wextra -pedantic -Warray-bo
 endif
 FFLAGS += -Wconversion -Wconversion-extra -ffree-form -ffree-line-length-none -fopenmp -fimplicit-none -finit-real=zero -std=f2003 #-fdefault-real-4 -fdefault-double-8
 endif
-CC = gcc
+CC = cc
+CPP = c++
 
 SRCDIR = ./src
 
@@ -23,8 +24,10 @@ SRCDIR = ./src
 OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
 SRC = $(SRCDIR)/Modules.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/LatticeBoltzmannSolver.f90 $(SRCDIR)/PostProcessing.f90 $(SRCDIR)/Util.f90 $(SRCDIR)/Initialization.f90 $(SRCDIR)/main.f90
 CSRC = $(SRCDIR)/forkthread.c
+CPPSRC = $(SRCDIR)/velocitymap.cpp
 OBJ = $(SRC:%.f90=%.o)
 COBJ = $(CSRC:%.c=%.o)
+CPPOBJ = $(CPPSRC:%.cpp=%.o)
 
 #######OPTIONS settings###########
 OPT := -I$(SRCDIR) $(FFLAGS)
@@ -36,8 +39,8 @@ LINKOPT := $(FFLAGS)
 
 all: FSILBM3D
 
-FSILBM3D : $(OBJ) $(COBJ)
-	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(COBJ)
+FSILBM3D : $(OBJ) $(COBJ) $(CPPOBJ)
+	$(FC) -o $@ $(LINKOPT) -lstdc++ $(OBJDECOMP) $(OBJ) $(COBJ) $(CPPOBJ)
 
 
 $(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
@@ -46,6 +49,10 @@ $(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
 
 $(COBJ):$(SRCDIR)%.o : $(SRCDIR)%.c
 	$(CC)  -c $<
+	mv $(@F) ${SRCDIR}
+
+$(CPPOBJ):$(SRCDIR)%.o : $(SRCDIR)%.cpp
+	$(CPP)  -c $<
 	mv $(@F) ${SRCDIR}
 
 clean:

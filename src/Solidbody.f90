@@ -2,6 +2,24 @@ module SolidBody
     use SolidSolver
     implicit none
     private
+    interface
+        subroutine setumap(ind, val) bind (c)
+            use iso_c_binding
+            integer(8):: ind
+            real(8)::val
+        end subroutine setumap
+        subroutine getumap(ind, val) bind (c)
+            use iso_c_binding
+            integer(8):: ind
+            real(8)::val
+        end subroutine getumap
+        subroutine clearumap() bind (c)
+            use iso_c_binding
+        end subroutine clearumap
+        subroutine printumap() bind (c)
+            use iso_c_binding
+        end subroutine printumap
+    end interface
     ! Immersed boundary method parameters
     integer:: m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
@@ -339,6 +357,20 @@ module SolidBody
         real(8),intent(in)::uuu(m_zDim,m_yDim,m_xDim,1:3)
         integer:: iEL,ix(-1:2),jy(-1:2),kz(-1:2),x,y,z,num
         integer:: index
+        integer(8)::ind
+        ind=1
+        call setumap(ind,2.d0)
+        ind=3
+        call setumap(ind,4.d0)
+        ind=3
+        call setumap(ind,5.d0)
+        call printumap
+        ind=4
+        call setumap(ind,5.d0)
+        call printumap
+        ind=-10000000
+        call setumap(ind,5.d0)
+        call printumap
         allocate(this%array_i(this%v_nelmts*64),this%array_u(this%v_nelmts*64,3))
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(iEL,1:4)
