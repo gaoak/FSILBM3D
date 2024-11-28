@@ -495,7 +495,7 @@ module SolidBody
         enddo
         ! update body load and fluid force
         do iFish=1,m_nFish
-            VBodies(iFish)%rbm%lodful = 0.0d0
+            VBodies(iFish)%rbm%extful = 0.0d0
             ! to do, consider gravity
         enddo
         do iFish=1,m_nFish
@@ -528,8 +528,8 @@ module SolidBody
             ! update beam load, momentum is not included
             i1=this%rbm%ele(this%vtor(iEL),1)
             i2=this%rbm%ele(this%vtor(iEL),2)
-            this%rbm%lodful(i1,1:3) = this%rbm%lodful(i1,1:3) + 0.5d0 * forceElemTemp
-            this%rbm%lodful(i2,1:3) = this%rbm%lodful(i2,1:3) + 0.5d0 * forceElemTemp
+            this%rbm%extful(i1,1:3) = this%rbm%extful(i1,1:3) + 0.5d0 * forceElemTemp
+            this%rbm%extful(i2,1:3) = this%rbm%extful(i2,1:3) + 0.5d0 * forceElemTemp
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
@@ -552,9 +552,9 @@ module SolidBody
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
-        real(8):: velElem(3),velElemIB(3),forceElemTemp(3),invh3
+        real(8):: velElem(3),velElemIB(this%v_nelmts,3),forceElemTemp(this%v_nelmts,3),invh3
         !==================================================================================================
-        integer::x,y,z,iEL,i1,i2
+        integer::x,y,z,iEL
         !==================================================================================================
         invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3/m_denIn
         tolerance = 0.d0
@@ -567,29 +567,42 @@ module SolidBody
             rx = this%v_Ew(iEL,1:4)
             ry = this%v_Ew(iEL,5:8)
             rz = this%v_Ew(iEL,9:12)
-            velElemIB(1:3)=0.0d0
+            velElemIB(iEL,1:3)=0.0d0
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        velElemIB(1:3)=velElemIB(1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
+                        velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
             enddo
+        enddo
+        do  iEL=1,this%v_nelmts
             velElem = this%v_Evel(iEL,1:3)
-            forceElemTemp(1:3) = -m_Pbeta* 2.0d0*m_denIn*(velElem-velElemIB)*this%v_Ea(iEL)
-            if ((.not. IEEE_IS_FINITE(forceElemTemp(1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(3)))) then
+            forceElemTemp(iEL,1:3) = -m_Pbeta* 2.0d0*m_denIn*(velElem(1:3)-velElemIB(iEL,1:3))*this%v_Ea(iEL)
+            if ((.not. IEEE_IS_FINITE(forceElemTemp(iEL,1))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,2))) .or. (.not. IEEE_IS_FINITE(forceElemTemp(iEL,3)))) then
                 write(*, *) 'Nan found in forceElemTemp', forceElemTemp
+                ix(0) = this%v_Ei(iEL,2)
+                jy(0) = this%v_Ei(iEL,6)
+                kz(0) = this%v_Ei(iEL,10)
                 write(*, *) 'Nan found at (ix, jy, kz)', ix(0), jy(0), kz(0)
                 stop
             endif
-            tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(1:3))**2))
-            this%v_Eforce(iEL,1:3) = this%v_Eforce(iEL,1:3) + forceElemTemp
+            tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(iEL,1:3))**2))
+            this%v_Eforce(iEL,1:3) = this%v_Eforce(iEL,1:3) + forceElemTemp(iEL,1:3)
+            forceElemTemp(iEL,1:3) = forceElemTemp(iEL,1:3) * invh3
+        enddo
+        do  iEL=1,this%v_nelmts
+            ix = this%v_Ei(iEL,1:4)
+            jy = this%v_Ei(iEL,5:8)
+            kz = this%v_Ei(iEL,9:12)
+            rx = this%v_Ew(iEL,1:4)
+            ry = this%v_Ew(iEL,5:8)
+            rz = this%v_Ew(iEL,9:12)
             ! correct velocity
-            forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
+                        forceTemp(1:3) = -forceElemTemp(iEL,1:3)*rx(x)*ry(y)*rz(z)
                         uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+forceTemp(1:3)
                     enddo
                 enddo
