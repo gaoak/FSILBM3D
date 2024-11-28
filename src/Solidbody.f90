@@ -21,7 +21,7 @@ module SolidBody
         end subroutine printumap
     end interface
     ! Immersed boundary method parameters
-    integer:: m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
+    integer:: m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim, m_Kb, m_Jb, m_Ib, m_Kmask, m_Jmask, m_Imask
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
@@ -132,6 +132,12 @@ module SolidBody
         m_yDim = yDim
         m_xDim = xDim
         m_dh = dh
+        m_Kb = ceiling(log(dble(m_zDim))/log(2.0))
+        m_Jb = ceiling(log(dble(m_yDim))/log(2.0))
+        m_Ib = ceiling(log(dble(m_xDim))/log(2.0))
+        m_Kmask = ishft(1,m_Kb)-1
+        m_Jmask = ishft(1,m_Jb+m_Kb)-1
+        m_Imask = ishft(1,m_Ib+m_Jb+m_Kb)-1
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Initialise(time,g)
             call VBodies(iFish)%Initialise(VBodies(iFish)%rbm%iBodyType)
@@ -443,28 +449,18 @@ module SolidBody
     subroutine findindex(i,j,k,index)
         IMPLICIT NONE
         integer,intent(out):: index
-        integer:: Ib,Jb,Kb,i,j,k
-        Ib = ceiling(log(dble(m_xDim))/log(2.0))
-        Jb = ceiling(log(dble(m_yDim))/log(2.0))
-        Kb = ceiling(log(dble(m_zDim))/log(2.0))
-        i = ishft((i-1),Jb+Kb)
-        j = ishft((j-1),Kb)
+        integer:: i,j,k
+        i = ishft((i-1),M_Jb+M_Kb)
+        j = ishft((j-1),M_Kb)
         index = ior((k-1),ior(j,i))
     end subroutine
     subroutine findijk(index,i,j,k)
         IMPLICIT NONE
         integer,intent(in):: index
         integer,intent(out):: i,j,k
-        integer:: Ib,Jb,Kb,mask
-        Ib = ceiling(log(dble(m_xDim))/log(2.0))
-        Jb = ceiling(log(dble(m_yDim))/log(2.0))
-        Kb = ceiling(log(dble(m_zDim))/log(2.0))
-        mask = ishft((2**Ib-1),Jb+Kb)
-        i = iand(index,mask)
-        mask = ishft((2**Jb-1),Kb)
-        j = iand(index,mask)
-        mask = 2**Kb-1
-        k = iand(index,mask)
+        i = iand(index,m_Imask)+1
+        j = iand(index,m_Jmask)+1
+        k = iand(index,m_Kmask)+1
     end subroutine
 
     subroutine UpdateElmtInterp_(this,xGrid,yGrid,zGrid)
