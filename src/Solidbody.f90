@@ -27,6 +27,8 @@ module SolidBody
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)!of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
+        integer,allocatable :: array_i(:)
+        real(8),allocatable :: array_u(:,:)
     contains
         procedure :: Initialise => Initialise_
         procedure :: PlateBuild => PlateBuild_
@@ -35,6 +37,8 @@ module SolidBody
         procedure :: Write_body => Write_body_
         procedure :: PlateWrite_body => PlateWrite_body_
         procedure :: UpdateElmtInterp => UpdateElmtInterp_
+        procedure :: getuuu => getuuu_
+        procedure :: setuuu => setuuu_
         procedure :: PenaltyForce => PenaltyForce_
         procedure :: FluidVolumeForce => FluidVolumeForce_
     end type VirtualBody
@@ -83,6 +87,7 @@ module SolidBody
         integer :: iFish,maxN
         real(8),intent(out):: Asfac,Lchod,Lspan,AR
         real(8) :: nAsfac(m_nFish),nLchod(m_nFish)
+        write(*,'(A)') '=============================================================================='
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
         enddo
@@ -328,6 +333,108 @@ module SolidBody
         rtov_ = this%rtov(x)
     ENDFUNCTION rtov_
 
+    subroutine getuuu_(this,uuu)
+        IMPLICIT NONE
+        class(VirtualBody), intent(inout) :: this
+        real(8),intent(in)::uuu(m_zDim,m_yDim,m_xDim,1:3)
+        integer:: iEL,ix(-1:2),jy(-1:2),kz(-1:2),x,y,z,num
+        integer:: index
+        allocate(this%array_i(this%v_nelmts*64),this%array_u(this%v_nelmts*64,3))
+        do  iEL=1,this%v_nelmts
+            ix = this%v_Ei(iEL,1:4)
+            jy = this%v_Ei(iEL,5:8)
+            kz = this%v_Ei(iEL,9:12)
+            do x=-1,2
+                do y=-1,2
+                    do z=-1,2
+                        call findindex(ix(x),jy(y),kz(z),index)
+                        num = (iEl-1)*64 + (x+1)*16 + (y+1)*4 + (z+1) + 1
+                        this%array_i(num) = index
+                        this%array_u(num,1:3) = uuu(kz(z),jy(y),ix(x),1:3)
+                    enddo
+                enddo
+            enddo
+        enddo
+        call sort_indices(this%array_i, this%array_u, this%v_nelmts*64)
+    end subroutine
+
+    subroutine sort_indices(A, B, n)
+        integer:: n, A(n)
+        real(8):: B(n,1:3)
+        integer:: indices(n)
+        integer:: i, j, temp
+
+        do i = 1, size(A)
+            indices(i) = i
+        end do
+
+        do i = 1, size(A) - 1
+            do j = i + 1, size(A)
+                if (A(indices(i)) > A(indices(j))) then
+                    temp = indices(i)
+                    indices(i) = indices(j)
+                    indices(j) = temp
+                end if
+            end do
+        end do
+
+        call reorder_array()
+        contains
+        subroutine reorder_array()
+            integer:: tempA(n)
+            real(8):: tempB(n,1:3)
+    
+            do i = 1, size(A)
+                tempA(i) = A(indices(i))
+                tempB(i,1:3) = B(indices(i),1:3)
+            end do
+    
+            A = tempA
+            B = tempB
+        end subroutine reorder_array
+    end subroutine sort_indices
+
+    subroutine setuuu_(this,uuu)
+        IMPLICIT NONE
+        class(VirtualBody), intent(inout) :: this
+        real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
+        integer:: index,i,j,k,ijk
+        allocate(this%array_i(this%v_nelmts*64),this%array_u(this%v_nelmts*64,3))
+        do  index = 1,this%v_nelmts*64
+            ijk = this%array_i(index)
+            call findijk(ijk,i,j,k)
+            uuu(k,j,i,1:3) = this%array_u(index,1:3)
+        enddo
+        call sort_indices(this%array_i, this%array_u, this%v_nelmts*64)
+    end subroutine
+
+    subroutine findindex(i,j,k,index)
+        IMPLICIT NONE
+        integer,intent(out):: index
+        integer:: Ib,Jb,Kb,i,j,k
+        Ib = ceiling(log(dble(m_xDim))/log(2.0))
+        Jb = ceiling(log(dble(m_yDim))/log(2.0))
+        Kb = ceiling(log(dble(m_zDim))/log(2.0))
+        i = ishft((i-1),Jb+Kb)
+        j = ishft((j-1),Kb)
+        index = ior((k-1),ior(j,i))
+    end subroutine
+    subroutine findijk(index,i,j,k)
+        IMPLICIT NONE
+        integer,intent(in):: index
+        integer,intent(out):: i,j,k
+        integer:: Ib,Jb,Kb,mask
+        Ib = ceiling(log(dble(m_xDim))/log(2.0))
+        Jb = ceiling(log(dble(m_yDim))/log(2.0))
+        Kb = ceiling(log(dble(m_zDim))/log(2.0))
+        mask = ishft((2**Ib-1),Jb+Kb)
+        i = iand(index,mask)
+        mask = ishft((2**Jb-1),Kb)
+        j = iand(index,mask)
+        mask = 2**Kb-1
+        k = iand(index,mask)
+    end subroutine
+
     subroutine UpdateElmtInterp_(this,xGrid,yGrid,zGrid)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
@@ -477,6 +584,7 @@ module SolidBody
         ! update virtual body shape and velocity
         do iFish = 1, m_nFish
             call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
+            call VBodies(iFish)%getuuu(uuu)
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
         ! calculate interaction force using immersed-boundary method
@@ -486,7 +594,7 @@ module SolidBody
             dmaxLBM = 0.d0
             dsum=0.0d0
             do iFish=1,m_nFish
-                call VBodies(iFish)%PenaltyForce(uuu,tol,ntol)
+                call VBodies(iFish)%PenaltyForce(tol,ntol)
                 dmaxLBM = dmaxLBM + tol
                 dsum = dsum + ntol
             enddo
@@ -499,6 +607,7 @@ module SolidBody
             ! to do, consider gravity
         enddo
         do iFish=1,m_nFish
+            call VBodies(iFish)%setuuu(uuu)
             call VBodies(iFish)%FluidVolumeForce(force)
         enddo
     END SUBROUTINE
@@ -543,18 +652,18 @@ module SolidBody
         enddo
     END SUBROUTINE FluidVolumeForce_
 
-    SUBROUTINE PenaltyForce_(this,uuu,tolerance,ntolsum)
+    SUBROUTINE PenaltyForce_(this,tolerance,ntolsum)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
         real(8),intent(out)::tolerance, ntolsum
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: velElem(3),velElemIB(this%v_nelmts,3),forceElemTemp(this%v_nelmts,3),invh3
+        real(8):: uuu(3)
         !==================================================================================================
-        integer::x,y,z,iEL
+        integer::x,y,z,iEL,index,index0
         !==================================================================================================
         invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3/m_denIn
         tolerance = 0.d0
@@ -571,7 +680,10 @@ module SolidBody
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
+                        call findindex(ix(x),jy(y),kz(z),index0)
+                        call my_minloc(index0,this%array_i,this%v_nelmts*64,index)
+                        uuu(1:3) = this%array_u(index,1:3)
+                        velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
             enddo
@@ -603,11 +715,38 @@ module SolidBody
                 do y=-1,2
                     do z=-1,2
                         forceTemp(1:3) = -forceElemTemp(iEL,1:3)*rx(x)*ry(y)*rz(z)
-                        uuu(kz(z),jy(y),ix(x),1:3)  = uuu(kz(z),jy(y),ix(x),1:3)+forceTemp(1:3)
+                        call findindex(ix(x),jy(y),kz(z),index0)
+                        call my_minloc(index0,this%array_i,this%v_nelmts*64,index)
+                        uuu(1:3) = this%array_u(index,1:3)
+                        uuu(1:3)  = uuu(1:3)+forceTemp(1:3)
                     enddo
                 enddo
             enddo
         enddo
+        contains
+        SUBROUTINE my_minloc(x_, array_, len_, index_) ! return the array(index) <= x < array(index+1)
+            implicit none
+            integer:: x_, array_(len_),len_, index_, count, step, it
+                if (x_<array_(1) .or. x_>array_(len_)) then
+                    write(*, *) 'index out of bounds when searching my_minloc', x_, '[', array_(1), array_(len_), ']'
+                    stop
+                endif
+                index_ = 1
+                count = len_
+                do while(count > 0)
+                    step = count / 2
+                    it = index_ + step
+                    if (array_(it) < x_) then
+                        index_ = it + 1
+                        count = count - (step + 1)
+                    else
+                        count = step
+                    endif
+                enddo
+                if (array_(index_)>x_) then
+                    index_ = index_ - 1
+                endif
+        END SUBROUTINE
     END SUBROUTINE PenaltyForce_
 
     subroutine PlateBuild_(this)
