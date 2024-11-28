@@ -571,7 +571,7 @@ module SolidBody
         ! update virtual body shape and velocity
         do iFish = 1, m_nFish
             call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
-            call VBodies(iFish)%getuuu(uuu)
+            call VBodies(iFish)%setuuu(uuu)
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
         ! calculate interaction force using immersed-boundary method
@@ -594,7 +594,7 @@ module SolidBody
             ! to do, consider gravity
         enddo
         do iFish=1,m_nFish
-            call VBodies(iFish)%setuuu(uuu)
+            call VBodies(iFish)%getuuu(uuu)
             call VBodies(iFish)%FluidVolumeForce(force)
         enddo
     END SUBROUTINE
