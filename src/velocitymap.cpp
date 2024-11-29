@@ -43,7 +43,8 @@ void inititerator(int32_t &np, int32_t *ndata) {
     iter.resize(np);
     iter[0] = umap.begin();
     for(int p=1; p<np; ++p) {
-        std::advance(iter[p], ndata[p]);
+        iter[p] = iter[p-1];
+        std::advance(iter[p], ntmp);
     }
 }
 
