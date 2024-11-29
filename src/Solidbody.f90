@@ -102,8 +102,8 @@ module SolidBody
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         real(8), allocatable :: v_Eforce(:, :) ! element center (x, y, z)
-        integer(4), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
-        real(8), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+        integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
+        real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)!of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
@@ -381,8 +381,8 @@ module SolidBody
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%r_Nspan(i)
                 ls = dl * (0.5d0 + dble(s-1)) - left
-                this%v_Exyz(cnt+s, 1:3) = tmpxyz + this%rbm%r_dirc*ls
-                this%v_Evel(cnt+s,1:3) = tmpvel
+                this%v_Exyz(1:3,cnt+s) = tmpxyz + this%rbm%r_dirc*ls
+                this%v_Evel(1:3,cnt+s) = tmpvel
                 this%v_Ea(cnt+s) = area
             enddo
         enddo
@@ -426,8 +426,8 @@ module SolidBody
         !==================================================================================================
         invdh = 1.D0/m_dh
         call my_minloc(this%v_Exyz(1,1), xGrid, m_xDim, .false., i0)
-        call my_minloc(this%v_Exyz(1,2), yGrid, m_yDim, .false., j0)
-        call my_minloc(this%v_Exyz(1,3), zGrid, m_zDim, .false., k0)
+        call my_minloc(this%v_Exyz(2,1), yGrid, m_yDim, .false., j0)
+        call my_minloc(this%v_Exyz(3,1), zGrid, m_zDim, .false., k0)
         x0 = xGrid(i0)
         y0 = yGrid(j0)
         z0 = zGrid(k0)
@@ -435,15 +435,15 @@ module SolidBody
         ! compute the velocity of IB nodes at element center
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz,detx,dety,detz,ix,jy,kz,index)
         do  iEL=1,this%v_nelmts
-            call minloc_fast(this%v_Exyz(iEL,1), x0, i0, invdh, i, detx)
-            call minloc_fast(this%v_Exyz(iEL,2), y0, j0, invdh, j, dety)
-            call minloc_fast(this%v_Exyz(iEL,3), z0, k0, invdh, k, detz)
+            call minloc_fast(this%v_Exyz(1,iEL), x0, i0, invdh, i, detx)
+            call minloc_fast(this%v_Exyz(2,iEL), y0, j0, invdh, j, dety)
+            call minloc_fast(this%v_Exyz(3,iEL), z0, k0, invdh, k, detz)
             call trimedindex(i, m_xDim, ix, m_boundaryConditions(1:2))
             call trimedindex(j, m_yDim, jy, m_boundaryConditions(3:4))
             call trimedindex(k, m_zDim, kz, m_boundaryConditions(5:6))
-            this%v_Ei(iEL,1:4) = ix
-            this%v_Ei(iEL,5:8) = jy
-            this%v_Ei(iEL,9:12) = kz
+            this%v_Ei(1:4,iEL) = ix
+            this%v_Ei(5:8,iEL) = jy
+            this%v_Ei(9:12,iEL) = kz
             do x=-1,2
                 rx(x)=Phi(dble(x)-detx)
             enddo
@@ -453,9 +453,9 @@ module SolidBody
             do z=-1,2
                 rz(z)=Phi(dble(z)-detz)
             enddo
-            this%v_Ew(iEL,1:4) = rx
-            this%v_Ew(iEL,5:8) = ry
-            this%v_Ew(iEL,9:12) = rz
+            this%v_Ew(1:4,iEL) = rx
+            this%v_Ew(5:8,iEL) = ry
+            this%v_Ew(9:12,iEL) = rz
         enddo
         !$OMP END PARALLEL DO
 
@@ -606,13 +606,13 @@ module SolidBody
         invh3 = (1.d0/m_dh)**3
         ! compute the velocity of IB nodes at element center
         do  iEL=1,this%v_nelmts
-            ix = this%v_Ei(iEL,1:4)
-            jy = this%v_Ei(iEL,5:8)
-            kz = this%v_Ei(iEL,9:12)
-            rx = this%v_Ew(iEL,1:4)
-            ry = this%v_Ew(iEL,5:8)
-            rz = this%v_Ew(iEL,9:12)
-            forceElemTemp = this%v_Eforce(iEL,1:3)
+            ix = this%v_Ei(1:4,iEL)
+            jy = this%v_Ei(5:8,iEL)
+            kz = this%v_Ei(9:12,iEL)
+            rx = this%v_Ew(1:4,iEL)
+            ry = this%v_Ew(5:8,iEL)
+            rz = this%v_Ew(9:12,iEL)
+            forceElemTemp = this%v_Eforce(1:3,iEL)
             ! update beam load, momentum is not included
             i1=this%rbm%ele(this%vtor(iEL),1)
             i2=this%rbm%ele(this%vtor(iEL),2)
@@ -652,12 +652,12 @@ module SolidBody
         ! compute the velocity of IB nodes at element center
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,index,velElemIB,forceTemp) reduction(+:tolerance)
         do  iEL=1,this%v_nelmts
-            ix = this%v_Ei(iEL,1:4)
-            jy = this%v_Ei(iEL,5:8)
-            kz = this%v_Ei(iEL,9:12)
-            rx = this%v_Ew(iEL,1:4)
-            ry = this%v_Ew(iEL,5:8)
-            rz = this%v_Ew(iEL,9:12)
+            ix = this%v_Ei(1:4,iEL)
+            jy = this%v_Ei(5:8,iEL)
+            kz = this%v_Ei(9:12,iEL)
+            rx = this%v_Ew(1:4,iEL)
+            ry = this%v_Ew(5:8,iEL)
+            rz = this%v_Ew(9:12,iEL)
             velElemIB(1:3)=0.0d0
             do x=-1,2
                 do y=-1,2
@@ -666,7 +666,7 @@ module SolidBody
                     enddo
                 enddo
             enddo
-            velElemIB = this%v_Evel(iEL,1:3)-velElemIB(1:3)
+            velElemIB = this%v_Evel(1:3,iEL)-velElemIB(1:3)
             forceTemp(1:3) = velElemIB(1:3)*this%v_Ea(iEL)
             !if ((.not. IEEE_IS_FINITE(forceTemp(1))) .or. (.not. IEEE_IS_FINITE(forceTemp(2))) .or. (.not. IEEE_IS_FINITE(forceTemp(3)))) then
             !    write(*, *) 'Nan found in forceElemTemp', forceTemp
@@ -674,7 +674,7 @@ module SolidBody
             !    stop
             !endif
             tolerance = tolerance + dabs(velElemIB(1)) + dabs(velElemIB(2)) + dabs(velElemIB(3))
-            this%v_Eforce(iEL,1:3) = this%v_Eforce(iEL,1:3) + forceTemp
+            this%v_Eforce(1:3,iEL) = this%v_Eforce(1:3,iEL) + forceTemp
             forceElemTemp(iEL,1:3) = forceTemp * invh3
         enddo
         !$OMP END PARALLEL DO
@@ -685,12 +685,12 @@ module SolidBody
 
         ! correct velocity
         do  iEL=1,this%v_nelmts
-            ix = this%v_Ei(iEL,1:4)
-            jy = this%v_Ei(iEL,5:8)
-            kz = this%v_Ei(iEL,9:12)
-            rx = this%v_Ew(iEL,1:4)
-            ry = this%v_Ew(iEL,5:8)
-            rz = this%v_Ew(iEL,9:12)
+            ix = this%v_Ei(1:4,iEL)
+            jy = this%v_Ei(5:8,iEL)
+            kz = this%v_Ei(9:12,iEL)
+            rx = this%v_Ew(1:4,iEL)
+            ry = this%v_Ew(5:8,iEL)
+            rz = this%v_Ew(9:12,iEL)
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
@@ -718,8 +718,8 @@ module SolidBody
                 this%vtor(j) = i
             enddo
         enddo
-        allocate(this%v_Exyz(this%v_nelmts,3), this%v_Ea(this%v_nelmts), this%v_Eforce(this%v_nelmts,3))
-        allocate(this%v_Evel(this%v_nelmts,3), this%v_Ei(this%v_nelmts,12), this%v_Ew(this%v_nelmts,12))
+        allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
+        allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
     end subroutine PlateBuild_
 
     subroutine Write_body_(this,iFish,time)
