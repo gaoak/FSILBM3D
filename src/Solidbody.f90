@@ -365,8 +365,8 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         integer :: i,s,cnt,i1,i2
         real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3)
-        real(8) :: dh, left, len, dl, ls, area
-
+        real(8) :: dh, left, len, dl, ls, area, beta
+        beta = - m_Pbeta* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)
             i2 = this%rbm%ele(i,2)
@@ -377,7 +377,7 @@ module SolidBody
             dl = len / dble(this%rbm%r_Nspan(i))
             tmpdx = this%rbm%xyzful(i2,1:3) - this%rbm%xyzful(i1,1:3)
             dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3))
-            area = dl * dh
+            area = dl * dh * beta
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%r_Nspan(i)
                 ls = dl * (0.5d0 + dble(s-1)) - left
@@ -637,21 +637,20 @@ module SolidBody
         real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
         class(VirtualBody), intent(inout) :: this
         real(8),intent(out)::tolerance, ntolsum
-        !==================================================================================================
+        !======================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
-        real(8):: velElem(3),velElemIB(3),forceElemTemp(this%v_nelmts,3),invh3
+        real(8):: velElemIB(3),forceElemTemp(this%v_nelmts,3),invh3
         real(8):: beta
-        !==================================================================================================
+        !======================================================
         integer:: x,y,z,iEL
         integer(8)::index
-        !==================================================================================================
-        beta = -m_Pbeta* 2.0d0*m_denIn
+        !======================================================
         invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3/m_denIn
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,index,velElem,velElemIB,forceTemp) reduction(+:tolerance)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,index,velElemIB,forceTemp) reduction(+:tolerance)
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(iEL,1:4)
             jy = this%v_Ei(iEL,5:8)
@@ -667,18 +666,23 @@ module SolidBody
                     enddo
                 enddo
             enddo
-            velElem = this%v_Evel(iEL,1:3)
-            forceTemp(1:3) = beta*(velElem(1:3)-velElemIB(1:3))*this%v_Ea(iEL)
-            if ((.not. IEEE_IS_FINITE(forceTemp(1))) .or. (.not. IEEE_IS_FINITE(forceTemp(2))) .or. (.not. IEEE_IS_FINITE(forceTemp(3)))) then
-                write(*, *) 'Nan found in forceElemTemp', forceTemp
-                write(*, *) 'Nan found at (ix, jy, kz)', ix(0), jy(0), kz(0)
-                stop
-            endif
-            tolerance = tolerance + dsqrt(sum((velElem(1:3)-velElemIB(1:3))**2))
+            velElemIB = this%v_Evel(iEL,1:3)-velElemIB(1:3)
+            forceTemp(1:3) = velElemIB(1:3)*this%v_Ea(iEL)
+            !if ((.not. IEEE_IS_FINITE(forceTemp(1))) .or. (.not. IEEE_IS_FINITE(forceTemp(2))) .or. (.not. IEEE_IS_FINITE(forceTemp(3)))) then
+            !    write(*, *) 'Nan found in forceElemTemp', forceTemp
+            !    write(*, *) 'Nan found at (ix, jy, kz)', ix(0), jy(0), kz(0)
+            !    stop
+            !endif
+            tolerance = tolerance + dabs(velElemIB(1)) + dabs(velElemIB(2)) + dabs(velElemIB(3))
             this%v_Eforce(iEL,1:3) = this%v_Eforce(iEL,1:3) + forceTemp
             forceElemTemp(iEL,1:3) = forceTemp * invh3
         enddo
         !$OMP END PARALLEL DO
+        if (.not. IEEE_IS_FINITE(tolerance)) then
+            write(*, *) 'Nan found in PenaltyForce'
+            stop
+        endif
+
         ! correct velocity
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(iEL,1:4)
