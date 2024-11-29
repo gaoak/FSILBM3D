@@ -59,18 +59,6 @@
         close(111)
     enddo
 
-    !open(111,file='./DatInfo/MaxValBody.plt')
-    !write(111,*)'variables= "t"  "xyzMax" "velMax" "accMax"  '
-    !close(111)
-
-    open(111,file='./DatInfo/MaMax.plt')
-    write(111,*)'variables= "t"  "MaMax"  '
-    close(111)
-
-    open(111,file='./DatInfo/Converg.plt')
-    write(111,*)'variables= "t"  "Convergence"  '
-    close(111)
-
     if(isBodyOutput==1)then
         do iFish=1,nFish
             write(fileName,'(I4)') iFish
@@ -107,29 +95,11 @@
     USE SolidBody
     implicit none
     integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend
-    real(8):: convergence,MaMax,weightm,velocity(1:3),Pressure
+    real(8):: weightm,velocity(1:3),Pressure
     integer,parameter::nameLen=4
     character (LEN=nameLen):: fileName
 
     call Write_solid_Data(111,time,timeOutInfo,Asfac)
-
-    UNow=sum(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))
-    convergence=dabs(UNow-UPre)/UNow
-    UPre=UNow
-    open(111,file='./DatInfo/Converg.plt',position='append')
-    write(111,'(2E20.10)')time/Tref,convergence
-    close(111)
-
-    MaMax=MaxVal(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))/dsqrt(Cs2)
-    open(111,file='./DatInfo/MaMax.plt',position='append')
-    write(111,'(2E20.10)')time/Tref,MaMax
-    close(111)
-
-    !open(111,file='./DatInfo/MaxValBody.plt',position='append')
-    !write(111,'(4E20.10)')time/Tref,maxval(dsqrt(xyzful(1:nND_max,1,1:nFish)**2+xyzful(1:nND_max,2,1:nFish)**2+xyzful(1:nND_max,3,1:nFish)**2))/Lref, &
-    !                                maxval(dsqrt(velful(1:nND_max,1,1:nFish)**2+velful(1:nND_max,2,1:nFish)**2+velful(1:nND_max,3,1:nFish)**2))/Uref, &
-    !                                maxval(dsqrt(accful(1:nND_max,1,1:nFish)**2+accful(1:nND_max,2,1:nFish)**2+accful(1:nND_max,3,1:nFish)**2))/Aref
-    !close(111)
 
     if(isBodyOutput==1)then
         call Write_SampBodyNode(111,time,numSampBody,SampBodyNode)

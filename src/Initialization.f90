@@ -514,8 +514,7 @@
     write(13) fIn,xGrid,yGrid,zGrid
     write(13) nFish
     write(13) IXref,IYref,IZref,NDref
-    call Write_cont(13)
-    write(13) UPre,UNow
+    call Write_solid_cont(13)
     close(13)
     ENDSUBROUTINE
 
@@ -535,8 +534,7 @@
     read(13) tmpnfish
     if((tmpnfish .eq. nFish)) then
         read(13) IXref,IYref,IZref,NDref
-        call Read_cont(13)
-        read(13) UPre,UNow
+        call Read_solid_cont(13)
     endif
     close(13)
     ENDSUBROUTINE
