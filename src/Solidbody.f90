@@ -11,17 +11,17 @@ module SolidBody
             use iso_c_binding
             integer(4):: p
             integer(8):: ind
-            real(8)::val
+            real(8),dimension(3)::val
         end subroutine thread_setumap
         subroutine setumap(ind, val) bind (c)
             use iso_c_binding
             integer(8):: ind
-            real(8)::val
+            real(8),dimension(3)::val
         end subroutine setumap
         subroutine getumap(ind, val) bind (c)
             use iso_c_binding
             integer(8):: ind
-            real(8)::val
+            real(8),dimension(3)::val
         end subroutine getumap
         subroutine mergeumap() bind (c)
             use iso_c_binding
@@ -31,7 +31,8 @@ module SolidBody
         end subroutine printumap
     end interface
     ! Immersed boundary method parameters
-    integer:: m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim, m_Kb, m_Jb, m_Ib, m_Kmask, m_Jmask, m_Imask
+    integer:: m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim, m_Kb, m_Jb, m_Ib
+    integer(8):: m_Kmask, m_Jmask, m_Imask
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
@@ -55,8 +56,6 @@ module SolidBody
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)!of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
-        integer,allocatable :: array_i(:)
-        real(8),allocatable :: array_u(:,:)
     contains
         procedure :: Initialise => Initialise_
         procedure :: PlateBuild => PlateBuild_
@@ -367,27 +366,12 @@ module SolidBody
         rtov_ = this%rtov(x)
     ENDFUNCTION rtov_
 
-    subroutine getuuu_(this,uuu)
+    subroutine setuuu_(this,uuu)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         real(8),intent(in)::uuu(m_zDim,m_yDim,m_xDim,1:3)
-        integer:: iEL,ix(-1:2),jy(-1:2),kz(-1:2),x,y,z,num
-        integer:: index
-        integer(8)::ind
-        ind=1
-        call setumap(ind,2.d0)
-        ind=3
-        call setumap(ind,4.d0)
-        ind=3
-        call setumap(ind,5.d0)
-        call printumap
-        ind=4
-        call setumap(ind,5.d0)
-        call printumap
-        ind=-10000000
-        call setumap(ind,5.d0)
-        call printumap
-        allocate(this%array_i(this%v_nelmts*64),this%array_u(this%v_nelmts*64,3))
+        integer:: iEL,ix(-1:2),jy(-1:2),kz(-1:2),x,y,z
+        integer(8):: index
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(iEL,1:4)
             jy = this%v_Ei(iEL,5:8)
@@ -396,69 +380,34 @@ module SolidBody
                 do y=-1,2
                     do z=-1,2
                         call findindex(ix(x),jy(y),kz(z),index)
-                        num = (iEl-1)*64 + (x+1)*16 + (y+1)*4 + (z+1) + 1
-                        this%array_i(num) = index
-                        this%array_u(num,1:3) = uuu(kz(z),jy(y),ix(x),1:3)
+                        call setumap(index,uuu(kz(z),jy(y),ix(x),1:3))
                     enddo
                 enddo
             enddo
         enddo
-        call sort_indices(this%array_i, this%array_u, this%v_nelmts*64)
     end subroutine
 
-    subroutine sort_indices(A, B, n)
-        integer:: n, A(n)
-        real(8):: B(n,1:3)
-        integer:: indices(n)
-        integer:: i, j, temp
-
-        do i = 1, size(A)
-            indices(i) = i
-        end do
-
-        do i = 1, size(A) - 1
-            do j = i + 1, size(A)
-                if (A(indices(i)) > A(indices(j))) then
-                    temp = indices(i)
-                    indices(i) = indices(j)
-                    indices(j) = temp
-                end if
-            end do
-        end do
-
-        call reorder_array()
-        contains
-        subroutine reorder_array()
-            integer:: tempA(n)
-            real(8):: tempB(n,1:3)
-    
-            do i = 1, size(A)
-                tempA(i) = A(indices(i))
-                tempB(i,1:3) = B(indices(i),1:3)
-            end do
-    
-            A = tempA
-            B = tempB
-        end subroutine reorder_array
-    end subroutine sort_indices
-
-    subroutine setuuu_(this,uuu)
+    subroutine getuuu_(this,uuu)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
-        integer:: index,i,j,k,ijk
-        allocate(this%array_i(this%v_nelmts*64),this%array_u(this%v_nelmts*64,3))
-        do  index = 1,this%v_nelmts*64
-            ijk = this%array_i(index)
-            call findijk(ijk,i,j,k)
-            uuu(k,j,i,1:3) = this%array_u(index,1:3)
+        integer:: iEL,ix(-1:2),jy(-1:2),kz(-1:2),x,y,z
+        integer(8):: index
+        do  iEL=1,this%v_nelmts
+            do x=-1,2
+                do y=-1,2
+                    do z=-1,2
+                        call findindex(ix(x),jy(y),kz(z),index)
+                        call getumap(index,uuu(kz(z),jy(y),ix(x),1:3))
+                    enddo
+                enddo
+            enddo
         enddo
-        call sort_indices(this%array_i, this%array_u, this%v_nelmts*64)
     end subroutine
 
     subroutine findindex(i,j,k,index)
         IMPLICIT NONE
-        integer,intent(out):: index
+        integer(8),intent(out):: index
         integer:: i,j,k
         i = ishft((i-1),M_Jb+M_Kb)
         j = ishft((j-1),M_Kb)
@@ -466,7 +415,7 @@ module SolidBody
     end subroutine
     subroutine findijk(index,i,j,k)
         IMPLICIT NONE
-        integer,intent(in):: index
+        integer(8),intent(in):: index
         integer,intent(out):: i,j,k
         i = iand(index,m_Imask)+1
         j = iand(index,m_Jmask)+1
@@ -622,7 +571,7 @@ module SolidBody
         ! update virtual body shape and velocity
         do iFish = 1, m_nFish
             call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
-            call VBodies(iFish)%getuuu(uuu)
+            call VBodies(iFish)%setuuu(uuu)
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
         ! calculate interaction force using immersed-boundary method
@@ -645,7 +594,7 @@ module SolidBody
             ! to do, consider gravity
         enddo
         do iFish=1,m_nFish
-            call VBodies(iFish)%setuuu(uuu)
+            call VBodies(iFish)%getuuu(uuu)
             call VBodies(iFish)%FluidVolumeForce(force)
         enddo
     END SUBROUTINE
@@ -701,7 +650,8 @@ module SolidBody
         real(8):: velElem(3),velElemIB(this%v_nelmts,3),forceElemTemp(this%v_nelmts,3),invh3
         real(8):: uuu(3)
         !==================================================================================================
-        integer::x,y,z,iEL,index,index0
+        integer:: x,y,z,iEL
+        integer(8)::index
         !==================================================================================================
         invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3/m_denIn
         tolerance = 0.d0
@@ -718,9 +668,8 @@ module SolidBody
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        call findindex(ix(x),jy(y),kz(z),index0)
-                        call my_minloc(index0,this%array_i,this%v_nelmts*64,index)
-                        uuu(1:3) = this%array_u(index,1:3)
+                        call findindex(ix(x),jy(y),kz(z),index)
+                        call getumap(index,uuu(1:3))
                         velElemIB(iEL,1:3)=velElemIB(iEL,1:3)+uuu(1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
@@ -753,38 +702,14 @@ module SolidBody
                 do y=-1,2
                     do z=-1,2
                         forceTemp(1:3) = -forceElemTemp(iEL,1:3)*rx(x)*ry(y)*rz(z)
-                        call findindex(ix(x),jy(y),kz(z),index0)
-                        call my_minloc(index0,this%array_i,this%v_nelmts*64,index)
-                        uuu(1:3) = this%array_u(index,1:3)
+                        call findindex(ix(x),jy(y),kz(z),index)
+                        call getumap(index,uuu(1:3))
                         uuu(1:3)  = uuu(1:3)+forceTemp(1:3)
+                        call setumap(index,uuu(1:3))
                     enddo
                 enddo
             enddo
         enddo
-        contains
-        SUBROUTINE my_minloc(x_, array_, len_, index_) ! return the array(index) <= x < array(index+1)
-            implicit none
-            integer:: x_, array_(len_),len_, index_, count, step, it
-                if (x_<array_(1) .or. x_>array_(len_)) then
-                    write(*, *) 'index out of bounds when searching my_minloc', x_, '[', array_(1), array_(len_), ']'
-                    stop
-                endif
-                index_ = 1
-                count = len_
-                do while(count > 0)
-                    step = count / 2
-                    it = index_ + step
-                    if (array_(it) < x_) then
-                        index_ = it + 1
-                        count = count - (step + 1)
-                    else
-                        count = step
-                    endif
-                enddo
-                if (array_(index_)>x_) then
-                    index_ = index_ - 1
-                endif
-        END SUBROUTINE
     END SUBROUTINE PenaltyForce_
 
     subroutine PlateBuild_(this)
