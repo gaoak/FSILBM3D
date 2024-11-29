@@ -2,86 +2,86 @@ module SolidBody
     use SolidSolver
     implicit none
     private
-    interface
-        subroutine initumap(np) bind (c)
-            use iso_c_binding
-            integer(4):: np
-            ! make a clean map for each and all threads
-        end subroutine initumap
+    ! interface
+    !     subroutine initumap(np) bind (c)
+    !         use iso_c_binding
+    !         integer(4):: np
+    !         ! make a clean map for each and all threads
+    !     end subroutine initumap
 
-        subroutine thread_adduindex(p, ind) bind (c)
-            use iso_c_binding
-            integer(4):: p
-            integer(8):: ind
-            ! add an index for thread p
-        end subroutine thread_adduindex
+    !     subroutine thread_adduindex(p, ind) bind (c)
+    !         use iso_c_binding
+    !         integer(4):: p
+    !         integer(8):: ind
+    !         ! add an index for thread p
+    !     end subroutine thread_adduindex
 
-        subroutine setumap(ind, val) bind (c)
-            use iso_c_binding
-            integer(8):: ind
-            real(8):: val(3)
-            ! set velocity for index ind
-        end subroutine setumap
+    !     subroutine setumap(ind, val) bind (c)
+    !         use iso_c_binding
+    !         integer(8):: ind
+    !         real(8):: val(3)
+    !         ! set velocity for index ind
+    !     end subroutine setumap
 
-        subroutine addumap(ind, val) bind (c)
-            use iso_c_binding
-            integer(8):: ind
-            real(8):: val(3)
-            ! add val to velocity at index ind
-        end subroutine addumap
+    !     subroutine addumap(ind, val) bind (c)
+    !         use iso_c_binding
+    !         integer(8):: ind
+    !         real(8):: val(3)
+    !         ! add val to velocity at index ind
+    !     end subroutine addumap
 
-        subroutine getumap(ind, val) bind (c)
-            use iso_c_binding
-            integer(8):: ind
-            real(8):: val(3)
-            ! get velocity of index ind
-        end subroutine getumap
+    !     subroutine getumap(ind, val) bind (c)
+    !         use iso_c_binding
+    !         integer(8):: ind
+    !         real(8):: val(3)
+    !         ! get velocity of index ind
+    !     end subroutine getumap
 
-        subroutine mergeumap() bind (c)
-            use iso_c_binding
-            ! merge all thread indexes to root thread
-        end subroutine mergeumap
+    !     subroutine mergeumap() bind (c)
+    !         use iso_c_binding
+    !         ! merge all thread indexes to root thread
+    !     end subroutine mergeumap
 
-        subroutine allocateuarray() bind (c)
-            use iso_c_binding
-            ! allocate space for velocity values
-        end subroutine allocateuarray
+    !     subroutine allocateuarray() bind (c)
+    !         use iso_c_binding
+    !         ! allocate space for velocity values
+    !     end subroutine allocateuarray
 
-        subroutine findindex(index,i,j,k) bind (c)
-            use iso_c_binding
-            IMPLICIT NONE
-            integer(4):: i,j,k
-            integer(8):: index
-        end subroutine
+    !     subroutine findindex(index,i,j,k) bind (c)
+    !         use iso_c_binding
+    !         IMPLICIT NONE
+    !         integer(4):: i,j,k
+    !         integer(8):: index
+    !     end subroutine
 
-        subroutine findijk(index,i,j,k) bind (c)
-            use iso_c_binding
-            IMPLICIT NONE
-            integer(4):: i,j,k
-            integer(8):: index
-        end subroutine
+    !     subroutine findijk(index,i,j,k) bind (c)
+    !         use iso_c_binding
+    !         IMPLICIT NONE
+    !         integer(4):: i,j,k
+    !         integer(8):: index
+    !     end subroutine
 
-        subroutine inititerator(np, ndata) bind (c)
-            use iso_c_binding
-            integer(4):: np, ndata(np)
-        end subroutine
+    !     subroutine inititerator(np, ndata) bind (c)
+    !         use iso_c_binding
+    !         integer(4):: np, ndata(np)
+    !     end subroutine inititerator
 
-        subroutine getiterator(p, index) bind (c)
-            use iso_c_binding
-            integer(4):: p
-            integer(8):: index
-        end subroutine
+    !     subroutine getiterator(p, index) bind (c)
+    !         use iso_c_binding
+    !         integer(4):: p
+    !         integer(8):: index
+    !     end subroutine getiterator
 
-        subroutine nextiterator(p) bind (c)
-            use iso_c_binding
-            integer(4):: p
-        end subroutine
+    !     subroutine nextiterator(p) bind (c)
+    !         use iso_c_binding
+    !         integer(4):: p
+    !     end subroutine nextiterator
 
-        subroutine printumap() bind (c)
-            use iso_c_binding
-            ! print velocity map for examination
-        end subroutine printumap
-    end interface
+    !     subroutine printumap() bind (c)
+    !         use iso_c_binding
+    !         ! print velocity map for examination
+    !     end subroutine printumap
+    ! end interface
     ! Immersed boundary method parameters
     integer:: m_nthreads,m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
@@ -413,25 +413,6 @@ module SolidBody
         rtov_ = this%rtov(x)
     ENDFUNCTION rtov_
 
-    subroutine setupinterpu(uuu)
-        IMPLICIT NONE
-        real(8),intent(in)::uuu(m_zDim,m_yDim,m_xDim,1:3)
-        integer:: p,x,y,z,ndata(m_nthreads),i
-        integer(8):: index
-        call allocateuarray()
-        call inititerator(m_nthreads,ndata)
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p,x,y,z,i,index)
-        do  p=1,m_nthreads
-            do i=1,ndata(p)
-                call getiterator(p,index)
-                call findijk(index,x,y,z)
-                call setumap(index,uuu(z,y,x,1:3))
-                call nextiterator(p)
-            enddo
-        enddo
-        !$OMP END PARALLEL DO
-    end subroutine
-
     subroutine UpdateElmtInterp_(this,xGrid,yGrid,zGrid)
         use omp_lib
         IMPLICIT NONE
@@ -475,19 +456,8 @@ module SolidBody
             this%v_Ew(iEL,1:4) = rx
             this%v_Ew(iEL,5:8) = ry
             this%v_Ew(iEL,9:12) = rz
-            ! store template index
-            if (p.lt.0) p = omp_get_thread_num()
-            do x=-1,2
-                do y=-1,2
-                    do z=-1,2
-                        call findindex(index, ix(x), jy(y), kz(z))
-                        call thread_adduindex(p, index)
-                    enddo
-                enddo
-            enddo
         enddo
         !$OMP END PARALLEL DO
-        call mergeumap()
 
         contains
         ! return the array(index) <= x < array(index+1)
@@ -593,12 +563,10 @@ module SolidBody
         real(8):: dmaxLBM,dsum
         real(8)::tol,ntol
         ! update virtual body shape and velocity
-        call initumap(m_nthreads)
         do iFish = 1, m_nFish
             call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
-        call setupinterpu(uuu)
         ! calculate interaction force using immersed-boundary method
         iterLBM=0
         dmaxLBM=1d10
@@ -606,7 +574,7 @@ module SolidBody
             dmaxLBM = 0.d0
             dsum=0.0d0
             do iFish=1,m_nFish
-                call VBodies(iFish)%PenaltyForce(tol,ntol)
+                call VBodies(iFish)%PenaltyForce(tol,ntol,uuu)
                 dmaxLBM = dmaxLBM + tol
                 dsum = dsum + ntol
             enddo
@@ -663,16 +631,17 @@ module SolidBody
         enddo
     END SUBROUTINE FluidVolumeForce_
 
-    SUBROUTINE PenaltyForce_(this,tolerance,ntolsum)
+    SUBROUTINE PenaltyForce_(this,tolerance,ntolsum,uuu)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
+        real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
         class(VirtualBody), intent(inout) :: this
         real(8),intent(out)::tolerance, ntolsum
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: velElem(3),velElemIB(3),forceElemTemp(this%v_nelmts,3),invh3
-        real(8):: uuu(3),beta
+        real(8):: beta
         !==================================================================================================
         integer:: x,y,z,iEL
         integer(8)::index
@@ -682,7 +651,7 @@ module SolidBody
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,index,uuu,velElem,velElemIB,forceTemp) reduction(+:tolerance)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,index,velElem,velElemIB,forceTemp) reduction(+:tolerance)
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(iEL,1:4)
             jy = this%v_Ei(iEL,5:8)
@@ -694,9 +663,7 @@ module SolidBody
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        call findindex(index,ix(x),jy(y),kz(z))
-                        call getumap(index,uuu)
-                        velElemIB(1:3)=velElemIB(1:3)+uuu(1:3)*rx(x)*ry(y)*rz(z)
+                        velElemIB(1:3)=velElemIB(1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
             enddo
@@ -723,9 +690,7 @@ module SolidBody
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
-                        forceTemp(1:3) = -forceElemTemp(iEL,1:3)*rx(x)*ry(y)*rz(z)
-                        call findindex(index,ix(x),jy(y),kz(z))
-                        call addumap(index,forceTemp)
+                        uuu(kz(z),jy(y),ix(x),1:3) = uuu(kz(z),jy(y),ix(x),1:3) - forceElemTemp(iEL,1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
             enddo

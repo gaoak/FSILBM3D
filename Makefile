@@ -39,8 +39,9 @@ LINKOPT := $(FFLAGS)
 
 all: FSILBM3D
 
-FSILBM3D : $(OBJ) $(COBJ) $(CPPOBJ)
-	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(COBJ) $(CPPOBJ)  -lstdc++
+FSILBM3D : $(OBJ) $(COBJ) #$(CPPOBJ)
+	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(COBJ)
+#$(CPPOBJ)  -lstdc++
 
 
 $(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
@@ -48,11 +49,11 @@ $(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
 	mv $(@F) ${SRCDIR}
 
 $(COBJ):$(SRCDIR)%.o : $(SRCDIR)%.c
-	$(CC)  -c $<
+	$(CC)  -c -O3 $<
 	mv $(@F) ${SRCDIR}
 
 $(CPPOBJ):$(SRCDIR)%.o : $(SRCDIR)%.cpp
-	$(CPP)  -c $<
+	$(CPP)  -c -O3 $<
 	mv $(@F) ${SRCDIR}
 
 clean:
