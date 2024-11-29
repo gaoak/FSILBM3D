@@ -15,7 +15,7 @@ extern "C" {
     void printumap();
     void findindex(uint16_t* index, int32_t &i, int32_t &j, int32_t &k);
     void findijk(uint16_t* index, int32_t &i, int32_t &j, int32_t &k);
-    void inititerator(int32_t &np, int32_t *ndata, int64_t &index);
+    void inititerator(int32_t &np, int32_t *ndata);
     void getiterator(int32_t &p, int64_t &index);
     void nextiterator(int32_t &p);
 }
@@ -32,7 +32,7 @@ void initumap(int32_t &np) {
     }
 }
 
-void inititerator(int32_t &np, int32_t *ndata, int64_t &index) {
+void inititerator(int32_t &np, int32_t *ndata) {
     int32_t ntmp = umap.size() / np;
     for(int p=0; p<np; ++p) {
         ndata[p] = ntmp;
@@ -48,11 +48,11 @@ void inititerator(int32_t &np, int32_t *ndata, int64_t &index) {
 }
 
 void getiterator(int32_t &p, int64_t &index) {
-    index = iter[p]->first;
+    index = iter[p-1]->first;
 }
 
 void nextiterator(int32_t &p) {
-    ++iter[p];
+    ++iter[p-1];
 }
 
 void thread_adduindex(int32_t &p, int64_t &index) {

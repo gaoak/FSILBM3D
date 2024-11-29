@@ -61,10 +61,9 @@ module SolidBody
             integer(8):: index
         end subroutine
 
-        subroutine inititerator(np, ndata, index) bind (c)
+        subroutine inititerator(np, ndata) bind (c)
             use iso_c_binding
             integer(4):: np, ndata(np)
-            integer(8):: index
         end subroutine
 
         subroutine getiterator(p, index) bind (c)
@@ -420,7 +419,7 @@ module SolidBody
         integer:: p,x,y,z,ndata(m_nthreads),i
         integer(8):: index
         call allocateuarray()
-        call inititerator(m_nthreads,ndata,index)
+        call inititerator(m_nthreads,ndata)
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p,x,y,z,i,index)
         do  p=1,m_nthreads
             do i=1,ndata(p)
