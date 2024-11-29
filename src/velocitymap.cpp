@@ -1,57 +1,71 @@
 #include<cstdint>
+#include<set>
 #include<map>
 #include<vector>
 #include<iostream>
 extern "C" {
     void initumap(int32_t &np);
-    void thread_setumap(int32_t &p, int64_t &index, std::vector<double> &value);
+    void thread_adduindex(int32_t &p, int64_t &index);
     void mergeumap();
-    void setumap(int64_t &index, std::vector<double> &value);
-    void getumap(int64_t &index, std::vector<double> &value);
+    void allocateuarray();
+    void setumap(int64_t &index, double* value);
+    void getumap(int64_t &index, double* value);
     void printumap();
 }
 
-std::vector<std::map<int64_t, std::vector<double>>> threadmap;
-std::map<int64_t, std::vector<double>> umap;
+std::vector<std::set<int64_t>> threadset;
+std::map<int64_t, int> umap;
+std::vector<double> velocity;
 
 void initumap(int32_t &np) {
-    threadmap.resize(np);
+    threadset.resize(np);
     umap.clear();
-    for(auto &m : threadmap) {
+    for(auto &m : threadset) {
         m.clear();
     }
 }
 
-void thread_setumap(int32_t &p, int64_t &index, std::vector<double> &value) {
-    threadmap[p][index] = value;
+void thread_adduindex(int32_t &p, int64_t &index) {
+    threadset[p].insert(index);
 }
 
 void mergeumap() {
-    for(auto &m : threadmap) {
+    int count = int(umap.size());
+    for(auto &m : threadset) {
         for(const auto &it : m) {
-            umap[it.first] = it.second;
+            umap[it] = 3*count;
+            ++count;
         }
         m.clear();
     }
 }
 
-void setumap(int64_t &index, std::vector<double> &value) {
-    umap[index] = value;
+void allocateuarray() {
+    velocity.resize(3*umap.size());
 }
 
-void getumap(int64_t &index, std::vector<double> &value) {
-    value = umap[index];
+void setumap(int64_t &index, double* value) {
+    int i = umap[index];
+    velocity[i  ] = value[0];
+    velocity[i+1] = value[1];
+    velocity[i+2] = value[2];
 }
 
+void getumap(int64_t &index, double value[3]) {
+    int i = umap[index];
+    value[0] = velocity[i  ];
+    value[1] = velocity[i+1];
+    value[2] = velocity[i+2];
+}
 
 void printumap() {
     std::cout << "umap with size " << umap.size() << std::endl;
     for(const auto &it:umap) {
         std::cout << it.first << ", [";
-        for (size_t i = 0; i < it.second.size(); ++i) {
-            std::cout << it.second[i];
-            if (i < it.second.size() - 1) {
-                std::cout << ", ";  // 添加逗号分隔符
+        for (size_t i = 0; i < 3; ++i) {
+            std::cout << velocity[it.second+i];
+            if (i < 2) {
+                std::cout << ", ";
             }
         }
         std::cout << "]" << std::endl;
