@@ -17,6 +17,9 @@ std::map<int64_t, double> umap;
 void initumap(int32_t &np) {
     threadmap.resize(np);
     umap.clear();
+    for(auto &m : threadmap) {
+        m.clear();
+    }
 }
 
 void thread_setumap(int32_t &p, int64_t &index, double &value) {
@@ -30,7 +33,6 @@ void mergeumap() {
         }
         m.clear();
     }
-    threadmap.clear();
 }
 
 void setumap(int64_t &index, double &value) {
