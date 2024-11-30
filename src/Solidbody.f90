@@ -641,7 +641,6 @@ module SolidBody
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: velElemIB(3),forceElemTemp(this%v_nelmts,3),invh3
-        real(8):: beta
         !======================================================
         integer:: x,y,z,iEL
         integer(8)::index
