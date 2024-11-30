@@ -35,7 +35,6 @@
  1          1          1                     read(111,*)     isMotionGiven(4:6,iFish)
  1.000D-0   0.250D+0                         read(111,*)     denR(iFish), psR(iFish)
  1.000D+3   1.000D+3                         read(111,*)     [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
- 0.010D+0   0.000D+0   100                   read(111,*)     dspan,theta,Nspan
 ===================================================================================================
  1                                           read(111,*)     numsubstep
  0.000d+0   0.000d+0                         read(111,*)     dampK,dampM

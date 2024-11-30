@@ -35,14 +35,12 @@
  1          1          1                            read(111,*)     isMotionGiven(iFish,4:6)
  0.200D+0   0.250D+0                                read(111,*)     denR(iFish), psR(iFish)
  0.800D+0   1.000D+3                                read(111,*)     [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
- 0.015625D+0   0.000D+0   64                        read(111,*)     dspan,theta,Nspan
  1          1          1                            read(111,*)     FishNum(FishKind),NumX,NumY
  2          Plate.dat                               read(111,*)     iBodyModel(iFish),FEmeshName(iFish) 
  0          1          1                            read(111,*)     isMotionGiven(iFish,1:3)
  1          1          1                            read(111,*)     isMotionGiven(iFish,4:6)
  0.200D+0   0.250D+0                                read(111,*)     denR(iFish), psR(iFish)
  0.800D+0   1.000D+3                                read(111,*)     [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
- 0.015625D+0   0.000D+0   64                        read(111,*)     dspan,theta,Nspan
 ===================================================================================================
  1                                                  read(111,*)     numsubstep
  0.000D+0   0.000D+0                                read(111,*)     dampK,dampM
