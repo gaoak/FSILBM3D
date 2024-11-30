@@ -4,16 +4,22 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_file()
     USE simParam
-    USE ImmersedBoundary
+    USE SolidBody
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
     integer:: i,iFish,iKind,FishKind,Order0
     integer:: FishOrder1,FishOrder2,LineX,LineY,LineZ
     integer, allocatable:: FishNum(:),NumX(:),NumY(:)
-    character(LEN=40):: nFEmeshName
-    integer:: niBodyModel,nisMotionGiven(1:6),nNspan
-    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt,ndspan,ntheta
+    character(LEN=40):: tmpFEmeshName
+    integer:: niBodyModel,nisMotionGiven(1:6)
+    real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
+    character (LEN=40), allocatable:: FEmeshName(:)
+    integer, allocatable:: isMotionGiven(:,:)
+    real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
+    real(8), allocatable:: Freq(:)
+    real(8), allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:)
+    real(8), allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
     open(unit=111,file='inFlow.dat')
     call readequal(111)
     read(111,*)     npsize
@@ -62,7 +68,6 @@
     if(nFish>0) then
         allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
-        allocate(dspan(1:nFish),theta(1:nFish),Nspan(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
         FishOrder1=0
@@ -72,18 +77,17 @@
     call readequal(111)
     do iKind=1,FishKind
         read(111,*)     FishNum(iKind+1),NumX(iKind),NumY(iKind)
-        read(111,*)     niBodyModel, nFEmeshName
+        read(111,*)     niBodyModel, tmpFEmeshName
         read(111,*)     nisMotionGiven(1:3)
         read(111,*)     nisMotionGiven(4:6)
         read(111,*)     ndenR, npsR
         if(iKB==0) read(111,*)     nEmR, ntcR
         if(iKB==1) read(111,*)     nKB, nKS
-        read(111,*)     ndspan,ntheta,nNspan
         FishOrder1=FishOrder1+FishNum(iKind  )
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
             iBodyModel(iFish)=niBodyModel
-            FEmeshName(iFish)=nFEmeshName
+            FEmeshName(iFish)=tmpFEmeshName
             isMotionGiven(1:6,iFish)=nisMotionGiven(1:6)
             denR(iFish)= ndenR
             psR(iFish) = npsR
@@ -94,9 +98,6 @@
             KB(iFish)  = nKB
             KS(iFish)  = nKS
             endif
-            dspan(iFish) = ndspan
-            theta(iFish) = ntheta
-            Nspan(iFish) = nNspan
         enddo
     enddo
 
@@ -178,6 +179,11 @@
     endif
     call readequal(111)
     close(111)
+
+    call read_solid_file(nFish,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
+                         Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
+                         ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
+                         dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
     END SUBROUTINE
 
     SUBROUTINE readequal(ifile)
@@ -290,106 +296,7 @@
     call OMPPartition(xDim_copy, npsize_copy, partition, parindex)
     END SUBROUTINE
 
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Allocate memory for solid simulation
-!    copyright@ RuNanHua
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE allocate_solid_memory()
-    USE simParam
-    USE ImmersedBoundary
-    implicit none
-    integer:: iND,iFish,maxN
-    real(8), allocatable:: nAsfac(:),nLchod(:),nLspan(:),lentemp(:)
-    if(nFish==0) return
-    allocate(nND(1:nFish),nEL(1:nFish),nMT(1:nFish),nEQ(1:nFish),nBD(1:nFish),nSTF(1:nFish))
 
-    write(*,'(A)') '=============================================================================='
-    do iFish=1,nFish
-    open(unit=idat, file = trim(adjustl(FEmeshName(iFish))))
-    rewind(idat)
-    read(idat,*)
-    read(idat,*)nND(iFish),nEL(iFish),nMT(iFish)
-    read(idat,*)
-    close(idat)
-    enddo
-
-    nND_max=maxval(nND(:))
-    nEL_max=maxval(nEL(:))
-    nMT_max=maxval(nMT(:))
-    nEQ_max=nND_max*6
-    nEQ(:)=nND(:)*6
-
-!   ===============================================================================================
-
-    allocate( ele(nEL_max,5,1:nFish),xyzful00(nND_max,6,1:nFish),xyzful0(nND_max,6,1:nFish),mssful(nND_max,6,1:nFish),lodful(nND_max,6,1:nFish), &
-              extful(nND_max,6,1:nFish),repful(nND_max,1:6,1:nFish),extful1(nND_max,6,1:nFish),extful2(nND_max,6,1:nFish),nloc(nND_max*6,1:nFish),nprof(nND_max*6,1:nFish), &
-              nprof2(nND_max*6,1:nFish),jBC(nND_max,6,1:nFish))
-    allocate( grav(nND_max,6,1:nFish),vBC(nND_max,6,1:nFish),mss(nND_max*6,1:nFish),prop(nMT_max,10,1:nFish),areaElem00(nEL_max,1:nFish),areaElem(nEL_max,1:nFish))
-
-    allocate( xyzful(nND_max,6,1:nFish),xyzfulnxt(nND_max,6,1:nFish),dspful(nND_max,6,1:nFish),velful(nND_max,6,1:nFish),accful(nND_max,6,1:nFish))
-    allocate( triad_nn(3,3,nND_max,1:nFish),triad_ee(3,3,nEL_max,1:nFish),triad_e0(3,3,nEL_max,1:nFish) )
-    allocate( triad_n1(3,3,nEL_max,1:nFish),triad_n2(3,3,nEL_max,1:nFish),triad_n3(3,3,nEL_max,1:nFish) )
-
-    repful(:,:,:) =0.d0
-    extful1(:,:,:)=0.d0
-    extful2(:,:,:)=0.d0
-
-!   ===============================================================================================
-    do iFish=1,nFish
-    open(unit=idat, file = trim(adjustl(FEmeshName(iFish))))
-    rewind(idat)
-    read(idat,*)
-    read(idat,*)nND(iFish),nEL(iFish),nMT(iFish)
-    read(idat,*)
-
-    call read_structural_datafile(jBC(1:nND(iFish),1:6,iFish),ele(1:nEL(iFish),1:5,iFish),nloc(1:nND(iFish)*6,iFish),nprof(1:nND(iFish)*6,iFish), &
-                                      nprof2(1:nND(iFish)*6,iFish),xyzful00(1:nND(iFish),1:6,iFish),prop(1:nMT(iFish),1:10,iFish),nND(iFish), &
-                                      nEL(iFish),nEQ(iFish),nMT(iFish),nBD(iFish),nSTF(iFish),idat)
-    close(idat)
-    if (maxval(Nspan).gt.0 .and. maxval(dabs(prop(1:nMT(iFish),5,iFish))).gt.1d-6) then
-        write(*,*) 'Extruded body should have zero rotation angle, gamma', prop(1:nMT(iFish),5,iFish)
-        stop
-    endif
-    write(*,*)'read FEMeshFile ',iFish,' end'
-    enddo
-!   ===============================================================================================
-!   calculate area
-    allocate(elmax(1:nFish),elmin(1:nFish))
-    allocate(nAsfac(1:nFish),nLchod(1:nFish),nLspan(1:nFish),lentemp(1:nFish))
-    do iFish=1,nFish
-        call cptArea(areaElem00(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful00(1:nND(iFish),1:6,iFish))
-        nAsfac(iFish)=sum(areaElem00(1:nEL(iFish),iFish))
-        elmax(iFish)=maxval(areaElem00(1:nEL(iFish),iFish))
-        elmin(iFish)=minval(areaElem00(1:nEL(iFish),iFish))
-    enddo
-    !calculate spanwise length, chord length, aspect ratio
-    do iFish=1,nFish
-        nLchod(iFish)  = maxval(xyzful00(:,1,iFish))-minval(xyzful00(:,1,iFish))
-        lentemp(iFish) = maxval(xyzful00(:,2,iFish))-minval(xyzful00(:,2,iFish))
-        if(lentemp(iFish) .gt. nLchod(iFish)) nLchod(iFish) = lentemp(iFish)
-    enddo
-    if (maxval(Nspan).gt.0) then
-        Lspan = maxval(dspan*Nspan)
-    else
-        Lspan = maxval(xyzful00(:,3,iFish))-minval(xyzful00(:,3,iFish))
-    endif
-    !Use the object with the largest area as the reference object
-    maxN  = maxloc(nAsfac, dim=1)
-    Asfac = nAsfac(maxN)
-    Lchod = nLchod(maxN)
-
-    if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
-    if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
-
-    AR    = Lspan**2/Asfac
-
-!   loading boundary type*******************************************************************************
-    do  iFish=1,nFish
-    do    iND=1,nND(iFish)
-        if(jBC(iND,1,iFish)==1) jBC(iND,1:6,iFish)=isMotionGiven(1:6,iFish)
-    enddo
-    enddo
-    END SUBROUTINE allocate_solid_memory
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    initialize flow field
@@ -439,73 +346,14 @@
     END SUBROUTINE initialize_flow
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    initialize solid field
-!    copyright@ RuNanHua
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE initialize_solid()
-    USE simParam
-    USE ImmersedBoundary
-    implicit none
-    integer:: iND,iFish
-    if(nFish.eq.0) return
-    allocate(TTT00(1:3,1:3,1:nFish),TTT0(1:3,1:3,1:nFish),TTTnow(1:3,1:3,1:nFish),TTTnxt(1:3,1:3,1:nFish))
-    allocate(XYZ(1:3,1:nFish),XYZd(1:3,1:nFish),UVW(1:3,1:nFish) )
-    allocate(AoA(1:3,1:nFish),AoAd(1:3,1:nFish),WWW1(1:3,1:nFish),WWW2(1:3,1:nFish),WWW3(1:3,1:nFish) )
-
-    do iFish=1,nFish
-        TTT00(:,:,iFish)=0.0d0
-        TTT00(1,1,iFish)=1.0d0
-        TTT00(2,2,iFish)=1.0d0
-        TTT00(3,3,iFish)=1.0d0
-
-        XYZ(1:3,iFish)=XYZo(1:3,iFish)+XYZAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*time+XYZPhi(1:3,iFish))
-        AoA(1:3,iFish)=AoAo(1:3,iFish)+AoAAmpl(1:3,iFish)*dcos(2.0*pi*Freq(iFish)*time+AoAPhi(1:3,iFish))
-
-        call AoAtoTTT(AoA(1:3,iFish),TTT0(1:3,1:3,iFish))
-        call AoAtoTTT(AoA(1:3,iFish),TTTnow(1:3,1:3,iFish))
-        call get_angle_triad(TTT0(1:3,1:3,iFish),TTTnow(1:3,1:3,iFish),AoAd(1,iFish),AoAd(2,iFish),AoAd(3,iFish))
-
-        do iND=1,nND(iFish)
-            xyzful0(iND,1:3,iFish)=matmul(TTT0(1:3,1:3,iFish),xyzful00(iND,1:3,iFish))+XYZ(1:3,iFish)
-            xyzful0(iND,4:6,iFish)=AoAd(1:3,iFish)
-        enddo
-
-        xyzful(1:nND(iFish),1:6,iFish)=xyzful0(1:nND(iFish),1:6,iFish)
-        velful(1:nND(iFish),1:6,iFish)=0.0
-
-        dspful(1:nND(iFish),1:6,iFish)=0.0
-        accful(1:nND(iFish),1:6,iFish)=0.0
-
-        if(ele(1,4,iFish).eq.2)then
-            CALL formmass_D(ele(1:nEL(iFish),1:5,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
-                            prop(1:nMT(iFish),1:10,iFish),mss(1:nND(iFish)*6,iFish),nND(iFish),nEL(iFish),nEQ(iFish),nMT(iFish),alphaf)
-
-            do iND = 1, nND(iFish)
-                mssful(iND,1:6,iFish)= mss((iND-1)*6+1:(iND-1)*6+6,iFish)
-                grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
-            enddo
-
-            CALL init_triad_D(ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1,iFish),xyzful(1:nND(iFish),2,iFish),xyzful(1:nND(iFish),3,iFish), &
-                            triad_nn(1:3,1:3,1:nND(iFish),iFish),triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
-                            triad_ee(1:3,1:3,1:nEL(iFish),iFish),triad_e0(1:3,1:3,1:nEL(iFish),iFish),nND(iFish),nEL(iFish))
-        else
-            do iND = 1, nND(iFish)
-                mssful(iND,1:6,iFish)= 1.0d0 !Culculate accCentM/velCentM/xyzCentM requires mass not zero
-                grav(iND,1:6,iFish)  = mssful(iND,1:6,iFish)*[g(1),g(2),g(3),0.0d0,0.0d0,0.0d0]
-            enddo
-        endif
-
-    enddo
-    END SUBROUTINE initialize_solid
-
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    calculate Bolztman parameters from flow parameters
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE calculate_LB_params()
     USE simParam
+    USE SolidBody
     implicit none
-    integer:: nt(1:nFish),iFish
+    integer:: iFish
     real(8):: nUref(1:nFish)
 !   reference values: length, velocity, time
     if(nFish.eq.0) then
@@ -525,15 +373,15 @@
     elseif(RefVelocity==4) then
         Uref = dabs(VelocityAmp)  !Velocity Amplitude
     elseif(RefVelocity==10) then
-        Uref = Lref * MAXVAL(Freq(1:nFish))
+        Uref = Lref * MAXVAL(VBodies(:)%rbm%Freq)
     elseif(RefVelocity==11) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))
+        nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     elseif(RefVelocity==12) then
         do iFish=1,nFish
-        nUref(iFish)=2.d0*pi*Freq(iFish)*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*2.D0 !Park 2017 pof
+        nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))*2.D0 !Park 2017 pof
         enddo
         Uref = MAXVAL(nUref(1:nFish))
     !else
@@ -543,25 +391,9 @@
     if(RefTime==0) then
         Tref = Lref / Uref
     elseif(RefTime==1) then
-        Tref = 1 / maxval(Freq(:))
+        Tref = 1 / maxval(VBodies(:)%rbm%Freq)
     !else
     endif
-
-    do iFish=1,nFish
-        St(iFish) = Lref * Freq(iFish) / Uref
-    enddo
-    g(1:3)=Frod(1:3) * Uref ** 2/Lref
-    uMax = 0.
-    do iFish=1,nFish
-        ! angle to radian
-        AoAo(1:3,iFish)=AoAo(1:3,iFish)/180.0*pi
-        AoAAmpl(1:3,iFish)=AoAAmpl(1:3,iFish)/180.0*pi
-        AoAPhi(1:3,iFish)=AoAPhi(1:3,iFish)/180.0*pi
-        XYZPhi(1:3,iFish)=XYZPhi(1:3,iFish)/180.0*pi
-        uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*pi*MAXVAL(dabs(xyzAmpl(1:3,iFish)))*Freq(iFish), &
-            2.0*pi*MAXVAL(dabs(AoAAmpl(1:3,iFish))*[maxval(dabs(xyzful00(:,2,iFish))), &
-            maxval(dabs(xyzful00(:,1,iFish))),maxval(dabs(xyzful00(:,3,iFish)))])*Freq(iFish)])
-    enddo
 
 !   calculate viscosity, LBM relexation time
     ratio  =  dt/dh
@@ -593,46 +425,9 @@
     Fref=0.5*denIn*Uref**2*Asfac
     Eref=0.5*denIn*Uref**2*Asfac*Lref
     Pref=0.5*denIn*Uref**2*Asfac*Uref
-    !calculate material parameters
-    do iFish=1,nFish
-    nt(iFish)=ele(1,4,iFish)
-    if(iKB==0)then
-        prop(1:nMT(iFish),1,iFish) = EmR(iFish)*denIn*Uref**2
-        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0+psR(iFish))
-        Lthck= tcR(iFish)*Lref
-        prop(1:nMT(iFish),3,iFish) = tcR(iFish)*Lref
-        prop(1:nMT(iFish),4,iFish) = denR(iFish)*Lref*denIn/prop(1:nMT(iFish),3,iFish)
-        if    (nt(iFish)==2)then   !frame
-        prop(1:nMT(iFish),7,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        prop(1:nMT(iFish),8,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        elseif(nt(iFish)==3)then   !plate
-        prop(1:nMT(iFish),6,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        else
-        endif
-        KB=prop(nMT(iFish),1,iFish)*prop(nMT(iFish),6,iFish)/(denIn*Uref**2*Lref**3)
-        KS=prop(nMT(iFish),1,iFish)*prop(nMT(iFish),3,iFish)/(denIn*Uref**2*Lref)
-    endif
 
-    if(iKB==1)then
-        prop(1:nMT(iFish),3,iFish) = dsqrt(KB(iFish)/KS(iFish)*12.0d0)*Lref
-        prop(1:nMT(iFish),4,iFish) = denR(iFish)*Lref*denIn/prop(1:nMT(iFish),3,iFish)
-        if    (nt(iFish)==2)then   !frame
-        prop(1:nMT(iFish),1,iFish) = KS(iFish)*denIn*Uref**2*Lref/prop(1:nMT(iFish),3,iFish)
-        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0d0+psR(iFish))
-        prop(1:nMT(iFish),7,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        prop(1:nMT(iFish),8,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        elseif(nt(iFish)==3)then   !plate
-        prop(1:nMT(iFish),1,iFish) = KS(iFish)*denIn*Uref**2*Lref/prop(1:nMT(iFish),3,iFish)
-        prop(1:nMT(iFish),2,iFish) = prop(1:nMT(iFish),1,iFish)/2.0d0/(1.0d0+psR(iFish))
-        prop(1:nMT(iFish),6,iFish) = prop(1:nMT(iFish),3,iFish)**3/12.0d0
-        else
-        endif
-        EmR(iFish) = prop(nMT(iFish),1,iFish)/(denIn*Uref**2)
-        tcR(iFish) = prop(nMT(iFish),3,iFish)/Lref
-        Lthck=prop(nMT(iFish),3,iFish)
-    endif
-    enddo
-
+    g(1:3)=Frod(1:3) * Uref ** 2/Lref
+    call Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,uMax,Lthck)
     END SUBROUTINE calculate_LB_params
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -709,45 +504,37 @@
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write check point file for restarting simulation
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE write_checkpoint_file()
     USE simParam
-    USE ImmersedBoundary
+    USE SolidBody
     IMPLICIT NONE
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
     write(13) step,time
     write(13) fIn,xGrid,yGrid,zGrid
-    write(13) nFish, nND_max
+    write(13) nFish
     write(13) IXref,IYref,IZref,NDref
-    write(13) xyzful0,xyzful,dspful,velful,accful,extful,mss,mssful,grav
-    write(13) triad_nn,triad_ee,triad_e0
-    write(13) triad_n1,triad_n2,triad_n3
-    write(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
+    call Write_solid_cont(13)
     close(13)
     ENDSUBROUTINE
 
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    read check point file for restarting simulation
-!    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_checkpoint_file()
     USE simParam
-    USE ImmersedBoundary
+    USE SolidBody
     IMPLICIT NONE
-    integer:: tmpnfish, tmpND_max
+    integer:: tmpnfish
 
     open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
     read(13) step,time
     read(13) fIn,xGrid,yGrid,zGrid
-    read(13) tmpnfish, tmpND_max
-    if((tmpnfish .eq. nFish) .and. (tmpND_max .eq. nND_max)) then
+    read(13) tmpnfish
+    if((tmpnfish .eq. nFish)) then
         read(13) IXref,IYref,IZref,NDref
-        read(13) xyzful0,xyzful,dspful,velful,accful,extful,mss,mssful,grav
-        read(13) triad_nn,triad_ee,triad_e0
-        read(13) triad_n1,triad_n2,triad_n3
-        read(13) UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
+        call Read_solid_cont(13)
     endif
     close(13)
     ENDSUBROUTINE

@@ -55,17 +55,16 @@
     real(8):: VolumeForce(1:SpcDim),VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpcDim)
     integer, allocatable:: SampBodyNode(:,:), iBodyModel(:)
     real(8), allocatable:: SampFlowPint(:,:)
+    integer:: nFish,NDref
     real(8):: Xref,Yref,Zref
     real(8):: timeSimTotl,timeOutTemp,timeOutBody,timeOutFlow,timeOutInfo,timeOutBegin,timeOutEnd
-    real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFEM,dtolFSI,subdeltat
+    real(8):: dtolLBM,Palpha,Pbeta,Pramp,uMax,dtolFEM,dtolFSI,deltat,subdeltat
     real(8):: uuuIn(1:SpcDim),shearRateIn(1:SpcDim),denIn,g(1:SpcDim)
     real(8):: AmplInitDist(1:SpcDim),waveInitDist,AmplforcDist(1:SpcDim),FreqforcDist
     real(8):: posiForcDist(1:SpcDim),begForcDist,endForcDist
     real(8):: Re,AR,Frod(1:SpcDim)
-    real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
     real(8):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,alpham,alphap
     real(8):: Uref,Lref,Tref,Aref,Fref,Eref,Pref,Lthck,Lchod,Lspan,Asfac
-    real(8):: UPre,UNow,Et,Ek,Ep,Es,Eb,Ew
 
     real(8):: upxc0, upxcm, upxcmm
     real(8):: upyc0, upycm, upycmm
@@ -78,7 +77,6 @@
     character (LEN=40):: LBmeshName
     integer:: xDim,yDim,zDim
     integer:: xMinBC,xMaxBC,yMinBC,yMaxBC,zMinBC,zMaxBC,iBC
-    real(8), allocatable:: elmax(:),elmin(:)
     real(8):: dh,dt,ratio,dxmin,dymin,dzmin,dxmax,dymax,dzmax
     real(8):: cptxMin,cptxMax,cptyMin,cptyMax,cptzMin,cptzMax
     real(8):: Omega,tau,Cs2,nu,Mu
@@ -89,39 +87,13 @@
 
 !   ***********************************************************************************************
 !   ***********************************************************************************************
-    integer, parameter:: idat=12, DOFDim=6
-    character (LEN=40), allocatable:: FEmeshName(:)
-!   ***********************************************************************************************
-    real(8):: deltaT
-    real(8), allocatable:: Freq(:)
-    real(8), allocatable:: XYZ(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),XYZd(:,:),UVW(:,:)
-    real(8), allocatable:: AoA(:,:),AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:),AoAd(:,:),WWW1(:,:),WWW2(:,:),WWW3(:,:)
-    real(8), allocatable:: TTT00(:,:,:),TTT0(:,:,:),TTTnow(:,:,:),TTTnxt(:,:,:)
-!   ***********************************************************************************************
-    integer:: nFish,nND_max,nEL_max,nMT_max,nEQ_max,NDref
-    integer, allocatable:: nND(:),nEL(:),nEQ(:),nMT(:),nBD(:),nSTF(:)
-    integer, allocatable:: NDtl(:,:),NDhd(:,:),NDct(:),isMotionGiven(:,:)
-!   ===============================================================================================
-    integer, allocatable:: ele(:,:,:),jBC(:,:,:),nloc(:,:),nprof(:,:),nprof2(:,:)
-    real(8), allocatable:: xyzful00(:,:,:),mssful(:,:,:),vBC(:,:,:),prop(:,:,:),mss(:,:),areaElem00(:,:),areaElem(:,:)
-    real(8), allocatable:: lodful(:,:,:),repful(:,:,:),extful(:,:,:),extful1(:,:,:),extful2(:,:,:),grav(:,:,:)
-
-    real(8), allocatable:: xyzful0(:,:,:),xyzfulnxt(:,:,:),dspful(:,:,:),accful(:,:,:)
-    real(8), allocatable:: xyzful(:,:,:),velful(:,:,:)
-    real(8), allocatable:: triad_nn(:,:,:,:),triad_ee(:,:,:,:),triad_e0(:,:,:,:)
-    real(8), allocatable:: triad_n1(:,:,:,:),triad_n2(:,:,:,:),triad_n3(:,:,:,:)
-!   ***********************************************************************************************
+    integer, parameter:: DOFDim=6
     END MODULE simParam
 
     MODULE PartitionXDim
         integer:: npsize_copy, xDim_copy
         integer, allocatable:: partition(:), parindex(:),eid(:)
         real(8), allocatable:: edge(:,:,:)
-    END MODULE
-
-    MODULE ImmersedBoundary
-        integer, allocatable:: Nspan(:)
-        real(8), allocatable:: dspan(:), theta(:)
     END MODULE
 
     MODULE OutFlowWorkspace

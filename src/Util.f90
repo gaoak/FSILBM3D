@@ -4,7 +4,7 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfoTitl()
     USE simParam
-    USE ImmersedBoundary
+    USE SolidBody
     implicit none
     integer:: i,iFish
     integer,parameter::nameLen=4
@@ -33,7 +33,7 @@
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
         !===============================================================================
-        write(Nodename,'(I4.4)') nNd(iFish)
+        write(Nodename,'(I4.4)') VBodies(iFish)%rbm%nNd
         open(111,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
@@ -59,25 +59,20 @@
         close(111)
     enddo
 
-    !open(111,file='./DatInfo/MaxValBody.plt')
-    !write(111,*)'variables= "t"  "xyzMax" "velMax" "accMax"  '
-    !close(111)
-
-    open(111,file='./DatInfo/MaMax.plt')
-    write(111,*)'variables= "t"  "MaMax"  '
-    close(111)
-
-    open(111,file='./DatInfo/Converg.plt')
-    write(111,*)'variables= "t"  "Convergence"  '
-    close(111)
-
     if(isBodyOutput==1)then
-    do  i=1,numSampBody
-        write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-        open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-    enddo
+        do iFish=1,nFish
+            write(fileName,'(I4)') iFish
+            fileName = adjustr(fileName)
+            do  i=1,nameLen
+                if(fileName(i:i)==' ')fileName(i:i)='0'
+            enddo
+            do  i=1,numSampBody
+                write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
+                open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
+                write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
+                close(111)
+            enddo
+        enddo !iFish
     endif
 
     if(isFluidOutput==1)then
@@ -97,119 +92,17 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfo()
     USE simParam
-    USE ImmersedBoundary
+    USE SolidBody
     implicit none
-    integer:: i,iEL,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend,iFish
-    real(8):: EEE(2),strainEnergy(nEL_max,2,nFish)
-    real(8):: convergence,MaMax,weightm,velocity(1:3),Pressure
-    real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+    integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend
+    real(8):: weightm,velocity(1:3),Pressure
     integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName,Nodename
+    character (LEN=nameLen):: fileName
 
-    do iFish=1,nFish
-
-        write(fileName,'(I4)') iFish
-        fileName = adjustr(fileName)
-        do  i=1,nameLen
-             if(fileName(i:i)==' ')fileName(i:i)='0'
-        enddo
-
-        if    (iForce2Body==1)then   !Same force as flow
-        open(111,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
-        write(111,'(4E20.10)')time/Tref,sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
-        close(111)
-        elseif(iForce2Body==2)then   !stress force
-        open(111,file='./DatInfo/ForceStress'//trim(fileName)//'.plt',position='append')
-        write(111,'(4E20.10)')time/Tref,sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
-        close(111)
-        endif
-
-        !==============================================================================================
-        open(111,file='./DatInfo/SampBodyNodeBegin'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,xyzful(1,1:3,iFish)/Lref,velful(1,1:3,iFish)/Uref,accful(1,1:3,iFish)/Aref
-        close(111)
-        !===============================================================================
-        write(Nodename,'(I4.4)') nNd(iFish)
-        open(111,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,xyzful(nND(iFish),1:3,iFish)/Lref,velful(nND(iFish),1:3,iFish)/Uref,accful(nND(iFish),1:3,iFish)/Aref
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyMean'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref, &
-                                         sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref, &
-                                         sum(accful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Aref
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyAngular'//trim(fileName)//'.plt',position='append')
-        write(111,'(5E20.10)')time/Tref,datan((xyzful(nND(iFish),2,iFish)-xyzful(1,2,iFish))/(xyzful(nND(iFish),1,iFish)-xyzful(1,1,iFish))),    &
-                                        xyzful(nND(iFish),2,iFish)/Lref-xyzful(1,2,iFish)/Lref,xyzful(1,2,iFish)/Lref,xyzful(nND(iFish),2,iFish)/Lref
-        close(111)
-
-        !==============================================================================================
-
-        Pax=sum(extful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
-        Pay=sum(extful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
-        Paz=sum(extful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
-        Paero=Pax+Pay+Paz
-        Pix=-sum(mssful(1:nND(iFish),1,iFish)*accful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
-        Piy=-sum(mssful(1:nND(iFish),2,iFish)*accful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
-        Piz=-sum(mssful(1:nND(iFish),3,iFish)*accful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
-        Piner=Pix+Piy+Piz
-        Ptot=Paero+Piner
-        open(111,file='./DatInfo/Power'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
-        close(111)
-
-        call cptArea(areaElem(1:nEL(iFish),iFish),nND(iFish),nEL(iFish),ele(1:nEL(iFish),1:5,iFish),xyzful(1:nND(iFish),1:6,iFish))
-        open(111,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
-        write(111,'(2E20.10)')time/Tref,sum(areaElem(:,iFish))/Asfac
-        close(111)
-
-        call strain_energy_D(strainEnergy(1:nEL(iFish),1:2,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
-                                xyzful(1:nND(iFish),1,iFish), xyzful(1:nND(iFish),2,iFish), xyzful(1:nND(iFish),3,iFish),ele(1:nEL(iFish),1:5,iFish), prop(1:nMT(iFish),1:10,iFish), &
-                                triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
-                                triad_ee(1:3,1:3,1:nEL(iFish),iFish), &
-                                nND(iFish),nEL(iFish),nMT(iFish))
-        EEE(1)=sum(strainEnergy(1:nEL(iFish),1,iFish))
-        EEE(2)=sum(strainEnergy(1:nEL(iFish),2,iFish))
-        Es=EEE(1)/Eref
-        Eb=EEE(2)/Eref
-        Ep=Es+Eb
-        Ew=Ew+Paero*timeOutInfo
-        Ek=0.5*sum(mssful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish))/Eref
-        Et=Ek+Ep
-
-        open(111,file='./DatInfo/Energy'//trim(fileName)//'.plt', position='append')
-        write(111,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
-        close(111)
-
-    enddo !nFish
-
-    UNow=sum(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))
-    convergence=dabs(UNow-UPre)/UNow
-    UPre=UNow
-    open(111,file='./DatInfo/Converg.plt',position='append')
-    write(111,'(2E20.10)')time/Tref,convergence
-    close(111)
-
-    MaMax=MaxVal(dsqrt( uuu(:,:,:,1)**2+uuu(:,:,:,2)**2+uuu(:,:,:,3)**2))/dsqrt(Cs2)
-    open(111,file='./DatInfo/MaMax.plt',position='append')
-    write(111,'(2E20.10)')time/Tref,MaMax
-    close(111)
-
-    !open(111,file='./DatInfo/MaxValBody.plt',position='append')
-    !write(111,'(4E20.10)')time/Tref,maxval(dsqrt(xyzful(1:nND_max,1,1:nFish)**2+xyzful(1:nND_max,2,1:nFish)**2+xyzful(1:nND_max,3,1:nFish)**2))/Lref, &
-    !                                maxval(dsqrt(velful(1:nND_max,1,1:nFish)**2+velful(1:nND_max,2,1:nFish)**2+velful(1:nND_max,3,1:nFish)**2))/Uref, &
-    !                                maxval(dsqrt(accful(1:nND_max,1,1:nFish)**2+accful(1:nND_max,2,1:nFish)**2+accful(1:nND_max,3,1:nFish)**2))/Aref
-    !close(111)
+    call Write_solid_Data(111,time,timeOutInfo,Asfac)
 
     if(isBodyOutput==1)then
-    do  i=1,numSampBody
-        write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-        open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref, xyzful(SampBodyNode(i,iFish),1:3,iFish)/Lref,velful(SampBodyNode(i,iFish),1:3,iFish)/Uref,accful(SampBodyNode(i,iFish),1:3,iFish)/Aref
-        close(111)
-    enddo
+        call Write_SampBodyNode(111,time,numSampBody,SampBodyNode)
     endif
 
     if(isFluidOutput==1)then
@@ -220,11 +113,25 @@
         else
                 xbgn=x-1;xend=x
         endif
+        if(xend.eq.xDim+1) then
+            xbgn = xDim - 1
+            xend = xDim
+        else if(xbgn.eq.0) then
+            xbgn = 1
+            xend = 2
+        endif
         y=minloc(dabs(SampFlowPint(i,2)-yGrid(1:yDim)),1)
         if(SampFlowPint(i,2)-yGrid(y)>0.0d0)then
                 ybgn=y; yend=y+1
         else
                 ybgn=y-1;yend=y
+        endif
+        if(yend.eq.yDim+1) then
+            ybgn = yDim - 1
+            yend = yDim
+        else if(ybgn.eq.0) then
+            ybgn = 1
+            yend = 2
         endif
         z=minloc(dabs(SampFlowPint(i,3)-zGrid(1:zDim)),1)
         if(SampFlowPint(i,3)-zGrid(z)>0.0d0)then
@@ -232,7 +139,13 @@
         else
                 zbgn=z-1;zend=z
         endif
-
+        if(zend.eq.zDim+1) then
+            zbgn = zDim - 1
+            zend = zDim
+        else if(zbgn.eq.0) then
+            zbgn = 1
+            zend = 2
+        endif
 
         velocity(1:3)=0.0d0
         Pressure=0.0d0
@@ -380,7 +293,6 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
 !    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine AoAtoTTT(AoA,TTT)
     implicit none
@@ -454,7 +366,6 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   write  string to unit=idfile  in binary format
 !    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine dumpstring(instring,idfile)
     implicit none
@@ -504,7 +415,7 @@
     USE simParam
     implicit none
     integer:: x, y, z,xbgn,xend,ybgn,yend,zbgn,zend
-    real(8):: rx,ry,rz,Phi
+    real(8):: rx,ry,rz
 
     xbgn    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)-3
     xend    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)+4
@@ -525,6 +436,19 @@
     enddo
     enddo
     enddo
+    contains
+    FUNCTION Phi(x_)
+        IMPLICIT NONE
+        real(8)::Phi,x_,r
+        r=dabs(x_)
+        if(r<1.0d0)then
+            Phi=(3.d0-2.d0*r+dsqrt( 1.d0+4.d0*r*(1.d0-r)))*0.125d0
+        elseif(r<2.0d0)then
+            Phi=(5.d0-2.d0*r-dsqrt(-7.d0+4.d0*r*(3.d0-r)))*0.125d0
+        else
+            Phi=0.0d0
+        endif
+    ENDFUNCTION Phi
     end
 
     SUBROUTINE OMPPartition(xDim, np, partition, parindex)
@@ -594,81 +518,3 @@
         integer,dimension(8) :: values
         CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
     ENDFUNCTION
-
-    SUBROUTINE my_minloc(x, array, len, uniform, index) ! return the array(index) <= x < array(index+1)
-        implicit none
-        integer:: len, index, count, step, it
-        real(8):: x, array(len)
-        logical:: uniform
-        if (.not.uniform) then
-            if (x<array(1) .or. x>array(len)) then
-                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-                stop
-            endif
-            index = 1
-            count = len
-            do while(count > 0)
-                step = count / 2
-                it = index + step
-                if (array(it) < x) then
-                    index = it + 1
-                    count = count - (step + 1)
-                else
-                    count = step
-                endif
-            enddo
-            if (array(index)>x) then
-                index = index - 1
-            endif
-        else
-            index = 1 + int((x - array(1))/(array(len)-array(1))*dble(len-1))
-            !int -1.1 -> -1; 1.1->1; 1.9->1
-            if (index<1 .or. index>len) then
-                write(*, *) 'index out of bounds when searching my_minloc', x, '[', array(1), array(len), ']'
-                stop
-            endif
-        endif
-    END SUBROUTINE
-
-    ! return the array(index) <= x < array(index+1)
-    ! assum uniform grid around x(x=i0) = x0
-    SUBROUTINE minloc_fast(x, x0, i0, invdh, index, offset)
-        implicit none
-        integer, intent(in):: i0
-        real(8), intent(in):: x, x0, invdh
-        integer, intent(out):: index
-        real(8), intent(out):: offset
-        offset = (x - x0)*invdh
-        index = floor(offset)
-        offset = offset - dble(index)
-        index = index + i0
-    END SUBROUTINE
-
-    SUBROUTINE trimedindex(i, xDim, ix, boundaryConditions)
-        USE BoundCondParams
-        implicit none
-        integer, intent(in):: boundaryConditions(1:2)
-        integer, intent(in):: i, xDim
-        integer, intent(out):: ix(-1:2)
-        integer:: k
-        do k=-1,2
-            ix(k) = i + k
-            if (ix(k)<1) then
-                if(boundaryConditions(1).eq.Periodic) then
-                    ix(k) = ix(k) + xDim
-                else if((boundaryConditions(1).eq.SYMMETRIC .or. boundaryConditions(1).eq.wall) .and. ix(k).eq.0) then
-                    ix(k) = 2
-                else
-                    write(*,*) 'index out of xmin bound', ix(k)
-                endif
-            else if(ix(k)>xDim) then
-                if(boundaryConditions(2).eq.Periodic) then
-                    ix(k) = ix(k) - xDim
-                else if((boundaryConditions(2).eq.SYMMETRIC .or. boundaryConditions(2).eq.wall) .and. ix(k).eq.xDim+1) then
-                    ix(k) = xDim - 1
-                else
-                    write(*,*) 'index out of xmax bound', ix(k)
-                endif
-            endif
-        enddo
-    END SUBROUTINE trimedindex
