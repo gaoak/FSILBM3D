@@ -913,7 +913,7 @@ module SolidBody
         close(fileiD)
         i = index(FEmeshName, '.')
         FEmeshName = FEmeshName(:i) // 'dat'
-        open(unit=fileiD, file = trim(adjustl(FEmeshName)) )! write *.dat file
+        open(unit=fileiD, file = trim(adjustl(FEmeshName)),position='append')! write *.dat file
             write(fileiD,*) "Frame3D"
             write(fileiD,*) tmpnpts, tmpnelmts, "     1     ", iBodyModel, "     0. 0. 1."
             write(fileiD,*) "END"
