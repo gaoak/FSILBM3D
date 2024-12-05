@@ -487,15 +487,16 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         if (this%v_type .eq. 1 .or. this%v_type .eq. 4) then
             call this%PlateUpdatePosVelArea()
-        elseif (this%v_type .eq. 0 ) then
+        elseif (this%v_type .eq. 0 .and. count_Area .eq. 0) then
+            call this%SurfaceUpdatePosVel()
+            call this%SurfaceUpdateArea()
+            count_Area = 1
+        elseif (this%v_type .eq. 3) then
             call this%SurfaceUpdatePosVel()
             if (count_Area .eq. 0) then
                 call this%SurfaceUpdateArea()
                 count_Area = 1
             endif
-        elseif (this%v_type .eq. 3) then
-            call this%SurfaceUpdatePosVel()
-            call this%SurfaceUpdateArea()
         else
             write(*,*) 'body type not implemented', this%v_type
         endif
@@ -670,8 +671,7 @@ module SolidBody
             if (VBodies(iFish)%v_type .le. 3 .and. count_Interp .eq. 0 ) then
                 call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
                 count_Area = 1
-            endif
-            if (VBodies(iFish)%v_type .gt. 3) then
+            elseif (VBodies(iFish)%v_type .gt. 3) then
                 call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
