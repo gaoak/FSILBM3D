@@ -670,7 +670,7 @@ module SolidBody
         do iFish = 1, m_nFish
             if (VBodies(iFish)%v_type .le. 3 .and. count_Interp .eq. 0 ) then
                 call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
-                count_Area = 1
+                count_Interp = 1
             elseif (VBodies(iFish)%v_type .gt. 3) then
                 call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
             endif
