@@ -83,6 +83,7 @@ module SolidBody
     !     end subroutine printumap
     ! end interface
     ! Immersed boundary method parameters
+    integer:: count_Area = 0, count_Interp = 0
     integer:: m_nthreads,m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
@@ -98,11 +99,11 @@ module SolidBody
         !!!virtual body surface
         integer :: v_nelmts
         integer :: v_type !3bits [cylinder/plate][surface/line mesh][move/stationary]
-        ! v_type 0 stationary plate given by line mesh
-        ! 1 movable plate given by line mesh
-        ! 2 stationary rigid body given by surface mesh
+        ! v_type 0 stationary rigid body given by surface mesh
+        ! 1 stationary plate given by line mesh
+        ! 2 stationary rod given by line mesh
         ! 3 moving rigid body given by surface mesh
-        ! 4 stationary rod given by line mesh
+        ! 4 movable plate given by line mesh
         ! 5 moving rod given by line mesh
         real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z), required for type 3
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
@@ -121,7 +122,8 @@ module SolidBody
         procedure :: SurfaceBuild => SurfaceBuild_
         procedure :: UpdatePosVelArea => UpdatePosVelArea_
         procedure :: PlateUpdatePosVelArea => PlateUpdatePosVelArea_
-        procedure :: SurfaceUpdatePosVelArea => SurfaceUpdatePosVelArea_
+        procedure :: SurfaceUpdatePosVel => SurfaceUpdatePosVel_
+        procedure :: SurfaceUpdateArea => SurfaceUpdateArea_
         procedure :: Write_body => Write_body_
         procedure :: PlateWrite_body => PlateWrite_body_
         procedure :: SurfaceWrite_body => SurfaceWrite_body_
@@ -136,7 +138,7 @@ module SolidBody
                                ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
                                dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
         integer,intent(in):: nFish
-        character (LEN=40),intent(in):: FEmeshName(nFish)
+        character (LEN=40),intent(inout):: FEmeshName(nFish)
         integer,intent(in):: iBodyModel(nFish),isMotionGiven(6,nFish)
         real(8),intent(in):: denR(nFish),KB(nFish),KS(nFish),EmR(nFish),psR(nFish),tcR(nFish),St(nFish)
         real(8),intent(in):: Freq(nFish)
@@ -160,6 +162,9 @@ module SolidBody
         allocate(VBodies(m_nFish))
 
         do iFish = 1,m_nFish
+            if (iBodyModel(iFish).eq.0 .or. iBodyModel(iFish).eq.3) then
+                call Read_gmsh(FEmeshName(iFish),iBodyModel(iFish))
+            endif
             call VBodies(iFish)%rbm%Read_inFlow(FEmeshName(iFish),iBodyModel(iFish),isMotionGiven(1:6,iFish), &
                                                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
                                                 Freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
@@ -207,27 +212,19 @@ module SolidBody
         m_dh = dh
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Initialise(time,g)
-            call VBodies(iFish)%Initialise(VBodies(iFish)%rbm%iBodyType)
+            call VBodies(iFish)%Initialise(VBodies(iFish)%rbm%iBodyModel)
         enddo
     end subroutine Initialise_bodies
 
-    subroutine Initialise_(this,iBodyType,iBodyMove,iBodyMesh)
+    subroutine Initialise_(this,iBodyModel)
         ! read beam central line file and allocate memory
         implicit none
         class(VirtualBody), intent(inout) :: this
-        integer, intent(in) :: iBodyType,iBodyMove,iBodyMesh
-        integer :: i,j
-        this%v_type = iBodyType
-        i=floor(log(dble(iBodyType))/log(2.d0))+2
-        j=floor(log(dble(iBodyType))/log(2.d0))+1
-        this%v_type = ior(this%v_type, ishft(iBodyMove,i))
-        this%v_type = ior(this%v_type, ishft(iBodyMesh,j))
-        mask_move = 2**i
-        mask_mesh = 2**j
-        mask_type = 2**j-1
-        if (this%v_type .eq. 0 .or. this%v_type .eq. 1) then
+        integer, intent(in) :: iBodyModel
+        this%v_type = iBodyModel
+        if (this%v_type .eq. 1 .or. this%v_type .eq. 4) then
             call this%PlateBuild()
-        elseif (this%v_type .eq. 2 .or. this%v_type .eq. 3) then
+        elseif (this%v_type .eq. 0 .or. this%v_type .eq. 3) then
             call this%SurfaceBuild()
         else
             write(*,*) 'not implemented body type', this%v_type
@@ -409,7 +406,7 @@ module SolidBody
         enddo
     endsubroutine PlateUpdatePosVelArea_
 
-    subroutine SurfaceUpdatePosVelArea_(this)
+    subroutine SurfaceUpdatePosVel_(this)
         !   compute displacement, velocity, area at surface element center
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
@@ -422,7 +419,6 @@ module SolidBody
             A = this%rbm%xyzful(i1,1:3)
             B = this%rbm%xyzful(i2,1:3)
             C = this%rbm%xyzful(i3,1:3)
-            call cpt_area(this%v_Ea(i))
             call cpt_incenter(this%v_Exyz(1:3,i))
         enddo
         this%v_Evel(:,:) = 0.d0
@@ -449,6 +445,23 @@ module SolidBody
                 Exyz(2) = (la*y1 + lb*y2 + lc*y3) * invC
                 Exyz(3) = (la*z1 + lb*z2 + lc*z3) * invC
         end subroutine cpt_incenter
+    endsubroutine SurfaceUpdatePosVel_
+    subroutine SurfaceUpdateArea_(this)
+        !   compute displacement, velocity, area at surface element center
+        IMPLICIT NONE
+        class(VirtualBody), intent(inout) :: this
+        integer :: i,i1,i2,i3
+        real(8) :: A(3),B(3),C(3)
+        do i = 1,this%rbm%nEL
+            i1 = this%rbm%ele(i,1)
+            i2 = this%rbm%ele(i,2)
+            i3 = this%rbm%ele(i,3)
+            A = this%rbm%xyzful(i1,1:3)
+            B = this%rbm%xyzful(i2,1:3)
+            C = this%rbm%xyzful(i3,1:3)
+            call cpt_area(this%v_Ea(i))
+        enddo
+        contains
         subroutine cpt_area(area)
             implicit none
             real(8), intent(out) :: area
@@ -467,13 +480,22 @@ module SolidBody
                 az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))
                 area=dsqrt( ax*ax + ay*ay + az*az)*0.5d0
         end subroutine cpt_area
-    endsubroutine SurfaceUpdatePosVelArea_
+    endsubroutine SurfaceUpdateArea_
 
     subroutine UpdatePosVelArea_(this)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        if (this%v_type .eq. 1) then
+        if (this%v_type .eq. 1 .or. this%v_type .eq. 4) then
             call this%PlateUpdatePosVelArea()
+        elseif (this%v_type .eq. 0 ) then
+            call this%SurfaceUpdatePosVel()
+            if (count_Area .eq. 0) then
+                call this%SurfaceUpdateArea()
+                count_Area = 1
+            endif
+        elseif (this%v_type .eq. 3) then
+            call this%SurfaceUpdatePosVel()
+            call this%SurfaceUpdateArea()
         else
             write(*,*) 'body type not implemented', this%v_type
         endif
@@ -645,7 +667,13 @@ module SolidBody
         real(8)::tol,ntol
         ! update virtual body shape and velocity
         do iFish = 1, m_nFish
-            call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
+            if (VBodies(iFish)%v_type .le. 3 .and. count_Interp .eq. 0 ) then
+                call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
+                count_Area = 1
+            endif
+            if (VBodies(iFish)%v_type .gt. 3) then
+                call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
+            endif
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
         ! calculate interaction force using immersed-boundary method
@@ -682,34 +710,63 @@ module SolidBody
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: forceElemTemp(3),invh3
         !==================================================================================================
-        integer::x,y,z,iEL,i1,i2
+        integer::x,y,z,iEL,i1,i2,i3
         !==================================================================================================
         invh3 = (1.d0/m_dh)**3
         ! compute the velocity of IB nodes at element center
-        do  iEL=1,this%v_nelmts
-            ix = this%v_Ei(1:4,iEL)
-            jy = this%v_Ei(5:8,iEL)
-            kz = this%v_Ei(9:12,iEL)
-            rx = this%v_Ew(1:4,iEL)
-            ry = this%v_Ew(5:8,iEL)
-            rz = this%v_Ew(9:12,iEL)
-            forceElemTemp = this%v_Eforce(1:3,iEL)
-            ! update beam load, momentum is not included
-            i1=this%rbm%ele(this%vtor(iEL),1)
-            i2=this%rbm%ele(this%vtor(iEL),2)
-            this%rbm%extful(i1,1:3) = this%rbm%extful(i1,1:3) + 0.5d0 * forceElemTemp
-            this%rbm%extful(i2,1:3) = this%rbm%extful(i2,1:3) + 0.5d0 * forceElemTemp
-            forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
-            do x=-1,2
-                do y=-1,2
-                    do z=-1,2
-                        forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
-                        ! add flow body force
-                        force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
+        if (this%v_type .eq. 1 .or. this%v_type .eq. 4) then
+            do  iEL=1,this%v_nelmts
+                ix = this%v_Ei(1:4,iEL)
+                jy = this%v_Ei(5:8,iEL)
+                kz = this%v_Ei(9:12,iEL)
+                rx = this%v_Ew(1:4,iEL)
+                ry = this%v_Ew(5:8,iEL)
+                rz = this%v_Ew(9:12,iEL)
+                forceElemTemp = this%v_Eforce(1:3,iEL)
+                ! update beam load, momentum is not included
+                i1=this%rbm%ele(this%vtor(iEL),1)
+                i2=this%rbm%ele(this%vtor(iEL),2)
+                this%rbm%extful(i1,1:3) = this%rbm%extful(i1,1:3) + 0.5d0 * forceElemTemp
+                this%rbm%extful(i2,1:3) = this%rbm%extful(i2,1:3) + 0.5d0 * forceElemTemp
+                forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
+                do x=-1,2
+                    do y=-1,2
+                        do z=-1,2
+                            forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
+                            ! add flow body force
+                            force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
+                        enddo
                     enddo
                 enddo
             enddo
-        enddo
+        elseif (this%v_type .eq. 0 .or. this%v_type .eq. 3) then
+            do  iEL=1,this%v_nelmts
+                ix = this%v_Ei(1:4,iEL)
+                jy = this%v_Ei(5:8,iEL)
+                kz = this%v_Ei(9:12,iEL)
+                rx = this%v_Ew(1:4,iEL)
+                ry = this%v_Ew(5:8,iEL)
+                rz = this%v_Ew(9:12,iEL)
+                forceElemTemp = this%v_Eforce(1:3,iEL)
+                ! update beam load, momentum is not included
+                i1=this%rbm%ele(this%vtor(iEL),1)
+                i2=this%rbm%ele(this%vtor(iEL),2)
+                i3=this%rbm%ele(this%vtor(iEL),3)
+                this%rbm%extful(i1,1:3) = this%rbm%extful(i1,1:3) + forceElemTemp/3.0d0
+                this%rbm%extful(i2,1:3) = this%rbm%extful(i2,1:3) + forceElemTemp/3.0d0
+                this%rbm%extful(i3,1:3) = this%rbm%extful(i3,1:3) + forceElemTemp/3.0d0
+                forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
+                do x=-1,2
+                    do y=-1,2
+                        do z=-1,2
+                            forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
+                            ! add flow body force
+                            force(kz(z),jy(y),ix(x),1:3) = force(kz(z),jy(y),ix(x),1:3) + forceTemp(1:3)
+                        enddo
+                    enddo
+                enddo
+            enddo
+        endif
     END SUBROUTINE FluidVolumeForce_
 
     SUBROUTINE PenaltyForce_(this,tolerance,ntolsum,uuu)
@@ -815,14 +872,77 @@ module SolidBody
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
     end subroutine SurfaceBuild_
 
+    subroutine Read_gmsh(FEmeshName,iBodyModel)
+        implicit none
+        character (LEN=40),intent(inout):: FEmeshName
+        integer :: iBodyModel
+        real(8),allocatable :: tmpxyz(:,:)
+        integer,allocatable :: tmpele(:,:)
+        integer :: fileiD = 111, tmpnpts, tmpnelmts, num, i, temp_prop(4)
+        open(unit=fileiD, file = trim(adjustl(FEmeshName)) )! read *.msh file
+            ! read nodes
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*) num
+            tmpnpts = num
+            allocate(tmpxyz(3, tmpnpts))
+            do i = 1,tmpnpts
+                read(fileiD,*)num,tmpxyz(1,i),tmpxyz(2,i),tmpxyz(3,i)
+            enddo
+            ! read element
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*) num
+            tmpnelmts = num
+            do i = 1,tmpnelmts
+                read(fileiD,*)num,temp_prop(1:4)
+                if((temp_prop(1)==2) .and. (temp_prop(2)==2) .and. (temp_prop(3)==0)) then
+                    tmpnelmts = tmpnelmts-num+1
+                    exit
+                endif
+            enddo
+
+            backspace(fileiD)
+
+            allocate(tmpele(3,tmpnelmts))
+            do i = 1,tmpnelmts
+                read(fileiD,*)num,temp_prop(1:4),tmpele(1,i),tmpele(2,i),tmpele(3,i)
+            enddo
+        close(fileiD)
+        i = index(FEmeshName, '.')
+        FEmeshName = FEmeshName(:i) // 'dat'
+        open(unit=fileiD, file = trim(adjustl(FEmeshName)) )! write *.dat file
+            write(fileiD,*) "Frame3D"
+            write(fileiD,*) tmpnpts, tmpnelmts, "     1     ", iBodyModel, "     0. 0. 1."
+            write(fileiD,*) "END"
+            write(fileiD,*) tmpnpts
+            do i = 1,tmpnpts
+                write(fileiD,*) i,tmpxyz(1,i),tmpxyz(2,i),tmpxyz(3,i),"     0.0     0.0"
+            enddo
+            write(fileiD,*) "END"
+            do i = 1,tmpnelmts
+                write(fileiD,*) i,tmpele(1,i),tmpele(2,i),tmpele(3,i),"     3     1     0"
+            enddo
+            write(fileiD,*) "END"
+            write(fileiD,*) "1"
+            write(fileiD,*) "1     1     0     0     0     0     0"
+            write(fileiD,*) "END"
+            write(fileiD,*) "1"
+            write(fileiD,*) "1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00"
+            write(fileiD,*) "END"
+        close(fileiD)
+    endsubroutine Read_gmsh
+
     subroutine Write_body_(this,iFish,time)
         implicit none
         class(VirtualBody), intent(inout) :: this
         integer,intent(in) :: iFish
         real(8),intent(in) :: time
-        if(iand(this%v_type,mask_type) .eq. 1) then
+        if (this%v_type .eq. 1 .or. this%v_type .eq. 4) then
             call this%PlateWrite_body(iFish,time)
-        elseif ((iand(this%v_type,mask_move) .eq. 0).and.(iand(this%v_type,mask_mesh) .ne. 0)) then
+        elseif (this%v_type .eq. 0 .or. this%v_type .eq. 3) then
             call this%SurfaceWrite_body(iFish,time)
             write(*, *) "body type not implemented", this%v_type
         endif
@@ -891,7 +1011,7 @@ module SolidBody
         !==========================================================================
         open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%rbm%nND,', E=',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%rbm%nND,', E=',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
 
         do i = 1,this%rbm%nNd
             tmpxyz = this%rbm%xyzful(i,1:3)

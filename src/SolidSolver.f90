@@ -632,7 +632,7 @@ module SolidSolver
         integer:: iFish,iND,isubstep
         real(8):: deltat,subdeltat,time
         !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
-            if(this%iBodyModel==1)then     ! rigid body
+            if(this%iBodyModel.le.3)then     ! rigid body
                 !======================================================
                 !prescribed motion
                 !------------------------------------------------------
@@ -666,7 +666,7 @@ module SolidSolver
                     this%velful(iND,4:6)=this%WWW3(1:3)
                 enddo
                 !-------------------------------------------------------
-            elseif(this%iBodyModel==2)then !elastic model
+            elseif(this%iBodyModel.gt.3)then !elastic model
                 !translational displacement
                 this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
                 !rotational displacement
