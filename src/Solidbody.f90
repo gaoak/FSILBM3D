@@ -86,6 +86,7 @@ module SolidBody
     integer:: m_nthreads,m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
+    integer :: mask_move,mask_mesh,mask_type
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
@@ -110,10 +111,13 @@ module SolidBody
     contains
         procedure :: Initialise => Initialise_
         procedure :: PlateBuild => PlateBuild_
+        procedure :: RigidBuild => RigidBuild_
         procedure :: UpdatePosVelArea => UpdatePosVelArea_
         procedure :: PlateUpdatePosVelArea => PlateUpdatePosVelArea_
+        procedure :: RigidUpdatePosVelArea => RigidUpdatePosVelArea_
         procedure :: Write_body => Write_body_
         procedure :: PlateWrite_body => PlateWrite_body_
+        procedure :: RigidWrite_body => RigidWrite_body_
         procedure :: UpdateElmtInterp => UpdateElmtInterp_
         procedure :: PenaltyForce => PenaltyForce_
         procedure :: FluidVolumeForce => FluidVolumeForce_
@@ -200,14 +204,24 @@ module SolidBody
         enddo
     end subroutine Initialise_bodies
 
-    subroutine Initialise_(this,iBodyType)
+    subroutine Initialise_(this,iBodyType,iBodyMove,iBodyMesh)
         ! read beam central line file and allocate memory
         implicit none
         class(VirtualBody), intent(inout) :: this
-        integer, intent(in) :: iBodyType
+        integer, intent(in) :: iBodyType,iBodyMove,iBodyMesh
+        integer :: i,j
         this%v_type = iBodyType
-        if (this%v_type .eq. 1) then
+        i=floor(log(dble(iBodyType))/log(2.d0))+2
+        j=floor(log(dble(iBodyType))/log(2.d0))+1
+        this%v_type = ior(this%v_type, ishft(iBodyMove,i))
+        this%v_type = ior(this%v_type, ishft(iBodyMesh,j))
+        mask_move = 2**i
+        mask_mesh = 2**j
+        mask_type = 2**j-1
+        if (iand(this%v_type,mask_type) .eq. 1) then
             call this%PlateBuild()
+        elseif ((iand(this%v_type,mask_move) .eq. 0).and.(iand(this%v_type,mask_mesh) .ne. 0)) then
+            call this%RigidBuild()
         else
             write(*,*) 'not implemented body type', this%v_type
         endif
@@ -387,6 +401,66 @@ module SolidBody
             enddo
         enddo
     endsubroutine PlateUpdatePosVelArea_
+
+    subroutine RigidUpdatePosVelArea_(this)
+        !   compute displacement, velocity, area at surface element center
+        IMPLICIT NONE
+        class(VirtualBody), intent(inout) :: this
+        integer :: i,i1,i2,i3
+        real(8) :: A(3),B(3),C(3)
+        do i = 1,this%rbm%nEL
+            i1 = this%rbm%ele(i,1)
+            i2 = this%rbm%ele(i,2)
+            i3 = this%rbm%ele(i,3)
+            A = this%rbm%xyzful(i1,1:3)
+            B = this%rbm%xyzful(i2,1:3)
+            C = this%rbm%xyzful(i3,1:3)
+            call cpt_area(this%v_Ea(i))
+            call cpt_incenter(this%v_Exyz(1:3,i))
+        enddo
+        this%v_Evel(:,:) = 0.d0
+        contains
+        subroutine cpt_incenter(Exyz)
+            implicit none
+            real(8), intent(out) :: Exyz(3)
+            real(8) :: x1, x2, x3, y1, y2, y3, z1, z2, z3
+            real(8) :: la, lb, lc, invC
+                x1=A(1)
+                x2=B(1)
+                x3=C(1)
+                y1=A(2)
+                y2=B(2)
+                y3=C(2)
+                z1=A(3)
+                z2=B(3)
+                z3=C(3)
+                la = sqrt((x2 - x3)**2 + (y2 - y3)**2 + (z2 - z3)**2)
+                lb = sqrt((x3 - x1)**2 + (y3 - y1)**2 + (z3 - z1)**2)
+                lc = sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+                invC = 1 / (la + lb + lc)
+                Exyz(1) = (la*x1 + lb*x2 + lc*x3) * invC
+                Exyz(2) = (la*y1 + lb*y2 + lc*y3) * invC
+                Exyz(3) = (la*z1 + lb*z2 + lc*z3) * invC
+        end subroutine cpt_incenter
+        subroutine cpt_area(area)
+            implicit none
+            real(8), intent(out) :: area
+            real(8) :: x1, x2, x3, y1, y2, y3, z1, z2, z3, ax, ay, az
+                x1=A(1)
+                x2=B(1)
+                x3=C(1)
+                y1=A(2)
+                y2=B(2)
+                y3=C(2)
+                z1=A(3)
+                z2=B(3)
+                z3=C(3)
+                ax =((z1-z2)*(y3-y2) + (y2-y1)*(z3-z2))
+                ay =((x1-x2)*(z3-z2) + (z2-z1)*(x3-x2))
+                az =((y1-y2)*(x3-x2) + (x2-x1)*(y3-y2))
+                area=dsqrt( ax*ax + ay*ay + az*az)*0.5d0
+        end subroutine cpt_area
+    endsubroutine RigidUpdatePosVelArea_
 
     subroutine UpdatePosVelArea_(this)
         IMPLICIT NONE
@@ -721,14 +795,28 @@ module SolidBody
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
     end subroutine PlateBuild_
 
+    subroutine RigidBuild_(this)
+        implicit none
+        class(VirtualBody), intent(inout) :: this
+        allocate(this%rtov(2))
+        this%v_nelmts = this%rbm%nEL
+        this%rtov(1) = 1
+        this%rtov(2) = this%v_nelmts + 1
+        allocate(this%vtor(this%v_nelmts))
+        this%vtor(:) = 1
+        allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
+        allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+    end subroutine RigidBuild_
+
     subroutine Write_body_(this,iFish,time)
         implicit none
         class(VirtualBody), intent(inout) :: this
         integer,intent(in) :: iFish
         real(8),intent(in) :: time
-        if(this%v_type.eq.1) then
+        if(iand(this%v_type,mask_type) .eq. 1) then
             call this%PlateWrite_body(iFish,time)
-        else
+        elseif ((iand(this%v_type,mask_move) .eq. 0).and.(iand(this%v_type,mask_mesh) .ne. 0)) then
+            call this%RigidWrite_body(iFish,time)
             write(*, *) "body type not implemented", this%v_type
         endif
     endsubroutine Write_body_
@@ -771,5 +859,44 @@ module SolidBody
         enddo
         close(idfile)
     end subroutine PlateWrite_body_
+
+    subroutine RigidWrite_body_(this,iFish,time)
+        ! to do: generate a temporary mesh
+        implicit none
+        class(VirtualBody), intent(inout) :: this
+        integer,intent(in) :: iFish
+        real(8),intent(in) :: time
+        !   -------------------------------------------------------
+        real(8):: timeTref
+        integer:: i, i1, i2, i3
+        real(8) :: tmpxyz(3)
+        integer,parameter::nameLen=10
+        character (LEN=nameLen):: fileName,idstr
+        integer,parameter:: idfile=100
+        !==========================================================================
+        timeTref = time/m_Tref
+        write(fileName,'(I10)') nint(timeTref*1d5)
+        fileName = adjustr(fileName)
+        do  I=1,nameLen
+            if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
+        !==========================================================================
+        open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
+        write(idfile, '(A)') 'variables = "x" "y" "z"'
+        write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%rbm%nND,', E=',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+
+        do i = 1,this%rbm%nNd
+            tmpxyz = this%rbm%xyzful(i,1:3)
+            write(idfile, *) tmpxyz/m_Lref
+        enddo
+        do  i=1,this%rbm%nEL
+            i1 = this%rbm%ele(i,1)
+            i2 = this%rbm%ele(i,2)
+            i3 = this%rbm%ele(i,3)
+            write(idfile, *) i1, i2, i3
+        enddo
+        close(idfile)
+    end subroutine RigidWrite_body_
 
 end module SolidBody
