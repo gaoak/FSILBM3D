@@ -451,7 +451,8 @@ module SolidBody
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         integer :: i,i1,i2,i3
-        real(8) :: A(3),B(3),C(3)
+        real(8) :: A(3),B(3),C(3),tmparea,beta
+        beta = - m_Pbeta* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)
             i2 = this%rbm%ele(i,2)
@@ -459,7 +460,8 @@ module SolidBody
             A = this%rbm%xyzful(i1,1:3)
             B = this%rbm%xyzful(i2,1:3)
             C = this%rbm%xyzful(i3,1:3)
-            call cpt_area(this%v_Ea(i))
+            call cpt_area(tmparea)
+            this%v_Ea(i) = tmparea*beta
         enddo
         contains
         subroutine cpt_area(area)
