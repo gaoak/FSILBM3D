@@ -922,6 +922,7 @@ module SolidBody
                 write(fileiD,*) i,tmpxyz(1,i),tmpxyz(2,i),tmpxyz(3,i),"     0.0     0.0"
             enddo
             write(fileiD,*) "END"
+            write(fileiD,*) tmpnelmts
             do i = 1,tmpnelmts
                 write(fileiD,*) i,tmpele(1,i),tmpele(2,i),tmpele(3,i),"     3     1     0"
             enddo
