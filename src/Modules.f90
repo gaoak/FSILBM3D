@@ -11,6 +11,8 @@ MODULE ConstParams
                                                  ],[lbmDim+1,SpaceDim])
 !    Opposite directions
     integer, parameter:: oppo(0:lbmDim)=[0, 2, 1, 4, 3, 6, 5,10, 9, 8, 7,14,13,12,11,18,17,16,15]
+    integer, parameter:: positivedirs(1:lbmDim/2)=[1, 3, 5, 7, 8, 11, 12, 15, 16]
+    integer, parameter:: negativedirs(1:lbmDim/2)=[2, 4, 6,10, 9, 14, 13, 18, 17]
 !    Weights
     real(8), parameter:: wt(0:lbmDim) = [&
        1.0d0/3.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0, &
