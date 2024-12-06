@@ -363,17 +363,20 @@ module FluidDomain
         do    z = 1, zDim
             uSqr           = sum(uuu(z,y,x,1:3)**2)
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
             Flb(0:lbmDim)  = dt*wt(0:lbmDim)*( &
-                              (3.0*(ee(0:lbmDim,1)-this%uuu(z,y,x,1))+9.0*(ee(0:lbmDim,1)*this%uuu(z,y,x,1)+ee(0:lbmDim,2)*this%uuu(z,y,x,2)+ee(0:lbmDim,3)*this%uuu(z,y,x,3))*ee(0:lbmDim,1))*force(z,y,x,1) &
-                             +(3.0*(ee(0:lbmDim,2)-this%uuu(z,y,x,2))+9.0*(ee(0:lbmDim,1)*this%uuu(z,y,x,1)+ee(0:lbmDim,2)*this%uuu(z,y,x,2)+ee(0:lbmDim,3)*this%uuu(z,y,x,3))*ee(0:lbmDim,2))*force(z,y,x,2) &
-                             +(3.0*(ee(0:lbmDim,3)-this%uuu(z,y,x,3))+9.0*(ee(0:lbmDim,1)*this%uuu(z,y,x,1)+ee(0:lbmDim,2)*this%uuu(z,y,x,2)+ee(0:lbmDim,3)*this%uuu(z,y,x,3))*ee(0:lbmDim,3))*force(z,y,x,3) &
+                              (3.0*(ee(0:lbmDim,1)-this%uuu(z,y,x,1))+9.0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*force(z,y,x,1) &
+                             +(3.0*(ee(0:lbmDim,2)-this%uuu(z,y,x,2))+9.0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*force(z,y,x,2) &
+                             +(3.0*(ee(0:lbmDim,3)-this%uuu(z,y,x,3))+9.0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*force(z,y,x,3) &
                                              )
 
             if    (iCollidModel==1)then
                 ! SRT collision
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + Omega * (fEq(0:lbmDim)-this%fIn(z,y,x,0:lbmDim))+(1.0-0.5*Omega)*Flb(0:lbmDim)
             elseif(iCollidModel==2)then
+                ! TRT collision
+                ! to be added
+            elseif(iCollidModel==3)then
                 ! MRT collision
                 this%fIn(z,y,x,0:lbmDim)=this%fIn(z,y,x,0:lbmDim)+MATMUL( M_COLLID(0:lbmDim,0:lbmDim), fEq(0:lbmDim)-this%fIn(z,y,x,0:lbmDim) ) + MATMUL( M_FORCE(0:lbmDim,0:lbmDim),Flb(0:lbmDim))
             else
@@ -452,9 +455,9 @@ module FluidDomain
             real(8), intent(out):: edge(:,:,:)
             real(8), intent(inout):: f(1:zDim, 1:yDim,1:xDim,0:lbmDim)
             integer:: p
-        
+
             if(dx.eq.0) return
-        
+
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
             do  p = 1,m_nthreads
                 if(dx .eq. -1) then
@@ -485,7 +488,7 @@ module FluidDomain
                 f(:,:,x,i) = f(:,:,x-1,i)
             enddo
         endsubroutine
-        
+
         SUBROUTINE swapxwAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
             implicit none
             integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
