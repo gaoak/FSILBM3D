@@ -18,7 +18,7 @@ module SolidSolver
         real(8):: elmax,elmin
         real(8):: XYZ(3),XYZo(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
         real(8):: AoA(3),AoAo(3),AoAAmpl(3),AoAPhi(3),AoAd(3),WWW1(3),WWW2(3),WWW3(3)
-        real(8):: TTT00(3,3),TTT0(3,3),TTTnow(3,3),TTTnxt(3,3)
+        real(8):: TTT00(3,3),TTT0(3,3),TTTnxt(3,3)
         integer:: nND,nEL,nEQ,nMT,nBD,nSTF
         integer:: isMotionGiven(6)
         integer, allocatable:: ele(:,:),jBC(:,:),nloc(:),nprof(:),nprof2(:)
@@ -45,12 +45,12 @@ module SolidSolver
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine Read_inFlow_(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
+    Subroutine Read_inFlow_(this,FEmeshName_,iBodyModel_,iBodyType_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
                             Freq_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
         character (LEN=40),intent(in):: FEmeshName_
-        integer,intent(in):: iBodyModel_,isMotionGiven_(6)
+        integer,intent(in):: iBodyModel_,iBodyType_,isMotionGiven_(6)
         real(8),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
         real(8),intent(in):: Freq_
         real(8),intent(in):: XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
@@ -58,6 +58,7 @@ module SolidSolver
         
         this%FEmeshName = FEmeshName_
         this%iBodyModel = iBodyModel_
+        this%iBodyType = iBodyType_
         this%isMotionGiven(1:6)=isMotionGiven_(1:6)
         this%denR= denR_
         this%psR = psR_
@@ -103,7 +104,7 @@ module SolidSolver
         open(unit=m_idat, file = trim(adjustl(this%FEmeshName)))
         rewind(m_idat)
         read(m_idat,*)
-        read(m_idat,*)this%nND,this%nEL,this%nMT,this%iBodyType,this%r_dirc(1:3)
+        read(m_idat,*)this%nND,this%nEL,this%nMT,this%r_dirc(1:3)
         read(m_idat,*)
 
         this%nEQ=this%nND*6
@@ -168,8 +169,8 @@ module SolidSolver
         this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
 
         call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))
-        call AoAtoTTT(this%AoA(1:3),this%TTTnow(1:3,1:3))
-        call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnow(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
+        call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
+        call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
 
         do iND=1,this%nND
             this%xyzful0(iND,1:3)=matmul(this%TTT0(1:3,1:3),this%xyzful00(iND,1:3))+this%XYZ(1:3)
@@ -632,7 +633,7 @@ module SolidSolver
         integer:: iFish,iND,isubstep
         real(8):: deltat,subdeltat,time
         !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
-            if(this%iBodyModel.le.3)then     ! rigid body
+            if(this%iBodyModel.eq.1)then     ! rigid body
                 !======================================================
                 !prescribed motion
                 !------------------------------------------------------
@@ -666,7 +667,7 @@ module SolidSolver
                     this%velful(iND,4:6)=this%WWW3(1:3)
                 enddo
                 !-------------------------------------------------------
-            elseif(this%iBodyModel.gt.3)then !elastic model
+            elseif(this%iBodyModel.eq.2)then !elastic model
                 !translational displacement
                 this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
                 !rotational displacement
