@@ -16,7 +16,7 @@
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
     CALL read_file()
-    CALL allocate_solid_memory(Asfac,Lchod,Lspan,AR)
+    CALL allocate_solid_memory(Asfac,Lchod,Lspan,AR,iBodyModel)
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()
     CALL write_params()
