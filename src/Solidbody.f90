@@ -83,7 +83,7 @@ module SolidBody
     !     end subroutine printumap
     ! end interface
     ! Immersed boundary method parameters
-    integer:: count_Area = 1, count_Interp = 0
+    integer:: count_Area = 0, count_Interp = 0
     real(8),allocatable :: Surfacetmpxyz(:,:)
     integer,allocatable :: Surfacetmpele(:,:)
     integer:: Surfacetmpnpts, Surfacetmpnelmts
@@ -499,8 +499,9 @@ module SolidBody
             if (count_Area .eq. 0) then
                 call this%SurfaceBuildPosVelArea()
                 count_Area = 1
+            else
+                call this%SurfaceUpdatePosVel()
             endif
-            call this%SurfaceUpdatePosVel()
         else
             write(*,*) 'body type not implemented', this%v_type
         endif
@@ -931,6 +932,7 @@ module SolidBody
             call this%PlateWrite_body(iFish,time)
         elseif (this%v_type .eq. -1) then
             call this%SurfaceWrite_body(iFish,time)
+        else
             write(*, *) "body type not implemented", this%v_type
         endif
     endsubroutine Write_body_

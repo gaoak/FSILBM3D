@@ -77,7 +77,7 @@
     call readequal(111)
     do iKind=1,FishKind
         read(111,*)     FishNum(iKind+1),NumX(iKind),NumY(iKind)
-        read(111,*)     niBodyModel,niBodyType, tmpFEmeshName
+        read(111,*)     niBodyModel,niBodyType,tmpFEmeshName
         read(111,*)     nisMotionGiven(1:3)
         read(111,*)     nisMotionGiven(4:6)
         read(111,*)     ndenR, npsR
