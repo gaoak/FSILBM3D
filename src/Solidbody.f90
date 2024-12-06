@@ -421,12 +421,12 @@ module SolidBody
         real(8) :: A(3),B(3),C(3),tmparea,beta
         beta = - m_Pbeta* 2.0d0*m_denIn
         do i = 1,Surfacetmpnelmts
-            i1 = Surfacetmpele(i,1)
-            i2 = Surfacetmpele(i,2)
-            i3 = Surfacetmpele(i,3)
-            A = Surfacetmpxyz(i1,1:3)
-            B = Surfacetmpxyz(i2,1:3)
-            C = Surfacetmpxyz(i3,1:3)
+            i1 = Surfacetmpele(1,i)
+            i2 = Surfacetmpele(2,i)
+            i3 = Surfacetmpele(3,i)
+            A = Surfacetmpxyz(1:3,i1)
+            B = Surfacetmpxyz(1:3,i2)
+            C = Surfacetmpxyz(1:3,i3)
             call cpt_incenter(this%v_Exyz(1:3,i))
             call cpt_area(tmparea)
             this%v_Ea(i) = tmparea*beta
@@ -1003,13 +1003,13 @@ module SolidBody
             write(idfile, '(A)') 'variables = "x" "y" "z"'
             write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
             do i = 1,Surfacetmpnpts
-                tmpxyz = Surfacetmpxyz(i,1:3)
+                tmpxyz = Surfacetmpxyz(1:3,i)
                 write(idfile, *) tmpxyz/m_Lref
             enddo
             do  i=1,Surfacetmpnelmts
-                i1 = Surfacetmpele(i,1)
-                i2 = Surfacetmpele(i,2)
-                i3 = Surfacetmpele(i,3)
+                i1 = Surfacetmpele(1,i)
+                i2 = Surfacetmpele(2,i)
+                i3 = Surfacetmpele(3,i)
                 write(idfile, *) i1, i2, i3
             enddo
         else
