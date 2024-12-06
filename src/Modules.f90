@@ -1,14 +1,14 @@
 MODULE ConstParams
     ! LBM module
     !    D3Q19model
-    INTEGER, PARAMETER:: SpcDim = 3, LBMDim = 18
+    INTEGER, PARAMETER:: SpaceDim = 3, LBMDim = 18
     !   Directions
     integer, parameter:: ee(0:lbmDim,1:3)=reshape([&
                                         !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
                                          0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0, &
                                          0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1, &
                                          0, 0, 0, 0, 0, 1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 1, 1,-1,-1  &
-                                                 ],[lbmDim+1,SpcDim])
+                                                 ],[lbmDim+1,SpaceDim])
 !    Opposite directions
     integer, parameter:: oppo(0:lbmDim)=[0, 2, 1, 4, 3, 6, 5,10, 9, 8, 7,14,13,12,11,18,17,16,15]
 !    Weights
