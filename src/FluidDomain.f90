@@ -5,6 +5,7 @@ module FluidDomain
     integer:: m_nthreads
     real(8):: denIn,nu,Mu
     type :: LBMBlock ! only support uniform grid
+        integer:: ID
         integer:: xDim,yDim,zDim
         integer:: xMinBC,xMaxBC,yMinBC,yMaxBC,zMinBC,zMaxBC
         real(8):: dh,Omega,tau
@@ -24,6 +25,7 @@ module FluidDomain
         procedure :: write_continue_ => write_continue_
         procedure :: read_continue_ => read_continue_
         procedure :: calculate_macro_quantities => calculate_macro_quantities_
+        procedure :: ComputeFieldStat => ComputeFieldStat_
     end type LBMBlock
 
     contains
@@ -612,4 +614,80 @@ module FluidDomain
             call myexit(0)
         endif
     END SUBROUTINE write_flow_
+
+    subroutine ComputeFieldStat_
+        USE simParam
+        USE OutFlowWorkspace
+        implicit none
+        integer:: x,y,z,i
+        real(8):: invUref, uLinfty(1:3), uL2(1:3), temp
+        invUref = 1.d0/Uref
+        uLinfty = -1.d0
+        uL2 = 0.d0
+        do i=1,3
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp) &
+            !$OMP reduction (+: uL2) reduction(max: uLinfty)
+            do x=1, xDim
+                do y=1, yDim
+                    do z=1, zDim
+                        temp = dabs(uuu(z,y,x,i)*invUref)
+                        uL2(i) = uL2(i) + temp * temp
+                        if(temp.gt.uLinfty(i)) uLinfty(i) = temp
+                    enddo
+                enddo
+            enddo
+            !$OMP END PARALLEL DO
+            uL2(i) = dsqrt(uL2(i) / dble(xDim * yDim * zDim))
+        enddo
+        write(*,'(A,F18.12)')'FIELDSTAT L2 u ', uL2(1)
+        write(*,'(A,F18.12)')'FIELDSTAT L2 v ', uL2(2)
+        write(*,'(A,F18.12)')'FIELDSTAT L2 w ', uL2(3)
+        write(*,'(A,F18.12)')'FIELDSTAT Linfinity u ', uLinfty(1)
+        write(*,'(A,F18.12)')'FIELDSTAT Linfinity v ', uLinfty(2)
+        write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
+    endsubroutine ComputeFieldStat_
+
+    SUBROUTINE initialize_flow()
+        USE simParam
+        implicit none
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
+        real(8):: vel(1:SpcDim)
+        integer:: x, y, z
+    
+    !   grid coordinate***************************************************************************************
+        xGrid(1:xDim)=xGrid0(1:xDim)
+        yGrid(1:yDim)=yGrid0(1:yDim)
+        zGrid(1:zDim)=zGrid0(1:zDim)
+    !   macro quantities***************************************************************************************
+        do  x = 1, xDim
+        do  y = 1, yDim
+        do  z = 1, zDim
+            if(VelocityKind==0) then
+                call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(z), vel)
+            elseif(VelocityKind==2) then
+                call evaluateOscillatoryVelocity(vel)
+            endif
+            uuu(z, y, x, 1) = vel(1)
+            uuu(z, y, x, 2) = vel(2)
+            uuu(z, y, x, 3) = vel(3)
+        enddo
+        enddo
+        enddo
+        den(1:zDim,1:yDim,1:xDim)   = denIn
+        prs(1:zDim,1:yDim,1:xDim)   = Cs2*(den(1:zDim,1:yDim,1:xDim)-denIn)
+    !   initial disturbance***************************************************************************************
+        call initDisturb()
+    !   distribution function***************************************************************************************
+        do  x = 1, xDim
+        do  y = 1, yDim
+        do  z = 1, zDim
+            uSqr       = sum(uuu(z,y,x,1:3)**2)
+            uxyz(0:lbmDim) = uuu(z,y,x,1) * ee(0:lbmDim,1) + uuu(z,y,x,2) * ee(0:lbmDim,2)+uuu(z,y,x,3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)= wt(0:lbmDim) * den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+            fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
+        enddo
+        enddo
+        enddo
+    END SUBROUTINE initialize_flow
+    
 end module FluidDomain
