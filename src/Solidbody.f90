@@ -1001,15 +1001,15 @@ module SolidBody
         open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         if (time .lt. 1e-5) then
             write(idfile, '(A)') 'variables = "x" "y" "z"'
-            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',this%rbm%nND,', E=',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
-            do i = 1,this%rbm%nNd
-                tmpxyz = this%rbm%xyzful(i,1:3)
+            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
+            do i = 1,Surfacetmpnpts
+                tmpxyz = Surfacetmpxyz(i,1:3)
                 write(idfile, *) tmpxyz/m_Lref
             enddo
-            do  i=1,this%rbm%nEL
-                i1 = this%rbm%ele(i,1)
-                i2 = this%rbm%ele(i,2)
-                i3 = this%rbm%ele(i,3)
+            do  i=1,Surfacetmpnelmts
+                i1 = Surfacetmpele(i,1)
+                i2 = Surfacetmpele(i,2)
+                i3 = Surfacetmpele(i,3)
                 write(idfile, *) i1, i2, i3
             enddo
         else
