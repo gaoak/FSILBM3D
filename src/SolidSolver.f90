@@ -638,7 +638,7 @@ module SolidSolver
         enddo
         do  i=1,numSampBody
             write(Nodename,'(I4.4)') SampBodyNode(i)
-            open(fid,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
+            open(fid,file='./DatInfo/SampBodyNode_'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
             write(fid,'(10E20.10)')time/Tref, this%xyzful(SampBodyNode(i),1:3)/Lref, &
                                               this%velful(SampBodyNode(i),1:3)/Uref, &
                                               this%accful(SampBodyNode(i),1:3)/Aref

@@ -70,7 +70,7 @@
             enddo
             do  i=1,numSampBody
                 write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-                open(111,file='./DatInfo/SampBodyNode'//trim(fileName)//'_'//trim(Nodename)//'.plt')
+                open(111,file='./DatInfo/SampBodyNode_'//trim(fileName)//'_'//trim(Nodename)//'.plt')
                 write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
                 close(111)
             enddo
@@ -80,7 +80,7 @@
     if(isFluidOutput==1)then
     do  i=1,numSampFlow
         write(Nodename,'(I4.4)') i
-        open(111,file='./DatInfo/SampFlowPint'//trim(Nodename)//'.plt')
+        open(111,file='./DatInfo/SampFlowPint_'//trim(Nodename)//'.plt')
         write(111,*)'variables= "t"  "p" "u"  "v"  "w" '
         close(111)
     enddo
