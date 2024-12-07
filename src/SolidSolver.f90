@@ -187,7 +187,7 @@ module SolidSolver
                         this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
                         this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
         this%WWW3(1:3)=matmul(this%TTT0(1:3,1:3),this%WWW2(1:3))
-        
+
         do  iND=1,this%nND
             this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
                                   this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
@@ -414,7 +414,7 @@ module SolidSolver
     real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
     real(8):: Et,Ek,Ep,Es,Eb,Ew
     integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName,Nodename
+    character (LEN=nameLen):: fileName
         write(fileName,'(I4)') iFish
         fileName = adjustr(fileName)
         do  i=1,nameLen
@@ -422,32 +422,35 @@ module SolidSolver
         enddo
 
         if    (m_iForce2Body==1)then   !Same force as flow
-        open(fid,file='./DatInfo/ForceDirect'//trim(fileName)//'.plt',position='append')
+        open(fid,file='./DatInfo/ForceDirect_'//trim(fileName)//'.plt',position='append')
         write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
         close(fid)
         elseif(m_iForce2Body==2)then   !stress force
-        open(fid,file='./DatInfo/ForceStress'//trim(fileName)//'.plt',position='append')
+        open(fid,file='./DatInfo/ForceStress_'//trim(fileName)//'.plt',position='append')
         write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
         close(fid)
         endif
 
         !==============================================================================================
-        open(fid,file='./DatInfo/SampBodyNodeBegin'//trim(fileName)//'.plt',position='append')
+        open(fid,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,this%xyzful(1,1:3)/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
         close(fid)
         !===============================================================================
-        write(Nodename,'(I4.4)') this%nNd
-        open(fid,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt',position='append')
+        open(fid,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,this%xyzful(this%nND,1:3)/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
         close(fid)
 
-        open(fid,file='./DatInfo/SampBodyMean'//trim(fileName)//'.plt',position='append')
+        open(111,file='./DatInfo/SampBodyNodeCenter_'//trim(fileName)//'.plt',position='append')
+        write(111,'(10E20.10)')time/Tref,this%xyzful((this%nND+1)/2,1:3)/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
+        close(111)
+
+        open(fid,file='./DatInfo/SampBodyMean_'//trim(fileName)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Lref, &
                                          sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
                                          sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
         close(fid)
 
-        open(fid,file='./DatInfo/SampBodyAngular'//trim(fileName)//'.plt',position='append')
+        open(fid,file='./DatInfo/SampBodyAngular_'//trim(fileName)//'.plt',position='append')
         write(fid,'(5E20.10)')time/Tref,datan((this%xyzful(this%nND,2)-this%xyzful(1,2))/(this%xyzful(this%nND,1)-this%xyzful(1,1))),    &
                                         this%xyzful(this%nND,2)/Lref-this%xyzful(1,2)/Lref,this%xyzful(1,2)/Lref,this%xyzful(this%nND,2)/Lref
         close(fid)
@@ -463,12 +466,12 @@ module SolidSolver
         Piz=-sum(this%mssful(1:this%nND,3)*this%accful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
         Piner=Pix+Piy+Piz
         Ptot=Paero+Piner
-        open(fid,file='./DatInfo/Power'//trim(fileName)//'.plt',position='append')
+        open(fid,file='./DatInfo/Power_'//trim(fileName)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
         close(fid)
 
         call cptArea(this%areaElem(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1:6))
-        open(fid,file='./DatInfo/Area'//trim(fileName)//'.plt',position='append')
+        open(fid,file='./DatInfo/Area_'//trim(fileName)//'.plt',position='append')
         write(fid,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
         close(fid)
 
@@ -486,7 +489,7 @@ module SolidSolver
         Ek=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
         Et=Ek+Ep
 
-        open(fid,file='./DatInfo/Energy'//trim(fileName)//'.plt', position='append')
+        open(fid,file='./DatInfo/Energy_'//trim(fileName)//'.plt', position='append')
         write(fid,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
         close(fid)
 

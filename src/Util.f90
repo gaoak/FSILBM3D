@@ -4,7 +4,6 @@
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfoTitl()
     USE simParam
-    USE SolidBody
     implicit none
     integer:: i,iFish
     integer,parameter::nameLen=4
@@ -19,42 +18,45 @@
         enddo
 
         if    (iForce2Body==1)then   !Same force as flow
-        open(111,file='./DatInfo/ForceDirect'//trim(filename)//'.plt')
+        open(111,file='./DatInfo/ForceDirect_'//trim(filename)//'.plt')
         write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
         close(111)
         elseif(iForce2Body==2)then   !stress force
-        open(111,file='./DatInfo/ForceStress'//trim(filename)//'.plt')
+        open(111,file='./DatInfo/ForceStress_'//trim(filename)//'.plt')
         write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
         close(111)
         endif
 
         !===============================================================================
-        open(111,file='./DatInfo/SampBodyNodeBegin'//trim(fileName)//'.plt')
+        open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
         !===============================================================================
-        write(Nodename,'(I4.4)') VBodies(iFish)%rbm%nNd
-        open(111,file='./DatInfo/SampBodyNodeEnd'//trim(fileName)//'.plt')
+        open(111,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
 
-        open(111,file='./DatInfo/SampBodyMean'//trim(fileName)//'.plt')
+        open(111,file='./DatInfo/SampBodyNodeCenter_'//trim(fileName)//'.plt')
+        write(111,*)'variables= "t"  "x"  "y"  "u"  "v"  "ax"  "ay" '
+        close(111)
+
+        open(111,file='./DatInfo/SampBodyMean_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
         close(111)
 
-        open(111,file='./DatInfo/SampBodyAngular'//trim(fileName)//'.plt')
+        open(111,file='./DatInfo/SampBodyAngular_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
         close(111)
 
-        open(111,file='./DatInfo/Power'//trim(fileName)//'.plt')
+        open(111,file='./DatInfo/Power_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t" "Ptot" "Paero" "Piner" "Pax" "Pay" "Paz" "Pix" "Piy" "Piz"'
         close(111)
 
-        !open(111,file='./DatInfo/Area'//trim(fileName)//'.plt')
-        !write(111,*)'variables= "t"  "Area"  '
-        !close(111)
+        open(111,file='./DatInfo/Area_'//trim(fileName)//'.plt')
+        write(111,*)'variables= "t"  "Area"  '
+        close(111)
 
-        open(111,file='./DatInfo/Energy'//trim(fileName)//'.plt')
+        open(111,file='./DatInfo/Energy_'//trim(fileName)//'.plt')
         write(111,*)'variables= "t","Es","Eb","Ep","Ek","Ew","Et"'
         close(111)
     enddo
