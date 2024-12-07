@@ -10,7 +10,7 @@ do
     start=$(date +%s)
     cd ${frqcase}
     mkdir test
-    cp *.dat test/
+    cp *.dat *.msh test/
     cd test
     for folder in DatTemp DatBodyIB DatBodySpan DatInfo DatOthe DatBody DatFlow 
     do
