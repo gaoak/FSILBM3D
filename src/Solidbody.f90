@@ -84,9 +84,6 @@ module SolidBody
     ! end interface
     ! Immersed boundary method parameters
     integer:: count_Area = 0, count_Interp = 0
-    real(8),allocatable :: Surfacetmpxyz(:,:)
-    integer,allocatable :: Surfacetmpele(:,:)
-    integer:: Surfacetmpnpts, Surfacetmpnelmts
     integer:: m_nthreads,m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
@@ -116,7 +113,7 @@ module SolidBody
         integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
         real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
-        ! integer,allocatable :: vtor(:)!of size fake_npts
+        integer,allocatable :: vtor(:)!of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
     contains
         procedure :: Initialise => Initialise_
@@ -132,7 +129,7 @@ module SolidBody
         procedure :: UpdateElmtInterp => UpdateElmtInterp_
         procedure :: PenaltyForce => PenaltyForce_
         procedure :: FluidVolumeForce => FluidVolumeForce_
-        procedure :: vtor => vtor_
+        procedure :: vtor_f => vtor_
     end type VirtualBody
     type(VirtualBody), allocatable :: VBodies(:)
   contains
@@ -166,7 +163,7 @@ module SolidBody
 
         do iFish = 1,m_nFish
             if (iBodyType(iFish).eq.-1) then
-                call Read_gmsh(FEmeshName(iFish))
+                call SurfacetoBeam_write(FEmeshName(iFish))
             endif
             call VBodies(iFish)%rbm%Read_inFlow(FEmeshName(iFish),iBodyModel(iFish),iBodyType(iFish),isMotionGiven(1:6,iFish), &
                                                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
@@ -202,7 +199,11 @@ module SolidBody
         endif
         if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
         if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
-        AR    = Lspan**2/Asfac
+        if (VBodies(maxN)%v_type .eq. 1) then
+            AR    = Lspan**2/Asfac
+        else
+            AR    = 1.d0
+        endif
     end subroutine allocate_solid_memory
 
     subroutine Initialise_bodies(npsize,time,zDim,yDim,xDim,dh,g)
@@ -413,10 +414,13 @@ module SolidBody
         enddo
     endsubroutine PlateUpdatePosVelArea_
 
-    subroutine SurfaceBuildPosVelArea_(this)
+    subroutine SurfaceBuildPosVelArea_(this,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         !   compute displacement, velocity, area at surface element center
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
+        integer:: Surfacetmpnpts, Surfacetmpnelmts
+        real(8) :: Surfacetmpxyz(3,Surfacetmpnpts)
+        integer :: Surfacetmpele(3,Surfacetmpnelmts)
         integer :: i,i1,i2,i3
         real(8) :: A(3),B(3),C(3),tmparea,beta
         beta = - m_Pbeta* 2.0d0*m_denIn
@@ -436,7 +440,6 @@ module SolidBody
             this%v_Exyz0 = this%v_Exyz
         endif
         this%v_Evel(:,:) = 0.d0
-        deallocate(Surfacetmpxyz,Surfacetmpele)
         contains
         subroutine cpt_incenter(Exyz)
             implicit none
@@ -485,7 +488,11 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         integer:: i
         do  i=1,this%v_nelmts
-            this%v_Exyz(i,1:3)=matmul(this%rbm%TTTnxt(1:3,1:3),this%v_Exyz0(i,1:3))+this%rbm%XYZ(1:3)
+            this%v_Exyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),this%v_Exyz0(1:3,i))+this%rbm%XYZ(1:3)
+            this%v_Evel(1:3,i)=[this%rbm%WWW3(2)*this%v_Exyz(3,i)-this%rbm%WWW3(3)*this%v_Exyz(2,i),    &
+                                this%rbm%WWW3(3)*this%v_Exyz(1,i)-this%rbm%WWW3(1)*this%v_Exyz(3,i),    &
+                                this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)    ]&
+                                + this%rbm%UVW(1:3)
         enddo
     end subroutine SurfaceUpdatePosVel_
 
@@ -495,13 +502,8 @@ module SolidBody
         if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. count_Area .eq. 0 )) then
             call this%PlateUpdatePosVelArea()
             count_Area = 1
-        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. count_Area .eq. 0 )) then
-            if (count_Area .eq. 0) then
-                call this%SurfaceBuildPosVelArea()
-                count_Area = 1
-            else
-                call this%SurfaceUpdatePosVel()
-            endif
+        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
+            call this%SurfaceUpdatePosVel()
         else
             write(*,*) 'body type not implemented', this%v_type
         endif
@@ -511,28 +513,9 @@ module SolidBody
         implicit none
         class(VirtualBody), intent(inout) :: this
         integer, intent(in) :: x
-        integer :: low, high, mid
         integer :: vtor_
         if (this%v_type .eq. 1)then
-            low = 1
-            high = this%rbm%nEL
-            if (x < this%rtov(1)) then
-                vtor_ = 1
-                return
-            end if
-            if (x >= this%rtov(this%rbm%nEL)) then
-                vtor_ = this%rbm%nEL
-                return
-            end if
-            do while (low <= high)
-                mid = (low + high) / 2
-                if (this%rtov(mid) < x) then
-                    vtor_ = mid
-                    low = mid + 1
-                else
-                    high = mid - 1
-                end if
-            end do
+            vtor_ = this%vtor(x)
         elseif (this%v_type .eq. -1)then
             vtor_ = 1
         endif
@@ -736,7 +719,7 @@ module SolidBody
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: forceElemTemp(3),invh3
         !==================================================================================================
-        integer::x,y,z,iEL,i1,i2,i3
+        integer::x,y,z,iEL,i1,i2
         !==================================================================================================
         invh3 = (1.d0/m_dh)**3
         ! compute the velocity of IB nodes at element center
@@ -749,8 +732,8 @@ module SolidBody
             rz = this%v_Ew(9:12,iEL)
             forceElemTemp = this%v_Eforce(1:3,iEL)
             ! update beam load, momentum is not included
-            i1=this%rbm%ele(this%vtor(iEL),1)
-            i2=this%rbm%ele(this%vtor(iEL),2)
+            i1=this%rbm%ele(this%vtor_f(iEL),1)
+            i2=this%rbm%ele(this%vtor_f(iEL),2)
             this%rbm%extful(i1,1:3) = this%rbm%extful(i1,1:3) + 0.5d0 * forceElemTemp
             this%rbm%extful(i2,1:3) = this%rbm%extful(i2,1:3) + 0.5d0 * forceElemTemp
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
@@ -778,13 +761,12 @@ module SolidBody
         real(8):: velElemIB(3),forceElemTemp(this%v_nelmts,3),invh3
         !======================================================
         integer:: x,y,z,iEL
-        integer(8)::index
         !======================================================
         invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3/m_denIn
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,index,velElemIB,forceTemp) reduction(+:tolerance)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElemIB,forceTemp) reduction(+:tolerance)
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(1:4,iEL)
             jy = this%v_Ei(5:8,iEL)
@@ -846,12 +828,12 @@ module SolidBody
             this%v_nelmts = this%v_nelmts + this%rbm%r_Nspan(i)
         enddo
         this%rtov(this%rbm%nEL+1) = this%v_nelmts + 1
-        ! allocate(this%vtor(this%v_nelmts))
-        ! do i=1,this%rbm%nEL
-        !     do j= this%rtov(i), this%rtov(i+1)-1
-        !         this%vtor(j) = i
-        !     enddo
-        ! enddo
+        allocate(this%vtor(this%v_nelmts))
+        do i=1,this%rbm%nEL
+            do j= this%rtov(i), this%rtov(i+1)-1
+                this%vtor(j) = i
+            enddo
+        enddo
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
     end subroutine PlateBuild_
@@ -859,18 +841,28 @@ module SolidBody
     subroutine SurfaceBuild_(this)
         implicit none
         class(VirtualBody), intent(inout) :: this
+        integer:: Surfacetmpnpts, Surfacetmpnelmts
+        real(8),allocatable :: Surfacetmpxyz(:,:)
+        integer,allocatable :: Surfacetmpele(:,:)
+        call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         this%v_nelmts = Surfacetmpnelmts
-        ! allocate(this%vtor(this%v_nelmts))
-        ! this%vtor(:) = 1
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+        call this%SurfaceBuildPosVelArea(Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
+        deallocate(Surfacetmpxyz,Surfacetmpele)
     end subroutine SurfaceBuild_
 
-    subroutine Read_gmsh(FEmeshName)
+    subroutine Read_gmsh(FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         implicit none
-        character (LEN=40),intent(inout):: FEmeshName
+        character (LEN=40),intent(in):: FEmeshName
+        character (LEN=40):: gmshName
+        integer:: Surfacetmpnpts, Surfacetmpnelmts
+        real(8),allocatable :: Surfacetmpxyz(:,:)
+        integer,allocatable :: Surfacetmpele(:,:)
         integer :: fileiD = 111, num, i, temp_prop(4)
-        open(unit=fileiD, file = trim(adjustl(FEmeshName)) )! read *.msh file
+        i = index(FEmeshName, '.')
+        gmshName = FEmeshName(:i) // 'msh'
+        open(unit=fileiD, file = trim(adjustl(gmshName)) )! read *.msh file
             ! read nodes
             read(fileiD,*)
             read(fileiD,*)
@@ -878,7 +870,7 @@ module SolidBody
             read(fileiD,*)
             read(fileiD,*) num
             Surfacetmpnpts = num
-            allocate(Surfacetmpxyz(3, Surfacetmpnpts))
+            allocate(Surfacetmpxyz(3,Surfacetmpnpts))
             do i = 1,Surfacetmpnpts
                 read(fileiD,*)num,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i)
             enddo
@@ -900,28 +892,47 @@ module SolidBody
                 read(fileiD,*)num,temp_prop(1:4),Surfacetmpele(1,i),Surfacetmpele(2,i),Surfacetmpele(3,i)
             enddo
         close(fileiD)
+    endsubroutine Read_gmsh
+
+    subroutine SurfacetoBeam_write(FEmeshName)
+        implicit none
+        character (LEN=40),intent(inout):: FEmeshName
+        integer :: fileiD = 111, i, num
+        real(8) :: Surfacetmpxyz(3,3)
+        open(unit=fileiD, file = trim(adjustl(FEmeshName)) )
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*)
+            read(fileiD,*)
+            do i = 1,3
+                read(fileiD,*)num,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i)
+            enddo
+        close(fileiD)
         i = index(FEmeshName, '.')
         FEmeshName = FEmeshName(:i) // 'dat'
         open(unit=fileiD, file = trim(adjustl(FEmeshName)))! write *.dat file
             write(fileiD,*) "Frame3D"
         close(fileiD)
         open(unit=fileiD, file = trim(adjustl(FEmeshName)),position='append')! write *.dat file
-            write(fileiD,*) "     1     1     1     0. 0. 1."
+            write(fileiD,*) "     3     1     1     0. 0. 1."
             write(fileiD,*) "END"
-            write(fileiD,*) "    1"
-            write(fileiD,*) "    1",Surfacetmpxyz(1,1),Surfacetmpxyz(2,1),Surfacetmpxyz(3,1),"     0.0     0.0"
+            write(fileiD,*) "     3"
+            do i = 1,3
+                write(fileiD,*) i,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i),"   0.0   0.0"
+            enddo
             write(fileiD,*) "END"
-            write(fileiD,*) "    1"
-            write(fileiD,*) "    1     1     1     1     3     1     0"
+            write(fileiD,*) "     1"
+            write(fileiD,*) "     1     1     2     3     3     1     0"
             write(fileiD,*) "END"
-            write(fileiD,*) "1"
-            write(fileiD,*) "1     1     0     0     0     0     0"
+            write(fileiD,*) "     1"
+            write(fileiD,*) "     1     1     0     0     0     0     0"
             write(fileiD,*) "END"
-            write(fileiD,*) "1"
-            write(fileiD,*) "1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00"
+            write(fileiD,*) "     1"
+            write(fileiD,*) "     1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00"
             write(fileiD,*) "END"
         close(fileiD)
-    endsubroutine Read_gmsh
+    endsubroutine SurfacetoBeam_write
 
     subroutine Write_body_(this,iFish,time)
         implicit none
@@ -989,6 +1000,9 @@ module SolidBody
         integer,parameter::nameLen=10
         character (LEN=nameLen):: fileName,idstr
         integer,parameter:: idfile=100
+        integer:: Surfacetmpnpts, Surfacetmpnelmts
+        real(8),allocatable :: Surfacetmpxyz(:,:)
+        integer,allocatable :: Surfacetmpele(:,:)
         !==========================================================================
         timeTref = time/m_Tref
         write(fileName,'(I10)') nint(timeTref*1d5)
@@ -1000,6 +1014,7 @@ module SolidBody
         !==========================================================================
         open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         if (time .lt. 1e-5) then
+            call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
             write(idfile, '(A)') 'variables = "x" "y" "z"'
             write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
             do i = 1,Surfacetmpnpts
@@ -1012,6 +1027,7 @@ module SolidBody
                 i3 = Surfacetmpele(3,i)
                 write(idfile, *) i1, i2, i3
             enddo
+            deallocate(Surfacetmpxyz,Surfacetmpele)
         else
             write(idfile, '(A)') 'variables = "X" "Y" "Z" "TTTnxt(RotMat)"'
             write(idfile, '(10E20.10)') this%rbm%XYZ(1),this%rbm%XYZ(2),this%rbm%XYZ(3)

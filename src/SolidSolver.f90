@@ -180,6 +180,22 @@ module SolidSolver
         this%xyzful(1:this%nND,1:6)=this%xyzful0(1:this%nND,1:6)
         this%velful(1:this%nND,1:6)=0.0
 
+        this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3))
+        !rotational velocity
+        this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
+        this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
+                        this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
+                        this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
+        this%WWW3(1:3)=matmul(this%TTT0(1:3,1:3),this%WWW2(1:3))
+        
+        do  iND=1,this%nND
+            this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
+                                  this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
+                                  this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
+                                  + this%UVW(1:3)
+            this%velful(iND,4:6)=this%WWW3(1:3)
+        enddo
+
         this%dspful(1:this%nND,1:6)=0.0
         this%accful(1:this%nND,1:6)=0.0
 
