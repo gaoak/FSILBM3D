@@ -83,7 +83,6 @@ module SolidBody
     !     end subroutine printumap
     ! end interface
     ! Immersed boundary method parameters
-    integer:: count_Area = 0, count_Interp = 0
     integer:: m_nthreads,m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
     real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
@@ -104,6 +103,7 @@ module SolidBody
         ! 1 plate given by line mesh
         ! 2 rod given by line mesh
         integer :: v_move = 0 ! 0 stationary 1 moving
+        integer :: count_Area = 0, count_Interp = 0
         real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z), required for type 3
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
         real(8), allocatable :: v_Ea(:) ! element area
@@ -444,10 +444,8 @@ module SolidBody
             call cpt_area(tmparea)
             this%v_Ea(i) = tmparea*beta
         enddo
-        if (this%v_move .eq. 1) then
-            allocate(this%v_Exyz0(3,this%v_nelmts))
-            this%v_Exyz0 = this%v_Exyz
-        endif
+        allocate(this%v_Exyz0(3,this%v_nelmts))
+        this%v_Exyz0 = this%v_Exyz
         this%v_Evel(:,:) = 0.d0
         contains
         subroutine cpt_incenter(Exyz)
@@ -508,14 +506,13 @@ module SolidBody
     subroutine UpdatePosVelArea_(this)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. count_Area .eq. 0 )) then
+        if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. this%count_Area .eq. 0)) then
             call this%PlateUpdatePosVelArea()
-            count_Area = 1
-        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
+            this%count_Area = 1
+        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. this%count_Area .eq. 0)) then
             call this%SurfaceUpdatePosVel()
+            this%count_Area = 1
         else
-            write(*,*) 'body type not implemented', this%v_type
-            stop
         endif
     end subroutine UpdatePosVelArea_
 
@@ -689,9 +686,9 @@ module SolidBody
         real(8)::tol,ntol
         ! update virtual body shape and velocity
         do iFish = 1, m_nFish
-            if (VBodies(iFish)%v_move .eq. 1 .or. VBodies(iFish)%rbm%iBodyModel .eq. 2 .or. count_Interp .eq. 0 ) then
+            if (VBodies(iFish)%v_move .eq. 1 .or. VBodies(iFish)%rbm%iBodyModel .eq. 2 .or. VBodies(iFish)%count_Interp .eq. 0 ) then
                 call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
-                count_Interp = 1
+                VBodies(iFish)%count_Interp = 1
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
@@ -909,6 +906,8 @@ module SolidBody
         character (LEN=40),intent(inout):: FEmeshName
         integer :: fileiD = 111, i, num
         real(8) :: Surfacetmpxyz(3,3)
+        i = index(FEmeshName, '.')
+        FEmeshName = FEmeshName(:i) // 'msh'
         open(unit=fileiD, file = trim(adjustl(FEmeshName)) )
             read(fileiD,*)
             read(fileiD,*)
@@ -1025,6 +1024,9 @@ module SolidBody
         open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         if (time .lt. 1e-5) then
             call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
+            do  i=1,Surfacetmpnpts
+                Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
+            enddo
             write(idfile, '(A)') 'variables = "x" "y" "z"'
             write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
             do i = 1,Surfacetmpnpts
