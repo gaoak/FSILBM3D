@@ -11,7 +11,7 @@
     integer:: FishOrder1,FishOrder2,LineX,LineY,LineZ
     integer, allocatable:: FishNum(:),NumX(:),NumY(:)
     character(LEN=40):: tmpFEmeshName
-    integer:: niBodyModel,nisMotionGiven(1:6)
+    integer:: niBodyModel,niBodyType,nisMotionGiven(1:6)
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     character (LEN=40), allocatable:: FEmeshName(:)
@@ -66,7 +66,7 @@
     if(nFish.eq.0) iForce2Body = 0
 
     if(nFish>0) then
-        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
+        allocate(FEmeshName(1:nFish),iBodyModel(1:nFish),iBodyType(1:nFish),isMotionGiven(1:DOFDim,1:nFish))
         allocate(denR(1:nFish),EmR(1:nFish),tcR(1:nFish),psR(1:nFish),KB(1:nFish),KS(1:nFish))
         allocate(FishNum(1:(FishKind+1)),NumX(1:FishKind),NumY(1:FishKind))
         FishNum(1)=1
@@ -77,7 +77,7 @@
     call readequal(111)
     do iKind=1,FishKind
         read(111,*)     FishNum(iKind+1),NumX(iKind),NumY(iKind)
-        read(111,*)     niBodyModel, tmpFEmeshName
+        read(111,*)     niBodyModel,niBodyType,tmpFEmeshName
         read(111,*)     nisMotionGiven(1:3)
         read(111,*)     nisMotionGiven(4:6)
         read(111,*)     ndenR, npsR
@@ -87,6 +87,7 @@
         FishOrder2=FishOrder2+FishNum(iKind+1)
         do iFish=FishOrder1,FishOrder2
             iBodyModel(iFish)=niBodyModel
+            iBodyType(iFish)=niBodyType
             FEmeshName(iFish)=tmpFEmeshName
             isMotionGiven(1:6,iFish)=nisMotionGiven(1:6)
             denR(iFish)= ndenR
@@ -180,7 +181,7 @@
     call readequal(111)
     close(111)
 
-    call read_solid_file(nFish,FEmeshName,iBodyModel,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
+    call read_solid_file(nFish,FEmeshName,iBodyModel,iBodyType,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
                          Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
                          ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
                          dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
