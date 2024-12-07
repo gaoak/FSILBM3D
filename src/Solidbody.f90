@@ -187,6 +187,7 @@ module SolidBody
                 VBodies(iFish)%v_move = 1
             endif
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
+            write(*,*)'read FEMeshFile ',iFish,' end' 
         enddo
         !Use the object with the largest area as the reference object
         maxN  = maxloc(nAsfac, dim=1)
