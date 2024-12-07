@@ -925,11 +925,11 @@ module SolidBody
             write(fileiD,*) "Frame3D"
         close(fileiD)
         open(unit=fileiD, file = trim(adjustl(FEmeshName)),position='append')! write *.dat file
-            write(fileiD,*) "     3     1     1     0. 0. 1."
+            write(fileiD,*) "     3     1     1"
             write(fileiD,*) "END"
             write(fileiD,*) "     3"
             do i = 1,3
-                write(fileiD,*) i,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i),"   0.0   0.0"
+                write(fileiD,*) i,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i),"   0.0   0.0   0. 0. 1."
             enddo
             write(fileiD,*) "END"
             write(fileiD,*) "     1"
