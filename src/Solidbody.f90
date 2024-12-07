@@ -236,6 +236,7 @@ module SolidBody
             call this%SurfaceBuild()
         else
             write(*,*) 'not implemented body type', this%v_type
+            stop
         endif
     end subroutine Initialise_
 
@@ -390,8 +391,8 @@ module SolidBody
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         integer :: i,s,cnt,i1,i2
-        real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3)
-        real(8) :: dh, left, len, dl, ls, area, beta
+        real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3), dirc(3)
+        real(8) :: dh, left, len, dl, ls, area, beta, dirc_norm
         beta = - m_Pbeta* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)
@@ -404,10 +405,18 @@ module SolidBody
             tmpdx = this%rbm%xyzful(i2,1:3) - this%rbm%xyzful(i1,1:3)
             dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3))
             area = dl * dh * beta
+            dirc(1:3) = this%rbm%r_dirc(i1,1:3) + this%rbm%r_dirc(i2,1:3)
+            dirc_norm = dsqrt(sum(dirc**2))
+            if (dirc_norm .gt. 1e-10) then
+                dirc = dirc / dirc_norm
+            else
+                write(*,*) this%rbm%r_dirc(i1,1:3), "and", this%rbm%r_dirc(i2,1:3), "are opposite directions; no unique bisector exists."
+                stop
+            endif
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%r_Nspan(i)
                 ls = dl * (0.5d0 + dble(s-1)) - left
-                this%v_Exyz(1:3,cnt+s) = tmpxyz + this%rbm%r_dirc*ls
+                this%v_Exyz(1:3,cnt+s) = tmpxyz + dirc*ls
                 this%v_Evel(1:3,cnt+s) = tmpvel
                 this%v_Ea(cnt+s) = area
             enddo
@@ -506,6 +515,7 @@ module SolidBody
             call this%SurfaceUpdatePosVel()
         else
             write(*,*) 'body type not implemented', this%v_type
+            stop
         endif
     end subroutine UpdatePosVelArea_
 
@@ -976,8 +986,8 @@ module SolidBody
 
         do i = 1,this%rbm%nNd
             tmpxyz = this%rbm%xyzful(i,1:3)
-            write(idfile, *) (tmpxyz - this%rbm%r_Lspan(i) * this%rbm%r_dirc)/m_Lref
-            write(idfile, *) (tmpxyz + this%rbm%r_Rspan(i) * this%rbm%r_dirc)/m_Lref
+            write(idfile, *) (tmpxyz - this%rbm%r_Lspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
+            write(idfile, *) (tmpxyz + this%rbm%r_Rspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
         enddo
         do  i=1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)

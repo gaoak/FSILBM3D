@@ -13,7 +13,7 @@ module SolidSolver
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
         integer, allocatable :: r_Nspan(:)
-        real(8):: r_dirc(3)
+        real(8), allocatable :: r_dirc(:,:)
         real(8):: Freq,denR,KB,KS,EmR,psR,tcR,St
         real(8):: elmax,elmin
         real(8):: XYZ(3),XYZo(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
@@ -104,7 +104,7 @@ module SolidSolver
         open(unit=m_idat, file = trim(adjustl(this%FEmeshName)))
         rewind(m_idat)
         read(m_idat,*)
-        read(m_idat,*)this%nND,this%nEL,this%nMT,this%r_dirc(1:3)
+        read(m_idat,*)this%nND,this%nEL,this%nMT
         read(m_idat,*)
 
         this%nEQ=this%nND*6
@@ -123,10 +123,10 @@ module SolidSolver
         this%extful1(:,:)=0.d0
         this%extful2(:,:)=0.d0
 
-        allocate( this%r_Lspan(this%nND),this%r_Rspan(this%nND),this%r_Nspan(this%nEL) )
+        allocate( this%r_Lspan(this%nND),this%r_Rspan(this%nND),this%r_Nspan(this%nEL),this%r_dirc(this%nND,3) )
 
     !   ===============================================================================================
-        call read_structural_datafile(this%r_Lspan(1:this%nND),this%r_Rspan(1:this%nND),this%r_Nspan(1:this%nEL), &
+        call read_structural_datafile(this%r_Lspan(1:this%nND),this%r_Rspan(1:this%nND),this%r_Nspan(1:this%nEL),this%r_dirc(1:this%nND,1:3), &
                                       this%jBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5),this%nloc(1:this%nND*6),this%nprof(1:this%nND*6), &
                                       this%nprof2(1:this%nND*6),this%xyzful00(1:this%nND,1:6),this%prop(1:this%nMT,1:10),this%nND, &
                                       this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,m_idat)
@@ -918,12 +918,12 @@ module SolidSolver
 !
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   READ structural DaTafile
-    subroutine read_structural_datafile(r_Lspan,r_Rspan,r_Nspan,jBC,ele,nloc,nprof,nprof2, &
+    subroutine read_structural_datafile(r_Lspan,r_Rspan,r_Nspan,r_dirc,jBC,ele,nloc,nprof,nprof2, &
                                         xyzful00,prop,nND,nEL,nEQ,nMT,nBD,maxstiff,idat)
     implicit none
     integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,idat
     integer:: ele(nEL,5),jBC(nND,6),nloc(nND*6),nprof(nND*6),nprof2(nND*6),r_Nspan(nEL)
-    real(8):: xyzful00(nND,6),prop(nMT,10),r_Lspan(nND),r_Rspan(nND)
+    real(8):: xyzful00(nND,6),prop(nMT,10),r_Lspan(nND),r_Rspan(nND),r_dirc(nND,3)
 !   ---------------------------------------------------------------------------
     integer:: i,j,nbc,node,nmp,ibandh,iend,ibandv,ji1
     character (LEN=50):: endin
@@ -931,7 +931,7 @@ module SolidSolver
 !   READ  node
     read(idat,*)  nND
     do    i= 1, nND
-        read(idat,*) node,xyzful00(node,1),xyzful00(node,2),xyzful00(node,3),r_Lspan(node),r_Rspan(node)
+        read(idat,*) node,xyzful00(node,1),xyzful00(node,2),xyzful00(node,3),r_Lspan(node),r_Rspan(node),r_dirc(node,1),r_dirc(node,2),r_dirc(node,3)
     enddo
     read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
