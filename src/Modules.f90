@@ -30,7 +30,6 @@ MODULE ConstParams
                         !given balance function,unbalanced extrapolation,1st order extrapolate,2nd order extrapolate,periodic
     
     real(8), parameter:: Pi=3.141592653589793d0,eps=1.0d-5
-
     integer, parameter:: DOFDim=6
 
 END MODULE ConstParams

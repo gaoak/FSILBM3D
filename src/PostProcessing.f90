@@ -18,9 +18,9 @@
 
         open(111,file='./Check.dat')
         write(111,'(A      )')'===================================='
-        if    (maxval(iBodyModel(:))==1)then
+        if    (maxval(iBodyModel(:)).eq.1)then
             write(111,'(A      )')'This is a RIGID    body problem'
-        elseif(maxval(iBodyModel(:))==2)then
+        elseif(maxval(iBodyModel(:)).eq.2)then
             write(111,'(A      )')'This is a FLRXIBLE body problem'
         else
             write(111,'(A      )')'This is a FLRXIBLE And RIGID body problem'
