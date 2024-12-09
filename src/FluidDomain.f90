@@ -3,13 +3,16 @@ module FluidDomain
     implicit none
     private
     integer:: m_nthreads
-    real(8):: m_denIn,m_Uref, m_nu, m_Mu
-    type :: LBMBlock ! only support uniform grid
+    real(8):: m_denIn,m_Uref,m_Lref,m_Tref,m_nu,m_Mu
+    real(8):: m_VolumeForce(1:3)
+    type :: LBMBlock
         integer:: ID
-        integer:: xDim,yDim,zDim
-        integer:: xMinBC,xMaxBC,yMinBC,yMaxBC,zMinBC,zMaxBC
-        real(8):: dh,Omega,tau
-        integer:: boundaryConditions(1:6)
+        integer:: xDim,yDim,zDim,iCollidModel
+        integer:: BndConds(1:6),offsetOutput
+        real(8):: dh,xmin,ymin,zmin
+        real(8):: Omega,Omega2 ! single time, two time relaxation
+        real(8):: xmax,ymax,zmax
+        real(8), allocatable:: M_COLLID(:,:),M_FORCE(:,:) ! multiple time relaxation
         real(8), allocatable:: fIn(:,:,:,:)
         real(8), allocatable:: uuu(:,:,:,:), force(:,:,:,:), den(:,:,:)
         integer, allocatable:: OMPpartition(:), OMPparindex(:),OMPeid(:)
@@ -30,10 +33,17 @@ module FluidDomain
 
     contains
 
+    subroutine Initialise_FluidDomains()
+        implicit none
+        ! to do
+        ! read inflow.dat to blks
+        ! allocate all fluid domains
+    end subroutine
+
     SUBROUTINE allocate_fluid_(this,zDim,yDim,xDim,offsetOutput)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        integer,intent(in)::zDim,yDim,xDim
+        integer,intent(in)::zDim,yDim,xDim,offsetOutput
         integer:: xmin,ymin,zmin,xmax,ymax,zmax
 
         ! allocate fluid memory
@@ -41,16 +51,18 @@ module FluidDomain
         allocate(this%uuu(zDim,yDim,xDim,1:3),this%force(zDim,yDim,xDim,1:3))
         allocate(this%den(zDim,yDim,xDim))
         ! allocate output workspace
+        this%offsetOutput = offsetOutput
         xmin = 1 + offsetOutput
         ymin = 1 + offsetOutput
         zmin = 1 + offsetOutput
         xmax = xDim - offsetOutput
         ymax = yDim - offsetOutput
         zmax = zDim - offsetOutput
-        allocate( this%oututmp(zmin:zmax,ymin:ymax,xmin:xmax),this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax),this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax) )
+        allocate( this%oututmp(zmin:zmax,ymin:ymax,xmin:xmax),this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax),&
+            this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax) )
         ! allocate mesh partition
         allocate(this%OMPpartition(1:m_nthreads),this%OMPparindex(1:m_nthreads+1),this%OMPeid(1:m_nthreads))
-        allocate(this%OMPedge(1:zDim,1:yDim, 1:npsize))
+        allocate(this%OMPedge(1:zDim,1:yDim, 1:m_nthreads))
         call OMPPrePartition(xDim, m_nthreads, this%OMPpartition, this%OMPparindex)
 
         contains
@@ -77,132 +89,59 @@ module FluidDomain
         endsubroutine OMPPrePartition
     END SUBROUTINE allocate_fluid_
 
-    SUBROUTINE initialize_(this)
+    SUBROUTINE initialise_(this,ID,iCollidModel,zDim,yDim,xDim,zmin,ymin,xmin,dh,bcs,params)
         implicit none
         class(LBMBlock), intent(inout) :: this
+        integer,intent(in):: ID, iCollidModel,zDim,yDim,xDim,bcs(1:6)
+        real(8),intent(in):: zmin,ymin,xmin,dh
+        real(8),intent(in):: params(1:10)!(1, TRT lambda), (2, shear rate)
         real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
-        real(8):: vel(1:SpcDim)
+        real(8):: vel(1:SpaceDim)
+        real(8):: xGrid(1:xDim),yGrid(1:yDim),zGrid(1:zDim)
         integer:: x, y, z
-    
-    !   grid coordinate
-        xGrid(1:xDim)=xGrid0(1:xDim)
-        yGrid(1:yDim)=yGrid0(1:yDim)
-        zGrid(1:zDim)=zGrid0(1:zDim)
-    !   macro quantities
-        do  x = 1, xDim
-        do  y = 1, yDim
-        do  z = 1, zDim
-            if(VelocityKind==0) then
-                call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(z), vel)
-            elseif(VelocityKind==2) then
-                call evaluateOscillatoryVelocity(vel)
-            endif
-            uuu(z, y, x, 1) = vel(1)
-            uuu(z, y, x, 2) = vel(2)
-            uuu(z, y, x, 3) = vel(3)
-        enddo
-        enddo
-        enddo
-        den(1:zDim,1:yDim,1:xDim)   = denIn
-        !prs(1:zDim,1:yDim,1:xDim)   = Cs2*(den(1:zDim,1:yDim,1:xDim)-denIn)
-    !   initial disturbance
-        call initDisturb()
-    !   distribution function
-        do  x = 1, xDim
-        do  y = 1, yDim
-        do  z = 1, zDim
-            uSqr       = sum(uuu(z,y,x,1:3)**2)
-            uxyz(0:lbmDim) = uuu(z,y,x,1) * ee(0:lbmDim,1) + uuu(z,y,x,2) * ee(0:lbmDim,2)+uuu(z,y,x,3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)= wt(0:lbmDim) * den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
-            fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
-        enddo
-        enddo
-        enddo
+        this%ID = ID
+        this%xDim = xDim
+        this%yDim = yDim
+        this%zDim = zDim
+        this%dh = dh
+        this%xmin = xmin
+        this%xmax = xmin + dh*(xDim-1)
+        this%ymin = ymin
+        this%ymax = ymin + dh*(yDim-1)
+        this%zmin = zmin
+        this%zmax = zmin + dh*(zDim-1)
+        this%BndConds = bcs
+        this%iCollidModel = iCollidModel
+        if(iCollidModel.eq.1) then
+            call calculate_SRT_params
+        elseif(iCollidModel.eq.2) then
+            call calculate_TRT_params(params(1))
+        elseif(iCollidModel.eq.3) then
+            call calculate_MRT_params
+        else
+            write(*,*)' collision_step Model is not defined'
+        endif
+
+        call initialize_flow(params)
 
         contains
 
-        SUBROUTINE calculate_LB_params()
-            USE simParam
-            USE SolidBody
+        SUBROUTINE calculate_SRT_params()
             implicit none
-            integer:: iFish
-            real(8):: nUref(1:nFish)
-        !   reference values: length, velocity, time
-            if(nFish.eq.0) then
-                Lref = 1.d0
-            else
-                Lref  = Lchod
-            endif
-        
-            if(RefVelocity==0) then
-                Uref = dabs(uuuIn(1))
-            elseif(RefVelocity==1) then
-                Uref = dabs(uuuIn(2))
-            elseif(RefVelocity==2) then
-                Uref = dabs(uuuIn(3))
-            elseif(RefVelocity==3) then
-                Uref = dsqrt(uuuIn(1)**2 + uuuIn(2)**2 + uuuIn(3)**2)
-            elseif(RefVelocity==4) then
-                Uref = dabs(VelocityAmp)  !Velocity Amplitude
-            elseif(RefVelocity==10) then
-                Uref = Lref * MAXVAL(VBodies(:)%rbm%Freq)
-            elseif(RefVelocity==11) then
-                do iFish=1,nFish
-                nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))
-                enddo
-                Uref = MAXVAL(nUref(1:nFish))
-            elseif(RefVelocity==12) then
-                do iFish=1,nFish
-                nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))*2.D0 !Park 2017 pof
-                enddo
-                Uref = MAXVAL(nUref(1:nFish))
-            !else
-                !Uref = 1.0d0
-            endif
-        
-            if(RefTime==0) then
-                Tref = Lref / Uref
-            elseif(RefTime==1) then
-                Tref = 1 / maxval(VBodies(:)%rbm%Freq)
-            !else
-            endif
-        
-        !   calculate viscosity, LBM relexation time
-            ratio  =  dt/dh
-            if(ratio>1.0d0+eps)then
-                write(*,*)'dt >  dhmin !!!!!!!!!!'
-                write(*,*)'dt <= dhmin (we use streching mesh for LBM)'
-                stop
-            endif
+            real(8):: tau
+            tau   =  m_nu/(dh*Cs2)+0.5d0
+            this%Omega =  1.0d0 / tau
+        END SUBROUTINE calculate_SRT_params
 
-            !for uniform grid, advection length equals grid size
-            isUniformGrid(1) = dabs(dxmax/dh-1.0d0)<eps
-            isUniformGrid(2) = dabs(dymax/dh-1.0d0)<eps
-            isUniformGrid(3) = dabs(dzmax/dh-1.0d0)<eps
-            if(dabs(dt/dh-1.0d0)<eps .and. isUniformGrid(1) .and. isUniformGrid(2) .and. isUniformGrid(3))then
-                iStreamModel=1
-                write(*,*)'uniform grid,STLBM'
-            else
-                iStreamModel=2
-                write(*,*)'non-uniform grid,ISLBM'
-            endif
+        SUBROUTINE calculate_TRT_params(lambda)
+            implicit none
+            real(8):: tau, lambda
+            tau   =  m_nu/(dh*Cs2)+0.5d0
+            this%Omega =  1.0d0 / tau
+            this%Omega2 = 0.d0 ! to be updated
+        END SUBROUTINE calculate_TRT_params
 
-            Cs2   =  (1/dsqrt(3.0d0))**2
-            nu    =  Uref * Lref/ Re
-            Mu    =  nu*denIn
-            tau   =  nu/(dt*Cs2)+0.5d0
-            Omega =  1.0d0 / tau
-
-            Aref=Uref/Tref
-            Fref=0.5*denIn*Uref**2*Asfac
-            Eref=0.5*denIn*Uref**2*Asfac*Lref
-            Pref=0.5*denIn*Uref**2*Asfac*Uref
-
-            g(1:3)=Frod(1:3) * Uref ** 2/Lref
-        END SUBROUTINE calculate_LB_params
-
-        SUBROUTINE calculate_MRTM_params()
-            USE simParam
+        SUBROUTINE calculate_MRT_params()
             implicit none
         !   ===============================================================================================
             integer:: I
@@ -247,7 +186,7 @@ module FluidDomain
         !   ----------------------------------------------------------
             !S(0:lbmDim)=Omega ! restore to SRT if S is Omega
             !              0   1  2  3  4  5  6  7  8  9     10  11    12  13    14    15    16  17  18
-            S(0:lbmDim)=[  s0,s1,s2,s0,s4,s0,s4,s0,s4,Omega,s10,Omega,s10,Omega,Omega,Omega,s16,s16,s16]
+            S(0:lbmDim)=[  s0,s1,s2,s0,s4,s0,s4,s0,s4,this%Omega,s10,this%Omega,s10,this%Omega,this%Omega,this%Omega,s16,s16,s16]
             !=====================
         !   calculate MRTM collision matrix
             !IM*S*M
@@ -255,7 +194,8 @@ module FluidDomain
             DO    i=0,lbmDim
                 S_D(i,i)=S(i)
             ENDDO
-            M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
+            allocate(this%M_COLLID(0:lbmDim,0:lbmDim),this%M_FORCE(0:lbmDim,0:lbmDim))
+            this%M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
             !=====================
         !   calculate MRTM body-force matrix
             !IM*(I-0.5D0*S)*M=I-0.5*IM*S*M
@@ -263,14 +203,14 @@ module FluidDomain
             DO    i=0,lbmDim
                 S_D(i,i)=1.0d0
             ENDDO
-            M_FORCE=S_D-0.5*M_COLLID
-        END SUBROUTINE calculate_MRTM_params
+            this%M_FORCE=S_D-0.5*this%M_COLLID
+        END SUBROUTINE calculate_MRT_params
 
-        SUBROUTINE initialize_flow()
-            USE simParam
+        SUBROUTINE initialize_flow(params)
             implicit none
+            real(8),intent(in):: params(1:10)
             real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
-            real(8):: vel(1:SpcDim)
+            real(8):: vel(1:SpaceDim)
             integer:: x, y, z
         
         !   grid coordinate***************************************************************************************
@@ -293,22 +233,21 @@ module FluidDomain
             enddo
             enddo
             den(1:zDim,1:yDim,1:xDim)   = denIn
-            prs(1:zDim,1:yDim,1:xDim)   = Cs2*(den(1:zDim,1:yDim,1:xDim)-denIn)
         !   initial disturbance***************************************************************************************
             call initDisturb()
         !   distribution function***************************************************************************************
             do  x = 1, xDim
             do  y = 1, yDim
             do  z = 1, zDim
-                uSqr       = sum(uuu(z,y,x,1:3)**2)
-                uxyz(0:lbmDim) = uuu(z,y,x,1) * ee(0:lbmDim,1) + uuu(z,y,x,2) * ee(0:lbmDim,2)+uuu(z,y,x,3) * ee(0:lbmDim,3)
+                uSqr       = sum(this%uuu(z,y,x,1:3)**2)
+                uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
                 fEq(0:lbmDim)= wt(0:lbmDim) * den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
                 fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
             enddo
             enddo
             enddo
         END SUBROUTINE initialize_flow
-    END SUBROUTINE initialize_
+    END SUBROUTINE initialise_
 
     SUBROUTINE write_continue_(this,step,time)
         IMPLICIT NONE
@@ -337,13 +276,13 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do  x = 1, xDim
-        do  y = 1, yDim
-        do  z = 1, zDim
+        do  x = 1, this%xDim
+        do  y = 1, this%yDim
+        do  z = 1, this%zDim
             this%den(z,y,x  )  = SUM(this%fIn(z,y,x,0:lbmDim))
-            this%uuu(z,y,x,1)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*VolumeForce(1)*dt)/this%den(z,y,x)
-            this%uuu(z,y,x,2)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*VolumeForce(2)*dt)/this%den(z,y,x)
-            this%uuu(z,y,x,3)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*VolumeForce(3)*dt)/this%den(z,y,x)
+            this%uuu(z,y,x,1)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*m_VolumeForce(1)*this%dh)/this%den(z,y,x)
+            this%uuu(z,y,x,2)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*m_VolumeForce(2)*this%dh)/this%den(z,y,x)
+            this%uuu(z,y,x,3)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*m_VolumeForce(3)*this%dh)/this%den(z,y,x)
             !prs(z,y,x)   = Cs2*(den(z,y,x)-denIn)
         enddo
         enddo
@@ -356,43 +295,41 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3
         integer:: x,y,z
-        dt3 = 3.d0*dt
+        dt3 = 3.d0*this%dh
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb)
-        do    x = 1, xDim
-        do    y = 1, yDim
-        do    z = 1, zDim
-            uSqr           = sum(uuu(z,y,x,1:3)**2)
+        do    x = 1, this%xDim
+        do    y = 1, this%yDim
+        do    z = 1, this%zDim
+            uSqr           = sum(this%uuu(z,y,x,1:3)**2)
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
-                              (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*force(z,y,x,1) &
-                             +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*force(z,y,x,2) &
-                             +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*force(z,y,x,3) &
+                              (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
+                             +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
+                             +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3) &
                                              )
 
-            if(iCollidModel==1)then
+            if(this%iCollidModel==1)then
                 ! SRT collision
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + Omega*fEq(0:lbmDim) + (1.d0-0.5d0*Omega)*Flb(0:lbmDim)
-            elseif(iCollidModel==2)then
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*fEq(0:lbmDim) + (1.d0-0.5d0*this%Omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==2)then
                 ! TRT collision
-                fEq(0) = Omega*fEq(0) + (1.d0-0.5d0*Omega)*Flb(0)
+                fEq(0) = this%Omega*fEq(0) + (1.d0-0.5d0*this%Omega)*Flb(0)
                 uxyz(positivedirs) = 0.5d0* Omega*(fEq(positivedirs)+fEq(negativedirs)) + (0.5d0-0.25d0* Omega)*(Flb(positivedirs)+Flb(negativedirs))
                 uxyz(negativedirs) = 0.5d0*Omega2*(fEq(positivedirs)-fEq(negativedirs)) + (0.5d0-0.25d0*Omega2)*(Flb(positivedirs)-Flb(negativedirs))
                 fEq(positivedirs) = uxyz(positivedirs) + uxyz(negativedirs)
                 fEq(negativedirs) = uxyz(positivedirs) - uxyz(negativedirs)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + fEq
-            elseif(iCollidModel==3)then
+            elseif(this%iCollidModel==3)then
                 ! MRT collision
-                this%fIn(z,y,x,0:lbmDim)=this%fIn(z,y,x,0:lbmDim)+MATMUL( M_COLLID(0:lbmDim,0:lbmDim), fEq(0:lbmDim) ) + MATMUL( M_FORCE(0:lbmDim,0:lbmDim),Flb(0:lbmDim))
-            else
-                write(*,*)' collision_step Model is not defined'
+                this%fIn(z,y,x,0:lbmDim)=this%fIn(z,y,x,0:lbmDim)+MATMUL( this%M_COLLID(0:lbmDim,0:lbmDim), fEq(0:lbmDim) ) + MATMUL( this%M_FORCE(0:lbmDim,0:lbmDim),Flb(0:lbmDim))
             endif
         enddo
         enddo
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE collision_
-    
+
     !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
     !0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0
     !0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1
@@ -510,9 +447,10 @@ module FluidDomain
         end subroutine
     END SUBROUTINE streaming_
 
-    SUBROUTINE write_flow_(this)
+    SUBROUTINE write_flow_(this,time)
         implicit none
         class(LBMBlock), intent(inout) :: this
+        real(8), intent(in):: time
         integer:: x,y,z,pid,i
         integer::xmin,xmax,ymin,ymax,zmin,zmax
         integer,parameter::nameLen=10,idfile=100
@@ -527,19 +465,19 @@ module FluidDomain
         if(waittime.gt.1.d-1) then
             write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
         endif
-        xmin = 1 + offsetOutput
-        ymin = 1 + offsetOutput
-        zmin = 1 + offsetOutput
-        xmax = xDim - offsetOutput
-        ymax = yDim - offsetOutput
-        zmax = zDim - offsetOutput
-        invUref = 1.d0/Uref
+        xmin = 1 + this%offsetOutput
+        ymin = 1 + this%offsetOutput
+        zmin = 1 + this%offsetOutput
+        xmax = this%xDim - this%offsetOutput
+        ymax = this%yDim - this%offsetOutput
+        zmax = this%zDim - this%offsetOutput
+        invUref = 1.d0/m_Uref
         
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do x=xmin, xmax
             do y=ymin, ymax
                 do z=zmin, zmax
-                    oututmp(z,y,x) = uuu(z,y,x,1)*invUref
+                    this%oututmp(z,y,x) = this%uuu(z,y,x,1)*invUref
                 enddo
             enddo
         enddo
@@ -548,7 +486,7 @@ module FluidDomain
         do x=xmin, xmax
             do y=ymin, ymax
                 do z=zmin, zmax
-                    outvtmp(z,y,x) = uuu(z,y,x,2)*invUref
+                    this%outvtmp(z,y,x) = this%uuu(z,y,x,2)*invUref
                 enddo
             enddo
         enddo
@@ -557,56 +495,55 @@ module FluidDomain
         do x=xmin, xmax
             do y=ymin, ymax
                 do z=zmin, zmax
-                    outwtmp(z,y,x) = uuu(z,y,x,3)*invUref
+                    this%outwtmp(z,y,x) = this%uuu(z,y,x,3)*invUref
                 enddo
             enddo
         enddo
         !$OMP END PARALLEL DO
-        offsetMoveGrid=0.0
-        if(isMoveGrid==1)then
-            if(isMoveDimX==1) offsetMoveGrid(1) = dh*dble(MoveOutputIref(1))
-            if(isMoveDimY==1) offsetMoveGrid(2) = dh*dble(MoveOutputIref(2))
-            if(isMoveDimZ==1) offsetMoveGrid(3) = dh*dble(MoveOutputIref(3))
-        endif
+        !this%offsetMoveGrid=0.0
+        !if(isMoveGrid==1)then
+        !    if(isMoveDimX==1) this%offsetMoveGrid(1) = dh*dble(MoveOutputIref(1))
+        !    if(isMoveDimY==1) this%offsetMoveGrid(2) = dh*dble(MoveOutputIref(2))
+        !    if(isMoveDimZ==1) this%offsetMoveGrid(3) = dh*dble(MoveOutputIref(3))
+        !endif
         call myfork(pid)
         if(pid.eq.0) then
-            write(fileName,'(I10)') nint(time/Tref*1d5)
+            write(fileName,'(I10)') nint(time/m_Tref*1d5)
             fileName = adjustr(fileName)
             do  i=1,nameLen
                 if(fileName(i:i)==' ')fileName(i:i)='0'
             enddo
             open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
             WRITE(idfile) xmin,xmax,ymin,ymax,zmin,zmax
-            WRITE(idfile) offsetMoveGrid(1:3)
-            write(idfile) oututmp,outvtmp,outwtmp
+            WRITE(idfile) this%offsetMoveGrid(1:3)
+            write(idfile) this%oututmp,this%outvtmp,this%outwtmp
             close(idfile)
             call myexit(0)
         endif
     END SUBROUTINE write_flow_
 
-    subroutine ComputeFieldStat_
-        USE simParam
-        USE OutFlowWorkspace
+    subroutine ComputeFieldStat_(this)
         implicit none
+        class(LBMBlock), intent(inout) :: this
         integer:: x,y,z,i
         real(8):: invUref, uLinfty(1:3), uL2(1:3), temp
-        invUref = 1.d0/Uref
+        invUref = 1.d0/m_Uref
         uLinfty = -1.d0
         uL2 = 0.d0
         do i=1,3
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp) &
             !$OMP reduction (+: uL2) reduction(max: uLinfty)
-            do x=1, xDim
-                do y=1, yDim
-                    do z=1, zDim
-                        temp = dabs(uuu(z,y,x,i)*invUref)
+            do x=1, this%xDim
+                do y=1, this%yDim
+                    do z=1, this%zDim
+                        temp = dabs(this%uuu(z,y,x,i)*invUref)
                         uL2(i) = uL2(i) + temp * temp
                         if(temp.gt.uLinfty(i)) uLinfty(i) = temp
                     enddo
                 enddo
             enddo
             !$OMP END PARALLEL DO
-            uL2(i) = dsqrt(uL2(i) / dble(xDim * yDim * zDim))
+            uL2(i) = dsqrt(uL2(i) / (dble(this%xDim) * dble(this%yDim) * dble(this%zDim)))
         enddo
         write(*,'(A,F18.12)')'FIELDSTAT L2 u ', uL2(1)
         write(*,'(A,F18.12)')'FIELDSTAT L2 v ', uL2(2)

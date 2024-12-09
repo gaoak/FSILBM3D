@@ -196,3 +196,57 @@
             read(ifile, *) linestring
         enddo
     END SUBROUTINE
+
+
+    SUBROUTINE calculate_Reference_params()
+        USE simParam
+        implicit none
+        integer:: iFish
+        real(8):: nUref(1:nFish)
+    !   reference values: length, velocity, time
+        if(nFish.eq.0) then
+            Lref = 1.d0
+        else
+            Lref  = Lchod
+        endif
+    
+        if(RefVelocity==0) then
+            Uref = dabs(uuuIn(1))
+        elseif(RefVelocity==1) then
+            Uref = dabs(uuuIn(2))
+        elseif(RefVelocity==2) then
+            Uref = dabs(uuuIn(3))
+        elseif(RefVelocity==3) then
+            Uref = dsqrt(uuuIn(1)**2 + uuuIn(2)**2 + uuuIn(3)**2)
+        elseif(RefVelocity==4) then
+            Uref = dabs(VelocityAmp)  !Velocity Amplitude
+        elseif(RefVelocity==10) then
+            Uref = Lref * MAXVAL(VBodies(:)%rbm%Freq)
+        elseif(RefVelocity==11) then
+            do iFish=1,nFish
+            nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))
+            enddo
+            Uref = MAXVAL(nUref(1:nFish))
+        elseif(RefVelocity==12) then
+            do iFish=1,nFish
+            nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))*2.D0 !Park 2017 pof
+            enddo
+            Uref = MAXVAL(nUref(1:nFish))
+        !else
+            !Uref = 1.0d0
+        endif
+    
+        if(RefTime==0) then
+            Tref = Lref / Uref
+        elseif(RefTime==1) then
+            Tref = 1 / maxval(VBodies(:)%rbm%Freq)
+        !else
+        endif
+
+        Aref=Uref/Tref
+        Fref=0.5*denIn*Uref**2*Asfac
+        Eref=0.5*denIn*Uref**2*Asfac*Lref
+        Pref=0.5*denIn*Uref**2*Asfac*Uref
+
+        g(1:3)=Frod(1:3) * Uref ** 2/Lref
+    END SUBROUTINE calculate_LB_params

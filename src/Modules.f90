@@ -22,14 +22,15 @@ MODULE ConstParams
     real(8)::M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim)
     !real(8),parameter::s0=1.0d0,s1=1.0d0,s2=1.0d0,s4=1.0d0,s10=1.0d0,s16=1.0d0
     real(8), parameter::s0=0.0d0,s1=1.19d0,s2=1.4d0,s4=1.2d0,s10=1.4d0,s16=1.98d0
-!   
 
-    !MODULE BoundCondParams
+!   MODULE BoundCondParams
     integer, parameter:: BCfluid = 0, BCwall = 200, BCmovingWall=201
     integer, parameter:: BCDirecletUP=300,BCDirecletUU=301,BCAdvection1=302,BCAdvection2=303,BCPeriodic=304, BCSymmetric=101
                         !given balance function,unbalanced extrapolation,1st order extrapolate,2nd order extrapolate,periodic
-    
+
     real(8), parameter:: Pi=3.141592653589793d0,eps=1.0d-5
     integer, parameter:: DOFDim=6
+
+    real(8), parameter:: Cs2 = 1.d0/3.0d0
 
 END MODULE ConstParams
