@@ -6,7 +6,6 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     PROGRAM main
-    USE simParam
     use omp_lib
     USE SolidBody
     implicit none

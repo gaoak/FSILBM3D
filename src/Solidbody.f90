@@ -1,4 +1,5 @@
 module SolidBody
+    use ConstParams
     use SolidSolver
     implicit none
     private
@@ -609,7 +610,6 @@ module SolidBody
             endif
         ENDFUNCTION Phi
         SUBROUTINE trimedindex(i_, xDim_, ix_, boundaryConditions_)
-            USE BoundCondParams
             implicit none
             integer, intent(in):: boundaryConditions_(1:2)
             integer, intent(in):: i_, xDim_
@@ -618,18 +618,18 @@ module SolidBody
             do k_=-1,2
                 ix_(k_) = i_ + k_
                 if (ix_(k_)<1) then
-                    if(boundaryConditions_(1).eq.Periodic) then
+                    if(boundaryConditions_(1).eq.BCPeriodic) then
                         ix_(k_) = ix_(k_) + xDim_
-                    else if((boundaryConditions_(1).eq.SYMMETRIC .or. boundaryConditions_(1).eq.wall) .and. ix_(k_).eq.0) then
+                    else if((boundaryConditions_(1).eq.BCSYMMETRIC .or. boundaryConditions_(1).eq.BCwall) .and. ix_(k_).eq.0) then
                         ix_(k_) = 2
                     else
                         write(*,*) 'index out of xmin bound', ix_(k_)
                         stop
                     endif
                 else if(ix_(k_)>xDim_) then
-                    if(boundaryConditions_(2).eq.Periodic) then
+                    if(boundaryConditions_(2).eq.BCPeriodic) then
                         ix_(k_) = ix_(k_) - xDim_
-                    else if((boundaryConditions_(2).eq.SYMMETRIC .or. boundaryConditions_(2).eq.wall) .and. ix_(k_).eq.xDim_+1) then
+                    else if((boundaryConditions_(2).eq.BCSYMMETRIC .or. boundaryConditions_(2).eq.BCwall) .and. ix_(k_).eq.xDim_+1) then
                         ix_(k_) = xDim_ - 1
                     else
                         write(*,*) 'index out of xmax bound', ix_(k_)

@@ -212,37 +212,27 @@ module FluidDomain
             real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
             real(8):: vel(1:SpaceDim)
             integer:: x, y, z
-        
-        !   grid coordinate***************************************************************************************
-            xGrid(1:xDim)=xGrid0(1:xDim)
-            yGrid(1:yDim)=yGrid0(1:yDim)
-            zGrid(1:zDim)=zGrid0(1:zDim)
+            real(8):: xGrid,yGrid,zGrid
+
         !   macro quantities***************************************************************************************
             do  x = 1, xDim
             do  y = 1, yDim
             do  z = 1, zDim
-                if(VelocityKind==0) then
-                    call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(z), vel)
-                elseif(VelocityKind==2) then
-                    call evaluateOscillatoryVelocity(vel)
-                endif
-                uuu(z, y, x, 1) = vel(1)
-                uuu(z, y, x, 2) = vel(2)
-                uuu(z, y, x, 3) = vel(3)
+                call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(z), vel)
+                this%uuu(z, y, x, 1) = vel(1)
+                this%uuu(z, y, x, 2) = vel(2)
+                this%uuu(z, y, x, 3) = vel(3)
             enddo
             enddo
             enddo
-            den(1:zDim,1:yDim,1:xDim)   = denIn
-        !   initial disturbance***************************************************************************************
-            call initDisturb()
-        !   distribution function***************************************************************************************
+            this%den(1:zDim,1:yDim,1:xDim)   = m_denIn
             do  x = 1, xDim
             do  y = 1, yDim
             do  z = 1, zDim
                 uSqr       = sum(this%uuu(z,y,x,1:3)**2)
                 uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
-                fEq(0:lbmDim)= wt(0:lbmDim) * den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
-                fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
+                fEq(0:lbmDim)= wt(0:lbmDim) * this%den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+                this%fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
             enddo
             enddo
             enddo
@@ -315,8 +305,8 @@ module FluidDomain
             elseif(this%iCollidModel==2)then
                 ! TRT collision
                 fEq(0) = this%Omega*fEq(0) + (1.d0-0.5d0*this%Omega)*Flb(0)
-                uxyz(positivedirs) = 0.5d0* Omega*(fEq(positivedirs)+fEq(negativedirs)) + (0.5d0-0.25d0* Omega)*(Flb(positivedirs)+Flb(negativedirs))
-                uxyz(negativedirs) = 0.5d0*Omega2*(fEq(positivedirs)-fEq(negativedirs)) + (0.5d0-0.25d0*Omega2)*(Flb(positivedirs)-Flb(negativedirs))
+                uxyz(positivedirs) = 0.5d0* this%Omega*(fEq(positivedirs)+fEq(negativedirs)) + (0.5d0-0.25d0* this%Omega)*(Flb(positivedirs)+Flb(negativedirs))
+                uxyz(negativedirs) = 0.5d0*this%Omega2*(fEq(positivedirs)-fEq(negativedirs)) + (0.5d0-0.25d0*this%Omega2)*(Flb(positivedirs)-Flb(negativedirs))
                 fEq(positivedirs) = uxyz(positivedirs) + uxyz(negativedirs)
                 fEq(negativedirs) = uxyz(positivedirs) - uxyz(negativedirs)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + fEq
@@ -552,5 +542,39 @@ module FluidDomain
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity v ', uLinfty(2)
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine ComputeFieldStat_
-    
+
+    SUBROUTINE evaluateShearVelocity(x, y, z, vel)
+        implicit none
+        real(8):: x, y, z, vel(1:SpaceDim)
+        vel(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)
+        vel(2) = uuuIn(2) + x * shearRateIn(1) + 0 * shearRateIn(2) + z * shearRateIn(3)
+        vel(3) = uuuIn(3) + x * shearRateIn(1) + y * shearRateIn(2) + 0 * shearRateIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE evaluateOscillatoryVelocity(vel)
+        implicit none
+        real(8):: vel(1:SpcDim)
+        vel(1) = uuuIn(1) + VelocityAmp * dcos(2*pi*VelocityFreq*time + VelocityPhi/180.0*pi)
+        vel(2) = uuuIn(2)
+        vel(3) = uuuIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE updateVolumForc()
+        implicit none
+        VolumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2.d0 * pi * VolumeForceFreq * time + VolumeForcePhi/180.0*pi)
+        VolumeForce(2) = VolumeForceIn(2)
+        VolumeForce(3) = VolumeForceIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE addVolumForc()
+        implicit none
+        integer:: x
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
+        do x=1,xDim
+            force(:,:,x,1) = force(:,:,x,1) + VolumeForce(1)
+            force(:,:,x,2) = force(:,:,x,2) + VolumeForce(2)
+            force(:,:,x,3) = force(:,:,x,3) + VolumeForce(3)
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
 end module FluidDomain
