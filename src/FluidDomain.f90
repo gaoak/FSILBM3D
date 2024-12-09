@@ -4,7 +4,8 @@ module FluidDomain
     private
     integer:: m_nthreads
     real(8):: m_denIn,m_Uref,m_Lref,m_Tref,m_nu,m_Mu
-    real(8):: m_VolumeForce(1:3)
+    real(8):: m_VolumeForce(1:SpaceDim)
+    real(8):: m_uuuIn(1:SpaceDim)
     type :: LBMBlock
         integer:: ID
         integer:: xDim,yDim,zDim,iCollidModel
@@ -153,25 +154,25 @@ module FluidDomain
                 M_MRT(0,I)=1
                 M_MRT(1,I)=19*SUM(ee(I,1:3)**2)-30
                 M_MRT(2,I)=(21*SUM(ee(I,1:3)**2)**2-53*SUM(ee(I,1:3)**2)+24)/2.0
-        
+
                 M_MRT(3,I)=ee(I,1)
                 M_MRT(5,I)=ee(I,2)
                 M_MRT(7,I)=ee(I,3)
-        
+
                 M_MRT(4,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,1)
                 M_MRT(6,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,2)
                 M_MRT(8,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,3)
-        
+
                 M_MRT(9,I)=3*ee(I,1)**2-SUM(ee(I,1:3)**2)
                 M_MRT(11,I)=ee(I,2)**2-ee(I,3)**2
-        
+
                 M_MRT(13,I)=ee(I,1)*ee(I,2)
                 M_MRT(14,I)=ee(I,2)*ee(I,3)
                 M_MRT(15,I)=ee(I,3)*ee(I,1)
-        
+
                 M_MRT(10,I)=(3*SUM(ee(I,1:3)**2)-5)*(3*ee(I,1)**2-SUM(ee(I,1:3)**2))
                 M_MRT(12,I)=(3*SUM(ee(I,1:3)**2)-5)*(ee(I,2)**2-ee(I,3)**2)
-        
+
                 M_MRT(16,I)=(ee(I,2)**2-ee(I,3)**2)*ee(I,1)
                 M_MRT(17,I)=(ee(I,3)**2-ee(I,1)**2)*ee(I,2)
                 M_MRT(18,I)=(ee(I,1)**2-ee(I,2)**2)*ee(I,3)
@@ -543,31 +544,24 @@ module FluidDomain
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine ComputeFieldStat_
 
-    SUBROUTINE evaluateShearVelocity(x, y, z, vel)
+    SUBROUTINE evaluateShearVelocity(x, y, z, vel, shearRateIn)
         implicit none
-        real(8):: x, y, z, vel(1:SpaceDim)
+        real(8):: x, y, z, vel(1:SpaceDim), shearRateIn(1:SpaceDim)
         vel(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)
         vel(2) = uuuIn(2) + x * shearRateIn(1) + 0 * shearRateIn(2) + z * shearRateIn(3)
         vel(3) = uuuIn(3) + x * shearRateIn(1) + y * shearRateIn(2) + 0 * shearRateIn(3)
     END SUBROUTINE
 
-    SUBROUTINE evaluateOscillatoryVelocity(vel)
-        implicit none
-        real(8):: vel(1:SpcDim)
-        vel(1) = uuuIn(1) + VelocityAmp * dcos(2*pi*VelocityFreq*time + VelocityPhi/180.0*pi)
-        vel(2) = uuuIn(2)
-        vel(3) = uuuIn(3)
-    END SUBROUTINE
-
-    SUBROUTINE updateVolumForc()
+    SUBROUTINE updateVolumForc(time)
         implicit none
         VolumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2.d0 * pi * VolumeForceFreq * time + VolumeForcePhi/180.0*pi)
         VolumeForce(2) = VolumeForceIn(2)
         VolumeForce(3) = VolumeForceIn(3)
     END SUBROUTINE
 
-    SUBROUTINE addVolumForc()
+    SUBROUTINE addVolumForc(this)
         implicit none
+        class(LBMBlock), intent(inout) :: this
         integer:: x
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
         do x=1,xDim
