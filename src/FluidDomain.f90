@@ -4,7 +4,8 @@ module FluidDomain
     private
     integer:: m_nthreads
     real(8):: m_denIn,m_Uref,m_Lref,m_Tref,m_nu,m_Mu
-    real(8):: m_VolumeForce(1:3)
+    real(8):: m_uuuIn(1:SpaceDim),m_shearRateIn(1:SpaceDim),m_VelocityAmp,m_VelocityFreq,m_VelocityPhi
+    real(8):: m_VolumeForce(1:SpaceDim),m_VolumeForceAmp,m_VolumeForceFreq,m_VolumeForcePhi,m_VolumeForceIn(1:SpaceDim)
     type :: LBMBlock
         integer:: ID
         integer:: xDim,yDim,zDim,iCollidModel
@@ -12,7 +13,7 @@ module FluidDomain
         real(8):: dh,xmin,ymin,zmin
         real(8):: Omega,Omega2 ! single time, two time relaxation
         real(8):: xmax,ymax,zmax
-        real(8), allocatable:: M_COLLID(:,:),M_FORCE(:,:) ! multiple time relaxation
+        real(8):: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         real(8), allocatable:: fIn(:,:,:,:)
         real(8), allocatable:: uuu(:,:,:,:), force(:,:,:,:), den(:,:,:)
         integer, allocatable:: OMPpartition(:), OMPparindex(:),OMPeid(:)
@@ -47,7 +48,7 @@ module FluidDomain
         integer:: xmin,ymin,zmin,xmax,ymax,zmax
 
         ! allocate fluid memory
-        allocate(this%fIn(zDim,yDim,xDim,0:LBMDim))
+        allocate(this%fIn(zDim,yDim,xDim,0:lbmDim))
         allocate(this%uuu(zDim,yDim,xDim,1:3),this%force(zDim,yDim,xDim,1:3))
         allocate(this%den(zDim,yDim,xDim))
         ! allocate output workspace
@@ -194,7 +195,6 @@ module FluidDomain
             DO    i=0,lbmDim
                 S_D(i,i)=S(i)
             ENDDO
-            allocate(this%M_COLLID(0:lbmDim,0:lbmDim),this%M_FORCE(0:lbmDim,0:lbmDim))
             this%M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
             !=====================
         !   calculate MRTM body-force matrix
@@ -546,34 +546,37 @@ module FluidDomain
     SUBROUTINE evaluateShearVelocity(x, y, z, vel)
         implicit none
         real(8):: x, y, z, vel(1:SpaceDim)
-        vel(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)
-        vel(2) = uuuIn(2) + x * shearRateIn(1) + 0 * shearRateIn(2) + z * shearRateIn(3)
-        vel(3) = uuuIn(3) + x * shearRateIn(1) + y * shearRateIn(2) + 0 * shearRateIn(3)
+        vel(1) = m_uuuIn(1) + 0 * m_shearRateIn(1) + y * m_shearRateIn(2) + z * m_shearRateIn(3)
+        vel(2) = m_uuuIn(2) + x * m_shearRateIn(1) + 0 * m_shearRateIn(2) + z * m_shearRateIn(3)
+        vel(3) = m_uuuIn(3) + x * m_shearRateIn(1) + y * m_shearRateIn(2) + 0 * m_shearRateIn(3)
     END SUBROUTINE
 
-    SUBROUTINE evaluateOscillatoryVelocity(vel)
+    SUBROUTINE evaluateOscillatoryVelocity(vel,time)
         implicit none
-        real(8):: vel(1:SpcDim)
-        vel(1) = uuuIn(1) + VelocityAmp * dcos(2*pi*VelocityFreq*time + VelocityPhi/180.0*pi)
-        vel(2) = uuuIn(2)
-        vel(3) = uuuIn(3)
+        real(8):: vel(1:SpaceDim)
+        real(8):: time
+        vel(1) = m_uuuIn(1) + m_VelocityAmp * dcos(2*pi*m_VelocityFreq*time + m_VelocityPhi/180.0*pi)
+        vel(2) = m_uuuIn(2)
+        vel(3) = m_uuuIn(3)
     END SUBROUTINE
 
-    SUBROUTINE updateVolumForc()
+    SUBROUTINE updateVolumForc(time)
         implicit none
-        VolumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2.d0 * pi * VolumeForceFreq * time + VolumeForcePhi/180.0*pi)
-        VolumeForce(2) = VolumeForceIn(2)
-        VolumeForce(3) = VolumeForceIn(3)
+        real(8):: time
+        m_VolumeForce(1) = m_VolumeForceIn(1) + m_VolumeForceAmp * dsin(2.d0 * pi * m_VolumeForceFreq * time + m_VolumeForcePhi/180.0*pi)
+        m_VolumeForce(2) = m_VolumeForceIn(2)
+        m_VolumeForce(3) = m_VolumeForceIn(3)
     END SUBROUTINE
 
-    SUBROUTINE addVolumForc()
+    SUBROUTINE addVolumForc(this)
         implicit none
+        class(LBMBlock), intent(inout) :: this
         integer:: x
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-        do x=1,xDim
-            force(:,:,x,1) = force(:,:,x,1) + VolumeForce(1)
-            force(:,:,x,2) = force(:,:,x,2) + VolumeForce(2)
-            force(:,:,x,3) = force(:,:,x,3) + VolumeForce(3)
+        do x=1,this%xDim
+            this%force(:,:,x,1) = this%force(:,:,x,1) + m_VolumeForce(1)
+            this%force(:,:,x,2) = this%force(:,:,x,2) + m_VolumeForce(2)
+            this%force(:,:,x,3) = this%force(:,:,x,3) + m_VolumeForce(3)
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE

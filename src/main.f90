@@ -6,6 +6,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     PROGRAM main
+    USE ConstParams
     use omp_lib
     USE SolidBody
     implicit none

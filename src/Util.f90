@@ -3,7 +3,6 @@
 !    copyright@ RuNanHua
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfoTitl()
-    USE simParam
     implicit none
     integer:: i,iFish
     integer,parameter::nameLen=4
@@ -93,7 +92,6 @@
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE wrtInfo()
-    USE simParam
     USE SolidBody
     implicit none
     integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend
@@ -176,7 +174,6 @@
 !    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE movGrid(dim,direction)
-    USE simParam
     implicit none
     integer:: dim,direction
 

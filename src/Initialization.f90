@@ -3,7 +3,7 @@
 !    copyright@ RuNanHua
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE read_file()
-    USE simParam
+    USE ConstParams
     USE SolidBody
     implicit none
     real(8):: iXYZ(1:3),dXYZ(1:3)
@@ -47,7 +47,7 @@
     read(111,*)     MovingKind1,MovingVel1,MovingFreq1
     read(111,*)     MovingKind2,MovingVel2,MovingFreq2
     call readequal(111)
-    read(111,*)     VolumeForceIn(1:SpcDim)
+    read(111,*)     VolumeForceIn(1:SpaceDim)
     read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
     call readequal(111)
     read(111,*)     Re,dt
@@ -158,10 +158,10 @@
         isMoveGrid = 0
     endif
     call readequal(111)
-    read(111,*)     waveInitDist,AmplInitDist(1:SpcDim)
-    read(111,*)     FreqForcDist,AmplForcDist(1:SpcDim)
+    read(111,*)     waveInitDist,AmplInitDist(1:SpaceDim)
+    read(111,*)     FreqForcDist,AmplForcDist(1:SpaceDim)
     read(111,*)     begForcDist,endForcDist
-    read(111,*)     posiForcDist(1:SpcDim)
+    read(111,*)     posiForcDist(1:SpaceDim)
     call readequal(111)
 
     read(111,*)     numSampFlow,isFluidOutput
@@ -199,7 +199,6 @@
 
 
     SUBROUTINE calculate_Reference_params()
-        USE simParam
         implicit none
         integer:: iFish
         real(8):: nUref(1:nFish)
