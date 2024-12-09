@@ -4,13 +4,8 @@ module FluidDomain
     private
     integer:: m_nthreads
     real(8):: m_denIn,m_Uref,m_Lref,m_Tref,m_nu,m_Mu
-<<<<<<< HEAD
     real(8):: m_uuuIn(1:SpaceDim),m_shearRateIn(1:SpaceDim),m_VelocityAmp,m_VelocityFreq,m_VelocityPhi
     real(8):: m_VolumeForce(1:SpaceDim),m_VolumeForceAmp,m_VolumeForceFreq,m_VolumeForcePhi,m_VolumeForceIn(1:SpaceDim)
-=======
-    real(8):: m_VolumeForce(1:SpaceDim)
-    real(8):: m_uuuIn(1:SpaceDim)
->>>>>>> 7c9293a5611919d4cc2ce47d6f74c4c4013b7d87
     type :: LBMBlock
         integer:: ID
         integer:: xDim,yDim,zDim,iCollidModel
@@ -548,9 +543,8 @@ module FluidDomain
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine ComputeFieldStat_
 
-    SUBROUTINE evaluateShearVelocity(x, y, z, vel, shearRateIn)
+    SUBROUTINE evaluateShearVelocity(x, y, z, vel)
         implicit none
-<<<<<<< HEAD
         real(8):: x, y, z, vel(1:SpaceDim)
         vel(1) = m_uuuIn(1) + 0 * m_shearRateIn(1) + y * m_shearRateIn(2) + z * m_shearRateIn(3)
         vel(2) = m_uuuIn(2) + x * m_shearRateIn(1) + 0 * m_shearRateIn(2) + z * m_shearRateIn(3)
@@ -566,14 +560,6 @@ module FluidDomain
         vel(3) = m_uuuIn(3)
     END SUBROUTINE
 
-=======
-        real(8):: x, y, z, vel(1:SpaceDim), shearRateIn(1:SpaceDim)
-        vel(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)
-        vel(2) = uuuIn(2) + x * shearRateIn(1) + 0 * shearRateIn(2) + z * shearRateIn(3)
-        vel(3) = uuuIn(3) + x * shearRateIn(1) + y * shearRateIn(2) + 0 * shearRateIn(3)
-    END SUBROUTINE
-
->>>>>>> 7c9293a5611919d4cc2ce47d6f74c4c4013b7d87
     SUBROUTINE updateVolumForc(time)
         implicit none
         real(8):: time
