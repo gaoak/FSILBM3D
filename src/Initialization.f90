@@ -15,11 +15,14 @@
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     character (LEN=40), allocatable:: FEmeshName(:)
-    integer, allocatable:: isMotionGiven(:,:)
+    integer, allocatable:: iBodyModel(:), iBodyType(:), isMotionGiven(:,:)
     real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
     real(8), allocatable:: Freq(:)
     real(8), allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:)
     real(8), allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
+    real(8):: uuuIn(1:SpaceDim),shearRateIn(1:SpaceDim)
+    integer:: boundaryConditions(1:6)
+    real(8):: VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpaceDim)
     open(unit=111,file='inFlow.dat')
     call readequal(111)
     read(111,*)     npsize
@@ -39,11 +42,6 @@
     read(111,*)     shearRateIn(1:3)
     read(111,*)     boundaryConditions(1:6)
     read(111,*)     VelocityKind
-    if(VelocityKind==2) then
-        VelocityAmp = shearRateIn(1)
-        VelocityFreq = shearRateIn(2)
-        VelocityPhi = shearRateIn(3)
-    endif
     read(111,*)     MovingKind1,MovingVel1,MovingFreq1
     read(111,*)     MovingKind2,MovingVel2,MovingFreq2
     call readequal(111)
@@ -181,6 +179,7 @@
     call readequal(111)
     close(111)
 
+    call read_fluid_file(uuuIn,shearRateIn,VelocityKind,boundaryConditions,VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi)
     call read_solid_file(nFish,FEmeshName,iBodyModel,iBodyType,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
                          Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
                          ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
@@ -199,6 +198,7 @@
 
 
     SUBROUTINE calculate_Reference_params()
+        USE SolidBody
         implicit none
         integer:: iFish
         real(8):: nUref(1:nFish)
@@ -248,4 +248,5 @@
         Pref=0.5*denIn*Uref**2*Asfac*Uref
 
         g(1:3)=Frod(1:3) * Uref ** 2/Lref
+        call Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,uMax,Lthck)
     END SUBROUTINE calculate_LB_params

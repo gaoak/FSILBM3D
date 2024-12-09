@@ -34,11 +34,26 @@ module FluidDomain
 
     contains
 
-    subroutine Initialise_FluidDomains()
+    subroutine read_fluid_file(uuuIn,shearRateIn,VelocityKind,boundaryConditions,VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi)
         implicit none
         ! to do
         ! read inflow.dat to blks
         ! allocate all fluid domains
+        real(8):: uuuIn(1:SpaceDim),shearRateIn(1:SpaceDim)
+        integer:: VelocityKind,boundaryConditions(1:6)
+        real(8):: VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpaceDim)
+        m_uuuIn = uuuIn
+        m_shearRateIn = shearRateIn
+        if(VelocityKind==2) then
+            m_VelocityAmp = shearRateIn(1)
+            m_VelocityFreq = shearRateIn(2)
+            m_VelocityPhi = shearRateIn(3)
+        endif
+        m_VolumeForceAmp = VolumeForceAmp
+        m_VolumeForceFreq = VolumeForceFreq
+        m_VolumeForcePhi = VolumeForcePhi
+        m_VolumeForceIn = VolumeForceIn
+        
     end subroutine
 
     SUBROUTINE allocate_fluid_(this,zDim,yDim,xDim,offsetOutput)
@@ -226,6 +241,7 @@ module FluidDomain
             enddo
             enddo
             this%den(1:zDim,1:yDim,1:xDim)   = m_denIn
+            ! call this%initDisturb()
             do  x = 1, xDim
             do  y = 1, yDim
             do  z = 1, zDim
@@ -579,5 +595,21 @@ module FluidDomain
             this%force(:,:,x,3) = this%force(:,:,x,3) + m_VolumeForce(3)
         enddo
         !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    subroutine  initDisturb_(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer:: x, y,z
+        do  z = 1, this%zDim
+        do  y = 1, this%yDim
+        do  x = 1, this%xDim
+            ! this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+AmplInitDist(1)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+            ! this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+AmplInitDist(2)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+            ! this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+AmplInitDist(3)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+        enddo
+        enddo
+        enddo
+    
     END SUBROUTINE
 end module FluidDomain
