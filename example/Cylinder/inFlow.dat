@@ -1,32 +1,43 @@
-===================================================================================================control parameters
+Parallel
  16                                          read(111,*)     npsize
- 0          1                                read(111,*)     isRelease,isConCmpt
- 1          1                                read(111,*)     iCollidModel,iKB
- 0          0.010D+0                         read(111,*)     RefVelocity,Uref
- 0.020D+0   50.00D+0                         read(111,*)     timeSimTotl,timeOutTemp
- 0.100D+0   0.100D+0   0.010D+0              read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
- 0.0D+0     201.0D+2                         read(111,*)     timeOutBegin,timeOutEnd
- 0.000D+0   1.000D+0   5.000D+0              read(111,*)     Palpha,Pbeta,Pramp
-===================================================================================================fluid information
- 0.010d+0   0.000d+0   0.000d+0              read(111,*)     uuuIn(1:3)
- 0.000D+0   0.000D+0   0.000d+0              read(111,*)     shearRateIn(1:3)
- 300   302   304   304   304   304           read(111,*)     boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0                                           read(111,*)     VelocityKind
- 0   0.000D+0   0.000D+0                     read(111,*)     MovingKind1,MovingVel1,MovingFreq1
- 0   0.000D+0   0.000D+0                     read(111,*)     MovingKind2,MovingVel2,MovingFreq2
-==================================================================================================
- 0.000D+0   0.000D+0   0.000D+0              read(111,*)     VolumeForceIn(1:3)
- 0.000D+0   0.000D+0   0.000D+0              read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
-==================================================================================================
+ENDParallel
+FluidDomain
+=========================
+1  801  100  50                              read(111,*) ID, xDim, yDim, zDim
+300   302   304   304   304   304            read(111,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+1     3                                      read(111,*) iCollideModel, offsetOutput
+0.02  -6.0  -1.0  0.0                        read(111,*) dh, xmin, ymin, zmin
+0  0 0 0  0 0 0  0 0 0                       read(111,*) params(1:10)
+==========================
+ENDFluidDomain
+FluidCondition
+=========================
  40.00D+0   0.020D+0                         read(111,*)     Re,dt
  0          100.0D+0                         read(111,*)     RefTime,Tref
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     Frod(1:3)
-===================================================================================================far field boundary condition
- 2                                           read(111,*)     iBC      1: set 1 layer 2: set 2 layers
- FluidMesh.dat                               read(111,*)     LBmeshName(use CRLF)
+ 0.020D+0   50.00D+0                         read(111,*)     timeSimTotl,timeOutTemp
+ 0.100D+0   0.100D+0   0.010D+0              read(111,*)     timeOutFlow,timeOutBody,timeOutInfo
+ 0          1                                read(111,*)     isRelease,isConCmpt
+ 0          0.010D+0                         read(111,*)     RefVelocity,Uref
+ 0.010d+0   0.000d+0   0.000d+0              read(111,*)     uuuIn(1:3)
  1.000d+0                                    read(111,*)     denIn
+ 0.000D+0   0.000D+0   0.000d+0              read(111,*)     shearRateIn(1:3)
+ 0                                           read(111,*)     VelocityKind
+ 0.000D+0   0.000D+0   0.000D+0              read(111,*)     VolumeForceIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0              read(111,*)     VolumeForceAmp,VolumeForceFreq,VolumeForcePhi
+===================================================================================================disturbance information
+ 0.000D+0   0.000D+0   0.000D+0   0.000D+0   read(111,*)     waveInitDist,AmplInitDist(1:SpcDim)   initial disturbance
+ 0.000D+0   0.000D+0   0.000D+0   0.000D+0   read(111,*)     FreqForcDist,AmplForcDist(1:SpcDim)   transient disturbance
+ 0.000D+0   0.000D+0                         read(111,*)     begForcDist,endForcDist               time interval
+ 0.000D+0   0.000D+0   0.000D+0              read(111,*)     posiForcDist(1:SpcDim)                disturbance position
+==========================
+ENDFluidCondition
+SolidBody
+ 1          1                                read(111,*)     iCollidModel,iKB
+ 0.0D+0     201.0D+2                         read(111,*)     timeOutBegin,timeOutEnd
+ 0.000D+0   1.000D+0   5.000D+0              read(111,*)     Palpha,Pbeta,Pramp
+ FluidMesh.dat                               read(111,*)     LBmeshName(use CRLF)
  1.000D-2   10                               read(111,*)     dtolLBM,ntolLBM
-===================================================================================================solid number
  1          1        1                       read(111,*)     nFish,FishKind,iForce2Body
 ===================================================================================================structure property
  1          1          1                     read(111,*)     FishNum(FishKind),NumX,NumY
@@ -50,21 +61,13 @@
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     AoAo(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     AoAAmpl(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     AoAPhi(1:3,iFish)
-====================================================is moving grid=====moving direction====is the output field translated==moving grid
- 0          0                                read(111,*)     isMoveGrid,      offsetOutput
- 0          0                                read(111,*)     isMoveDimX,      isMoveOutputX
- 0          0                                read(111,*)     isMoveDimY,      isMoveOutputY
- 0          0                                read(111,*)     isMoveDimZ,      isMoveOutputZ
- 0.000D+0   0.000D+0   0.000D+0              read(111,*)     Xref,Yref,Zref
-===================================================================================================disturbance information
- 0.000D+0   0.000D+0   0.000D+0   0.000D+0   read(111,*)     waveInitDist,AmplInitDist(1:SpcDim)   initial disturbance
- 0.000D+0   0.000D+0   0.000D+0   0.000D+0   read(111,*)     FreqForcDist,AmplForcDist(1:SpcDim)   transient disturbance
- 0.000D+0   0.000D+0                         read(111,*)     begForcDist,endForcDist               time interval
- 0.000D+0   0.000D+0   0.000D+0              read(111,*)     posiForcDist(1:SpcDim)                disturbance position
-===================================================================================================flow field sampling
+==========================
+ENDSolidBody
+Probing
  1         1                                 read(111,*)     numSampFlow,isFluidOutput   provide 3 coordinates
  0.000d+0   0.000D+0   1.000D+0
 ===================================================================================================structure sampling
  1            1                              read(111,*)     numSampBody,isBodyOutput  provide node number
  1                                           read(111,*)     SampBodyNode(1:numSampBody,1:nFish)
-===================================================================================================
+==========================
+ENDProbing
