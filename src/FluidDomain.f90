@@ -4,8 +4,13 @@ module FluidDomain
     private
     integer:: m_nthreads
     real(8):: m_denIn,m_Uref,m_Lref,m_Tref,m_nu,m_Mu
+<<<<<<< HEAD
     real(8):: m_uuuIn(1:SpaceDim),m_shearRateIn(1:SpaceDim),m_VelocityAmp,m_VelocityFreq,m_VelocityPhi
     real(8):: m_VolumeForce(1:SpaceDim),m_VolumeForceAmp,m_VolumeForceFreq,m_VolumeForcePhi,m_VolumeForceIn(1:SpaceDim)
+=======
+    real(8):: m_VolumeForce(1:SpaceDim)
+    real(8):: m_uuuIn(1:SpaceDim)
+>>>>>>> 7c9293a5611919d4cc2ce47d6f74c4c4013b7d87
     type :: LBMBlock
         integer:: ID
         integer:: xDim,yDim,zDim,iCollidModel
@@ -154,25 +159,25 @@ module FluidDomain
                 M_MRT(0,I)=1
                 M_MRT(1,I)=19*SUM(ee(I,1:3)**2)-30
                 M_MRT(2,I)=(21*SUM(ee(I,1:3)**2)**2-53*SUM(ee(I,1:3)**2)+24)/2.0
-        
+
                 M_MRT(3,I)=ee(I,1)
                 M_MRT(5,I)=ee(I,2)
                 M_MRT(7,I)=ee(I,3)
-        
+
                 M_MRT(4,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,1)
                 M_MRT(6,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,2)
                 M_MRT(8,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,3)
-        
+
                 M_MRT(9,I)=3*ee(I,1)**2-SUM(ee(I,1:3)**2)
                 M_MRT(11,I)=ee(I,2)**2-ee(I,3)**2
-        
+
                 M_MRT(13,I)=ee(I,1)*ee(I,2)
                 M_MRT(14,I)=ee(I,2)*ee(I,3)
                 M_MRT(15,I)=ee(I,3)*ee(I,1)
-        
+
                 M_MRT(10,I)=(3*SUM(ee(I,1:3)**2)-5)*(3*ee(I,1)**2-SUM(ee(I,1:3)**2))
                 M_MRT(12,I)=(3*SUM(ee(I,1:3)**2)-5)*(ee(I,2)**2-ee(I,3)**2)
-        
+
                 M_MRT(16,I)=(ee(I,2)**2-ee(I,3)**2)*ee(I,1)
                 M_MRT(17,I)=(ee(I,3)**2-ee(I,1)**2)*ee(I,2)
                 M_MRT(18,I)=(ee(I,1)**2-ee(I,2)**2)*ee(I,3)
@@ -543,8 +548,9 @@ module FluidDomain
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine ComputeFieldStat_
 
-    SUBROUTINE evaluateShearVelocity(x, y, z, vel)
+    SUBROUTINE evaluateShearVelocity(x, y, z, vel, shearRateIn)
         implicit none
+<<<<<<< HEAD
         real(8):: x, y, z, vel(1:SpaceDim)
         vel(1) = m_uuuIn(1) + 0 * m_shearRateIn(1) + y * m_shearRateIn(2) + z * m_shearRateIn(3)
         vel(2) = m_uuuIn(2) + x * m_shearRateIn(1) + 0 * m_shearRateIn(2) + z * m_shearRateIn(3)
@@ -560,6 +566,14 @@ module FluidDomain
         vel(3) = m_uuuIn(3)
     END SUBROUTINE
 
+=======
+        real(8):: x, y, z, vel(1:SpaceDim), shearRateIn(1:SpaceDim)
+        vel(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)
+        vel(2) = uuuIn(2) + x * shearRateIn(1) + 0 * shearRateIn(2) + z * shearRateIn(3)
+        vel(3) = uuuIn(3) + x * shearRateIn(1) + y * shearRateIn(2) + 0 * shearRateIn(3)
+    END SUBROUTINE
+
+>>>>>>> 7c9293a5611919d4cc2ce47d6f74c4c4013b7d87
     SUBROUTINE updateVolumForc(time)
         implicit none
         real(8):: time
