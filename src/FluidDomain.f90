@@ -1,11 +1,9 @@
 module FluidDomain
     use ConstParams
+    use FlowCondition
     implicit none
     private
     integer:: m_nthreads
-    real(8):: m_denIn,m_Uref,m_Lref,m_Tref,m_nu,m_Mu
-    real(8):: m_uuuIn(1:SpaceDim),m_shearRateIn(1:SpaceDim),m_VelocityAmp,m_VelocityFreq,m_VelocityPhi
-    real(8):: m_VolumeForce(1:SpaceDim),m_VolumeForceAmp,m_VolumeForceFreq,m_VolumeForcePhi,m_VolumeForceIn(1:SpaceDim)
     type :: LBMBlock
         integer:: ID
         integer:: xDim,yDim,zDim,iCollidModel
@@ -34,11 +32,11 @@ module FluidDomain
 
     contains
 
-    subroutine read_fluid_file(uuuIn,shearRateIn,VelocityKind,boundaryConditions,VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi)
+    subroutine read_fluiddomain()
         implicit none
         ! to do
-        ! read inflow.dat to blks
-        ! allocate all fluid domains
+        ! read inflow.dat FluidDomain
+        ! allocate all fluid domains and initialise them
         real(8):: uuuIn(1:SpaceDim),shearRateIn(1:SpaceDim)
         integer:: VelocityKind,boundaryConditions(1:6)
         real(8):: VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpaceDim)

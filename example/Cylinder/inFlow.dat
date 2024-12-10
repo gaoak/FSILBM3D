@@ -10,7 +10,7 @@ FluidDomain
 0  0 0 0  0 0 0  0 0 0                       read(111,*) params(1:10)
 ==========================
 ENDFluidDomain
-FluidCondition
+FlowCondition
 =========================
  40.00D+0   0.020D+0                         read(111,*)     Re,dt
  0          100.0D+0                         read(111,*)     RefTime,Tref
@@ -31,7 +31,7 @@ FluidCondition
  0.000D+0   0.000D+0                         read(111,*)     begForcDist,endForcDist               time interval
  0.000D+0   0.000D+0   0.000D+0              read(111,*)     posiForcDist(1:SpcDim)                disturbance position
 ==========================
-ENDFluidCondition
+ENDFlowCondition
 SolidBody
  1          1                                read(111,*)     iCollidModel,iKB
  0.0D+0     201.0D+2                         read(111,*)     timeOutBegin,timeOutEnd
