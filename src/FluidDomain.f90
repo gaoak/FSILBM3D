@@ -3,81 +3,79 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
-    integer:: m_nthreads
     type :: LBMBlock
-        integer:: ID
-        integer:: xDim,yDim,zDim,iCollidModel
-        integer:: BndConds(1:6),offsetOutput
-        real(8):: dh,xmin,ymin,zmin
-        real(8):: Omega,Omega2 ! single time, two time relaxation
-        real(8):: xmax,ymax,zmax
+        integer:: ID,iCollidModel,offsetOutput
+        integer:: xDim,yDim,zDim
+        real(8):: dh,xmin,ymin,zmin,xmax,ymax,zmax
+        integer:: BndConds(1:6)
+        real(8):: params(1:10),Omega,Omega2 ! single time, two time relaxation
         real(8):: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
-        real(8), allocatable:: fIn(:,:,:,:)
-        real(8), allocatable:: uuu(:,:,:,:), force(:,:,:,:), den(:,:,:)
-        integer, allocatable:: OMPpartition(:), OMPparindex(:),OMPeid(:)
-        real(8), allocatable:: OMPedge(:,:,:)
-        real(4), allocatable:: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
+        integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
+        real(8), allocatable :: OMPedge(:,:,:)
+        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),volumeForce(1:3)
+        real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
         real(4):: offsetMoveGrid(1:3)
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_
+        procedure :: calculate_macro_quantities => calculate_macro_quantities_
         procedure :: collision => collision_
         procedure :: streaming => streaming_
-        procedure :: write_flow => write_flow_
-        procedure :: write_continue_ => write_continue_
-        procedure :: read_continue_ => read_continue_
-        procedure :: calculate_macro_quantities => calculate_macro_quantities_
         procedure :: ComputeFieldStat => ComputeFieldStat_
+        procedure :: write_flow => write_flow_
+        procedure :: write_continue => write_continue_
+        procedure :: read_continue => read_continue_
     end type LBMBlock
-
+    type(LBMBlock), allocatable :: blocks(:)
     contains
 
-    subroutine read_fluiddomain()
+    SUBROUTINE initialise_blocks()
         implicit none
-        ! to do
-        ! read inflow.dat FluidDomain
-        ! allocate all fluid domains and initialise them
-        real(8):: uuuIn(1:SpaceDim),shearRateIn(1:SpaceDim)
-        integer:: VelocityKind,boundaryConditions(1:6)
-        real(8):: VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpaceDim)
-        m_uuuIn = uuuIn
-        m_shearRateIn = shearRateIn
-        if(VelocityKind==2) then
-            m_VelocityAmp = shearRateIn(1)
-            m_VelocityFreq = shearRateIn(2)
-            m_VelocityPhi = shearRateIn(3)
-        endif
-        m_VolumeForceAmp = VolumeForceAmp
-        m_VolumeForceFreq = VolumeForceFreq
-        m_VolumeForcePhi = VolumeForcePhi
-        m_VolumeForceIn = VolumeForceIn
-        
-    end subroutine
+        integer :: iblock
+        ! creat blocks and read parameters
+        type(LBMBlock) :: blocks(conditions%nblock)
+        open(unit=111, file='inFlow.dat', status='old', action='read')
+        call found_keyword(111,'FluidDomain')
+        do iblock = 1,conditions%nblock
+            read(111,*)    blocks(iblock)%ID,blocks(iblock)%iCollidModel,blocks(iblock)%offsetOutput
+            read(111,*)    blocks(iblock)%xDim,blocks(iblock)%yDim,blocks(iblock)%zDim
+            read(111,*)    blocks(iblock)%dh,blocks(iblock)%xmin,blocks(iblock)%ymin,blocks(iblock)%zmin
+            read(111,*)    blocks(iblock)%BndConds(1:6)
+            read(111,*)    blocks(iblock)%params(1:10)
+            ! calculate the maximum coordinates
+            blocks(iblock)%xmax = blocks(iblock)%xmin + blocks(iblock)%dh*(blocks(iblock)%xDim-1)
+            blocks(iblock)%ymax = blocks(iblock)%ymin + blocks(iblock)%dh*(blocks(iblock)%yDim-1)
+            blocks(iblock)%zmax = blocks(iblock)%zmin + blocks(iblock)%dh*(blocks(iblock)%zDim-1)
+            ! allocate memory and initialise
+            blocks(iblock)%allocate_fluid()
+            blocks(iblock)%initialise()
+        enddo
+        close(111)
+    END SUBROUTINE
 
-    SUBROUTINE allocate_fluid_(this,zDim,yDim,xDim,offsetOutput)
+    SUBROUTINE allocate_fluid_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        integer,intent(in)::zDim,yDim,xDim,offsetOutput
         integer:: xmin,ymin,zmin,xmax,ymax,zmax
-
         ! allocate fluid memory
-        allocate(this%fIn(zDim,yDim,xDim,0:lbmDim))
-        allocate(this%uuu(zDim,yDim,xDim,1:3),this%force(zDim,yDim,xDim,1:3))
-        allocate(this%den(zDim,yDim,xDim))
+        allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
+        allocate(this%uuu(this%zDim,this%yDim,this%xDim,1:3))
+        allocate(this%force(this%zDim,this%yDim,this%xDim,1:3))
+        allocate(this%den(this%zDim,this%yDim,this%xDim))
         ! allocate output workspace
-        this%offsetOutput = offsetOutput
-        xmin = 1 + offsetOutput
-        ymin = 1 + offsetOutput
-        zmin = 1 + offsetOutput
-        xmax = xDim - offsetOutput
-        ymax = yDim - offsetOutput
-        zmax = zDim - offsetOutput
-        allocate( this%oututmp(zmin:zmax,ymin:ymax,xmin:xmax),this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax),&
-            this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax) )
+        xmin = 1 + this%offsetOutput
+        ymin = 1 + this%offsetOutput
+        zmin = 1 + this%offsetOutput
+        xmax = this%xDim - this%offsetOutput
+        ymax = this%yDim - this%offsetOutput
+        zmax = this%zDim - this%offsetOutput
+        allocate(this%oututmp(zmin:zmax,ymin:ymax,xmin:xmax))
+        allocate(this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax))
+        allocate(this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax))
         ! allocate mesh partition
-        allocate(this%OMPpartition(1:m_nthreads),this%OMPparindex(1:m_nthreads+1),this%OMPeid(1:m_nthreads))
-        allocate(this%OMPedge(1:zDim,1:yDim, 1:m_nthreads))
-        call OMPPrePartition(xDim, m_nthreads, this%OMPpartition, this%OMPparindex)
+        allocate(this%OMPpartition(1:conditions%m_nthreads),this%OMPparindex(1:conditions%m_nthreads+1),this%OMPeid(1:conditions%m_nthreads))
+        allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:conditions%m_nthreads))
+        call OMPPrePartition(this%xDim, conditions%m_nthreads, this%OMPpartition, this%OMPparindex)
 
         contains
 
@@ -100,70 +98,50 @@ module FluidDomain
                     parindex(p) = parindex(p-1) + partition(p-1)
                 endif
             enddo
-        endsubroutine OMPPrePartition
+        END SUBROUTINE OMPPrePartition
     END SUBROUTINE allocate_fluid_
 
-    SUBROUTINE initialise_(this,ID,iCollidModel,zDim,yDim,xDim,zmin,ymin,xmin,dh,bcs,params)
+    SUBROUTINE initialise_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        integer,intent(in):: ID, iCollidModel,zDim,yDim,xDim,bcs(1:6)
-        real(8),intent(in):: zmin,ymin,xmin,dh
-        real(8),intent(in):: params(1:10)!(1, TRT lambda), (2, shear rate)
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
-        real(8):: vel(1:SpaceDim)
-        real(8):: xGrid(1:xDim),yGrid(1:yDim),zGrid(1:zDim)
-        integer:: x, y, z
-        this%ID = ID
-        this%xDim = xDim
-        this%yDim = yDim
-        this%zDim = zDim
-        this%dh = dh
-        this%xmin = xmin
-        this%xmax = xmin + dh*(xDim-1)
-        this%ymin = ymin
-        this%ymax = ymin + dh*(yDim-1)
-        this%zmin = zmin
-        this%zmax = zmin + dh*(zDim-1)
-        this%BndConds = bcs
-        this%iCollidModel = iCollidModel
-        if(iCollidModel.eq.1) then
-            call calculate_SRT_params
-        elseif(iCollidModel.eq.2) then
-            call calculate_TRT_params(params(1))
-        elseif(iCollidModel.eq.3) then
-            call calculate_MRT_params
+        ! select the collision model
+        if(this%iCollidModel.eq.1) then
+            call calculate_SRT_params()
+        elseif(this%iCollidModel.eq.2) then
+            call calculate_TRT_params(this%params(1))
+        elseif(this%iCollidModel.eq.3) then
+            call calculate_MRT_params()
         else
             write(*,*)' collision_step Model is not defined'
         endif
-
-        call initialize_flow(params)
+        ! initialize flow information
+        call initialize_flow()
 
         contains
 
         SUBROUTINE calculate_SRT_params()
             implicit none
             real(8):: tau
-            tau   =  m_nu/(dh*Cs2)+0.5d0
+            tau   =  conditions%nu/(this%dh*Cs2)+0.5d0
             this%Omega =  1.0d0 / tau
         END SUBROUTINE calculate_SRT_params
 
         SUBROUTINE calculate_TRT_params(lambda)
             implicit none
             real(8):: tau, lambda
-            tau   =  m_nu/(dh*Cs2)+0.5d0
+            tau   =  conditions%nu/(this%dh*Cs2)+0.5d0
             this%Omega =  1.0d0 / tau
             this%Omega2 = 0.d0 ! to be updated
+            lambda = 1.0d0/4.0d0;
         END SUBROUTINE calculate_TRT_params
 
         SUBROUTINE calculate_MRT_params()
             implicit none
-        !   ===============================================================================================
             integer:: I
             real(8):: M_MRT(0:lbmDim,0:lbmDim),M_MRTI(0:lbmDim,0:lbmDim),M(0:lbmDim,0:lbmDim)
             real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)
-        !   =======================================================
-        !   calculate MRTM transformation matrix
-            DO    I=0,lbmDim
+            ! calculate MRTM transformation matrix
+            DO  I=0,lbmDim
                 M_MRT(0,I)=1
                 M_MRT(1,I)=19*SUM(ee(I,1:3)**2)-30
                 M_MRT(2,I)=(21*SUM(ee(I,1:3)**2)**2-53*SUM(ee(I,1:3)**2)+24)/2.0
@@ -190,28 +168,24 @@ module FluidDomain
                 M_MRT(17,I)=(ee(I,3)**2-ee(I,1)**2)*ee(I,2)
                 M_MRT(18,I)=(ee(I,1)**2-ee(I,2)**2)*ee(I,3)
             ENDDO
-        !   calculate the inverse matrix
+            ! calculate the inverse matrix
             M_MRTI=TRANSPOSE(M_MRT)
             M=MATMUL(M_MRT,M_MRTI)
             DO    I=0,lbmDim
                 M_MRTI(0:lbmDim,I)=M_MRTI(0:lbmDim,I)/M(I,I)
             ENDDO
-
-        !   ----------------------------------------------------------
-            !S(0:lbmDim)=Omega ! restore to SRT if S is Omega
-            !              0   1  2  3  4  5  6  7  8  9     10  11    12  13    14    15    16  17  18
+            ! S(0:lbmDim)=Omega ! restore to SRT if S is Omega
+            !              0   1  2  3  4  5  6  7  8      9     10      11     12      13        14         15      16  17  18
             S(0:lbmDim)=[  s0,s1,s2,s0,s4,s0,s4,s0,s4,this%Omega,s10,this%Omega,s10,this%Omega,this%Omega,this%Omega,s16,s16,s16]
-            !=====================
-        !   calculate MRTM collision matrix
-            !IM*S*M
+            ! calculate MRTM collision matrix
+            ! IM*S*M
             S_D(0:lbmDim,0:lbmDim)=0.0D0
             DO    i=0,lbmDim
                 S_D(i,i)=S(i)
             ENDDO
             this%M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
-            !=====================
-        !   calculate MRTM body-force matrix
-            !IM*(I-0.5D0*S)*M=I-0.5*IM*S*M
+            ! calculate MRTM body-force matrix
+            ! IM*(I-0.5D0*S)*M=I-0.5*IM*S*M
             S_D(0:lbmDim,0:lbmDim)=0.0D0
             DO    i=0,lbmDim
                 S_D(i,i)=1.0d0
@@ -219,33 +193,33 @@ module FluidDomain
             this%M_FORCE=S_D-0.5*this%M_COLLID
         END SUBROUTINE calculate_MRT_params
 
-        SUBROUTINE initialize_flow(params)
+        SUBROUTINE initialize_flow()
             implicit none
-            real(8),intent(in):: params(1:10)
             real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
-            real(8):: vel(1:SpaceDim)
+            real(8):: xCoord,yCoord,zCoord
             integer:: x, y, z
-            real(8):: xGrid,yGrid,zGrid
-
-        !   macro quantities***************************************************************************************
-            do  x = 1, xDim
-            do  y = 1, yDim
-            do  z = 1, zDim
-                call evaluateShearVelocity(xGrid(x),yGrid(y),zGrid(z), vel)
-                this%uuu(z, y, x, 1) = vel(1)
-                this%uuu(z, y, x, 2) = vel(2)
-                this%uuu(z, y, x, 3) = vel(3)
+            ! calculating initial flow velocity
+            do  x = 1, this%xDim
+                xCoord = this%xmin + this%dh * (x - 1);
+            do  y = 1, this%yDim
+                yCoord = this%ymin + this%dh * (x - 1);
+            do  z = 1, this%zDim
+                zCoord = this%zmin + this%dh * (x - 1);
+                this%uuu(z, y, x, 1) = conditions%uvwIn(1) + 0*conditions%shearRateIn(1) + yCoord*conditions%shearRateIn(2) + zCoord*conditions%shearRateIn(3);
+                this%uuu(z, y, x, 2) = conditions%uvwIn(1) + xCoord*conditions%shearRateIn(1) + 0*conditions%shearRateIn(2) + zCoord*conditions%shearRateIn(3);
+                this%uuu(z, y, x, 3) = conditions%uvwIn(1) + xCoord*conditions%shearRateIn(1) + yCoord*conditions%shearRateIn(2) + 0*conditions%shearRateIn(3);
             enddo
             enddo
             enddo
-            this%den(1:zDim,1:yDim,1:xDim)   = m_denIn
-            ! call this%initDisturb()
-            do  x = 1, xDim
-            do  y = 1, yDim
-            do  z = 1, zDim
-                uSqr       = sum(this%uuu(z,y,x,1:3)**2)
+            this%den(1:this%zDim,1:this%yDim,1:this%xDim) = conditions%denIn
+            ! calculating the distribution function
+            do  x = 1, this%xDim
+            do  y = 1, this%yDim
+            do  z = 1, this%zDim
+                uSqr           = sum(this%uuu(z,y,x,1:3)**2)
                 uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
-                fEq(0:lbmDim)= wt(0:lbmDim) * this%den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+                fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+                
                 this%fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
             enddo
             enddo
@@ -253,27 +227,37 @@ module FluidDomain
         END SUBROUTINE initialize_flow
     END SUBROUTINE initialise_
 
-    SUBROUTINE write_continue_(this,step,time)
-        IMPLICIT NONE
-        class(LBMBlock), intent(inout) :: this
-        integer:: step
-        real(8):: time
-        open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
-        write(13) step,time
-        write(13) this%fIn
-        close(13)
-    ENDSUBROUTINE write_continue_
+    !SUBROUTINE evaluateShearVelocity(xCoord,yCoord,zCoord,velocity)
+    !    implicit none
+    !    real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
+    !    velocity(1) = m_uuuIn(1) + 0 * m_shearRateIn(1) + yCoord * m_shearRateIn(2) + zCoord * m_shearRateIn(3)
+    !    velocity(2) = m_uuuIn(2) + xCoord * m_shearRateIn(1) + 0 * m_shearRateIn(2) + zCoord * m_shearRateIn(3)
+    !    velocity(3) = m_uuuIn(3) + xCoord * m_shearRateIn(1) + yCoord * m_shearRateIn(2) + 0 * m_shearRateIn(3)
+    !END SUBROUTINE
 
-    SUBROUTINE read_continue_(this,step,time)
-        IMPLICIT NONE
-        class(LBMBlock), intent(inout) :: this
-        integer:: step
-        real(8):: time
-        open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
-        read(13) step,time
-        read(13) this%fIn
-        close(13)
-    ENDSUBROUTINE read_continue_
+    !SUBROUTINE evaluateOscillatoryVelocity(velocity,time)
+    !    implicit none
+    !    real(8):: velocity(1:SpaceDim)
+    !    real(8):: time
+    !    velocity(1) = m_uuuIn(1) + m_VelocityAmp * dcos(2*pi*m_VelocityFreq*time + m_VelocityPhi/180.0*pi)
+    !    velocity(2) = m_uuuIn(2)
+    !    velocity(3) = m_uuuIn(3)
+    !END SUBROUTINE
+
+    !subroutine  initDisturb_(this)
+    !    implicit none
+    !    class(LBMBlock), intent(inout) :: this
+    !    integer:: x, y,z
+    !    do  z = 1, this%zDim
+    !    do  y = 1, this%yDim
+    !    do  x = 1, this%xDim
+    !         this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+AmplInitDist(1)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+    !         this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+AmplInitDist(2)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+    !         this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+AmplInitDist(3)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+    !    enddo
+    !    enddo
+    !    enddo
+    !END SUBROUTINE
 
     SUBROUTINE calculate_macro_quantities_(this)
         implicit none
@@ -283,16 +267,38 @@ module FluidDomain
         do  x = 1, this%xDim
         do  y = 1, this%yDim
         do  z = 1, this%zDim
-            this%den(z,y,x  )  = SUM(this%fIn(z,y,x,0:lbmDim))
-            this%uuu(z,y,x,1)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*m_VolumeForce(1)*this%dh)/this%den(z,y,x)
-            this%uuu(z,y,x,2)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*m_VolumeForce(2)*this%dh)/this%den(z,y,x)
-            this%uuu(z,y,x,3)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*m_VolumeForce(3)*this%dh)/this%den(z,y,x)
+            this%den(z,y,x  )  = (SUM(this%fIn(z,y,x,0:lbmDim)))
+            this%uuu(z,y,x,1)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*this%volumeForce(1)*this%dh)/this%den(z,y,x)
+            this%uuu(z,y,x,2)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*this%volumeForce(2)*this%dh)/this%den(z,y,x)
+            this%uuu(z,y,x,3)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*this%volumeForce(3)*this%dh)/this%den(z,y,x)
             !prs(z,y,x)   = Cs2*(den(z,y,x)-denIn)
         enddo
         enddo
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE calculate_macro_quantities_
+
+    SUBROUTINE updateVolumForc(this,time)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        real(8):: time
+        this%volumeForce(1) = conditions%volumeForceIn(1) + conditions%volumeForceAmp * dsin(2.d0 * pi * conditions%volumeForceFreq * time + conditions%volumeForcePhi/180.0*pi)
+        this%volumeForce(2) = conditions%volumeForceIn(2)
+        this%volumeForce(3) = conditions%volumeForceIn(3)
+    END SUBROUTINE
+
+    SUBROUTINE addVolumForc(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer:: x
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
+        do x=1,this%xDim
+            this%force(:,:,x,1) = this%force(:,:,x,1) + this%volumeForce(1)
+            this%force(:,:,x,2) = this%force(:,:,x,2) + this%volumeForce(2)
+            this%force(:,:,x,3) = this%force(:,:,x,3) + this%volumeForce(3)
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
 
     SUBROUTINE collision_(this)
         implicit none
@@ -310,16 +316,14 @@ module FluidDomain
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
                               (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
                              +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
-                             +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3) &
-                                             )
-
+                             +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
             if(this%iCollidModel==1)then
                 ! SRT collision
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*fEq(0:lbmDim) + (1.d0-0.5d0*this%Omega)*Flb(0:lbmDim)
             elseif(this%iCollidModel==2)then
                 ! TRT collision
                 fEq(0) = this%Omega*fEq(0) + (1.d0-0.5d0*this%Omega)*Flb(0)
-                uxyz(positivedirs) = 0.5d0* this%Omega*(fEq(positivedirs)+fEq(negativedirs)) + (0.5d0-0.25d0* this%Omega)*(Flb(positivedirs)+Flb(negativedirs))
+                uxyz(positivedirs) = 0.5d0*this%Omega *(fEq(positivedirs)+fEq(negativedirs)) + (0.5d0-0.25d0* this%Omega)*(Flb(positivedirs)+Flb(negativedirs))
                 uxyz(negativedirs) = 0.5d0*this%Omega2*(fEq(positivedirs)-fEq(negativedirs)) + (0.5d0-0.25d0*this%Omega2)*(Flb(positivedirs)-Flb(negativedirs))
                 fEq(positivedirs) = uxyz(positivedirs) + uxyz(negativedirs)
                 fEq(negativedirs) = uxyz(positivedirs) - uxyz(negativedirs)
@@ -405,7 +409,7 @@ module FluidDomain
             if(dx.eq.0) return
 
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
-            do  p = 1,m_nthreads
+            do  p = 1,conditions%m_nthreads
                 if(dx .eq. -1) then
                     call swapxwAtom(f, edge(:,:,p), eid(p), i, zDim, yDim, xDim, lbmDim, parindex(p), parindex(p+1)-1)
                 elseif(dx.eq.1) then
@@ -414,7 +418,7 @@ module FluidDomain
             enddo
             !$OMP END PARALLEL DO
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
-            do  p = 1,m_nthreads
+            do  p = 1,conditions%m_nthreads
                 f(:,:,eid(p),i) = edge(:,:,p)
             enddo
             !$OMP END PARALLEL DO
@@ -451,6 +455,7 @@ module FluidDomain
         end subroutine
     END SUBROUTINE streaming_
 
+
     SUBROUTINE write_flow_(this,time)
         implicit none
         class(LBMBlock), intent(inout) :: this
@@ -475,7 +480,7 @@ module FluidDomain
         xmax = this%xDim - this%offsetOutput
         ymax = this%yDim - this%offsetOutput
         zmax = this%zDim - this%offsetOutput
-        invUref = 1.d0/m_Uref
+        invUref = 1.d0/conditions%Uref
         
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do x=xmin, xmax
@@ -512,7 +517,7 @@ module FluidDomain
         !endif
         call myfork(pid)
         if(pid.eq.0) then
-            write(fileName,'(I10)') nint(time/m_Tref*1d5)
+            write(fileName,'(I10)') nint(time/conditions%Tref*1d5)
             fileName = adjustr(fileName)
             do  i=1,nameLen
                 if(fileName(i:i)==' ')fileName(i:i)='0'
@@ -531,7 +536,7 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer:: x,y,z,i
         real(8):: invUref, uLinfty(1:3), uL2(1:3), temp
-        invUref = 1.d0/m_Uref
+        invUref = 1.d0/conditions%Uref
         uLinfty = -1.d0
         uL2 = 0.d0
         do i=1,3
@@ -557,57 +562,26 @@ module FluidDomain
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine ComputeFieldStat_
 
-    SUBROUTINE evaluateShearVelocity(x, y, z, vel)
-        implicit none
-        real(8):: x, y, z, vel(1:SpaceDim)
-        vel(1) = m_uuuIn(1) + 0 * m_shearRateIn(1) + y * m_shearRateIn(2) + z * m_shearRateIn(3)
-        vel(2) = m_uuuIn(2) + x * m_shearRateIn(1) + 0 * m_shearRateIn(2) + z * m_shearRateIn(3)
-        vel(3) = m_uuuIn(3) + x * m_shearRateIn(1) + y * m_shearRateIn(2) + 0 * m_shearRateIn(3)
-    END SUBROUTINE
-
-    SUBROUTINE evaluateOscillatoryVelocity(vel,time)
-        implicit none
-        real(8):: vel(1:SpaceDim)
-        real(8):: time
-        vel(1) = m_uuuIn(1) + m_VelocityAmp * dcos(2*pi*m_VelocityFreq*time + m_VelocityPhi/180.0*pi)
-        vel(2) = m_uuuIn(2)
-        vel(3) = m_uuuIn(3)
-    END SUBROUTINE
-
-    SUBROUTINE updateVolumForc(time)
-        implicit none
-        real(8):: time
-        m_VolumeForce(1) = m_VolumeForceIn(1) + m_VolumeForceAmp * dsin(2.d0 * pi * m_VolumeForceFreq * time + m_VolumeForcePhi/180.0*pi)
-        m_VolumeForce(2) = m_VolumeForceIn(2)
-        m_VolumeForce(3) = m_VolumeForceIn(3)
-    END SUBROUTINE
-
-    SUBROUTINE addVolumForc(this)
-        implicit none
+    SUBROUTINE write_continue_(this,step,time)
+        IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
-        integer:: x
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-        do x=1,this%xDim
-            this%force(:,:,x,1) = this%force(:,:,x,1) + m_VolumeForce(1)
-            this%force(:,:,x,2) = this%force(:,:,x,2) + m_VolumeForce(2)
-            this%force(:,:,x,3) = this%force(:,:,x,3) + m_VolumeForce(3)
-        enddo
-        !$OMP END PARALLEL DO
-    END SUBROUTINE
+        integer:: step
+        real(8):: time
+        open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
+        write(13) step,time
+        write(13) this%fIn
+        close(13)
+    ENDSUBROUTINE write_continue_
 
-    subroutine  initDisturb_(this)
-        implicit none
+    SUBROUTINE read_continue_(this,step,time)
+        IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
-        integer:: x, y,z
-        do  z = 1, this%zDim
-        do  y = 1, this%yDim
-        do  x = 1, this%xDim
-            ! this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+AmplInitDist(1)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-            ! this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+AmplInitDist(2)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-            ! this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+AmplInitDist(3)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-        enddo
-        enddo
-        enddo
-    
-    END SUBROUTINE
+        integer:: step
+        real(8):: time
+        open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
+        read(13) step,time
+        read(13) this%fIn
+        close(13)
+    ENDSUBROUTINE read_continue_
+
 end module FluidDomain

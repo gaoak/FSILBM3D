@@ -7,7 +7,8 @@
 
     PROGRAM main
     USE ConstParams
-    use omp_lib
+    USE FluidDomain
+    USE FlowCondition
     USE SolidBody
     implicit none
     integer:: isubstep,iFish,x,y,z
@@ -15,7 +16,19 @@
     logical alive
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
-    CALL read_file()
+
+    call read_Parallel()
+    call initialise_blocks()
+    call read_FlowCondition()
+    
+
+
+
+
+
+
+
+    
     CALL allocate_solid_memory(Asfac,Lchod,Lspan,AR,iBodyType)
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()
