@@ -135,14 +135,14 @@ module FluidDomain
         SUBROUTINE calculate_SRT_params()
             implicit none
             real(8):: tau
-            tau   =  conditions%nu/(this%dh*Cs2)+0.5d0
+            tau   =  flow%nu/(this%dh*Cs2)+0.5d0
             this%Omega =  1.0d0 / tau
         END SUBROUTINE calculate_SRT_params
 
         SUBROUTINE calculate_TRT_params(lambda)
             implicit none
             real(8):: tau, lambda
-            tau   =  conditions%nu/(this%dh*Cs2)+0.5d0
+            tau   =  flow%nu/(this%dh*Cs2)+0.5d0
             this%Omega =  1.0d0 / tau
             this%Omega2 = 0.d0 ! to be updated
             lambda = 1.0d0/4.0d0;
@@ -218,13 +218,13 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (x - 1);
             do  z = 1, this%zDim
                 zCoord = this%zmin + this%dh * (x - 1);
-                this%uuu(z, y, x, 1) = conditions%uvwIn(1) + 0*conditions%shearRateIn(1) + yCoord*conditions%shearRateIn(2) + zCoord*conditions%shearRateIn(3);
-                this%uuu(z, y, x, 2) = conditions%uvwIn(1) + xCoord*conditions%shearRateIn(1) + 0*conditions%shearRateIn(2) + zCoord*conditions%shearRateIn(3);
-                this%uuu(z, y, x, 3) = conditions%uvwIn(1) + xCoord*conditions%shearRateIn(1) + yCoord*conditions%shearRateIn(2) + 0*conditions%shearRateIn(3);
+                this%uuu(z, y, x, 1) = flow%uvwIn(1) + 0*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
+                this%uuu(z, y, x, 2) = flow%uvwIn(1) + xCoord*flow%shearRateIn(1) + 0*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
+                this%uuu(z, y, x, 3) = flow%uvwIn(1) + xCoord*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + 0*flow%shearRateIn(3);
             enddo
             enddo
             enddo
-            this%den(1:this%zDim,1:this%yDim,1:this%xDim) = conditions%denIn
+            this%den(1:this%zDim,1:this%yDim,1:this%xDim) = flow%denIn
             ! calculating the distribution function
             do  x = 1, this%xDim
             do  y = 1, this%yDim
@@ -295,9 +295,9 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         real(8):: time
-        this%volumeForce(1) = conditions%volumeForceIn(1) + conditions%volumeForceAmp * dsin(2.d0 * pi * conditions%volumeForceFreq * time + conditions%volumeForcePhi/180.0*pi)
-        this%volumeForce(2) = conditions%volumeForceIn(2)
-        this%volumeForce(3) = conditions%volumeForceIn(3)
+        this%volumeForce(1) = flow%volumeForceIn(1) + flow%volumeForceAmp * dsin(2.d0 * pi * flow%volumeForceFreq * time + flow%volumeForcePhi/180.0*pi)
+        this%volumeForce(2) = flow%volumeForceIn(2)
+        this%volumeForce(3) = flow%volumeForceIn(3)
     END SUBROUTINE
 
     SUBROUTINE addVolumForc(this)
@@ -493,7 +493,7 @@ module FluidDomain
         xmax = this%xDim - this%offsetOutput
         ymax = this%yDim - this%offsetOutput
         zmax = this%zDim - this%offsetOutput
-        invUref = 1.d0/conditions%Uref
+        invUref = 1.d0/flow%Uref
         
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do x=xmin, xmax
@@ -530,7 +530,7 @@ module FluidDomain
         !endif
         call myfork(pid)
         if(pid.eq.0) then
-            write(fileName,'(I10)') nint(time/conditions%Tref*1d5)
+            write(fileName,'(I10)') nint(time/flow%Tref*1d5)
             fileName = adjustr(fileName)
             do  i=1,nameLen
                 if(fileName(i:i)==' ')fileName(i:i)='0'
@@ -549,7 +549,7 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer:: x,y,z,i
         real(8):: invUref, uLinfty(1:3), uL2(1:3), temp
-        invUref = 1.d0/conditions%Uref
+        invUref = 1.d0/flow%Uref
         uLinfty = -1.d0
         uL2 = 0.d0
         do i=1,3

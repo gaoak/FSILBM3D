@@ -17,19 +17,24 @@
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
 
+
+    integer:: iBodyType(m_nFish)
+    real(8):: Asfac,Lchod,Lspan,AR
+
+    
     call read_FlowCondition()
     call initialise_blocks()
+
     
-    
 
 
-
-
-
-
-
-
+    call read_solid_file()
     CALL allocate_solid_memory(Asfac,Lchod,Lspan,AR,iBodyType)
+
+
+
+
+
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()
     CALL write_params()

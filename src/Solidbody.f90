@@ -116,6 +116,7 @@ module SolidBody
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)!of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
+        
     contains
         procedure :: Initialise => Initialise_
         procedure :: PlateBuild => PlateBuild_
@@ -133,7 +134,9 @@ module SolidBody
         procedure :: vtor_f => vtor_
     end type VirtualBody
     type(VirtualBody), allocatable :: VBodies(:)
-  contains
+
+    contains
+
     subroutine read_solid_file(nFish,FEmeshName,iBodyModel,iBodyType,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
                                Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
                                ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
