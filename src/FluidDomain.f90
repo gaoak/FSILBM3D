@@ -272,6 +272,12 @@ module FluidDomain
     !    enddo
     !END SUBROUTINE
 
+    SUBROUTINE setBndCond(this)
+        implicit none
+        ! set the boundary conditions of the block
+        
+    END SUBROUTINE setBndCond
+
     SUBROUTINE calculate_macro_quantities_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this

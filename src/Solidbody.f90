@@ -90,8 +90,8 @@ module SolidBody
     real(8):: m_Asfac,m_Lchod ! fish area, length
     real(8):: m_IBPenaltyalpha,m_alphaf,m_NewmarkGamma,m_NewmarkBeta,m_dampK,m_dampM,m_dtolFEM
     integer:: m_nFish,m_nthreads,m_fishGroup,m_iForce2Body,m_isKB,m_ntolFEM
-    integer:: m_zDim, m_yDim, m_xDim,m_boundaryConditions(1:6)
-    real(8):: m_dt, m_dh, m_denIn, m_uvwIn(3) 
+    integer:: m_zDim,m_yDim,m_xDim,m_boundaryConditions(1:6)
+    real(8):: m_dt,m_dh,m_denIn,m_uvwIn(3) 
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
@@ -119,7 +119,7 @@ module SolidBody
         integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
         real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
-        integer,allocatable :: vtor(:)!of size fake_npts
+        integer,allocatable :: vtor(:)! of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
         
     contains
@@ -217,9 +217,9 @@ module SolidBody
                     AoAPhi(1:3,iFish)  = t_AoAPhi(1:3)
                     ! calculate the initial location for each fish
                     order3 = iFish - order1
-                    lineX  = mod(order3,numX(ifishGroup))
-                    lineY  = mod(order3,numX(ifishGroup)*numY(ifishGroup))
-                    lineZ  = mod(order3,numX(ifishGroup)*numY(ifishGroup)*numZ(ifishGroup))
+                    lineX  = mod(order3,numY(ifishGroup)*numZ(ifishGroup))
+                    lineY  = mod(order3,numX(ifishGroup)*numZ(ifishGroup))
+                    lineZ  = mod(order3,numX(ifishGroup)*numY(ifishGroup))
                     XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
                     XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
                     XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
