@@ -3,7 +3,7 @@ module FlowCondition
     private
     public :: conditions
     type :: FlowCondType
-        integer :: m_nthreads, nblock,TrefType,UrefType
+        integer :: TrefType,UrefType
         real(8) :: Re,dt,denIn,nu,Mu
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
         real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
@@ -14,15 +14,6 @@ module FlowCondition
     end type FlowCondType
     type(FlowCondType) :: conditions
     contains
-
-    SUBROUTINE read_Parallel()
-        ! read flow conditions
-        implicit none
-        open(unit=111, file='inFlow.dat', status='old', action='read')
-        call found_keyword(111,'Parallel')
-        read(111,*)    conditions%m_nthreads,conditions%nblock
-        close(111)
-    END SUBROUTINE
 
     SUBROUTINE read_FlowCondition()
         ! read computing core and block numbers
@@ -43,23 +34,6 @@ module FlowCondition
         conditions%nu = conditions%Re !needed
 
         close(111)
-    END SUBROUTINE
-
-    SUBROUTINE found_keyword(fileID,keyword)
-        implicit none
-        integer fileID
-        character :: keyword
-        character(len=50) :: readString
-        readString = 'null'
-        do while(.true.)
-            read(fileID, *) readString
-            if (index(readString, keyword) .GT. 0) then
-                exit
-            endif
-        enddo
-        if (index(readString, keyword) .EQ. 0) then
-            write(*,*) 'the parameters in inflow.dat do not exist.'
-        endif
     END SUBROUTINE
 
 end module FlowCondition

@@ -17,9 +17,9 @@
     !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
 
-    call read_Parallel()
-    call initialise_blocks()
     call read_FlowCondition()
+    call initialise_blocks()
+    
     
 
 
@@ -28,7 +28,7 @@
 
 
 
-    
+
     CALL allocate_solid_memory(Asfac,Lchod,Lspan,AR,iBodyType)
     CALL allocate_fluid_memory()
     CALL calculate_LB_params()

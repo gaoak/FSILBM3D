@@ -389,3 +389,21 @@
         integer,dimension(8) :: values
         CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
     ENDFUNCTION
+
+    SUBROUTINE found_keyword(fileID,keyword)
+        implicit none
+        integer fileID
+        character :: keyword
+        character(len=50) :: readString
+        readString = 'null'
+        do while(.not.EOF(fileID))
+            read(fileID, *) readString
+            if (index(LOWCASE(readString), LOWCASE(keyword)) .GT. 0) then
+                exit
+            endif
+        enddo
+        if (index(LOWCASE(readString), LOWCASE(keyword)) .EQ. 0) then
+            write(*,*) 'the parameters in inflow.dat do not exist.'
+            stop
+        endif
+    END SUBROUTINE

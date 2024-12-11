@@ -3,18 +3,20 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
+    integer :: nblock
     type :: LBMBlock
-        integer:: ID,iCollidModel,offsetOutput
-        integer:: xDim,yDim,zDim
-        real(8):: dh,xmin,ymin,zmin,xmax,ymax,zmax
-        integer:: BndConds(1:6)
-        real(8):: params(1:10),Omega,Omega2 ! single time, two time relaxation
-        real(8):: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
+        integer :: npsize
+        integer :: ID,iCollidModel,offsetOutput
+        integer :: xDim,yDim,zDim
+        real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
+        integer :: BndConds(1:6)
+        real(8) :: params(1:10),Omega,Omega2 ! single time, two time relaxation
+        real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),volumeForce(1:3)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
-        real(4):: offsetMoveGrid(1:3)
+        real(4) :: offsetMoveGrid(1:3)
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_
@@ -32,11 +34,13 @@ module FluidDomain
     SUBROUTINE initialise_blocks()
         implicit none
         integer :: iblock
+        call read_nblocks()
         ! creat blocks and read parameters
-        type(LBMBlock) :: blocks(conditions%nblock)
+        type(LBMBlock), allocatable :: blocks(:)
         open(unit=111, file='inFlow.dat', status='old', action='read')
         call found_keyword(111,'FluidDomain')
-        do iblock = 1,conditions%nblock
+        do iblock = 1,nblock
+            read(111,*)    blocks(iblock)%npsize
             read(111,*)    blocks(iblock)%ID,blocks(iblock)%iCollidModel,blocks(iblock)%offsetOutput
             read(111,*)    blocks(iblock)%xDim,blocks(iblock)%yDim,blocks(iblock)%zDim
             read(111,*)    blocks(iblock)%dh,blocks(iblock)%xmin,blocks(iblock)%ymin,blocks(iblock)%zmin
@@ -50,6 +54,15 @@ module FluidDomain
             blocks(iblock)%allocate_fluid()
             blocks(iblock)%initialise()
         enddo
+        close(111)
+    END SUBROUTINE
+
+    SUBROUTINE read_nblocks()
+        ! read computing core and block numbers
+        implicit none
+        open(unit=111, file='inFlow.dat', status='old', action='read')
+        call found_keyword(111,'ENDFlowCondition')
+        read(111,*)    nblock
         close(111)
     END SUBROUTINE
 
@@ -73,9 +86,9 @@ module FluidDomain
         allocate(this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax))
         allocate(this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax))
         ! allocate mesh partition
-        allocate(this%OMPpartition(1:conditions%m_nthreads),this%OMPparindex(1:conditions%m_nthreads+1),this%OMPeid(1:conditions%m_nthreads))
-        allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:conditions%m_nthreads))
-        call OMPPrePartition(this%xDim, conditions%m_nthreads, this%OMPpartition, this%OMPparindex)
+        allocate(this%OMPpartition(1:this%npsize),this%OMPparindex(1:this%npsize+1),this%OMPeid(1:this%npsize))
+        allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:this%npsize))
+        call OMPPrePartition(this%xDim, this%npsize, this%OMPpartition, this%OMPparindex)
 
         contains
 
@@ -409,7 +422,7 @@ module FluidDomain
             if(dx.eq.0) return
 
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
-            do  p = 1,conditions%m_nthreads
+            do  p = 1,this%npsize
                 if(dx .eq. -1) then
                     call swapxwAtom(f, edge(:,:,p), eid(p), i, zDim, yDim, xDim, lbmDim, parindex(p), parindex(p+1)-1)
                 elseif(dx.eq.1) then
@@ -418,7 +431,7 @@ module FluidDomain
             enddo
             !$OMP END PARALLEL DO
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
-            do  p = 1,conditions%m_nthreads
+            do  p = 1,this%npsize
                 f(:,:,eid(p),i) = edge(:,:,p)
             enddo
             !$OMP END PARALLEL DO
