@@ -5,93 +5,13 @@ module SolidBody
     use SolidSolver
     implicit none
     private
-    ! interface
-    !     subroutine initumap(np) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: np
-    !         ! make a clean map for each and all threads
-    !     end subroutine initumap
-
-    !     subroutine thread_adduindex(p, ind) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: p
-    !         integer(8):: ind
-    !         ! add an index for thread p
-    !     end subroutine thread_adduindex
-
-    !     subroutine setumap(ind, val) bind (c)
-    !         use iso_c_binding
-    !         integer(8):: ind
-    !         real(8):: val(3)
-    !         ! set velocity for index ind
-    !     end subroutine setumap
-
-    !     subroutine addumap(ind, val) bind (c)
-    !         use iso_c_binding
-    !         integer(8):: ind
-    !         real(8):: val(3)
-    !         ! add val to velocity at index ind
-    !     end subroutine addumap
-
-    !     subroutine getumap(ind, val) bind (c)
-    !         use iso_c_binding
-    !         integer(8):: ind
-    !         real(8):: val(3)
-    !         ! get velocity of index ind
-    !     end subroutine getumap
-
-    !     subroutine mergeumap() bind (c)
-    !         use iso_c_binding
-    !         ! merge all thread indexes to root thread
-    !     end subroutine mergeumap
-
-    !     subroutine allocateuarray() bind (c)
-    !         use iso_c_binding
-    !         ! allocate space for velocity values
-    !     end subroutine allocateuarray
-
-    !     subroutine findindex(index,i,j,k) bind (c)
-    !         use iso_c_binding
-    !         IMPLICIT NONE
-    !         integer(4):: i,j,k
-    !         integer(8):: index
-    !     end subroutine
-
-    !     subroutine findijk(index,i,j,k) bind (c)
-    !         use iso_c_binding
-    !         IMPLICIT NONE
-    !         integer(4):: i,j,k
-    !         integer(8):: index
-    !     end subroutine
-
-    !     subroutine inititerator(np, ndata) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: np, ndata(np)
-    !     end subroutine inititerator
-
-    !     subroutine getiterator(p, index) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: p
-    !         integer(8):: index
-    !     end subroutine getiterator
-
-    !     subroutine nextiterator(p) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: p
-    !     end subroutine nextiterator
-
-    !     subroutine printumap() bind (c)
-    !         use iso_c_binding
-    !         ! print velocity map for examination
-    !     end subroutine printumap
-    ! end interface
     ! Immersed boundary method parameters
     public :: m_nFish,m_Asfac,m_Lchod ! use for calculating reference values in flow condition 
     real(8):: m_Asfac,m_Lchod ! fish area, length
     real(8):: m_IBPenaltyalpha,m_alphaf,m_NewmarkGamma,m_NewmarkBeta,m_dampK,m_dampM,m_dtolFEM
     integer:: m_nFish,m_nthreads,m_fishGroup,m_iForce2Body,m_isKB,m_ntolFEM
     integer:: m_zDim, m_yDim, m_xDim,m_boundaryConditions(1:6)
-    real(8):: m_dt, m_dh, m_denIn, m_uvwIn(3) 
+    real(8):: m_dt, m_dh, m_denIn, m_uvwIn(3)
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
@@ -153,6 +73,8 @@ module SolidBody
             read(111,*)    m_dtolFEM,m_ntolFEM
             read(111,*)    m_nFish,m_fishGroup,m_iForce2Body,m_isKB
         close(111)
+        ! set solid solver global parameters
+        call Set_SolidSolver_Params(m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf,m_dtolFEM,m_ntolFEM,m_iForce2Body,m_isKB)
     END SUBROUTINE
 
     subroutine initialise_solid_bodies()
@@ -170,61 +92,61 @@ module SolidBody
         real(8):: AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish)
         real(8):: Lspan,AR  ! parameters for allocate_solid_memory()
         ! read fish parameters for each type
-        integer:: order1=0,order2=0,order3=0,lineX,lineX,lineX
+        integer:: order1=0,order2=0,order3=0,lineX,lineY,lineZ
         fishNum(1)=0
         open(unit=111, file='inFlow.dat', status='old', action='read')
         call found_keyword(111,'bodyParameters')
-            do ifishGroup = 1,m_fishGroup
-                read(111,*)    fishNum(ifishGroup+1),numX(ifishGroup),numY(ifishGroup),numZ(ifishGroup)
-                read(111,*)    t_FEmeshName
-                read(111,*)    t_iBodyModel,t_iBodyType
-                read(111,*)    t_isMotionGiven(1:3)
-                read(111,*)    t_isMotionGiven(4:6)
-                read(111,*)    t_denR,t_psR
-                if(m_isKB==0)     read(111,*)    t_EmR,t_tcR
-                if(m_isKB==1)     read(111,*)    t_KB,t_KS
-                read(111,*)    t_freq,t_St
-                read(111,*)    firstXYZ(1:3)
-                read(111,*)    deltaXYZ(1:3)
-                read(111,*)    t_XYZAmpl(1:3)
-                read(111,*)    t_XYZPhi(1:3)
-                read(111,*)    t_AoAo(1:3)
-                read(111,*)    t_AoAAmpl(1:3)
-                read(111,*)    t_AoAPhi(1:3)
-                order1 = order1 + fishNum(ifishGroup  );
-                order2 = order2 + fishNum(ifishGroup+1);
-                ! read parameters for each fish
-                do iFish=order1,order2
-                    FEmeshName(iFish) = t_FEmeshName
-                    iBodyModel(iFish) = t_iBodyModel
-                    iBodyType (iFish) = t_iBodyType
-                    isMotionGiven(1:6,iFish)=t_isMotionGiven(1:6)
-                    denR(iFish)= t_denR
-                    psR(iFish) = t_psR
-                    if(m_isKB==0) then
-                        EmR(iFish) = t_EmR
-                        tcR(iFish) = t_tcR
-                    elseif(m_isKB==1) then
-                        KB(iFish)  = t_KB
-                        KS(iFish)  = t_KS
-                    endif
-                    freq(iFish) = t_freq
-                    St(iFish) = t_St
-                    XYZAmpl(1:3,iFish) = t_XYZAmpl(1:3)
-                    XYZPhi(1:3,iFish)  = t_XYZPhi(1:3)
-                    AoAo(1:3,iFish)    = t_AoAo(1:3)
-                    AoAAmpl(1:3,iFish) = t_AoAAmpl(1:3)
-                    AoAPhi(1:3,iFish)  = t_AoAPhi(1:3)
-                    ! calculate the initial location for each fish
-                    order3 = iFish - order1
-                    lineX  = mod(order3,numX(ifishGroup))
-                    lineY  = mod(order3,numX(ifishGroup)*numY(ifishGroup))
-                    lineZ  = mod(order3,numX(ifishGroup)*numY(ifishGroup)*numZ(ifishGroup))
-                    XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
-                    XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
-                    XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
-                enddo
+        do ifishGroup = 1,m_fishGroup
+            read(111,*)    fishNum(ifishGroup+1),numX(ifishGroup),numY(ifishGroup),numZ(ifishGroup)
+            read(111,*)    t_FEmeshName
+            read(111,*)    t_iBodyModel,t_iBodyType
+            read(111,*)    t_isMotionGiven(1:3)
+            read(111,*)    t_isMotionGiven(4:6)
+            read(111,*)    t_denR,t_psR
+            if(m_isKB==0)     read(111,*)    t_EmR,t_tcR
+            if(m_isKB==1)     read(111,*)    t_KB,t_KS
+            read(111,*)    t_freq,t_St
+            read(111,*)    firstXYZ(1:3)
+            read(111,*)    deltaXYZ(1:3)
+            read(111,*)    t_XYZAmpl(1:3)
+            read(111,*)    t_XYZPhi(1:3)
+            read(111,*)    t_AoAo(1:3)
+            read(111,*)    t_AoAAmpl(1:3)
+            read(111,*)    t_AoAPhi(1:3)
+            order1 = order1 + fishNum(ifishGroup  );
+            order2 = order2 + fishNum(ifishGroup+1);
+            ! read parameters for each fish
+            do iFish=order1,order2
+                FEmeshName(iFish) = t_FEmeshName
+                iBodyModel(iFish) = t_iBodyModel
+                iBodyType (iFish) = t_iBodyType
+                isMotionGiven(1:6,iFish)=t_isMotionGiven(1:6)
+                denR(iFish)= t_denR
+                psR(iFish) = t_psR
+                if(m_isKB==0) then
+                    EmR(iFish) = t_EmR
+                    tcR(iFish) = t_tcR
+                elseif(m_isKB==1) then
+                    KB(iFish)  = t_KB
+                    KS(iFish)  = t_KS
+                endif
+                freq(iFish) = t_freq
+                St(iFish) = t_St
+                XYZAmpl(1:3,iFish) = t_XYZAmpl(1:3)
+                XYZPhi(1:3,iFish)  = t_XYZPhi(1:3)
+                AoAo(1:3,iFish)    = t_AoAo(1:3)
+                AoAAmpl(1:3,iFish) = t_AoAAmpl(1:3)
+                AoAPhi(1:3,iFish)  = t_AoAPhi(1:3)
+                ! calculate the initial location for each fish
+                order3 = iFish - order1
+                lineX  = mod(order3,numX(ifishGroup))
+                lineY  = mod(order3,numX(ifishGroup)*numY(ifishGroup))
+                lineZ  = mod(order3,numX(ifishGroup)*numY(ifishGroup)*numZ(ifishGroup))
+                XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
+                XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
+                XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
             enddo
+        enddo
         close(111)
         ! calculating other body gobal parameters
         m_dt = flow%dt/flow%numsubstep
@@ -237,13 +159,11 @@ module SolidBody
             if (iBodyType(iFish).eq.-1) then
                 call SurfacetoBeam_write(FEmeshName(iFish))
             endif
-            call VBodies(iFish)%rbm%Read_inFlow(FEmeshName(iFish),iBodyModel(iFish),iBodyType(iFish),isMotionGiven(1:6,iFish), &
+            call VBodies(iFish)%rbm%SetSolver(FEmeshName(iFish),iBodyModel(iFish),iBodyType(iFish),isMotionGiven(1:6,iFish), &
                                                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
                                                 freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
                                                 AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
         enddo
-        ! read solid solver global parameters
-        call Read_SolidSolver_Params(m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf,m_dtolFEM,m_ntolFEM,m_iForce2Body,m_isKB)
         ! allocate solid memory
         call allocate_solid_memory(m_Asfac,m_Lchod,Lspan,AR,iBodyType(1:m_nFish))
         ! initialise bodies

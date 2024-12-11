@@ -1,7 +1,7 @@
-Parallel======================================================================================================
+Parallel
  parameter for mpi
-EndParallel===================================================================================================
-FlowCondition=================================================================================================
+EndParallel
+FlowCondition
  0          1          1                      read(111,*) isRelease,isConCmpt,numsubstep
  0.020D+0   50.00D+0                          read(111,*) timeWriteBegin,timeWriteEnd
  0.100D+0   0.100D+0   0.010D+0               read(111,*) timeWriteFlow,timeWriteBody,timeWriteInfo
@@ -13,23 +13,23 @@ FlowCondition===================================================================
  0          100.0D+0                          read(111,*) TrefType,Tref
  0          0.010D+0                          read(111,*) UrefType,Uref
  10         0.001D+0                          read(111,*) ntolLBM,dtolLBM
-ENDFlowCondition==============================================================================================
+ENDFlowCondition
  1                                            read(111,*) nblock
-FluidBlocks===================================================================================================
+FluidBlocks
  8                                            read(111,*) npsize
  1         1         0                        read(111,*) ID,iCollideModel,offsetOutput
  801       100       50                       read(111,*) xDim,yDim,zDim
  0.020D+0  0.000D+0  0.000D+0  0.000D+0       read(111,*) dh,xmin,ymin,zmin
  300  302  304  304  304  304                 read(111,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0   0   0   0   0   0   0   0   0   0        read(111,*) params(1:10)
-ENDFluidBlocks================================================================================================
-SolidBody=====================================================================================================
+ENDFluidBlocks
+SolidBody
  0.000D+0   0.000d+0                          read(111,*) IBPenaltyalpha,alphaf
  0.500d+0   1.000d+0                          read(111,*) NewmarkGamma,NewmarkBeta
  0.000d+0   0.000d+0                          read(111,*) dampK,dampM
- 1.000D-6   100			                      read(111,*) dtolFEM,ntolFEM 
+ 1.000D-6   100			                      read(111,*) dtolFEM,ntolFEM
  2          2          1          1           read(111,*) nFish,fishGroup,iForce2Body,isKB
-bodyParameters------------------------------------------------------------------------------------------------
+bodyParameters
  1          1          1          1           read(111,*) fishNum(fishGroup),numX,numY,numZ
  Beam.dat                                     read(111,*) FEmeshName(iFish)
  1          1                                 read(111,*) iBodyModel(iFish),iBodyType(iFish)
@@ -60,21 +60,21 @@ bodyParameters------------------------------------------------------------------
  0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAo(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAAmpl(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAPhi(1:3,iFish)
-ENDSolidBody==================================================================================================
-Probing=======================================================================================================
+ENDSolidBody
+Probing
  1         1                                 read(111,*)     numSampFlow,isFluidOutput   provide 3 coordinates
  0.000d+0   0.000D+0   1.000D+0
---------------------------------------------------------------------------------------------------------------
+===
  1            1                              read(111,*)     numSampBody,isBodyOutput  provide node number
  1                                           read(111,*)     SampBodyNode(1:numSampBody,1:nFish)
-ENDProbing====================================================================================================
+ENDProbing
 
 
 
 
 
 0                                            read(111,*)     velocityKind
-===================================================================================================disturbance information
+=disturbance information
  0.000D+0   0.000D+0   0.000D+0   0.000D+0   read(111,*)     waveInitDist,AmplInitDist(1:SpcDim)   initial disturbance
  0.000D+0   0.000D+0   0.000D+0   0.000D+0   read(111,*)     FreqForcDist,AmplForcDist(1:SpcDim)   transient disturbance
  0.000D+0   0.000D+0                         read(111,*)     begForcDist,endForcDist               time interval

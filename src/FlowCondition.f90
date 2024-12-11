@@ -10,7 +10,7 @@ module FlowCondition
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
         real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
         real(8) :: Uref,Lref,Tref
-        real(8) :: Aref,Fref,Eref,Pref 
+        real(8) :: Aref,Fref,Eref,Pref
         !real(8) :: velocityType,velocityAmp,velocityFreq,velocityPhi
     end type FlowCondType
     type(FlowCondType) :: flow
