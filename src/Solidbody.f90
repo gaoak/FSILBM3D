@@ -174,14 +174,13 @@ module SolidBody
         CALL Read_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
     end subroutine read_solid_file
 
-    subroutine allocate_solid_memory(Asfac,Lchod,Lspan,AR,iBodyType)
-        integer, intent(in) :: iBodyType(m_nFish)
+    subroutine allocate_solid_memory(Asfac,Lchod,Lspan,AR)
         real(8),intent(out):: Asfac,Lchod,Lspan,AR
         real(8) :: nAsfac(m_nFish),nLchod(m_nFish)
         integer :: iFish,maxN
         write(*,'(A)') '=============================================================================='
         do iFish = 1,m_nFish
-            VBodies(iFish)%v_type = iBodyType(iFish)
+            VBodies(iFish)%v_type = VBodies(iFish)%rbm%iBodyType
             if (dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3))-0.d0) .gt. 1e-5 .or. &
                 dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3))-0.d0) .gt. 1e-5) then
                 VBodies(iFish)%v_move = 1

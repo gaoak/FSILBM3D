@@ -53,7 +53,7 @@
     integer:: boundaryConditions(1:6),MovingKind1,MovingKind2,VelocityKind
     real(8):: VelocityAmp,VelocityFreq,VelocityPhi,MovingVel1,MovingVel2,MovingFreq1,MovingFreq2
     real(8):: VolumeForce(1:SpcDim),VolumeForceAmp,VolumeForceFreq,VolumeForcePhi,VolumeForceIn(1:SpcDim)
-    integer, allocatable:: SampBodyNode(:,:), iBodyModel(:), iBodyType(:)
+    integer, allocatable:: SampBodyNode(:,:)
     real(8), allocatable:: SampFlowPint(:,:)
     integer:: nFish,NDref
     real(8):: Xref,Yref,Zref

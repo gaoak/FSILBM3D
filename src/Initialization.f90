@@ -15,7 +15,7 @@
     real(8):: ndenR,npsR,nEmR,ntcR,nKB,nKS,nFreq,nSt
     real(8):: nXYZAmpl(1:3),nXYZPhi(1:3),nAoAo(1:3),nAoAAmpl(1:3),nAoAPhi(1:3)
     character (LEN=40), allocatable:: FEmeshName(:)
-    integer, allocatable:: isMotionGiven(:,:)
+    integer, allocatable:: isMotionGiven(:,:), iBodyModel(:), iBodyType(:)
     real(8), allocatable:: denR(:),KB(:),KS(:),EmR(:),psR(:),tcR(:),St(:)
     real(8), allocatable:: Freq(:)
     real(8), allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:)
