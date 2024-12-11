@@ -1,5 +1,7 @@
 module SolidBody
     use ConstParams
+    use FluidDomain
+    use FlowCondition
     use SolidSolver
     implicit none
     private
@@ -84,14 +86,17 @@ module SolidBody
     !     end subroutine printumap
     ! end interface
     ! Immersed boundary method parameters
-    integer:: m_nthreads,m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
-    real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
-    integer:: m_boundaryConditions(1:6)
+    public :: m_nFish,m_Asfac,m_Lchod ! use for calculating reference values in flow condition 
+    real(8):: m_Asfac,m_Lchod ! fish area, length
+    real(8):: m_IBPenaltyalpha,m_alphaf,m_NewmarkGamma,m_NewmarkBeta,m_dampK,m_dampM,m_dtolFEM
+    integer:: m_nFish,m_nthreads,m_fishGroup,m_iForce2Body,m_isKB,m_ntolFEM
+    integer:: m_zDim, m_yDim, m_xDim,m_boundaryConditions(1:6)
+    real(8):: m_dt, m_dh, m_denIn, m_uvwIn(3) 
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
-    public :: VBodies,read_solid_file,allocate_solid_memory,Initialise_bodies,Write_solid_v_bodies,FSInteraction_force, &
+    public :: VBodies,initialise_solid_bodies,allocate_solid_memory,Initialise_bodies,Write_solid_v_bodies,FSInteraction_force, &
               Initialise_Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check,Write_solid_Data,Write_SampBodyNode
     type :: VirtualBody
         type(BeamSolver):: rbm
@@ -137,46 +142,113 @@ module SolidBody
 
     contains
 
-    subroutine read_solid_file(nFish,FEmeshName,iBodyModel,iBodyType,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
-                               Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
-                               ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
-                               dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
-        integer,intent(in):: nFish
-        character (LEN=40),intent(inout):: FEmeshName(nFish)
-        integer,intent(in):: iBodyModel(nFish),iBodyType(nFish),isMotionGiven(6,nFish)
-        real(8),intent(in):: denR(nFish),KB(nFish),KS(nFish),EmR(nFish),psR(nFish),tcR(nFish),St(nFish)
-        real(8),intent(in):: Freq(nFish)
-        real(8),intent(in):: XYZo(3,nFish),XYZAmpl(3,nFish),XYZPhi(3,nFish)
-        real(8),intent(in):: AoAo(3,nFish),AoAAmpl(3,nFish),AoAPhi(3,nFish)
-        integer,intent(in):: ntolLBM,boundaryConditions(6)
-        real(8),intent(in):: dtolLBM,Pbeta,dt,denIn,uuuIn(3)
-        real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM
-        integer,intent(in):: ntolFEM,iForce2Body,iKB
-        integer:: iFish
+    SUBROUTINE read_body_conditions()
+        ! read global body parameters
+        implicit none
+        open(unit=111, file='inFlow.dat', status='old', action='read')
+        call found_keyword(111,'SolidBody')
+            read(111,*)    m_IBPenaltyalpha,m_alphaf
+            read(111,*)    m_NewmarkGamma,m_NewmarkBeta
+            read(111,*)    m_dampK,m_dampM
+            read(111,*)    m_dtolFEM,m_ntolFEM
+            read(111,*)    m_nFish,m_fishGroup,m_iForce2Body,m_isKB
+        close(111)
+    END SUBROUTINE
 
-        m_nFish = nFish
-        m_ntolLBM = ntolLBM
-        m_dtolLBM = dtolLBM
-        m_Pbeta = Pbeta
-        m_dt = dt
-        m_denIn = denIn
-        m_uuuIn = uuuIn
-        m_boundaryConditions(1:6) = boundaryConditions(1:6)
-
+    subroutine initialise_solid_bodies()
+        ! read body private parameters and files
+        implicit none
+        integer:: iFish,ifishGroup,fishNum(m_fishTyp+1),numX(m_fishTyp),numY(m_fishTyp),numZ(m_fishTyp)
+        character (LEN=40) :: FEmeshName(m_nFish), t_FEmeshName
+        integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)                           ! temporary variables
+        integer:: iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish)
+        real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St                               ! temporary variables
+        real(8):: denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish)
+        real(8):: t_freq,t_St,firstXYZ(1:3),deltaXYZ(1:3)
+        real(8):: t_XYZo(3),t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3) ! temporary variables
+        real(8):: XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish)
+        real(8):: AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish)
+        real(8):: Lspan,AR  ! parameters for allocate_solid_memory()
+        ! read fish parameters for each type
+        integer:: order1=0,order2=0,order3=0,lineX,lineX,lineX
+        fishNum(1)=0
+        open(unit=111, file='inFlow.dat', status='old', action='read')
+        call found_keyword(111,'bodyParameters')
+            do ifishGroup = 1,m_fishGroup
+                read(111,*)    fishNum(ifishGroup+1),numX(ifishGroup),numY(ifishGroup),numZ(ifishGroup)
+                read(111,*)    t_FEmeshName
+                read(111,*)    t_iBodyModel,t_iBodyType
+                read(111,*)    t_isMotionGiven(1:3)
+                read(111,*)    t_isMotionGiven(4:6)
+                read(111,*)    t_denR,t_psR
+                if(m_isKB==0)     read(111,*)    t_EmR,t_tcR
+                if(m_isKB==1)     read(111,*)    t_KB,t_KS
+                read(111,*)    t_freq,t_St
+                read(111,*)    firstXYZ(1:3)
+                read(111,*)    deltaXYZ(1:3)
+                read(111,*)    t_XYZAmpl(1:3)
+                read(111,*)    t_XYZPhi(1:3)
+                read(111,*)    t_AoAo(1:3)
+                read(111,*)    t_AoAAmpl(1:3)
+                read(111,*)    t_AoAPhi(1:3)
+                order1 = order1 + fishNum(ifishGroup  );
+                order2 = order2 + fishNum(ifishGroup+1);
+                ! read parameters for each fish
+                do iFish=order1,order2
+                    FEmeshName(iFish) = t_FEmeshName
+                    iBodyModel(iFish) = t_iBodyModel
+                    iBodyType (iFish) = t_iBodyType
+                    isMotionGiven(1:6,iFish)=t_isMotionGiven(1:6)
+                    denR(iFish)= t_denR
+                    psR(iFish) = t_psR
+                    if(m_isKB==0) then
+                        EmR(iFish) = t_EmR
+                        tcR(iFish) = t_tcR
+                    elseif(m_isKB==1) then
+                        KB(iFish)  = t_KB
+                        KS(iFish)  = t_KS
+                    endif
+                    freq(iFish) = t_freq
+                    St(iFish) = t_St
+                    XYZAmpl(1:3,iFish) = t_XYZAmpl(1:3)
+                    XYZPhi(1:3,iFish)  = t_XYZPhi(1:3)
+                    AoAo(1:3,iFish)    = t_AoAo(1:3)
+                    AoAAmpl(1:3,iFish) = t_AoAAmpl(1:3)
+                    AoAPhi(1:3,iFish)  = t_AoAPhi(1:3)
+                    ! calculate the initial location for each fish
+                    order3 = iFish - order1
+                    lineX  = mod(order3,numX(ifishGroup))
+                    lineY  = mod(order3,numX(ifishGroup)*numY(ifishGroup))
+                    lineZ  = mod(order3,numX(ifishGroup)*numY(ifishGroup)*numZ(ifishGroup))
+                    XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
+                    XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
+                    XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
+                enddo
+            enddo
+        close(111)
+        ! calculating other body gobal parameters
+        m_dt = flow%dt/flow%numsubstep
+        m_denIn = flow%denIn
+        m_uvwIn = flow%uvwIn
+        m_boundaryConditions(1:6) = blocks(1)%BndConds(1:6)
+        ! allocate bodies memory
         allocate(VBodies(m_nFish))
-
         do iFish = 1,m_nFish
             if (iBodyType(iFish).eq.-1) then
                 call SurfacetoBeam_write(FEmeshName(iFish))
             endif
             call VBodies(iFish)%rbm%Read_inFlow(FEmeshName(iFish),iBodyModel(iFish),iBodyType(iFish),isMotionGiven(1:6,iFish), &
                                                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
-                                                Freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
+                                                freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
                                                 AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
         enddo
-
-        CALL Read_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
-    end subroutine read_solid_file
+        ! read solid solver global parameters
+        call Read_SolidSolver_Params(m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf,m_dtolFEM,m_ntolFEM,m_iForce2Body,m_isKB)
+        ! allocate solid memory
+        call allocate_solid_memory(m_Asfac,m_Lchod,Lspan,AR,iBodyType(1:m_nFish))
+        ! initialise bodies
+        ! call Initialise_bodies(npsize,time,zDim,yDim,xDim,dh,g)
+    end subroutine initialise_solid_bodies
 
     subroutine allocate_solid_memory(Asfac,Lchod,Lspan,AR,iBodyType)
         integer, intent(in) :: iBodyType(m_nFish)
@@ -245,22 +317,21 @@ module SolidBody
         endif
     end subroutine Initialise_
 
-    subroutine Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,uMax,Lthck)
+    subroutine Initialise_Calculate_Solid_params(uMax,Lthck)
         implicit none
-        real(8),intent(in):: Aref,Eref,Fref,Lref,Pref,Tref,Uref
         real(8),intent(out):: Lthck,uMax
         integer:: iFish
         real(8):: nLthck(m_nFish)
-        m_Aref = Aref
-        m_Eref = Eref
-        m_Fref = Fref
-        m_Lref = Lref
-        m_Pref = Pref
-        m_Tref = Tref
-        m_Uref = Uref
+        m_Aref = flow%Aref
+        m_Eref = flow%Eref
+        m_Fref = flow%Fref
+        m_Lref = flow%Lref
+        m_Pref = flow%Pref
+        m_Tref = flow%Tref
+        m_Uref = flow%Uref
         uMax = 0.d0
         do iFish = 1,m_nFish
-            call VBodies(iFish)%rbm%calculate_angle_material(m_Lref, m_Uref, m_denIn, uMax, m_uuuIn, nLthck(iFish))
+            call VBodies(iFish)%rbm%calculate_angle_material(m_Lref, m_Uref, m_denIn, uMax, m_uvwIn, nLthck(iFish))
         enddo
         Lthck = maxval(nLthck)
     end subroutine Initialise_Calculate_Solid_params
@@ -398,7 +469,7 @@ module SolidBody
         integer :: i,s,cnt,i1,i2
         real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3), dirc(3)
         real(8) :: dh, left, len, dl, ls, area, beta, dirc_norm
-        beta = - m_Pbeta* 2.0d0*m_denIn
+        beta = - IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)
             i2 = this%rbm%ele(i,2)
@@ -437,7 +508,7 @@ module SolidBody
         integer :: Surfacetmpele(3,Surfacetmpnelmts)
         integer :: i,i1,i2,i3
         real(8) :: A(3),B(3),C(3),tmparea,beta
-        beta = - m_Pbeta* 2.0d0*m_denIn
+        beta = - IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,Surfacetmpnelmts
             i1 = Surfacetmpele(1,i)
             i2 = Surfacetmpele(2,i)

@@ -3,7 +3,7 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
-    integer :: nblock
+    integer :: nblock = 1
     type :: LBMBlock
         integer :: npsize
         integer :: ID,iCollidModel,offsetOutput
@@ -14,7 +14,7 @@ module FluidDomain
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
-        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),volumeForce(1:3)
+        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),volumeForce(3)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
         real(4) :: offsetMoveGrid(1:3)
     contains
@@ -29,14 +29,14 @@ module FluidDomain
         procedure :: read_continue => read_continue_
     end type LBMBlock
     type(LBMBlock), allocatable :: blocks(:)
+
     contains
 
-    SUBROUTINE initialise_blocks()
+    SUBROUTINE initialise_fuild_blocks()
         implicit none
         integer :: iblock
         call read_nblocks()
         ! creat blocks and read parameters
-        type(LBMBlock), allocatable :: blocks(:)
         open(unit=111, file='inFlow.dat', status='old', action='read')
         call found_keyword(111,'FluidDomain')
         do iblock = 1,nblock

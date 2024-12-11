@@ -14,34 +14,23 @@
     integer:: isubstep,iFish,x,y,z
     real(8):: Pbetatemp,CPUtime
     logical alive
-    !time_and_date
     integer,dimension(8) :: values0,values1,values_s,values_e
 
 
-    integer:: iBodyType(m_nFish)
-    real(8):: Asfac,Lchod,Lspan,AR
-
-    
-    call read_FlowCondition()
-    call initialise_blocks()
-
-    
+    call read_flow_conditions()
+    call initialise_fuild_blocks()
+    call read_body_conditions()
+    call initialise_solid_bodies()
+    call calculate_reference_params()
+    call write_params()    
 
 
-    call read_solid_file()
-    CALL allocate_solid_memory(Asfac,Lchod,Lspan,AR,iBodyType)
-
-
-
-
-
-    CALL allocate_fluid_memory()
-    CALL calculate_LB_params()
-    CALL write_params()
-    CALL calculate_MRTM_params()
-
-    call OMP_set_num_threads(npsize)
-    write(*,*)'npsize=', npsize
+    !call Initialise_Calculate_Solid_params()
+    !CALL allocate_fluid_memory()
+    !CALL calculate_LB_params()
+    !CALL calculate_MRTM_params()
+    !call OMP_set_num_threads(npsize)
+    !write(*,*)'npsize=', npsize
 
     if(isRelease==1)then
         write(*,*)'Release'

@@ -390,6 +390,7 @@
         CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
     ENDFUNCTION
 
+    ! found keyword in inflow.dat for next parameters read
     SUBROUTINE found_keyword(fileID,keyword)
         implicit none
         integer fileID
