@@ -12,13 +12,13 @@ PROGRAM main
     USE FluidDomain
     implicit none
     character(LEN=40):: filename
-    integer:: isubstep=0,step=0,iFish,x,y,z
-    real(8):: dt_solid, dt_fluid,get_cpu_time
+    integer:: isubstep=0,step=0
+    real(8):: dt_solid, dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
-    integer,dimension(8) :: time_begine1,time_begine2,time_end1,time_end2
+    real(8):: time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
-    call date_and_time(VALUES=time_begine1) ! begine time for the preparation before computing
+    call get_now_time(time_begine1) ! begine time for the preparation before computing
     filename = 'inflow.dat'
     call read_flow_conditions(filename)
     call read_solid_files(filename)
@@ -49,7 +49,7 @@ PROGRAM main
     call write_flow_blocks(time)
     call write_solid_field(time)
     call Write_solid_v_bodies(time)
-    call date_and_time(VALUES=time_end1)              ! end time for the preparation before computing
+    call get_now_time(time_end1)             ! end time for the preparation before computing
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================'
     !==================================================================================================
@@ -57,42 +57,57 @@ PROGRAM main
     dt_solid = flow%dt/flow%numsubstep       !time step of the solid
     write(*,*) 'Time loop beginning'
     do while(time/flow%Tref < flow%timeSimTotal)
-        call date_and_time(VALUES=time_begine1)
+        call get_now_time(time_begine1)
         time = time + dt_fluid
         step = step + 1
         write(*,'(A)') '========================================================'
-        write(*,'(A,I6,A,F15.10)')' step:',step,'    time/Tref:',time/flow%Tref
+        write(*,'(A,I6,A,F15.10)')' Steps:',step,'    Time/Tref:',time/flow%Tref
         write(*,'(A)')' ----------------------fluid solver----------------------'
         ! LBM solver
-        call date_and_time(VALUES=time_begine2)
-        CALL streaming_step()
-        call date_and_time(VALUES=time_end2)
+        call get_now_time(time_begine2)
+        CALL streaming_blocks()
+        call get_now_time(time_end2)
         write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
-        ! Set boundary conditions
-        CALL setBndConds()
-        CALL calculate_macro_quantities_blocks()
-        call date_and_time(VALUES=time_begine2)
-
-        !compute force exerted on fluids
+        ! Set fluid boundary conditions
+        call set_boundary_conditions_blocks()
+        call calculate_macro_quantities_blocks()
+        ! Compute volume force exerted on fluids
+        call get_now_time(time_begine2)
         CALL FSInteraction_force(dt_fluid,LBMblks(1)%dh,LBMblks(1)%xmin,LBMblks(1)%ymin,LBMblks(1)%zmin,LBMblks(1)%xDim,LBMblks(1)%yDim,LBMblks(1)%zDim,LBMblks(1)%uuu,LBMblks(1)%force)
-        !compute volume force exerted on fluids
-        call date_and_time(VALUES=time_end2)
-        write(*,*)'time for IBM step : ',get_cpu_time(time_end2)-get_cpu_time(time_begine2)
-
-        call date_and_time(VALUES=time_begine2)
-        CALL collision_step()
-        call date_and_time(VALUES=time_end2)
-        write(*,*)'time for collision_step:',get_cpu_time(time_end2)-get_cpu_time(time_begine2)
-        !******************************************************************************************
-        !solve solid
+        call get_now_time(time_end2)
+        write(*,*)'Time   for   IBM   step:', (time_end2 - time_begine2)
+        ! Fluid collision
+        call get_now_time(time_begine2)
+        call collision_blocks()
+        call get_now_time(time_end2)
+        write(*,*)'time for collision_step:', (time_end2 - time_begine2)
+        !IBM solver
         write(*,'(A)')' ----------------------solid solver----------------------'
-        call date_and_time(VALUES=time_begine2)
         do isubstep=1,flow%numsubstep
             call Solver(time,isubstep,dt_fluid,dt_solid)
         enddo !do isubstep=1,numsubstep
         write(*,'(A)')' --------------------------------------------------------'
-        call date_and_time(VALUES=time_end1)
-        write(*,*)'time for one step:',get_cpu_time(time_end1)-get_cpu_time(time_begine1)
+        call get_now_time(time_end1)
+        write(*,*)'time   for   one   step:', (time_end1 - time_begine1)
+        ! write data for continue computing
+        if(DABS(time/flow%Tref-flow%timeConDelta*NINT(time/flow%Tref/flow%timeConDelta)) <= 0.5*dt_fluid/flow%Tref)then
+            call write_continue_blocks(filename,step,time)
+        endif
+        ! write fluid and soild data
+        if((flow%timeWriteBegin .le. time/flow%Tref) .and. (time/flow%Tref .le. timeWriteEnd)) then
+            if(DABS(time/flow%Tref-flow%timeBodyDelta*NINT(time/flow%Tref/flow%timeBodyDelta)) <= 0.5*dt_fluid/flow%Tref)then
+                call write_solid_field(time)
+                call Write_solid_v_bodies(time)
+            endif
+            if(DABS(time/flow%Tref-flow%timeFlowDelta*NINT(time/flow%Tref/flow%timeFlowDelta)) <= 0.5*dt_fluid/flow%Tref)then
+                call write_flow_blocks(time)
+            endif
+        endif
+        ! write processing informations
+        !if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
+        !    call write_information()
+        !endif
     enddo
+    ! write validation informations
     call ComputeFieldStat()
 END PROGRAM main

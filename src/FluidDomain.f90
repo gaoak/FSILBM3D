@@ -21,15 +21,15 @@ module FluidDomain
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_
+        procedure :: read_continue => read_continue_
         procedure :: calculate_macro_quantities => calculate_macro_quantities_
         procedure :: collision => collision_
         procedure :: streaming => streaming_
-        procedure :: ComputeFieldStat => ComputeFieldStat_
+        procedure :: set_boundary_conditions => set_boundary_conditions_
+        procedure :: update_volumn_force => update_volumn_force_
         procedure :: write_flow => write_flow_
         procedure :: write_continue => write_continue_
-        procedure :: read_continue => read_continue_
-        procedure :: update_volumn_force => update_volumn_force_
-        procedure :: setBndCond => setBndCond_
+        procedure :: ComputeFieldStat => ComputeFieldStat_
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
 
@@ -91,6 +91,14 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
+    SUBROUTINE set_boundary_conditions_blocks()
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%set_boundary_conditions()
+        enddo
+    END SUBROUTINE
+
     SUBROUTINE read_continue_blocks(filename,step,time)
         implicit none
         character(LEN=40),intent(in):: filename
@@ -99,6 +107,17 @@ module FluidDomain
         integer:: iblock
         do iblock = 1,m_nblock
             call LBMblks(iblock)%read_continue(filename,step,time)
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE write_continue_blocks(filename,step,time)
+        implicit none
+        character(LEN=40),intent(in):: filename
+        integer,intent(out):: step
+        real(8),intent(out):: time
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%write_continue(filename,step,time)
         enddo
     END SUBROUTINE
 
@@ -111,7 +130,7 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE streaming_step()
+    SUBROUTINE streaming_blocks()
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock
@@ -119,7 +138,7 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE collision_step()
+    SUBROUTINE collision_blocks()
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock
@@ -353,20 +372,12 @@ module FluidDomain
     !    enddo
     !END SUBROUTINE
 
-    SUBROUTINE setBndConds()
-        implicit none
-        integer:: iblock
-        do iblock = 1,m_nblock
-            call LBMblks(iblock)%setBndCond()
-        enddo
-    END SUBROUTINE setBndConds
-
-    SUBROUTINE setBndCond_(this)
+    SUBROUTINE set_boundary_conditions_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
         ! set the boundary conditions of the block
         
-    END SUBROUTINE setBndCond_
+    END SUBROUTINE
 
     SUBROUTINE calculate_macro_quantities_(this)
         implicit none
@@ -385,7 +396,7 @@ module FluidDomain
         enddo
         enddo
         !$OMP END PARALLEL DO
-    END SUBROUTINE calculate_macro_quantities_
+    END SUBROUTINE
 
     SUBROUTINE update_volumn_force_(this,time)
         implicit none

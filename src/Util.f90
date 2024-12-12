@@ -131,12 +131,12 @@
     endsubroutine dumpstring
 
     ! get the time right now
-    SUBROUTINE get_cpu_time(now_time) 
+    SUBROUTINE get_now_time(now_time) 
         IMPLICIT NONE
-        real(8)::cpu_time
-        integer,dimension(8) :: now_time
-        call date_and_time(VALUES=now_time)
-        cpu_time = dble(now_time(6))*60.d0+dble(now_time(7))*1.d0+dble(now_time(8))*0.001d0
+        real(8)::now_time
+        integer,dimension(8) :: cpu_time
+        call date_and_time(VALUES=cpu_time)
+        now_time = cpu_time(6)*60.d0 + cpu_time(7)*1.d0 + cpu_time(8)*0.001d0
     END SUBROUTINE
 
     ! found keyword in inflow.dat for next parameters read
@@ -147,10 +147,10 @@
         character(len=50) :: readString
         readString = 'null'
         IOstatus = 0
-        call downcase(keyword)
+        call to_lowercase(keyword)
         do while(IOstatus.eq.0)
             read(fileID, *, IOSTAT=IOstatus) readString
-            call downcase(readString)
+            call to_lowercase(readString)
             call adjustl(readString)
             if (index(readString, keyword) .GT. 0) then
                 exit
@@ -161,6 +161,34 @@
             stop
         endif
     END SUBROUTINE
+
+    SUBROUTINE to_lowercase(string)
+        implicit none
+        character:: string
+        integer :: i
+        do i = 1, len_trim(string)
+            if (iachar(string(i:i)) .ge. iachar('A') .and. iachar(string(i:i)).le. iachar('Z')) then
+                string(i:i) = achar(iachar(string(i:i)) + iachar('a') - iachar('A'))
+            end if
+        end do
+    END SUBROUTINE
+
+    subroutine downcase(ifile, buffer)
+        implicit none
+        character(LEN=256):: buffer
+        integer:: ifile, IOstatus
+        do while(.true.)
+            read(ifile, *, IOSTAT=IOstatus) buffer
+            if (IOstatus.ne.0) then
+                write(*, *) 'end of file encounter in readNextData', ifile
+                stop
+            endif
+            call adjustl(buffer)
+            if(buffer(1:1).ne.'#') then
+                exit
+            endif
+        enddo
+    end subroutine downcase
 
     subroutine readNextData(ifile, buffer)
         implicit none
