@@ -1,173 +1,3 @@
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    write files' header
-!    copyright@ RuNanHua
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_information_titles()
-    implicit none
-    integer:: i,iFish
-    integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName,Nodename
-
-    do iFish=1,nFish
-
-        write(fileName,'(I4)') iFish
-        fileName = adjustr(fileName)
-        do  i=1,nameLen
-             if(fileName(i:i)==' ')fileName(i:i)='0'
-        enddo
-
-        if    (iForce2Body==1)then   !Same force as flow
-        open(111,file='./DatInfo/ForceDirect_'//trim(filename)//'.plt')
-        write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
-        close(111)
-        elseif(iForce2Body==2)then   !stress force
-        open(111,file='./DatInfo/ForceStress_'//trim(filename)//'.plt')
-        write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
-        close(111)
-        endif
-
-        !===============================================================================
-        open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-        !===============================================================================
-        open(111,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyNodeCenter_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "u"  "v"  "ax"  "ay" '
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyMean_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyAngular_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
-        close(111)
-
-        open(111,file='./DatInfo/Power_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t" "Ptot" "Paero" "Piner" "Pax" "Pay" "Paz" "Pix" "Piy" "Piz"'
-        close(111)
-
-        open(111,file='./DatInfo/Area_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "Area"  '
-        close(111)
-
-        open(111,file='./DatInfo/Energy_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t","Es","Eb","Ep","Ek","Ew","Et"'
-        close(111)
-    enddo
-
-    if(isBodyOutput==1)then
-        do iFish=1,nFish
-            write(fileName,'(I4)') iFish
-            fileName = adjustr(fileName)
-            do  i=1,nameLen
-                if(fileName(i:i)==' ')fileName(i:i)='0'
-            enddo
-            do  i=1,numSampBody
-                write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-                open(111,file='./DatInfo/SampBodyNode_'//trim(fileName)//'_'//trim(Nodename)//'.plt')
-                write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-                close(111)
-            enddo
-        enddo !iFish
-    endif
-
-    if(isFluidOutput==1)then
-    do  i=1,numSampFlow
-        write(Nodename,'(I4.4)') i
-        open(111,file='./DatInfo/SampFlowPint_'//trim(Nodename)//'.plt')
-        write(111,*)'variables= "t"  "p" "u"  "v"  "w" '
-        close(111)
-    enddo
-    endif
-    END SUBROUTINE
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!     write data
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE wrtInfo()
-    USE SolidBody
-    implicit none
-    integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend
-    real(8):: weightm,velocity(1:3),Pressure
-    integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName
-
-    call Write_solid_Data(111,time,timeOutInfo,Asfac)
-
-    if(isBodyOutput==1)then
-        call Write_SampBodyNode(111,time,numSampBody,SampBodyNode)
-    endif
-
-    if(isFluidOutput==1)then
-    do  i=1,numSampFlow
-        x=minloc(dabs(SampFlowPint(i,1)-xGrid(1:xDim)),1)
-        if(SampFlowPint(i,1)-xGrid(x)>0.0d0)then
-                xbgn=x; xend=x+1
-        else
-                xbgn=x-1;xend=x
-        endif
-        if(xend.eq.xDim+1) then
-            xbgn = xDim - 1
-            xend = xDim
-        else if(xbgn.eq.0) then
-            xbgn = 1
-            xend = 2
-        endif
-        y=minloc(dabs(SampFlowPint(i,2)-yGrid(1:yDim)),1)
-        if(SampFlowPint(i,2)-yGrid(y)>0.0d0)then
-                ybgn=y; yend=y+1
-        else
-                ybgn=y-1;yend=y
-        endif
-        if(yend.eq.yDim+1) then
-            ybgn = yDim - 1
-            yend = yDim
-        else if(ybgn.eq.0) then
-            ybgn = 1
-            yend = 2
-        endif
-        z=minloc(dabs(SampFlowPint(i,3)-zGrid(1:zDim)),1)
-        if(SampFlowPint(i,3)-zGrid(z)>0.0d0)then
-                zbgn=z; zend=z+1
-        else
-                zbgn=z-1;zend=z
-        endif
-        if(zend.eq.zDim+1) then
-            zbgn = zDim - 1
-            zend = zDim
-        else if(zbgn.eq.0) then
-            zbgn = 1
-            zend = 2
-        endif
-
-        velocity(1:3)=0.0d0
-        Pressure=0.0d0
-
-        do    x=xbgn,xend
-        do    y=ybgn,yend
-        do    z=zbgn,zend
-            weightm=(dx(x)-dabs(xGrid(x)-SampFlowPint(i,1)))*(dy(y)-dabs(yGrid(y)-SampFlowPint(i,2)))*(dz(z)-dabs(zGrid(z)-SampFlowPint(i,3)))
-            velocity(1:3)=velocity(1:3)+uuu(z,y,x,1:3)*weightm/(dx(x)*dy(y)*dz(z))
-            Pressure=Pressure+prs(z,y,x)*weightm/(dx(x)*dy(y)*dz(z))
-        enddo
-        enddo
-        enddo
-
-        write(fileName,'(I4.4)') i
-        open(111,file='./DatInfo/SampFlowPint'//trim(fileName)//'.plt',position='append')
-        write(111,'(5E20.10)') time/Tref,  Pressure/(0.5*denIn*Uref**2), velocity(1:3)/Uref
-        close(111)
-    enddo
-    endif
-    END SUBROUTINE
-
     subroutine cptArea(areaElem,nND,nEL,ele,xyzful)
     implicit none
     integer:: nND,nEL,ele(nEL,5)
@@ -312,17 +142,21 @@
     ! found keyword in inflow.dat for next parameters read
     SUBROUTINE found_keyword(fileID,keyword)
         implicit none
-        integer fileID
+        integer:: fileID, IOstatus
         character :: keyword
         character(len=50) :: readString
         readString = 'null'
-        do while(.not.EOF(fileID))
-            read(fileID, *) readString
-            if (index(LOWCASE(readString), LOWCASE(keyword)) .GT. 0) then
+        IOstatus = 0
+        call downcase(keyword)
+        do while(IOstatus.eq.0)
+            read(fileID, *, IOSTAT=IOstatus) readString
+            call downcase(readString)
+            call adjustl(readString)
+            if (index(readString, keyword) .GT. 0) then
                 exit
             endif
         enddo
-        if (index(LOWCASE(readString), LOWCASE(keyword)) .EQ. 0) then
+        if (index(readString, keyword) .EQ. 0) then
             write(*,*) 'the parameters in inflow.dat do not exist.'
             stop
         endif
@@ -338,7 +172,7 @@
                 write(*, *) 'end of file encounter in readNextData', ifile
                 stop
             endif
-            adjustl(buffer)
+            call adjustl(buffer)
             if(buffer(1:1).ne.'#') then
                 exit
             endif
@@ -355,7 +189,7 @@
                 write(*, *) 'end of file encounter in readequal', ifile
                 stop
             endif
-            adjustl(buffer)
+            call adjustl(buffer)
             if(buffer(1:1).eq.'=') then
                 exit
             endif
@@ -364,8 +198,11 @@
 
     SUBROUTINE check_is_continue(filename,step,time,isContinue)
         implicit none
-        integer:: isContinue
         character(LEN=40),intent(in):: filename
+        integer,intent(out):: step
+        real(8),intent(out):: time
+        integer:: isContinue
+        logical:: alive
         inquire(file=filename, exist=alive)
         if (isContinue==1 .and. alive) then
             write(*,*)  '=============================================='

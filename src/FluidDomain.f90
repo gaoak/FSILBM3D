@@ -97,7 +97,6 @@ module FluidDomain
 
     SUBROUTINE update_volumn_force_blocks(time)
         implicit none
-        character(LEN=40),intent(in):: filename
         real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblock
@@ -109,15 +108,16 @@ module FluidDomain
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock
-            LBMblks(iblock)%calculate_macro_quantities()
+            call LBMblks(iblock)%calculate_macro_quantities()
         enddo
     END SUBROUTINE
 
     SUBROUTINE write_flow_blocks(time)
         implicit none
+        real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblock
-            LBMblks(iblock)%write_flow(time)
+            call LBMblks(iblock)%write_flow(time)
         enddo
     END SUBROUTINE
 
