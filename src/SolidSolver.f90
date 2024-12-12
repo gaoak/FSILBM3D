@@ -6,7 +6,7 @@ module SolidSolver
     real(8):: m_dtolFEM,m_pi
     integer:: m_ntolFEM,m_iForce2Body,m_iKB
     real(8):: m_g(3)
-    public :: BeamSolver,Read_SolidSolver_Params
+    public :: BeamSolver,Set_SolidSolver_Params
     type :: BeamSolver
         character (LEN=40):: FEmeshName
         integer:: iBodyModel,iBodyType
@@ -31,7 +31,7 @@ module SolidSolver
         real(8), allocatable:: triad_n1(:,:,:),triad_n2(:,:,:),triad_n3(:,:,:)
         real(8):: FishInfo(3)
     contains
-        procedure :: Read_inFlow => Read_inFlow_
+        procedure :: SetSolver => SetSolver_
         procedure :: Allocate_solid => Allocate_solid_
         procedure :: Initialise => Initialise_
         procedure :: calculate_angle_material => calculate_angle_material_
@@ -45,7 +45,7 @@ module SolidSolver
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine Read_inFlow_(this,FEmeshName_,iBodyModel_,iBodyType_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
+    Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,iBodyType_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
                             Freq_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
@@ -74,12 +74,12 @@ module SolidSolver
         this%AoAo(1:3)   =AoAo_(1:3)
         this%AoAAmpl(1:3)=AoAAmpl_(1:3)
         this%AoAPhi(1:3) =AoAPhi_(1:3)
-    ENDSUBROUTINE Read_inFlow_
-    Subroutine Read_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
+    ENDSUBROUTINE SetSolver_
+    Subroutine Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iKB)
         implicit none
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf
         real(8),intent(in):: dtolFEM
-        integer,intent(in):: ntolFEM,iForce2Body,iKB
+        integer,intent(in):: ntolFEM,iKB
         m_dampK = dampK
         m_dampM = dampM
         m_NewmarkGamma = NewmarkGamma
@@ -88,9 +88,8 @@ module SolidSolver
         m_dtolFEM = dtolFEM
         m_ntolFEM = ntolFEM
         m_pi = 3.141592653589793d0
-        m_iForce2Body = iForce2Body
         m_iKB = iKB
-    ENDSUBROUTINE Read_SolidSolver_Params
+    ENDSUBROUTINE Set_SolidSolver_Params
     SUBROUTINE Allocate_solid_(this,nAsfac,nLchod)
         implicit none
         class(BeamSolver), intent(inout) :: this

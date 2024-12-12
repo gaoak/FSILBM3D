@@ -1,97 +1,19 @@
 module SolidBody
+    use ConstParams
     use SolidSolver
     implicit none
     private
-    ! interface
-    !     subroutine initumap(np) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: np
-    !         ! make a clean map for each and all threads
-    !     end subroutine initumap
-
-    !     subroutine thread_adduindex(p, ind) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: p
-    !         integer(8):: ind
-    !         ! add an index for thread p
-    !     end subroutine thread_adduindex
-
-    !     subroutine setumap(ind, val) bind (c)
-    !         use iso_c_binding
-    !         integer(8):: ind
-    !         real(8):: val(3)
-    !         ! set velocity for index ind
-    !     end subroutine setumap
-
-    !     subroutine addumap(ind, val) bind (c)
-    !         use iso_c_binding
-    !         integer(8):: ind
-    !         real(8):: val(3)
-    !         ! add val to velocity at index ind
-    !     end subroutine addumap
-
-    !     subroutine getumap(ind, val) bind (c)
-    !         use iso_c_binding
-    !         integer(8):: ind
-    !         real(8):: val(3)
-    !         ! get velocity of index ind
-    !     end subroutine getumap
-
-    !     subroutine mergeumap() bind (c)
-    !         use iso_c_binding
-    !         ! merge all thread indexes to root thread
-    !     end subroutine mergeumap
-
-    !     subroutine allocateuarray() bind (c)
-    !         use iso_c_binding
-    !         ! allocate space for velocity values
-    !     end subroutine allocateuarray
-
-    !     subroutine findindex(index,i,j,k) bind (c)
-    !         use iso_c_binding
-    !         IMPLICIT NONE
-    !         integer(4):: i,j,k
-    !         integer(8):: index
-    !     end subroutine
-
-    !     subroutine findijk(index,i,j,k) bind (c)
-    !         use iso_c_binding
-    !         IMPLICIT NONE
-    !         integer(4):: i,j,k
-    !         integer(8):: index
-    !     end subroutine
-
-    !     subroutine inititerator(np, ndata) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: np, ndata(np)
-    !     end subroutine inititerator
-
-    !     subroutine getiterator(p, index) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: p
-    !         integer(8):: index
-    !     end subroutine getiterator
-
-    !     subroutine nextiterator(p) bind (c)
-    !         use iso_c_binding
-    !         integer(4):: p
-    !     end subroutine nextiterator
-
-    !     subroutine printumap() bind (c)
-    !         use iso_c_binding
-    !         ! print velocity map for examination
-    !     end subroutine printumap
-    ! end interface
     ! Immersed boundary method parameters
-    integer:: m_nthreads,m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
-    real(8):: m_dtolLBM, m_Pbeta, m_dt, m_dh, m_denIn, m_uuuIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
+    public :: m_nFish ! use for calculating reference values in flow condition
+    integer:: m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
+    real(8):: m_dtolLBM, m_IBPenaltyBeta, m_dt, m_dh, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
-    public :: VBodies,read_solid_file,allocate_solid_memory,Initialise_bodies,Write_solid_v_bodies,FSInteraction_force, &
-              Initialise_Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check,Write_solid_Data,Write_SampBodyNode
+    public :: VBodies,read_solid_files,allocate_solid_memory,Initialise_solid_bodies,Write_solid_v_bodies,FSInteraction_force, &
+              Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check,Write_solid_Data,Write_SampBodyNode
     type :: VirtualBody
         type(BeamSolver):: rbm
         !!!virtual infomation
@@ -113,8 +35,9 @@ module SolidBody
         integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
         real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
-        integer,allocatable :: vtor(:)!of size fake_npts
+        integer,allocatable :: vtor(:)! of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
+        
     contains
         procedure :: Initialise => Initialise_
         procedure :: PlateBuild => PlateBuild_
@@ -132,47 +55,192 @@ module SolidBody
         procedure :: vtor_f => vtor_
     end type VirtualBody
     type(VirtualBody), allocatable :: VBodies(:)
-  contains
-    subroutine read_solid_file(nFish,FEmeshName,iBodyModel,iBodyType,isMotionGiven,denR,KB,KS,EmR,psR,tcR,St, &
-                               Freq,XYZo,XYZAmpl,XYZPhi,AoAo,AoAAmpl,AoAPhi, &
-                               ntolLBM,dtolLBM,Pbeta,dt,denIn,uuuIn,boundaryConditions, &
-                               dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
-        integer,intent(in):: nFish
-        character (LEN=40),intent(inout):: FEmeshName(nFish)
-        integer,intent(in):: iBodyModel(nFish),iBodyType(nFish),isMotionGiven(6,nFish)
-        real(8),intent(in):: denR(nFish),KB(nFish),KS(nFish),EmR(nFish),psR(nFish),tcR(nFish),St(nFish)
-        real(8),intent(in):: Freq(nFish)
-        real(8),intent(in):: XYZo(3,nFish),XYZAmpl(3,nFish),XYZPhi(3,nFish)
-        real(8),intent(in):: AoAo(3,nFish),AoAAmpl(3,nFish),AoAPhi(3,nFish)
-        integer,intent(in):: ntolLBM,boundaryConditions(6)
-        real(8),intent(in):: dtolLBM,Pbeta,dt,denIn,uuuIn(3)
-        real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM
-        integer,intent(in):: ntolFEM,iForce2Body,iKB
-        integer:: iFish
 
-        m_nFish = nFish
-        m_ntolLBM = ntolLBM
-        m_dtolLBM = dtolLBM
-        m_Pbeta = Pbeta
-        m_dt = dt
-        m_denIn = denIn
-        m_uuuIn = uuuIn
-        m_boundaryConditions(1:6) = boundaryConditions(1:6)
+    contains
 
+    SUBROUTINE read_solid_files(filename)
+        ! read global body parameters
+        implicit none
+        character(LEN=40),intent(in):: filename
+        character(LEN=256):: buffer
+        real(8):: IBPenaltyalpha,alphaf,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
+        integer:: nfishGroup,isKB,ntolFEM
+        integer:: iFish,ifishGroup,numX,numY,numZ
+        character(LEN=40) :: t_FEmeshName
+        integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
+        real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
+        real(8):: t_freq,firstXYZ(1:3),deltaXYZ(1:3)
+        real(8):: t_XYZo(3),t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
+        real(8):: Lspan,AR  ! parameters for allocate_solid_memory()
+        integer:: order1=0,order2=0,order3=0,lineX,lineY,lineZ
+        character(LEN=40),allocatable:: FEmeshName(:)
+        integer,allocatable:: fishNum(:)
+        integer,allocatable:: iBodyModel(:),iBodyType(:),isMotionGiven(:,:)
+        real(8),allocatable:: denR(:),psR(:),EmR(:),tcR(:),KB(:),KS(:)
+        real(8),allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
+        real(8),allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
+        ! read body parameters from inflow file
+        open(unit=111, file=filename, status='old', action='read')
+        call found_keyword(111,'SolidBody')
+        call readNextData(111, buffer)
+        read(buffer,*)    IBPenaltyalpha,alphaf
+        call readNextData(111, buffer)
+        read(buffer,*)    NewmarkGamma,NewmarkBeta
+        call readNextData(111, buffer)
+        read(buffer,*)    dampK,dampM
+        call readNextData(111, buffer)
+        read(buffer,*)    dtolFEM,ntolFEM
+        call readNextData(111, buffer)
+        read(buffer,*)    m_nFish,nfishGroup,isKB
+        m_IBPenaltyBeta = - IBPenaltyalpha* 2.0d0*m_denIn
+        ! set solid solver global parameters
+        call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
+        allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish),denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish),XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish),AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
+        ! read fish parameters for each type
+        fishNum(1)=0
+        do ifishGroup = 1,nfishGroup
+            call readNextData(111, buffer)
+            read(buffer,*)    fishNum(ifishGroup+1),numX,numY,numZ
+            call readNextData(111, buffer)
+            read(buffer,*)    t_FEmeshName
+            call readNextData(111, buffer)
+            read(buffer,*)    t_iBodyModel,t_iBodyType
+            call readNextData(111, buffer)
+            read(buffer,*)    t_isMotionGiven(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_isMotionGiven(4:6)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_denR,t_psR
+            call readNextData(111, buffer)
+            if(isKB==0) then
+                read(buffer,*)    t_EmR,t_tcR
+            else
+                read(buffer,*)    t_KB,t_KS
+            endif
+            call readNextData(111, buffer)
+            read(buffer,*)    t_freq,t_St
+            call readNextData(111, buffer)
+            read(buffer,*)    firstXYZ(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    deltaXYZ(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_XYZAmpl(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_XYZPhi(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_AoAo(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_AoAAmpl(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_AoAPhi(1:3)
+            call readequal(111)
+            order1 = order1 + fishNum(ifishGroup  );
+            order2 = order2 + fishNum(ifishGroup+1);
+            ! read parameters for each fish
+            do iFish=order1,order2
+                FEmeshName(iFish) = t_FEmeshName
+                iBodyModel(iFish) = t_iBodyModel
+                iBodyType (iFish) = t_iBodyType
+                isMotionGiven(1:6,iFish)=t_isMotionGiven(1:6)
+                denR(iFish)= t_denR
+                psR(iFish) = t_psR
+                if(isKB==0) then
+                    EmR(iFish) = t_EmR
+                    tcR(iFish) = t_tcR
+                elseif(isKB==1) then
+                    KB(iFish)  = t_KB
+                    KS(iFish)  = t_KS
+                endif
+                freq(iFish) = t_freq
+                St(iFish) = t_St
+                XYZAmpl(1:3,iFish) = t_XYZAmpl(1:3)
+                XYZPhi(1:3,iFish)  = t_XYZPhi(1:3)
+                AoAo(1:3,iFish)    = t_AoAo(1:3)
+                AoAAmpl(1:3,iFish) = t_AoAAmpl(1:3)
+                AoAPhi(1:3,iFish)  = t_AoAPhi(1:3)
+                ! calculate the initial location for each fish
+                order3 = iFish - order1
+                lineX  = mod(order3,numX)
+                lineY  = (order3 - lineX)/numX
+                lineZ  = (order3 - mod(order3,numX*numY))/numX*numY
+                XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
+                XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
+                XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
+            enddo
+        enddo
+        close(111)
+        ! allocate bodies memory
         allocate(VBodies(m_nFish))
-
         do iFish = 1,m_nFish
+            VBodies(iFish)%v_type = iBodyType(iFish)
             if (iBodyType(iFish).eq.-1) then
                 call SurfacetoBeam_write(FEmeshName(iFish))
             endif
-            call VBodies(iFish)%rbm%Read_inFlow(FEmeshName(iFish),iBodyModel(iFish),iBodyType(iFish),isMotionGiven(1:6,iFish), &
-                                                denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
-                                                Freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
-                                                AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
+            call VBodies(iFish)%rbm%SetSolver(FEmeshName(iFish),&
+                iBodyModel(iFish),iBodyType(iFish),isMotionGiven(1:6,iFish), &
+                denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
+                freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
+                AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
         enddo
+    end subroutine read_solid_files
 
-        CALL Read_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
-    end subroutine read_solid_file
+
+    SUBROUTINE calculate_reference_params(flow)
+        USE ConstParams
+        USE FlowCondition, only: FlowCondType
+        implicit none
+        type(FlowCondType),intent(inout):: flow
+        integer:: iFish
+        real(8):: nUref(1:m_nFish)
+        ! reference length
+        if(m_nFish.eq.0) then
+            flow%Lref = 1.d0
+        else
+            flow%Lref  = flow%Lchod
+        endif
+        ! reference velocity
+        if(flow%UrefType==0) then
+            flow%Uref = dabs(flow%uvwIn(1))
+        elseif(flow%UrefType==1) then
+            flow%Uref = dabs(flow%uvwIn(2))
+        elseif(flow%UrefType==2) then
+            flow%Uref = dabs(flow%uvwIn(3))
+        elseif(flow%UrefType==3) then
+            flow%Uref = dsqrt(flow%uvwIn(1)**2 + flow%uvwIn(2)**2 + flow%uvwIn(3)**2)
+        !elseif(flow%UrefType==4) then
+        !    Uref = dabs(VelocityAmp)  !Velocity Amplitude
+        elseif(flow%UrefType==5) then
+            flow%Uref = flow%Lref * MAXVAL(VBodies(:)%rbm%Freq)
+        elseif(flow%UrefType==6) then
+            do iFish=1,m_nFish
+            nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))
+            enddo
+            flow%Uref = MAXVAL(nUref(:))
+        elseif(flow%UrefType==7) then
+            do iFish=1,m_nFish
+            nUref(iFish)=2.d0*pi*VBodies(iFish)%rbm%Freq*MAXVAL(dabs(VBodies(iFish)%rbm%xyzAmpl(1:3)))*2.D0 !Park 2017 pof
+            enddo
+            flow%Uref = MAXVAL(nUref(1:m_nFish))
+        else
+            write(*,*) 'use input reference velocity'
+        endif
+        ! reference time
+        if(flow%TrefType==0) then
+            flow%Tref = flow%Lref / flow%Uref
+        elseif(flow%TrefType==1) then
+            flow%Tref = 1 / maxval(VBodies(:)%rbm%Freq)
+        else
+            write(*,*) 'use input reference time'
+        endif
+        ! reference acceleration, force, energy, power
+        flow%Aref = flow%Uref/flow%Tref
+        flow%Fref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac
+        flow%Eref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac*flow%Lref
+        flow%Pref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac*flow%Uref
+        ! fluid viscosity
+        flow%nu =  flow%Uref*flow%Lref/flow%Re
+        flow%Mu =  flow%nu*flow%denIn
+    END SUBROUTINE
 
     subroutine allocate_solid_memory(Asfac,Lchod,Lspan,AR)
         real(8),intent(out):: Asfac,Lchod,Lspan,AR
@@ -206,12 +274,18 @@ module SolidBody
         endif
     end subroutine allocate_solid_memory
 
-    subroutine Initialise_bodies(npsize,time,zDim,yDim,xDim,dh,g)
+    subroutine set_solidbody_parameters(dt,dh,denIn,uvwIn,BndConds,zDim,yDim,xDim,&
+        Aref,Eref,Fref,Lref,Pref,Tref,Uref)
         implicit none
-        real(8),intent(in):: time,dh,g(3)
+        real(8),intent(in):: dt,dh,denIn,uvwIn,Aref,Eref,Fref,Lref,Pref,Tref,Uref
+        integer,intent(in):: BndConds(1:6)
         integer,intent(in):: zDim,yDim,xDim
-        integer :: iFish,npsize
-        m_nthreads = npsize
+        real(8):: Lthck,uMax
+        ! set gobal parameters
+        m_dt = dt
+        m_denIn = denIn
+        m_uvwIn = uvwIn
+        m_boundaryConditions(1:6) = BndConds(1:6)
         m_zDim = zDim
         m_yDim = yDim
         m_xDim = xDim
@@ -220,11 +294,25 @@ module SolidBody
             stop
         endif
         m_dh = dh
+        m_Aref = Aref
+        m_Eref = Eref
+        m_Fref = Fref
+        m_Lref = Lref
+        m_Pref = Pref
+        m_Tref = Tref
+        m_Uref = Uref
+        call Calculate_Solid_params(uMax,Lthck)
+    end subroutine set_solidbody_parameters
+
+    subroutine Initialise_solid_bodies(time,g)
+        implicit none
+        real(8),intent(in):: time,g(3)
+        integer :: iFish
         do iFish = 1,m_nFish
             call VBodies(iFish)%rbm%Initialise(time,g)
             call VBodies(iFish)%Initialise()
         enddo
-    end subroutine Initialise_bodies
+    end subroutine Initialise_solid_bodies
 
     subroutine Initialise_(this)
         ! read beam central line file and allocate memory
@@ -240,25 +328,17 @@ module SolidBody
         endif
     end subroutine Initialise_
 
-    subroutine Initialise_Calculate_Solid_params(Aref,Eref,Fref,Lref,Pref,Tref,Uref,uMax,Lthck)
+    subroutine Calculate_Solid_params(uMax,Lthck)
         implicit none
-        real(8),intent(in):: Aref,Eref,Fref,Lref,Pref,Tref,Uref
         real(8),intent(out):: Lthck,uMax
         integer:: iFish
         real(8):: nLthck(m_nFish)
-        m_Aref = Aref
-        m_Eref = Eref
-        m_Fref = Fref
-        m_Lref = Lref
-        m_Pref = Pref
-        m_Tref = Tref
-        m_Uref = Uref
         uMax = 0.d0
         do iFish = 1,m_nFish
-            call VBodies(iFish)%rbm%calculate_angle_material(m_Lref, m_Uref, m_denIn, uMax, m_uuuIn, nLthck(iFish))
+            call VBodies(iFish)%rbm%calculate_angle_material(m_Lref, m_Uref, m_denIn, uMax, m_uvwIn, nLthck(iFish))
         enddo
         Lthck = maxval(nLthck)
-    end subroutine Initialise_Calculate_Solid_params
+    end subroutine Calculate_Solid_params
 
     SUBROUTINE Solver(time,isubstep,deltat,subdeltat)
         implicit none
@@ -392,8 +472,7 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         integer :: i,s,cnt,i1,i2
         real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3), dirc(3)
-        real(8) :: dh, left, len, dl, ls, area, beta, dirc_norm
-        beta = - m_Pbeta* 2.0d0*m_denIn
+        real(8) :: dh, left, len, dl, ls, area, dirc_norm
         do i = 1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)
             i2 = this%rbm%ele(i,2)
@@ -404,7 +483,7 @@ module SolidBody
             dl = len / dble(this%rbm%r_Nspan(i))
             tmpdx = this%rbm%xyzful(i2,1:3) - this%rbm%xyzful(i1,1:3)
             dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3))
-            area = dl * dh * beta
+            area = dl * dh * m_IBPenaltyBeta
             dirc(1:3) = this%rbm%r_dirc(i1,1:3) + this%rbm%r_dirc(i2,1:3)
             dirc_norm = dsqrt(sum(dirc**2))
             if (dirc_norm .gt. 1e-10) then
@@ -431,8 +510,7 @@ module SolidBody
         real(8) :: Surfacetmpxyz(3,Surfacetmpnpts)
         integer :: Surfacetmpele(3,Surfacetmpnelmts)
         integer :: i,i1,i2,i3
-        real(8) :: A(3),B(3),C(3),tmparea,beta
-        beta = - m_Pbeta* 2.0d0*m_denIn
+        real(8) :: A(3),B(3),C(3),tmparea
         do i = 1,Surfacetmpnelmts
             i1 = Surfacetmpele(1,i)
             i2 = Surfacetmpele(2,i)
@@ -442,7 +520,7 @@ module SolidBody
             C = Surfacetmpxyz(1:3,i3)
             call cpt_incenter(this%v_Exyz(1:3,i))
             call cpt_area(tmparea)
-            this%v_Ea(i) = tmparea*beta
+            this%v_Ea(i) = tmparea*m_IBPenaltyBeta
         enddo
         allocate(this%v_Exyz0(3,this%v_nelmts))
         this%v_Exyz0 = this%v_Exyz
@@ -608,7 +686,6 @@ module SolidBody
             endif
         ENDFUNCTION Phi
         SUBROUTINE trimedindex(i_, xDim_, ix_, boundaryConditions_)
-            USE BoundCondParams
             implicit none
             integer, intent(in):: boundaryConditions_(1:2)
             integer, intent(in):: i_, xDim_
@@ -617,18 +694,18 @@ module SolidBody
             do k_=-1,2
                 ix_(k_) = i_ + k_
                 if (ix_(k_)<1) then
-                    if(boundaryConditions_(1).eq.Periodic) then
+                    if(boundaryConditions_(1).eq.BCPeriodic) then
                         ix_(k_) = ix_(k_) + xDim_
-                    else if((boundaryConditions_(1).eq.SYMMETRIC .or. boundaryConditions_(1).eq.wall) .and. ix_(k_).eq.0) then
+                    else if((boundaryConditions_(1).eq.BCSYMMETRIC .or. boundaryConditions_(1).eq.BCwall) .and. ix_(k_).eq.0) then
                         ix_(k_) = 2
                     else
                         write(*,*) 'index out of xmin bound', ix_(k_)
                         stop
                     endif
                 else if(ix_(k_)>xDim_) then
-                    if(boundaryConditions_(2).eq.Periodic) then
+                    if(boundaryConditions_(2).eq.BCPeriodic) then
                         ix_(k_) = ix_(k_) - xDim_
-                    else if((boundaryConditions_(2).eq.SYMMETRIC .or. boundaryConditions_(2).eq.wall) .and. ix_(k_).eq.xDim_+1) then
+                    else if((boundaryConditions_(2).eq.BCSYMMETRIC .or. boundaryConditions_(2).eq.BCwall) .and. ix_(k_).eq.xDim_+1) then
                         ix_(k_) = xDim_ - 1
                     else
                         write(*,*) 'index out of xmax bound', ix_(k_)
