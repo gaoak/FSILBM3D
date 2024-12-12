@@ -281,13 +281,13 @@
     end subroutine
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   write  string to unit=idfile  in binary format
-!    copyright@ RuNanHua
+!   copyright@ RuNanHua
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine dumpstring(instring,idfile)
     implicit none
     character(40) instring
     integer:: nascii,ii,len,idfile
-!
+
     len=LEN_TRIM(instring)
 
     do    ii=1,len
@@ -296,16 +296,18 @@
     enddo
 
     write(idfile) 0
-!
+
     return
     endsubroutine dumpstring
 
-    FUNCTION CPUtime(values)
+    ! get the time right now
+    SUBROUTINE get_cpu_time(now_time) 
         IMPLICIT NONE
-        real(8)::CPUtime
-        integer,dimension(8) :: values
-        CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
-    ENDFUNCTION
+        real(8)::cpu_time
+        integer,dimension(8) :: now_time
+        call date_and_time(VALUES=now_time)
+        cpu_time = dble(now_time(6))*60.d0+dble(now_time(7))*1.d0+dble(now_time(8))*0.001d0
+    END SUBROUTINE
 
     ! found keyword in inflow.dat for next parameters read
     SUBROUTINE found_keyword(fileID,keyword)
@@ -365,7 +367,7 @@
         integer:: isContinue
         character(LEN=40),intent(in):: filename
         inquire(file=filename, exist=alive)
-        if (isContinue==1 .and. alive)then
+        if (isContinue==1 .and. alive) then
             write(*,*)  '=============================================='
             write(*,*)  '==============Continue computing=============='
             write(*,*)  '=============================================='

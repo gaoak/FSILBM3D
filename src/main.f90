@@ -12,11 +12,11 @@ USE SolidBody
 USE FluidDomain
 implicit none
 logical alive
-real(8):: CPUtime,time=0.0d0,g(3)=[0,0,0]
 integer:: isubstep=0,step=0,iFish,x,y,z
-integer,dimension(8) :: values0,values1,values_s,values_e
+real(8):: time=0.0d0,g(3)=[0,0,0],time_begine1,time_begine2,time_end1,time_end2
 !==================================================================================================
 ! Read all parameters from input file
+call get_cpu_time(time_begine1)          ! begine time for the preparation before computing
 call read_flow_conditions('inflow.dat')
 call read_solid_files('inflow.dat')
 call read_fuild_blocks('inflow.dat')
@@ -43,30 +43,30 @@ call write_information_titles()
 call update_volumn_force_blocks(time)
 call calculate_macro_quantities_blocks()
 !==================================================================================================
-! Write the initial (time = 0 ) fluid and solid data
-CALL write_flow_blocks(time)
-CALL write_solid_field(time)
+! Write the initial fluid and solid data
+call write_flow_blocks(time)
+call write_solid_field(time)
 call Write_solid_v_bodies(time)
+call get_cpu_time(time_end1)              ! end time for the preparation before computing
+write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
+write(*,'(A)') '========================================================'
 !==================================================================================================
-deltat = flow%dt  !set time step of solid deltat the same as fluid time step
-write(*,*)'time loop'
-do while(time/Tref < timeSimTotl)
-    call date_and_time(VALUES=values_s)
-    time=time+dt
-    step=step+1
-    write(*,'(A)')' ======================================================================='
+dt_fluid = flow%dt                       !time step of the fluid 
+dt_solid = flow%dt/flow%numsubstep       !time step of the solid
+write(*,*) 'Time loop beginning'
+do while(time/flow%Tref < flow%timeSimTotal)
+    call get_cpu_time(time_begine1)
+    time = time + dt_fluid
+    step = step + 1
+    write(*,'(A)') '========================================================'
     write(*,'(A,I6,A,F15.10)')' step:',step,'    time/Tref:',time/Tref
-    !******************************************************************************************
-    !******************************************************************************************
-    !******************************************************************************************
     write(*,'(A)')' ----------------------fluid solver----------------------'
-    !solve fluid
-    call date_and_time(VALUES=values0)
+    ! LBM solver
+    call get_cpu_time(time_begine2)
     CALL streaming_step()
-    call date_and_time(VALUES=values1)
-    write(*,*)'time for streaming_step:',CPUtime(values1)-CPUtime(values0)
-    !******************************************************************************************
-    !DirecletUP=300,DirecletUU=301,Advection1=302,Advection2=303,Periodic=304,fluid=0, wall=200, movingWall=201
+    call get_cpu_time(time_end2)
+    write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
+    ! Set boundary conditions
     if    (iStreamModel==1)then
     xMinBC=boundaryConditions(1)
     xMaxBC=boundaryConditions(2)
@@ -131,18 +131,18 @@ do while(time/Tref < timeSimTotl)
     CALL addVolumForc()
 
     call date_and_time(VALUES=values1)
-    write(*,*)'time for IBM step : ',CPUtime(values1)-CPUtime(values0)
+    write(*,*)'time for IBM step : ',get_cpu_time(values1)-get_cpu_time(values0)
     if(time/Tref >begForcDist .and. time/Tref <endForcDist) call forcDisturb() !force disturbance for instability
 
     call date_and_time(VALUES=values0)
     !call cptForceR(dxmin,dymin,dzmin,nND,nND_max,xyzful,repful,nFish,Lspan)
     call date_and_time(VALUES=values1)
-    write(*,*)'time for Lubforce :',CPUtime(values1)-CPUtime(values0)
+    write(*,*)'time for Lubforce :',get_cpu_time(values1)-get_cpu_time(values0)
 
     call date_and_time(VALUES=values0)
     CALL collision_step()
     call date_and_time(VALUES=values1)
-    write(*,*)'time for collision_step:',CPUtime(values1)-CPUtime(values0)
+    write(*,*)'time for collision_step:',get_cpu_time(values1)-get_cpu_time(values0)
     !******************************************************************************************
     !solve solid
     if(isRelease/=1)write(*,'(A)')' ----------------------solid solver----------------------'
@@ -152,7 +152,7 @@ do while(time/Tref < timeSimTotl)
         call Solver(time,isubstep,deltat,subdeltat)
     enddo !do isubstep=1,numsubstep
     call date_and_time(VALUES=values1)
-    write(*,*)'time for FEM:',CPUtime(values1)-CPUtime(values0)
+    write(*,*)'time for FEM:',get_cpu_time(values1)-get_cpu_time(values0)
     !----------------------------------------------------------------------
     !******************************************************************************************
     !******************************************************************************************
@@ -165,7 +165,7 @@ do while(time/Tref < timeSimTotl)
     endif
     write(*,'(A)')' --------------------------------------------------------'
     call date_and_time(VALUES=values1)
-    write(*,*)'max time for FEM  : ',CPUtime(values1)-CPUtime(values0)
+    write(*,*)'max time for FEM  : ',get_cpu_time(values1)-get_cpu_time(values0)
     !******************************************************************************************
     !******************************************************************************************
     !******************************************************************************************
@@ -204,7 +204,7 @@ do while(time/Tref < timeSimTotl)
     !******************************************************************************************
     write(*,'(A)')' --------------------------------------------------------'
     call date_and_time(VALUES=values_e)
-    write(*,*)'time for one step:',CPUtime(values_e)-CPUtime(values_s)
+    write(*,*)'time for one step:',get_cpu_time(values_e)-get_cpu_time(values_s)
 enddo
 call ComputeFieldStat
 END PROGRAM main

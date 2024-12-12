@@ -536,12 +536,12 @@ module FluidDomain
         integer,parameter::nameLen=10,idfile=100
         character (LEN=nameLen):: fileName
         real(8):: invUref
-        real(8):: CPUtime, waittime
+        real(8):: get_cpu_time, waittime
         integer,dimension(8) :: values0,values1
         call date_and_time(VALUES=values0)
         call mywait()
         call date_and_time(VALUES=values1)
-        waittime = CPUtime(values1)-CPUtime(values0)
+        waittime = get_cpu_time(values1)-get_cpu_time(values0)
         if(waittime.gt.1.d-1) then
             write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
         endif

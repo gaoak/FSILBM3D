@@ -4,7 +4,7 @@ module FlowCondition
     public :: flow
     type :: FlowCondType
         integer :: isRelease,isConCmpt,numsubstep
-        real(8) :: timeWriteBegin,timeWriteEnd,timeWriteFlow,timeWriteBody,timeWriteInfo
+        real(8) :: timeSimTotal,timeWriteBegin,timeWriteEnd,timeWriteFlow,timeWriteBody,timeWriteInfo
         real(8) :: Re,dt,denIn,nu,Mu,dtolLBM
         integer :: TrefType,UrefType,ntolLBM
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
@@ -26,7 +26,7 @@ module FlowCondition
         call readNextData(111, buffer)
         read(111,*)    flow%isRelease,flow%isConCmpt,flow%numsubstep
         call readNextData(111, buffer)
-        read(111,*)    flow%timeWriteBegin,flow%timeWriteEnd
+        read(111,*)    flow%timeSimTotal,flow%timeWriteBegin,flow%timeWriteEnd
         call readNextData(111, buffer)
         read(111,*)    flow%timeWriteFlow,flow%timeWriteBody,flow%timeWriteInfo
         call readNextData(111, buffer)
