@@ -248,7 +248,6 @@ module SolidBody
         integer :: iFish,maxN
         write(*,'(A)') '=============================================================================='
         do iFish = 1,m_nFish
-            VBodies(iFish)%v_type = VBodies(iFish)%rbm%iBodyType
             if (dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3))-0.d0) .gt. 1e-5 .or. &
                 dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3))-0.d0) .gt. 1e-5) then
                 VBodies(iFish)%v_move = 1
