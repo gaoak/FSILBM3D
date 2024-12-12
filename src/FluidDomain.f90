@@ -14,9 +14,9 @@ module FluidDomain
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
-        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),volumeForce(3)
+        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
-        real(4) :: offsetMoveGrid(1:3)
+        real(4) :: offsetMoveGrid(1:3),volumeForce(3)
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_
@@ -27,6 +27,7 @@ module FluidDomain
         procedure :: write_flow => write_flow_
         procedure :: write_continue => write_continue_
         procedure :: read_continue => read_continue_
+        procedure :: update_volumn_force => update_volumn_force_
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
 
@@ -70,7 +71,7 @@ module FluidDomain
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock
-            LBMblks(iblock)%allocate_fluid()
+            call LBMblks(iblock)%allocate_fluid()
         enddo
     END SUBROUTINE
 
@@ -79,23 +80,28 @@ module FluidDomain
         type(FlowCondType),intent(inout) :: flow
         integer:: iblock
         do iblock = 1,m_nblock
-            LBMblks(iblock)%initialise(flow)
+            call LBMblks(iblock)%initialise(flow)
         enddo
     END SUBROUTINE
 
     SUBROUTINE read_continue_blocks(filename,step,time)
         implicit none
+        character(LEN=40),intent(in):: filename
+        integer,intent(out):: step
+        real(8),intent(out):: time
         integer:: iblock
         do iblock = 1,m_nblock
-            LBMblks(iblock)%read_continue(filename,step,time)
+            call LBMblks(iblock)%read_continue(filename,step,time)
         enddo
     END SUBROUTINE
 
     SUBROUTINE update_volumn_force_blocks(filename,time)
         implicit none
+        character(LEN=40),intent(in):: filename
+        real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblock
-            LBMblks(iblock)%update_volumn_force(time)
+            call LBMblks(iblock)%update_volumn_force(time)
         enddo
     END SUBROUTINE
 
@@ -310,6 +316,7 @@ module FluidDomain
 
     SUBROUTINE setBndCond(this)
         implicit none
+        class(LBMBlock), intent(inout) :: this
         ! set the boundary conditions of the block
         
     END SUBROUTINE setBndCond
@@ -333,7 +340,7 @@ module FluidDomain
         !$OMP END PARALLEL DO
     END SUBROUTINE calculate_macro_quantities_
 
-    SUBROUTINE update_volumn_force(this,time)
+    SUBROUTINE update_volumn_force_(this,time)
         implicit none
         class(LBMBlock), intent(inout) :: this
         real(8):: time
@@ -621,8 +628,8 @@ module FluidDomain
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         character(LEN=40),intent(in):: filename
-        integer:: step
-        real(8):: time
+        integer,intent(in):: step
+        real(8),intent(in):: time
         open(unit=13,file=filename,form='unformatted',status='replace')
         write(13) step,time
         write(13) this%fIn
@@ -633,8 +640,8 @@ module FluidDomain
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         character(LEN=40),intent(in):: filename
-        integer:: step
-        real(8):: time
+        integer,intent(out):: step
+        real(8),intent(out):: time
         open(unit=13,file=filename,form='unformatted',status='old')
         read(13) step,time
         read(13) this%fIn

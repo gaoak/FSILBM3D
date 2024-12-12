@@ -1,7 +1,7 @@
 module FlowCondition
     implicit none
     private
-    public :: flow
+    public :: FlowCondType,flow
     type :: FlowCondType
         integer :: isRelease,isConCmpt,numsubstep
         real(8) :: timeWriteBegin,timeWriteEnd,timeWriteFlow,timeWriteBody,timeWriteInfo
@@ -15,12 +15,14 @@ module FlowCondition
         real(8):: Asfac,Lchod,Lspan,AR ! fish area, length
     end type FlowCondType
     type(FlowCondType) :: flow
+
     contains
 
     SUBROUTINE read_flow_conditions(filename)
         ! read computing core and block numbers
         implicit none
         character(LEN=40),intent(in):: filename
+        character(LEN=256):: buffer
         open(unit=111, file=filename, status='old', action='read')
         call found_keyword(111,'FlowCondition')
         call readNextData(111, buffer)
