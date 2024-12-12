@@ -3,7 +3,7 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
-    integer :: nblock = 1
+    integer :: m_nblock
     type :: LBMBlock
         integer :: npsize
         integer :: ID,iCollidModel,offsetOutput
@@ -28,41 +28,61 @@ module FluidDomain
         procedure :: write_continue => write_continue_
         procedure :: read_continue => read_continue_
     end type LBMBlock
-    type(LBMBlock), allocatable :: blocks(:)
+    type(LBMBlock), allocatable :: LBMblks(:)
 
     contains
 
-    SUBROUTINE initialise_fuild_blocks()
+    SUBROUTINE read_fuild_blocks(filename)
         implicit none
-        integer :: iblock
-        call read_nblocks()
-        ! creat blocks and read parameters
-        open(unit=111, file='inFlow.dat', status='old', action='read')
+        character(LEN=40),intent(in):: filename
+        integer:: iblock
+        character(LEN=256):: buffer
+        ! creat LBMblks and read parameters
+        open(unit=111, file=filename, status='old', action='read')
         call found_keyword(111,'FluidDomain')
-        do iblock = 1,nblock
-            read(111,*)    blocks(iblock)%npsize
-            read(111,*)    blocks(iblock)%ID,blocks(iblock)%iCollidModel,blocks(iblock)%offsetOutput
-            read(111,*)    blocks(iblock)%xDim,blocks(iblock)%yDim,blocks(iblock)%zDim
-            read(111,*)    blocks(iblock)%dh,blocks(iblock)%xmin,blocks(iblock)%ymin,blocks(iblock)%zmin
-            read(111,*)    blocks(iblock)%BndConds(1:6)
-            read(111,*)    blocks(iblock)%params(1:10)
+        call readNextData(111, buffer)
+        read(buffer,*) m_nblock
+        allocate(LBMblks(m_nblock))
+        do iblock = 1,m_nblock
+            call readNextData(111, buffer)
+            read(buffer,*)    LBMblks(iblock)%npsize
+            call readNextData(111, buffer)
+            read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput
+            call readNextData(111, buffer)
+            read(buffer,*)    LBMblks(iblock)%xDim,LBMblks(iblock)%yDim,LBMblks(iblock)%zDim
+            call readNextData(111, buffer)
+            read(buffer,*)    LBMblks(iblock)%dh,LBMblks(iblock)%xmin,LBMblks(iblock)%ymin,LBMblks(iblock)%zmin
+            call readNextData(111, buffer)
+            read(buffer,*)    LBMblks(iblock)%BndConds(1:6)
+            call readNextData(111, buffer)
+            read(buffer,*)    LBMblks(iblock)%params(1:10)
             ! calculate the maximum coordinates
-            blocks(iblock)%xmax = blocks(iblock)%xmin + blocks(iblock)%dh*(blocks(iblock)%xDim-1)
-            blocks(iblock)%ymax = blocks(iblock)%ymin + blocks(iblock)%dh*(blocks(iblock)%yDim-1)
-            blocks(iblock)%zmax = blocks(iblock)%zmin + blocks(iblock)%dh*(blocks(iblock)%zDim-1)
+            LBMblks(iblock)%xmax = LBMblks(iblock)%xmin + LBMblks(iblock)%dh*(LBMblks(iblock)%xDim-1)
+            LBMblks(iblock)%ymax = LBMblks(iblock)%ymin + LBMblks(iblock)%dh*(LBMblks(iblock)%yDim-1)
+            LBMblks(iblock)%zmax = LBMblks(iblock)%zmin + LBMblks(iblock)%dh*(LBMblks(iblock)%zDim-1)
             ! allocate memory and initialise
-            blocks(iblock)%allocate_fluid()
-            blocks(iblock)%initialise()
+            LBMblks(iblock)%allocate_fluid()
+            LBMblks(iblock)%initialise()
         enddo
         close(111)
     END SUBROUTINE
 
-    SUBROUTINE read_nblocks()
-        ! read computing core and block numbers
+    SUBROUTINE allocate_fuild_memory()
         implicit none
-        open(unit=111, file='inFlow.dat', status='old', action='read')
-        call found_keyword(111,'ENDFlowCondition')
-        read(111,*)    nblock
+        integer:: iblock
+        do iblock = 1,m_nblock
+            LBMblks(iblock)%allocate_fluid()
+        enddo
+        close(111)
+    END SUBROUTINE
+
+    SUBROUTINE initialise_fuild_blocks(flow)
+        implicit none
+        type(FlowCondType),intent(inout) :: flow
+        integer:: iblock
+        do iblock = 1,m_nblock
+            LBMblks(iblock)%initialise(flow)
+        enddo
         close(111)
     END SUBROUTINE
 
@@ -114,9 +134,10 @@ module FluidDomain
         END SUBROUTINE OMPPrePartition
     END SUBROUTINE allocate_fluid_
 
-    SUBROUTINE initialise_(this)
+    SUBROUTINE initialise_(this, flow)
         implicit none
-        class(LBMBlock), intent(inout) :: this
+        class(LBMBlock),intent(inout) :: this
+        type(FlowCondType),intent(inout) :: flow
         ! select the collision model
         if(this%iCollidModel.eq.1) then
             call calculate_SRT_params()
@@ -271,6 +292,12 @@ module FluidDomain
     !    enddo
     !    enddo
     !END SUBROUTINE
+
+    SUBROUTINE setBndCond(this)
+        implicit none
+        ! set the boundary conditions of the block
+        
+    END SUBROUTINE setBndCond
 
     SUBROUTINE calculate_macro_quantities_(this)
         implicit none

@@ -7,46 +7,34 @@
 
     PROGRAM main
     USE ConstParams
-    USE FluidDomain
     USE FlowCondition
     USE SolidBody
+    USE FluidDomain
     implicit none
     integer:: isubstep,iFish,x,y,z
-    real(8):: Pbetatemp,CPUtime
+    real(8):: g(3),CPUtime
     logical alive
     integer,dimension(8) :: values0,values1,values_s,values_e
 
 
-    call read_flow_conditions()
-    call initialise_fuild_blocks()
-    call read_body_conditions()
-    call initialise_solid_bodies()
+    call read_flow_conditions('inflow.dat')
+    call read_solid_files('inflow.dat')
+    call read_fuild_blocks('inflow.dat')
+
+    call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
+    call allocate_fuild_memory()
+    
     call calculate_reference_params()
-    call write_params()    
+    call set_solidbody_parameters(flow%dt/dble(flow%numsubstep),LBMblks(1)%dh,flow%denIn,&
+        flow%uvwIn,LBMblks(1)%BndConds,LBMblks(1)%zDim,LBMblks(1)%yDim,LBMblks(1)%xDim,&
+        flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref)
 
 
-    !call Initialise_Calculate_Solid_params()
-    !CALL allocate_fluid_memory()
-    !CALL calculate_LB_params()
-    !CALL calculate_MRTM_params()
-    !call OMP_set_num_threads(npsize)
-    !write(*,*)'npsize=', npsize
-
-    if(isRelease==1)then
-        write(*,*)'Release'
-    endif
-    Pbetatemp=Pbeta
     deltat = dt  !set time step of solid deltat the same as fluid time step
-!===============================================================================================
     time=0.0d0
     step=0
-    CALL Initialise_bodies(npsize,time,zDim,yDim,xDim,dh,g)
-    CALL initialize_flow()
-    if(ismovegrid==1)then
-        iFish = 1
-        call cptIref(NDref,IXref,IYref,IZref,VBodies(iFish)%rbm%nND,xDim,yDim,zDim,VBodies(iFish)%rbm%xyzful(1:VBodies(iFish)%rbm%nND,1:3),xGrid,yGrid,zGrid,Xref,Yref,Zref)
-        MoveOutputIref=0
-    endif
+    call initialise_solid_bodies(0,g)
+    call initialise_fuild_blocks(flow)
     if(step==0)    CALL wrtInfoTitl()
 
     inquire(file='./DatTemp/conwr.dat', exist=alive)

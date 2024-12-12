@@ -75,11 +75,11 @@ module SolidSolver
         this%AoAAmpl(1:3)=AoAAmpl_(1:3)
         this%AoAPhi(1:3) =AoAPhi_(1:3)
     ENDSUBROUTINE SetSolver_
-    Subroutine Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iForce2Body,iKB)
+    Subroutine Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iKB)
         implicit none
         real(8),intent(in):: dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf
         real(8),intent(in):: dtolFEM
-        integer,intent(in):: ntolFEM,iForce2Body,iKB
+        integer,intent(in):: ntolFEM,iKB
         m_dampK = dampK
         m_dampM = dampM
         m_NewmarkGamma = NewmarkGamma
@@ -88,7 +88,6 @@ module SolidSolver
         m_dtolFEM = dtolFEM
         m_ntolFEM = ntolFEM
         m_pi = 3.141592653589793d0
-        m_iForce2Body = iForce2Body
         m_iKB = iKB
     ENDSUBROUTINE Set_SolidSolver_Params
     SUBROUTINE Allocate_solid_(this,nAsfac,nLchod)

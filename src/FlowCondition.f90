@@ -12,14 +12,16 @@ module FlowCondition
         real(8) :: Uref,Lref,Tref
         real(8) :: Aref,Fref,Eref,Pref
         !real(8) :: velocityType,velocityAmp,velocityFreq,velocityPhi
+        real(8):: Asfac,Lchod,Lspan,AR ! fish area, length
     end type FlowCondType
     type(FlowCondType) :: flow
     contains
 
-    SUBROUTINE read_flow_conditions()
+    SUBROUTINE read_flow_conditions(filename)
         ! read computing core and block numbers
         implicit none
-        open(unit=111, file='inFlow.dat', status='old', action='read')
+        character(LEN=40),intent(in):: filename
+        open(unit=111, file=filename, status='old', action='read')
         call found_keyword(111,'FlowCondition')
         read(111,*)    flow%isRelease,flow%isConCmpt,flow%numsubstep
         read(111,*)    flow%timeWriteBegin,flow%timeWriteEnd
@@ -45,7 +47,7 @@ module FlowCondition
         if(m_nFish.eq.0) then
             flow%Lref = 1.d0
         else
-            flow%Lref  = m_Lchod
+            flow%Lref  = flow%Lchod
         endif
         ! reference velocity
         if(flow%UrefType==0) then
@@ -83,9 +85,9 @@ module FlowCondition
         endif
         ! reference acceleration, force, energy, power
         flow%Aref = flow%Uref/flow%Tref
-        flow%Fref = 0.5*flow%denIn*flow%Uref**2*m_Asfac
-        flow%Eref = 0.5*flow%denIn*flow%Uref**2*m_Asfac*flow%Lref
-        flow%Pref = 0.5*flow%denIn*flow%Uref**2*m_Asfac*flow%Uref
+        flow%Fref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac
+        flow%Eref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac*flow%Lref
+        flow%Pref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac*flow%Uref
         ! fluid viscosity
         flow%nu =  flow%Uref*flow%Lref/flow%Re
         flow%Mu =  flow%nu*flow%denIn

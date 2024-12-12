@@ -168,89 +168,6 @@
     endif
     END SUBROUTINE
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE movGrid(dim,direction)
-    implicit none
-    integer:: dim,direction
-
-    if    (dim==1)then      !x
-        if(direction<0)       then      !move to -x
-            fIn(:,:,2:xDim,:)=fIn(:,:,1:xDim-1,:)
-            xGrid(:)=xGrid(:)-dx
-        elseif(direction>0)    then     !move to +x
-            fIn(:,:,1:xDim-1,:)=fIn(:,:,2:xDim,:)
-            xGrid(:)=xGrid(:)+dx
-        else
-        endif
-    elseif(dim==2)then      !y
-        if(direction<0)        then     !move to -y
-            fIn(:,2:yDim,:,:)=fIn(:,1:yDim-1,:,:)
-            yGrid(:)=yGrid(:)-dy
-        elseif(direction>0)    then     !move to +y
-            fIn(:,1:yDim-1,:,:)=fIn(:,2:yDim,:,:)
-            yGrid(:)=yGrid(:)+dy
-        else
-        endif
-    elseif(dim==3)then      !z
-        if(direction<0)        then     !move to -z
-            fIn(2:zDim,:,:,:)=fIn(1:zDim-1,:,:,:)
-            zGrid(:)=zGrid(:)-dz
-        elseif(direction>0)    then     !move to +z
-            fIn(1:zDim-1,:,:,:)=fIn(2:zDim,:,:,:)
-            zGrid(:)=zGrid(:)+dz
-        else
-        endif
-    else
-    endif
-    END SUBROUTINE
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    Counting the number of steps the grid has moved
-!    Determine if the grd is moving left or right
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine  cptMove(move,xB,xG,d,MoveOutputIref)
-    implicit none
-    integer:: move(3),i,MoveOutputIref(3)
-    real(8):: xB(3),xG(3),d
-    do  i=1,3
-        if    (xB(i)-xG(i)> d)then
-            move(i)=1
-            MoveOutputIref(i)=MoveOutputIref(i)+1
-        elseif(xB(i)-xG(i)<-d)then
-            move(i)=-1
-            MoveOutputIref(i)=MoveOutputIref(i)-1
-        else
-            move(i)=0
-        endif
-    enddo
-    end subroutine
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    find reference point, moving grid
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref)
-    implicit none
-    integer:: NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim
-    real(8):: xyzful(1:nND,1:3),xGrid(xDim),yGrid(yDim),zGrid(zDim),Xref,Yref,Zref
-
-    NDref=minloc(dsqrt((xyzful(1:nND,1)-Xref)**2+(xyzful(1:nND,2)-Yref)**2+(xyzful(1:nND,3)-Zref)**2),1)
-    IXref=minloc(dabs(xyzful(NDref,1)-xGrid(1:xDim)),1)
-    IYref=minloc(dabs(xyzful(NDref,2)-yGrid(1:yDim)),1)
-    IZref=minloc(dabs(xyzful(NDref,3)-zGrid(1:zDim)),1)
-
-    end subroutine
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine cptArea(areaElem,nND,nEL,ele,xyzful)
     implicit none
     integer:: nND,nEL,ele(nEL,5)
@@ -407,4 +324,38 @@
             write(*,*) 'the parameters in inflow.dat do not exist.'
             stop
         endif
+    END SUBROUTINE
+
+    subroutine readNextData(ifile, buffer)
+        implicit none
+        character(LEN=256):: buffer
+        integer:: ifile, IOstatus
+        do while(.true.)
+            read(ifile, *, IOSTAT=IOstatus) buffer
+            if (IOstatus.ne.0) then
+                write(*, *) 'end of file encounter in readNextData', ifile
+                stop
+            endif
+            adjustl(buffer)
+            if(buffer(1:1).ne.'#') then
+                exit
+            endif
+        enddo
+    end subroutine readNextData
+
+    SUBROUTINE readequal(ifile)
+        implicit none
+        integer:: IOstatus, ifile
+        character (40):: buffer
+        do while(.true.)
+            read(ifile, *, IOSTAT=IOstatus) buffer
+            if (IOstatus.ne.0) then
+                write(*, *) 'end of file encounter in readequal', ifile
+                stop
+            endif
+            adjustl(buffer)
+            if(buffer(1:1).eq.'=') then
+                exit
+            endif
+        enddo
     END SUBROUTINE
