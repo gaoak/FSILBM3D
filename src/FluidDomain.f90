@@ -107,6 +107,14 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
+    SUBROUTINE write_flow_blocks(time)
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            LBMblks(iblock)%write_flow(time)
+        enddo
+    END SUBROUTINE
+
     !=================================================================================================
     ! Functions for single block
     SUBROUTINE allocate_fluid_(this)

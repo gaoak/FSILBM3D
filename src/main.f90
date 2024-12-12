@@ -43,12 +43,10 @@ call write_information_titles()
 call update_volumn_force_blocks(time)
 call calculate_macro_quantities_blocks()
 !==================================================================================================
-! Write the initial (time = 0 ) data
-CALL write_flow_fast()
+! Write the initial (time = 0 ) fluid and solid data
+CALL write_flow_blocks(time)
 CALL write_solid_field(time)
 call Write_solid_v_bodies(time)
-!==================================================================================================
-!==================================================================================================
 !==================================================================================================
 deltat = flow%dt  !set time step of solid deltat the same as fluid time step
 write(*,*)'time loop'
