@@ -2,7 +2,7 @@
 !    write files' header
 !    copyright@ RuNanHua
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE wrtInfoTitl()
+    SUBROUTINE write_information_titles()
     implicit none
     integer:: i,iFish
     integer,parameter::nameLen=4
@@ -358,4 +358,21 @@
                 exit
             endif
         enddo
+    END SUBROUTINE
+
+    SUBROUTINE check_is_continue(filename,step,time,isContinue)
+        implicit none
+        integer:: isContinue
+        character(LEN=40),intent(in):: filename
+        inquire(file=filename, exist=alive)
+        if (isContinue==1 .and. alive)then
+            write(*,*)  '=============================================='
+            write(*,*)  '==============Continue computing=============='
+            write(*,*)  '=============================================='
+            call read_continue_blocks(filename,step,time)
+        else
+            write(*,*)  '=============================================='
+            write(*,*)  '=================New computing================'
+            write(*,*)  '=============================================='
+        endif
     END SUBROUTINE

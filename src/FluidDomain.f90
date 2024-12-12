@@ -60,20 +60,18 @@ module FluidDomain
             LBMblks(iblock)%xmax = LBMblks(iblock)%xmin + LBMblks(iblock)%dh*(LBMblks(iblock)%xDim-1)
             LBMblks(iblock)%ymax = LBMblks(iblock)%ymin + LBMblks(iblock)%dh*(LBMblks(iblock)%yDim-1)
             LBMblks(iblock)%zmax = LBMblks(iblock)%zmin + LBMblks(iblock)%dh*(LBMblks(iblock)%zDim-1)
-            ! allocate memory and initialise
-            LBMblks(iblock)%allocate_fluid()
-            LBMblks(iblock)%initialise()
         enddo
         close(111)
     END SUBROUTINE
 
-    SUBROUTINE allocate_fuild_memory()
+    !=================================================================================================
+    ! Functions to iterate over each block
+    SUBROUTINE allocate_fuild_memory_blocks()
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock
             LBMblks(iblock)%allocate_fluid()
         enddo
-        close(111)
     END SUBROUTINE
 
     SUBROUTINE initialise_fuild_blocks(flow)
@@ -83,9 +81,26 @@ module FluidDomain
         do iblock = 1,m_nblock
             LBMblks(iblock)%initialise(flow)
         enddo
-        close(111)
     END SUBROUTINE
 
+    SUBROUTINE read_continue_blocks(filename,step,time)
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            LBMblks(iblock)%read_continue(filename,step,time)
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE update_volumn_force_blocks(filename,time)
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            LBMblks(iblock)%update_volumn_force(time)
+        enddo
+    END SUBROUTINE
+
+    !=================================================================================================
+    ! Functions for single block
     SUBROUTINE allocate_fluid_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
@@ -318,7 +333,7 @@ module FluidDomain
         !$OMP END PARALLEL DO
     END SUBROUTINE calculate_macro_quantities_
 
-    SUBROUTINE updateVolumForc(this,time)
+    SUBROUTINE update_volumn_force(this,time)
         implicit none
         class(LBMBlock), intent(inout) :: this
         real(8):: time
@@ -602,23 +617,25 @@ module FluidDomain
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine ComputeFieldStat_
 
-    SUBROUTINE write_continue_(this,step,time)
+    SUBROUTINE write_continue_(this,filename,step,time)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
+        character(LEN=40),intent(in):: filename
         integer:: step
         real(8):: time
-        open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='replace')
+        open(unit=13,file=filename,form='unformatted',status='replace')
         write(13) step,time
         write(13) this%fIn
         close(13)
     ENDSUBROUTINE write_continue_
 
-    SUBROUTINE read_continue_(this,step,time)
+    SUBROUTINE read_continue_(this,filename,step,time)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
+        character(LEN=40),intent(in):: filename
         integer:: step
         real(8):: time
-        open(unit=13,file='./DatTemp/conwr.dat',form='unformatted',status='old')
+        open(unit=13,file=filename,form='unformatted',status='old')
         read(13) step,time
         read(13) this%fIn
         close(13)

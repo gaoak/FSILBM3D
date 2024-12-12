@@ -23,16 +23,27 @@ module FlowCondition
         character(LEN=40),intent(in):: filename
         open(unit=111, file=filename, status='old', action='read')
         call found_keyword(111,'FlowCondition')
+        call readNextData(111, buffer)
         read(111,*)    flow%isRelease,flow%isConCmpt,flow%numsubstep
+        call readNextData(111, buffer)
         read(111,*)    flow%timeWriteBegin,flow%timeWriteEnd
+        call readNextData(111, buffer)
         read(111,*)    flow%timeWriteFlow,flow%timeWriteBody,flow%timeWriteInfo
+        call readNextData(111, buffer)
         read(111,*)    flow%Re,flow%dt,flow%denIn
+        call readNextData(111, buffer)
         read(111,*)    flow%uvwIn(1:3)
+        call readNextData(111, buffer)
         read(111,*)    flow%shearRateIn(1:3)
+        call readNextData(111, buffer)
         read(111,*)    flow%volumeForceIn(1:3)
+        call readNextData(111, buffer)
         read(111,*)    flow%volumeForceAmp,flow%volumeForceFreq,flow%volumeForcePhi
+        call readNextData(111, buffer)
         read(111,*)    flow%TrefType,flow%Tref
+        call readNextData(111, buffer)
         read(111,*)    flow%UrefType,flow%Uref
+        call readNextData(111, buffer)
         read(111,*)    flow%ntolLBM,flow%dtolLBM
         close(111)
     END SUBROUTINE
