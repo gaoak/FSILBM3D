@@ -39,16 +39,14 @@ call initialise_fuild_blocks(flow)
 call check_is_continue('./DatTemp/conwr.dat',step,time,flow%isConCmpt)
 call write_information_titles()
 !==================================================================================================
-! Determine whether to continue calculating and write output informantion titles
+! Update the volumn forces and calculate the macro quantities
 call update_volumn_force_blocks(time)
-call calculate_macro_quantities()
-
-
-CALL write_flow_fast()
+call calculate_macro_quantities_blocks()
+!==================================================================================================
+! Write the initial (time = 0 ) fluid and solid data
+CALL write_flow_blocks(time)
 CALL write_solid_field(time)
 call Write_solid_v_bodies(time)
-!==================================================================================================
-!==================================================================================================
 !==================================================================================================
 deltat = flow%dt  !set time step of solid deltat the same as fluid time step
 write(*,*)'time loop'
