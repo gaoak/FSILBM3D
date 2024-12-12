@@ -4,6 +4,7 @@ module FluidDomain
     implicit none
     private
     integer :: m_nblock
+    public:: LBMblks,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks
     type :: LBMBlock
         integer :: npsize
         integer :: ID,iCollidModel,offsetOutput
@@ -28,6 +29,7 @@ module FluidDomain
         procedure :: write_continue => write_continue_
         procedure :: read_continue => read_continue_
         procedure :: update_volumn_force => update_volumn_force_
+        procedure :: setBndCond => setBndCond_
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
 
@@ -57,6 +59,11 @@ module FluidDomain
             read(buffer,*)    LBMblks(iblock)%BndConds(1:6)
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%params(1:10)
+            ! check bounds
+            if (LBMblks(iblock)%xDim.gt.32767 .or. LBMblks(iblock)%yDim.gt.32767 .or. LBMblks(iblock)%zDim.gt.32767) then
+                write(*,*) "Grid number exceeds 32767, please try to reduced the grid size."
+                stop
+            endif
             ! calculate the maximum coordinates
             LBMblks(iblock)%xmax = LBMblks(iblock)%xmin + LBMblks(iblock)%dh*(LBMblks(iblock)%xDim-1)
             LBMblks(iblock)%ymax = LBMblks(iblock)%ymin + LBMblks(iblock)%dh*(LBMblks(iblock)%yDim-1)
@@ -101,6 +108,22 @@ module FluidDomain
         integer:: iblock
         do iblock = 1,m_nblock
             call LBMblks(iblock)%update_volumn_force(time)
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE streaming_step()
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%streaming()
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE collision_step()
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%collision()
         enddo
     END SUBROUTINE
 
@@ -330,12 +353,20 @@ module FluidDomain
     !    enddo
     !END SUBROUTINE
 
-    SUBROUTINE setBndCond(this)
+    SUBROUTINE setBndConds()
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%setBndCond()
+        enddo
+    END SUBROUTINE setBndConds
+
+    SUBROUTINE setBndCond_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
         ! set the boundary conditions of the block
         
-    END SUBROUTINE setBndCond
+    END SUBROUTINE setBndCond_
 
     SUBROUTINE calculate_macro_quantities_(this)
         implicit none

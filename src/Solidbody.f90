@@ -4,9 +4,9 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
-    public :: m_nFish ! use for calculating reference values in flow condition
-    integer:: m_nFish, m_ntolLBM, m_zDim, m_yDim, m_xDim
-    real(8):: m_dtolLBM, m_IBPenaltyBeta, m_dt, m_dh, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
+    public :: set_solidbody_parameters ! use for calculating reference values in flow condition
+    integer:: m_nFish, m_ntolLBM
+    real(8):: m_dtolLBM, m_IBPenaltyBeta, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
@@ -273,26 +273,16 @@ module SolidBody
         endif
     end subroutine allocate_solid_memory
 
-    subroutine set_solidbody_parameters(dt,dh,denIn,uvwIn,BndConds,zDim,yDim,xDim,&
+    subroutine set_solidbody_parameters(denIn,uvwIn,BndConds,&
         Aref,Eref,Fref,Lref,Pref,Tref,Uref)
         implicit none
-        real(8),intent(in):: dt,dh,denIn,uvwIn,Aref,Eref,Fref,Lref,Pref,Tref,Uref
+        real(8),intent(in):: denIn,uvwIn(1:3),Aref,Eref,Fref,Lref,Pref,Tref,Uref
         integer,intent(in):: BndConds(1:6)
-        integer,intent(in):: zDim,yDim,xDim
         real(8):: Lthck,uMax
         ! set gobal parameters
-        m_dt = dt
         m_denIn = denIn
         m_uvwIn = uvwIn
         m_boundaryConditions(1:6) = BndConds(1:6)
-        m_zDim = zDim
-        m_yDim = yDim
-        m_xDim = xDim
-        if (m_xDim.gt.32767 .or. m_yDim.gt.32767 .or. m_zDim.gt.32767) then
-            write(*,*) "Grid number exceeds 32767, please try to reduced the grid size."
-            stop
-        endif
-        m_dh = dh
         m_Aref = Aref
         m_Eref = Eref
         m_Fref = Fref
@@ -452,17 +442,18 @@ module SolidBody
             call VBodies(iFish)%rbm%write_solid_SampBodyNode(fid,iFish,time,numSampBody,SampBodyNode(1:numSampBody,iFish),m_Tref,m_Lref,m_Uref,m_Aref)
         enddo !nFish
     end subroutine
-    
-    subroutine FSInteraction_force(xGrid,yGrid,zGrid,uuu,force)
+
+    subroutine FSInteraction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
         implicit none
-        real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim)
-        real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
-        real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
+        real(8),intent(in):: dt,dh,xmin,ymin,zmin
+        integer,intent(in):: xDim,yDim,zDim
+        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
+        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: iFish
         do iFish = 1,m_nFish
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
-        call calculate_interaction_force(xGrid,yGrid,zGrid,uuu,force)
+        call calculate_interaction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
     end subroutine
 
     subroutine PlateUpdatePosVelArea_(this)
@@ -612,34 +603,37 @@ module SolidBody
         rtov_ = this%rtov(x)
     ENDFUNCTION rtov_
 
-    subroutine UpdateElmtInterp_(this,xGrid,yGrid,zGrid)
+    subroutine UpdateElmtInterp_(this,dh,xmin,ymin,zmin,xDim,yDim,zDim)
         use omp_lib
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim)
+        real(8),intent(in):: dh,xmin,ymin,zmin
+        integer,intent(in):: xDim,yDim,zDim
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2)
         real(8)::x0,y0,z0,detx,dety,detz,invdh
-        integer::i0,j0,k0,iEL,x,y,z,i,j,k,p
+        integer::i0,j0,k0,iEL,x,y,z,i,j,k
         integer(8):: index
         !==================================================================================================
-        invdh = 1.D0/m_dh
-        call my_minloc(this%v_Exyz(1,1), xGrid, m_xDim, .false., i0)
-        call my_minloc(this%v_Exyz(2,1), yGrid, m_yDim, .false., j0)
-        call my_minloc(this%v_Exyz(3,1), zGrid, m_zDim, .false., k0)
-        x0 = xGrid(i0)
-        y0 = yGrid(j0)
-        z0 = zGrid(k0)
-        p = -1
+        invdh = 1.D0/dh
+        i0 = floor((this%v_Exyz(1,1) - xmin) * invdh)
+        x0 = xmin + dble(i0) * dh
+        i0 = i0 + 1
+        j0 = floor((this%v_Exyz(2,1) - ymin) * invdh)
+        y0 = ymin + dble(j0) * dh
+        j0 = j0 + 1
+        k0 = floor((this%v_Exyz(3,1) - zmin) * invdh)
+        z0 = zmin + dble(k0) * dh
+        k0 = k0 + 1
         ! compute the velocity of IB nodes at element center
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz,detx,dety,detz,ix,jy,kz,index)
         do  iEL=1,this%v_nelmts
             call minloc_fast(this%v_Exyz(1,iEL), x0, i0, invdh, i, detx)
             call minloc_fast(this%v_Exyz(2,iEL), y0, j0, invdh, j, dety)
             call minloc_fast(this%v_Exyz(3,iEL), z0, k0, invdh, k, detz)
-            call trimedindex(i, m_xDim, ix, m_boundaryConditions(1:2))
-            call trimedindex(j, m_yDim, jy, m_boundaryConditions(3:4))
-            call trimedindex(k, m_zDim, kz, m_boundaryConditions(5:6))
+            call trimedindex(i, xDim, ix, m_boundaryConditions(1:2))
+            call trimedindex(j, yDim, jy, m_boundaryConditions(3:4))
+            call trimedindex(k, zDim, kz, m_boundaryConditions(5:6))
             this%v_Ei(1:4,iEL) = ix
             this%v_Ei(5:8,iEL) = jy
             this%v_Ei(9:12,iEL) = kz
@@ -713,48 +707,15 @@ module SolidBody
                 endif
             enddo
         END SUBROUTINE trimedindex
-        SUBROUTINE my_minloc(x_, array_, len_, uniform_, index_) ! return the array(index) <= x < array(index+1)
-            implicit none
-            integer:: len_, index_, count, step, it
-            real(8):: x_, array_(len_)
-            logical:: uniform_
-            if (.not.uniform_) then
-                if (x_<array_(1) .or. x_>array_(len_)) then
-                    write(*, *) 'index out of bounds when searching my_minloc', x_, '[', array_(1), array_(len_), ']'
-                    stop
-                endif
-                index_ = 1
-                count = len_
-                do while(count > 0)
-                    step = count / 2
-                    it = index_ + step
-                    if (array_(it) < x_) then
-                        index_ = it + 1
-                        count = count - (step + 1)
-                    else
-                        count = step
-                    endif
-                enddo
-                if (array_(index_)>x_) then
-                    index_ = index_ - 1
-                endif
-            else
-                index_ = 1 + int((x_ - array_(1))/(array_(len_)-array_(1))*dble(len_-1))
-                !int -1.1 -> -1; 1.1->1; 1.9->1
-                if (index_<1 .or. index_>len_) then
-                    write(*, *) 'index out of bounds when searching my_minloc', x_, '[', array_(1), array_(len_), ']'
-                    stop
-                endif
-            endif
-        END SUBROUTINE
     end subroutine UpdateElmtInterp_
 
-    SUBROUTINE calculate_interaction_force(xGrid,yGrid,zGrid,uuu,force)
+    SUBROUTINE calculate_interaction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
-        real(8),intent(in):: xGrid(m_xDim),yGrid(m_yDim),zGrid(m_zDim)
-        real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
-        real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
+        real(8),intent(in):: dt,dh,xmin,ymin,zmin
+        integer,intent(in):: xDim,yDim,zDim
+        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
+        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         !================================
         integer:: iFish
         integer:: iterLBM
@@ -763,7 +724,7 @@ module SolidBody
         ! update virtual body shape and velocity
         do iFish = 1, m_nFish
             if (VBodies(iFish)%v_move .eq. 1 .or. VBodies(iFish)%rbm%iBodyModel .eq. 2 .or. VBodies(iFish)%count_Interp .eq. 0 ) then
-                call VBodies(iFish)%UpdateElmtInterp(xGrid,yGrid,zGrid)
+                call VBodies(iFish)%UpdateElmtInterp(dh,xmin,ymin,zmin,xDim,yDim,zDim)
                 VBodies(iFish)%count_Interp = 1
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
@@ -775,7 +736,7 @@ module SolidBody
             dmaxLBM = 0.d0
             dsum=0.0d0
             do iFish=1,m_nFish
-                call VBodies(iFish)%PenaltyForce(tol,ntol,uuu)
+                call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
                 dmaxLBM = dmaxLBM + tol
                 dsum = dsum + ntol
             enddo
@@ -788,15 +749,17 @@ module SolidBody
             ! to do, consider gravity
         enddo
         do iFish=1,m_nFish
-            call VBodies(iFish)%FluidVolumeForce(force)
+            call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force)
         enddo
     END SUBROUTINE
 
-    SUBROUTINE FluidVolumeForce_(this,force)
+    SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,force)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        real(8),intent(out)::force(m_zDim,m_yDim,m_xDim,1:3)
+        real(8),intent(in):: dh
+        integer,intent(in):: xDim,yDim,zDim
+        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
@@ -804,7 +767,7 @@ module SolidBody
         !==================================================================================================
         integer::x,y,z,iEL,i1,i2
         !==================================================================================================
-        invh3 = (1.d0/m_dh)**3
+        invh3 = (1.d0/dh)**3
         ! compute the velocity of IB nodes at element center
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(1:4,iEL)
@@ -832,10 +795,12 @@ module SolidBody
         enddo
     END SUBROUTINE FluidVolumeForce_
 
-    SUBROUTINE PenaltyForce_(this,tolerance,ntolsum,uuu)
+    SUBROUTINE PenaltyForce_(this,dt,dh,xDim,yDim,zDim,tolerance,ntolsum,uuu)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
-        real(8),intent(inout)::uuu(m_zDim,m_yDim,m_xDim,1:3)
+        real(8),intent(in):: dt,dh
+        integer,intent(in):: xDim,yDim,zDim
+        real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         class(VirtualBody), intent(inout) :: this
         real(8),intent(out)::tolerance, ntolsum
         !======================================================
@@ -845,7 +810,7 @@ module SolidBody
         !======================================================
         integer:: x,y,z,iEL
         !======================================================
-        invh3 = 0.5d0*m_dt*(1.d0/m_dh)**3/m_denIn
+        invh3 = 0.5d0*dt*(1.d0/dh)**3/m_denIn
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
