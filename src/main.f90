@@ -89,7 +89,7 @@ PROGRAM main
         call get_now_time(time_end1)
         write(*,*)'time   for   one   step:', (time_end1 - time_begine1)
         ! write data for continue computing
-        if(DABS(time/flow%Tref-flow%timeConDelta*NINT(time/flow%Tref/flow%timeConDelta)) <= 0.5*dt_fluid/flow%Tref)then
+        if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
             call write_continue_blocks(continueFile,step,time)
         endif
         ! write fluid and soild data

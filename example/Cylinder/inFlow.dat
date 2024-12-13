@@ -2,8 +2,8 @@ Parallel
 # parameter for mpi
 EndParallel
 FlowCondition
- 0          1          1                      read(111,*) isRelease,isConCmpt,numsubstep
- 50.00D+0   10.00D+0                          read(111,*) timeSimTotal,timeConDelta
+ 1          1                                 read(111,*) isConCmpt,numsubstep
+ 50.00D+0   10.00D+0                          read(111,*) timeSimTotal,timeContiDelta
  0.000D+0   50.00D+0                          read(111,*) timeWriteBegin,timeWriteEnd
  0.100D+0   0.100D+0   0.010D+0               read(111,*) timeWriteFlow,timeWriteBody,timeWriteInfo
  40.00D+0   0.020D+0   1.000d+0               read(111,*) Re,dt,denIn

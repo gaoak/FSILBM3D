@@ -4,8 +4,8 @@ module FlowCondition
     public :: FlowCondType,flow
     public :: read_flow_conditions
     type :: FlowCondType
-        integer :: isRelease,isConCmpt,numsubstep
-        real(8) :: timeSimTotal,timeConDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
+        integer :: isConCmpt,numsubstep
+        real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
         real(8) :: Re,dt,denIn,nu,Mu,dtolLBM
         integer :: TrefType,UrefType,ntolLBM
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
@@ -27,9 +27,9 @@ module FlowCondition
         open(unit=111, file=filename, status='old', action='read')
         call found_keyword(111,'FlowCondition')
         call readNextData(111, buffer)
-        read(111,*)    flow%isRelease,flow%isConCmpt,flow%numsubstep
+        read(111,*)    flow%isConCmpt,flow%numsubstep
         call readNextData(111, buffer)
-        read(111,*)    flow%timeSimTotal,flow%timeConDelta
+        read(111,*)    flow%timeSimTotal,flow%timeContiDelta
         call readNextData(111, buffer)
         read(111,*)    flow%timeWriteBegin,flow%timeWriteEnd
         call readNextData(111, buffer)
