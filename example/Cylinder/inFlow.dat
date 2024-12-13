@@ -21,7 +21,7 @@ FluidBlocks
  1         1         0                        read(111,*) ID,iCollideModel,offsetOutput
  801       100       50                       read(111,*) xDim,yDim,zDim
  0.020D+0  0.000D+0  0.000D+0  0.000D+0       read(111,*) dh,xmin,ymin,zmin
- 300  302  304  304  304  304                 read(111,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 102   103   201   201   301   301            read(111,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0   0   0   0   0   0   0   0   0   0        read(111,*) params(1:10)
 ENDFluidBlocks
 SolidBody

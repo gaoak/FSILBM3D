@@ -139,7 +139,7 @@
         now_time = cpu_time(6)*60.d0 + cpu_time(7)*1.d0 + cpu_time(8)*0.001d0
     END SUBROUTINE
 
-    ! found keyword in inflow.dat for next parameters read
+    ! Found keyword in inflow.dat for next parameters read
     SUBROUTINE found_keyword(fileID,keyword)
         implicit none
         integer:: fileID, IOstatus
@@ -162,6 +162,7 @@
         endif
     END SUBROUTINE
 
+    ! Convert an uppercase string to lowercase
     SUBROUTINE to_lowercase(string)
         implicit none
         character:: string
@@ -173,7 +174,7 @@
         end do
     END SUBROUTINE
 
-    subroutine downcase(ifile, buffer)
+    SUBROUTINE readNextData(ifile, buffer)
         implicit none
         character(LEN=256):: buffer
         integer:: ifile, IOstatus
@@ -188,24 +189,7 @@
                 exit
             endif
         enddo
-    end subroutine downcase
-
-    subroutine readNextData(ifile, buffer)
-        implicit none
-        character(LEN=256):: buffer
-        integer:: ifile, IOstatus
-        do while(.true.)
-            read(ifile, *, IOSTAT=IOstatus) buffer
-            if (IOstatus.ne.0) then
-                write(*, *) 'end of file encounter in readNextData', ifile
-                stop
-            endif
-            call adjustl(buffer)
-            if(buffer(1:1).ne.'#') then
-                exit
-            endif
-        enddo
-    end subroutine readNextData
+    END SUBROUTINE readNextData
 
     SUBROUTINE readequal(ifile)
         implicit none
@@ -224,6 +208,7 @@
         enddo
     END SUBROUTINE
 
+    ! Check whether the calculation is continued
     SUBROUTINE check_is_continue(filename,step,time,isContinue)
         implicit none
         character(LEN=40),intent(in):: filename

@@ -17,7 +17,7 @@ module FluidDomain
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
-        real(4) :: offsetMoveGrid(1:3),volumeForce(3)
+        real(8) :: offsetMoveGrid(1:3),volumeForce(3)
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_
@@ -318,9 +318,7 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (x - 1);
             do  z = 1, this%zDim
                 zCoord = this%zmin + this%dh * (x - 1);
-                this%uuu(z, y, x, 1) = flow%uvwIn(1) + 0*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
-                this%uuu(z, y, x, 2) = flow%uvwIn(1) + xCoord*flow%shearRateIn(1) + 0*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
-                this%uuu(z, y, x, 3) = flow%uvwIn(1) + xCoord*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + 0*flow%shearRateIn(3);
+                call evaluate_shear_velocity(zCoord,yCoord,xCoord,flow%uvwIn,this%uuu,flow%shearRateIn)
             enddo
             enddo
             enddo
@@ -375,8 +373,158 @@ module FluidDomain
     SUBROUTINE set_boundary_conditions_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        ! set the boundary conditions of the block
-        
+        integer:: x, y, z
+        real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
+        real(8):: uSqr ,uxyz(0:lbmDim) ,fEq(0:lbmDim)
+        real(8):: uSqri,uxyzi(0:lbmDim),fEqi(0:lbmDim),fTmp(0:lbmDim)
+        ! set the x direction (inlet) --------------------------------------------------------------------
+        if (this%BndConds(1) .eq. Eq_DirecletU) then
+            ! equilibriun scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
+                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(z,y,1,0:lbmDim))
+            enddo
+            enddo
+        elseif(this%BndConds(1) .eq. nEq_DirecletU)then
+            ! non-equilibriun extrapoltion scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
+                ! equilibriun part
+                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                ! non-equilibriun part
+                call calculate_distribution_funcion(this%den(z,y,2),this%uuu(z,y,2,1:SpaceDim),fEqi(0:lbmDim))
+                ! given equilibriun funciton
+                this%fIn(z,y,1,[1,7,9,11,13]) = fEq([1,7,9,11,13]) + (this%fIn(z,y,2,[1,7,9,11,13]) - fEqi([1,7,9,11,13]))
+            enddo
+            enddo
+        elseif(this%BndConds(1) .eq. order1_Extrapolate)then
+            this%fIn(:,:,1,[1,7,9,11,13]) = this%fIn(:,:,2,[1,7,9,11,13])
+        elseif(this%BndConds(1) .eq. order2_Extrapolate)then
+            this%fIn(:,:,1,[1,7,9,11,13]) = 2.0*this%fIn(:,:,2,[1,7,9,11,13]) - this%fIn(:,:,3,[1,7,9,11,13])
+        elseif(this%BndConds(1) .eq. stationary_Wall)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                fTmp([1,7,9,11,13]) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
+                this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+            enddo
+            enddo
+        elseif(this%BndConds(1) .eq. Symmetric)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                fTmp([1,7,9,11,13]) = this%fIn(z,y,1,[2,8,10,12,14])
+                this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+            enddo
+            enddo
+        elseif(this%BndConds(1) .eq. Periodic)then
+            ! no need to set
+        else
+            stop 'inlet (xmin) has no such boundary condition'
+        endif
+        ! set the x direction (outlet) -------------------------------------------------------------------
+        if (this%BndConds(2) .eq. Eq_DirecletU) then
+            ! equilibriun scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
+                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(z,y,this%xDim,0:lbmDim))
+            enddo
+            enddo
+        elseif(this%BndConds(2) .eq. nEq_DirecletU)then
+            ! non-equilibriun extrapoltion scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
+                ! equilibriun part
+                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                ! non-equilibriun part
+                call calculate_distribution_funcion(this%den(z,y,this%xDim-1),this%uuu(z,y,this%xDim-1,1:3),fEqi(0:lbmDim))
+                ! given equilibriun funciton
+                this%fIn(z,y,this%xDim,[1,7,9,11,13]) = fEq([1,7,9,11,13]) + (this%fIn(z,y,this%xDim-1,[1,7,9,11,13]) - fEqi([1,7,9,11,13]))
+            enddo
+            enddo
+        elseif(this%BndConds(2) .eq. order1_Extrapolate)then
+            this%fIn(:,:,this%xDim,[2,8,10,12,14]) = this%fIn(:,:,this%xDim-1,[2,8,10,12,14])
+        elseif(this%BndConds(2) .eq. order2_Extrapolate)then
+            this%fIn(:,:,this%xDim,[2,8,10,12,14]) = 2.0*this%fIn(:,:,this%xDim-1,[2,8,10,12,14])-this%fIn(:,:,this%xDim-2,[2,8,10,12,14])
+        elseif(this%BndConds(2) .eq. stationary_Wall)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                fTmp([2,8,10,12,14]) = this%fIn(z,y,this%xDim,oppo([2,8,10,12,14]))
+                this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
+            enddo
+            enddo
+        elseif(this%BndConds(2) .eq. Symmetric)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                fTmp([2,8,10,12,14]) = this%fIn(z,y,this%xDim,[1,7,9,11,13])
+                this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
+            enddo
+            enddo
+        elseif(this%BndConds(2) .eq. Periodic)then
+            ! no need to set
+        else
+            stop 'outlet (xmax) has no such boundary condition'
+        endif
+        ! set the y direction (lower) --------------------------------------------------------------------
+        if (this%BndConds(3) .eq. Eq_DirecletU) then
+            ! equilibriun scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
+                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(z,y,1,0:lbmDim))
+            enddo
+            enddo
+        elseif(this%BndConds(3) .eq. nEq_DirecletU)then
+            ! non-equilibriun extrapoltion scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
+                ! equilibriun part
+                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                ! non-equilibriun part
+                call calculate_distribution_funcion(this%den(z,y,2),this%uuu(z,y,2,1:SpaceDim),fEqi(0:lbmDim))
+                ! given equilibriun funciton
+                this%fIn(z,y,1,[1,7,9,11,13]) = fEq([1,7,9,11,13]) + (this%fIn(z,y,2,[1,7,9,11,13]) - fEqi([1,7,9,11,13]))
+            enddo
+            enddo
+        elseif(this%BndConds(3) .eq. order1_Extrapolate)then
+            this%fIn(:,:,1,[1,7,9,11,13]) = this%fIn(:,:,2,[1,7,9,11,13])
+        elseif(this%BndConds(3) .eq. order2_Extrapolate)then
+            this%fIn(:,:,1,[1,7,9,11,13]) = 2.0*this%fIn(:,:,2,[1,7,9,11,13]) - this%fIn(:,:,3,[1,7,9,11,13])
+        elseif(this%BndConds(3) .eq. stationary_Wall)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                fTmp([1,7,9,11,13]) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
+                this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+            enddo
+            enddo
+        elseif(this%BndConds(3) .eq. Symmetric)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                fTmp([1,7,9,11,13]) = this%fIn(z,y,1,[2,8,10,12,14])
+                this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+            enddo
+            enddo
+        elseif(this%BndConds(3) .eq. Periodic)then
+            ! no need to set
+        else
+            stop 'lower boundary (ymin) has no such boundary condition'
+        endif
+
     END SUBROUTINE
 
     SUBROUTINE calculate_macro_quantities_(this)
@@ -706,4 +854,23 @@ module FluidDomain
         close(13)
     ENDSUBROUTINE read_continue_
 
+    ! set the shear velocity
+    SUBROUTINE evaluate_shear_velocity(zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)
+        implicit none
+        real(8):: zCoord,yCoord,xCoord
+        real(8):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:SpaceDim)
+        velocityOut(1) = velocityIn(1) + 0*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
+        velocityOut(2) = velocityIn(2) + xCoord*flow%shearRateIn(1) + 0*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
+        velocityOut(3) = velocityIn(3) + xCoord*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + 0*flow%shearRateIn(3);
+    END SUBROUTINE
+
+    ! calcualte distribution Function 
+    SUBROUTINE calculate_distribution_funcion(density,velocity,distribution)
+        implicit none
+        real(8):: velocity(1:SpaceDim),distribution(0:lbmDim)
+        real(8):: uSqr,uxyz(0:lbmDim),density
+        uSqr           = sum(velocity(1:3)**2)
+        uxyz(0:lbmDim) = velocity(1) * ee(0:lbmDim,1) + velocity(2) * ee(0:lbmDim,2) + velocity(3) * ee(0:lbmDim,3)
+        distribution(0:lbmDim)  = wt(0:lbmDim) * density * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+    END SUBROUTINE
 end module FluidDomain
