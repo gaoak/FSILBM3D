@@ -66,7 +66,7 @@ module SolidBody
         real(8):: IBPenaltyalpha,alphaf,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
         integer:: nfishGroup,isKB,ntolFEM
         integer:: iFish,ifishGroup,numX,numY,numZ
-        character(LEN=40) :: t_FEmeshName
+        character(LEN=40) :: t_FEmeshName,keywordstr
         integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
         real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
         real(8):: t_freq,firstXYZ(1:3),deltaXYZ(1:3)
@@ -80,7 +80,8 @@ module SolidBody
         real(8),allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
         ! read body parameters from inflow file
         open(unit=111, file=filename, status='old', action='read')
-        call found_keyword(111,'SolidBody')
+        keywordstr = 'SolidBody'
+        call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*)    IBPenaltyalpha,alphaf
         call readNextData(111, buffer)
@@ -588,6 +589,7 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         integer, intent(in) :: x
         integer :: vtor_
+        vtor_ = 0
         if (this%v_type .eq. 1)then
             vtor_ = this%vtor(x)
         elseif (this%v_type .eq. -1)then

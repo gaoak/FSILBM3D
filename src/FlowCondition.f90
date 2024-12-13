@@ -23,8 +23,10 @@ module FlowCondition
         implicit none
         character(LEN=40),intent(in):: filename
         character(LEN=256):: buffer
+        character(LEN=40):: keywordstr
         open(unit=111, file=filename, status='old', action='read')
-        call found_keyword(111,'FlowCondition')
+        keywordstr = 'FlowCondition'
+        call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(111,*)    flow%isConCmpt,flow%numsubstep
         call readNextData(111, buffer)

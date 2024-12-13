@@ -42,9 +42,11 @@ module FluidDomain
         character(LEN=40),intent(in):: filename
         integer:: iblock
         character(LEN=256):: buffer
+        character(LEN=40):: keywordstr
         ! creat LBMblks and read parameters
         open(unit=111, file=filename, status='old', action='read')
-        call found_keyword(111,'FluidDomain')
+        keywordstr = 'FluidDomain'
+        call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*) m_nblock
         allocate(LBMblks(m_nblock))
