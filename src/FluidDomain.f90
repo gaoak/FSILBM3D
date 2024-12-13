@@ -1073,9 +1073,9 @@ module FluidDomain
         implicit none
         real(8):: zCoord,yCoord,xCoord
         real(8):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:SpaceDim)
-        velocityOut(1) = velocityIn(1) + 0*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
-        velocityOut(2) = velocityIn(2) + xCoord*flow%shearRateIn(1) + 0*flow%shearRateIn(2) + zCoord*flow%shearRateIn(3);
-        velocityOut(3) = velocityIn(3) + xCoord*flow%shearRateIn(1) + yCoord*flow%shearRateIn(2) + 0*flow%shearRateIn(3);
+        velocityOut(1) = velocityIn(1) + 0*shearRate(1) + yCoord*shearRate(2) + zCoord*shearRate(3);
+        velocityOut(2) = velocityIn(2) + xCoord*shearRate(1) + 0*shearRate(2) + zCoord*shearRate(3);
+        velocityOut(3) = velocityIn(3) + xCoord*shearRate(1) + yCoord*shearRate(2) + 0*shearRate(3);
     END SUBROUTINE
 
     ! calcualte distribution Function 
