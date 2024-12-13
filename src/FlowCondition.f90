@@ -2,6 +2,7 @@ module FlowCondition
     implicit none
     private
     public :: FlowCondType,flow
+    public :: read_flow_conditions
     type :: FlowCondType
         integer :: isRelease,isConCmpt,numsubstep
         real(8) :: timeSimTotal,timeConDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta

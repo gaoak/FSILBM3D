@@ -4,7 +4,9 @@ module FluidDomain
     implicit none
     private
     integer :: m_nblock
-    public:: LBMblks,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks
+    public:: LBMblks,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
+             check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_blocks,collision_blocks, &
+             write_continue_blocks,streaming_blocks,computeFieldStat_blocks
     type :: LBMBlock
         integer :: npsize
         integer :: ID,iCollidModel,offsetOutput
@@ -172,6 +174,14 @@ module FluidDomain
         integer:: iblock
         do iblock = 1,m_nblock
             call LBMblks(iblock)%write_flow(time)
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE computeFieldStat_blocks()
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%ComputeFieldStat()
         enddo
     END SUBROUTINE
 
@@ -1045,7 +1055,7 @@ module FluidDomain
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity u ', uLinfty(1)
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity v ', uLinfty(2)
         write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
-    endsubroutine ComputeFieldStat_
+    endsubroutine
 
     SUBROUTINE write_continue_(this,filename,step,time)
         IMPLICIT NONE

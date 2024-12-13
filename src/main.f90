@@ -11,7 +11,7 @@ PROGRAM main
     USE SolidBody
     USE FluidDomain
     implicit none
-    character(LEN=40):: filename
+    character(LEN=40):: parameterFile='inflow.dat',continueFile='continue.dat'
     integer:: isubstep=0,step=0
     real(8):: dt_solid, dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
@@ -19,17 +19,16 @@ PROGRAM main
     !==================================================================================================
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
-    filename = 'inflow.dat'
-    call read_flow_conditions(filename)
-    call read_solid_files(filename)
-    call read_fuild_blocks(filename)
+    call read_flow_conditions(parameterFile)
+    call read_solid_files(parameterFile)
+    call read_fuild_blocks(parameterFile)
     !==================================================================================================
     ! Allocate the memory for simulation
-    call allocate_solid_memory_blocks(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
+    call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
     call allocate_fuild_memory_blocks()
     !==================================================================================================
     ! Calculate all the reference values
-    call calculate_reference_params()
+    call calculate_reference_params(flow)
     call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(1)%BndConds,&
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref)
     !==================================================================================================
@@ -38,8 +37,8 @@ PROGRAM main
     call initialise_fuild_blocks(flow)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
-    call check_is_continue('./DatTemp/conwr.dat',step,time,flow%isConCmpt)
-    call write_information_titles()
+    call check_is_continue(continueFile,step,time,flow%isConCmpt)
+    !call write_information_titles()
     !==================================================================================================
     ! Update the volumn forces and calculate the macro quantities
     call update_volumn_force_blocks(time)
@@ -91,7 +90,7 @@ PROGRAM main
         write(*,*)'time   for   one   step:', (time_end1 - time_begine1)
         ! write data for continue computing
         if(DABS(time/flow%Tref-flow%timeConDelta*NINT(time/flow%Tref/flow%timeConDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            call write_continue_blocks(filename,step,time)
+            call write_continue_blocks(continueFile,step,time)
         endif
         ! write fluid and soild data
         if((flow%timeWriteBegin .le. time/flow%Tref) .and. (time/flow%Tref .le. flow%timeWriteEnd)) then
@@ -109,5 +108,5 @@ PROGRAM main
         !endif
     enddo
     ! write validation informations
-    call ComputeFieldStat()
+    call computeFieldStat_blocks()
 END PROGRAM main
