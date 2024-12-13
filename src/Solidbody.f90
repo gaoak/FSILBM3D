@@ -71,8 +71,7 @@ module SolidBody
         integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
         real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
         real(8):: t_freq,firstXYZ(1:3),deltaXYZ(1:3)
-        real(8):: t_XYZo(3),t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
-        real(8):: Lspan,AR  ! parameters for allocate_solid_memory()
+        real(8):: t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
         integer:: order1=0,order2=0,order3=0,lineX,lineY,lineZ
         character(LEN=40),allocatable:: FEmeshName(:)
         integer,allocatable:: fishNum(:)
@@ -614,7 +613,6 @@ module SolidBody
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2)
         real(8)::x0,y0,z0,detx,dety,detz,invdh
         integer::i0,j0,k0,iEL,x,y,z,i,j,k
-        integer(8):: index
         !==================================================================================================
         invdh = 1.D0/dh
         i0 = floor((this%v_Exyz(1,1) - xmin) * invdh)
@@ -627,7 +625,7 @@ module SolidBody
         z0 = zmin + dble(k0) * dh
         k0 = k0 + 1
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz,detx,dety,detz,ix,jy,kz,index)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,i,j,k,x,y,z,rx,ry,rz,detx,dety,detz,ix,jy,kz)
         do  iEL=1,this%v_nelmts
             call minloc_fast(this%v_Exyz(1,iEL), x0, i0, invdh, i, detx)
             call minloc_fast(this%v_Exyz(2,iEL), y0, j0, invdh, j, dety)

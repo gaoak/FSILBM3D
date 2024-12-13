@@ -143,7 +143,7 @@
     SUBROUTINE found_keyword(fileID,keyword)
         implicit none
         integer:: fileID, IOstatus
-        character :: keyword
+        character(LEN=100) :: keyword
         character(len=50) :: readString
         readString = 'null'
         IOstatus = 0
