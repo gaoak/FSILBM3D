@@ -8,7 +8,7 @@ module ConstParams
                                          0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 1,-1, 1,-1, 0, 0, 0, 0, &
                                          0, 0, 0, 1,-1, 0, 0, 1, 1,-1,-1, 0, 0, 0, 0, 1,-1, 1,-1, &
                                          0, 0, 0, 0, 0, 1,-1, 0, 0, 0, 0, 1, 1,-1,-1, 1, 1,-1,-1  &
-                                                 ],[lbmDim+1,SpaceDim])
+                                         ],[lbmDim+1,SpaceDim])
     !   Opposite directions
     integer, parameter:: oppo(0:lbmDim) = [0, 2, 1, 4, 3, 6, 5, 10, 9, 8, 7, 14, 13, 12, 11, 18, 17, 16, 15]
     integer, parameter:: positivedirs(1:lbmDim/2) = [1, 3, 5, 7, 8, 11, 12, 15, 16]
