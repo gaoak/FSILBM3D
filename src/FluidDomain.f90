@@ -3,12 +3,11 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
-    integer :: m_nblock
+    integer :: m_nblock, m_npsize
     public:: LBMblks,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
              check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_blocks,collision_blocks, &
              write_continue_blocks,streaming_blocks,computeFieldStat_blocks
     type :: LBMBlock
-        integer :: npsize
         integer :: ID,iCollidModel,offsetOutput
         integer :: xDim,yDim,zDim
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
@@ -45,14 +44,14 @@ module FluidDomain
         character(LEN=40):: keywordstr
         ! creat LBMblks and read parameters
         open(unit=111, file=filename, status='old', action='read')
-        keywordstr = 'FluidDomain'
+        keywordstr = 'FluidBlocks'
         call found_keyword(111,keywordstr)
+        call readNextData(111, buffer)
+        read(buffer,*)   m_npsize
         call readNextData(111, buffer)
         read(buffer,*) m_nblock
         allocate(LBMblks(m_nblock))
         do iblock = 1,m_nblock
-            call readNextData(111, buffer)
-            read(buffer,*)    LBMblks(iblock)%npsize
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput
             call readNextData(111, buffer)
@@ -209,9 +208,9 @@ module FluidDomain
         allocate(this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax))
         allocate(this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax))
         ! allocate mesh partition
-        allocate(this%OMPpartition(1:this%npsize),this%OMPparindex(1:this%npsize+1),this%OMPeid(1:this%npsize))
-        allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:this%npsize))
-        call OMPPrePartition(this%xDim, this%npsize, this%OMPpartition, this%OMPparindex)
+        allocate(this%OMPpartition(1:m_npsize),this%OMPparindex(1:m_npsize+1),this%OMPeid(1:m_npsize))
+        allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:m_npsize))
+        call OMPPrePartition(this%xDim, m_npsize, this%OMPpartition, this%OMPparindex)
 
         contains
 
@@ -907,7 +906,7 @@ module FluidDomain
             if(dx.eq.0) return
 
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
-            do  p = 1,this%npsize
+            do  p = 1,m_npsize
                 if(dx .eq. -1) then
                     call swapxwAtom(f, edge(:,:,p), eid(p), i, zDim, yDim, xDim, lbmDim, parindex(p), parindex(p+1)-1)
                 elseif(dx.eq.1) then
@@ -916,7 +915,7 @@ module FluidDomain
             enddo
             !$OMP END PARALLEL DO
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(p)
-            do  p = 1,this%npsize
+            do  p = 1,m_npsize
                 f(:,:,eid(p),i) = edge(:,:,p)
             enddo
             !$OMP END PARALLEL DO

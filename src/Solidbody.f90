@@ -97,7 +97,7 @@ module SolidBody
         call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
         allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish),denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish),XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish),AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
         ! read fish parameters for each type
-        fishNum(1)=0
+        fishNum(1)=1
         do ifishGroup = 1,nfishGroup
             call readNextData(111, buffer)
             read(buffer,*)    fishNum(ifishGroup+1),numX,numY,numZ

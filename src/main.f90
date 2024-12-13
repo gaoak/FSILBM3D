@@ -11,7 +11,7 @@ PROGRAM main
     USE SolidBody
     USE FluidDomain
     implicit none
-    character(LEN=40):: parameterFile='inflow.dat',continueFile='continue.dat',checkFile='check.dat'
+    character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
     integer:: isubstep=0,step=0
     real(8):: dt_solid, dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]

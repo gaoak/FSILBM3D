@@ -157,7 +157,7 @@
             endif
         enddo
         if (index(readString, keyword) .EQ. 0) then
-            write(*,*) 'the parameters in inflow.dat do not exist.'
+            write(*,*) trim(keyword)//' is not found in inFlow.dat'
             stop
         endif
     END SUBROUTINE
@@ -179,7 +179,7 @@
         character(LEN=256):: buffer
         integer:: ifile, IOstatus
         do while(.true.)
-            read(ifile, *, IOSTAT=IOstatus) buffer
+            read(ifile, '(a)', IOSTAT=IOstatus) buffer
             if (IOstatus.ne.0) then
                 write(*, *) 'end of file encounter in readNextData', ifile
                 stop

@@ -28,29 +28,29 @@ module FlowCondition
         keywordstr = 'FlowCondition'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(111,*)    flow%isConCmpt,flow%numsubstep
+        read(buffer,*)    flow%isConCmpt,flow%numsubstep
         call readNextData(111, buffer)
-        read(111,*)    flow%timeSimTotal,flow%timeContiDelta
+        read(buffer,*)    flow%timeSimTotal,flow%timeContiDelta
         call readNextData(111, buffer)
-        read(111,*)    flow%timeWriteBegin,flow%timeWriteEnd
+        read(buffer,*)    flow%timeWriteBegin,flow%timeWriteEnd
         call readNextData(111, buffer)
-        read(111,*)    flow%timeFlowDelta,flow%timeBodyDelta,flow%timeInfoDelta
+        read(buffer,*)    flow%timeFlowDelta,flow%timeBodyDelta,flow%timeInfoDelta
         call readNextData(111, buffer)
-        read(111,*)    flow%Re,flow%dt,flow%denIn
+        read(buffer,*)    flow%Re,flow%dt,flow%denIn
         call readNextData(111, buffer)
-        read(111,*)    flow%uvwIn(1:3)
+        read(buffer,*)    flow%uvwIn(1:3)
         call readNextData(111, buffer)
-        read(111,*)    flow%shearRateIn(1:3)
+        read(buffer,*)    flow%shearRateIn(1:3)
         call readNextData(111, buffer)
-        read(111,*)    flow%volumeForceIn(1:3)
+        read(buffer,*)    flow%volumeForceIn(1:3)
         call readNextData(111, buffer)
-        read(111,*)    flow%volumeForceAmp,flow%volumeForceFreq,flow%volumeForcePhi
+        read(buffer,*)    flow%volumeForceAmp,flow%volumeForceFreq,flow%volumeForcePhi
         call readNextData(111, buffer)
-        read(111,*)    flow%TrefType,flow%Tref
+        read(buffer,*)    flow%TrefType,flow%Tref
         call readNextData(111, buffer)
-        read(111,*)    flow%UrefType,flow%Uref
+        read(buffer,*)    flow%UrefType,flow%Uref
         call readNextData(111, buffer)
-        read(111,*)    flow%ntolLBM,flow%dtolLBM
+        read(buffer,*)    flow%ntolLBM,flow%dtolLBM
         close(111)
     END SUBROUTINE
 

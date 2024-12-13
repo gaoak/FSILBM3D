@@ -1,9 +1,10 @@
 Parallel
 # parameter for mpi
+ 8                                            read(111,*) npsize
 EndParallel
 FlowCondition
  1          1                                 read(111,*) isConCmpt,numsubstep
- 50.00D+0   10.00D+0                          read(111,*) timeSimTotal,timeContiDelta
+ 0.02D+0   10.00D+0                          read(111,*) timeSimTotal,timeContiDelta
  0.000D+0   50.00D+0                          read(111,*) timeWriteBegin,timeWriteEnd
  0.100D+0   0.100D+0   0.010D+0               read(111,*) timeWriteFlow,timeWriteBody,timeWriteInfo
  40.00D+0   0.020D+0   1.000d+0               read(111,*) Re,dt,denIn
@@ -15,13 +16,13 @@ FlowCondition
  0          0.010D+0                          read(111,*) UrefType,Uref
  10         0.001D+0                          read(111,*) ntolLBM,dtolLBM
 ENDFlowCondition
- 1                                            read(111,*) nblock
 FluidBlocks
- 8                                            read(111,*) npsize
+ 16                                            read(111,*) m_npsize
+ 1                                            read(111,*) nblock
  1         1         0                        read(111,*) ID,iCollideModel,offsetOutput
  801       100       50                       read(111,*) xDim,yDim,zDim
- 0.020D+0  0.000D+0  0.000D+0  0.000D+0       read(111,*) dh,xmin,ymin,zmin
- 102   103   201   201   301   301            read(111,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 0.020D+0  -6.000D+0  -1.000D+0  0.000D+0     read(111,*) dh,xmin,ymin,zmin
+ 102   103   301   301   301   301            read(111,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0   0   0   0   0   0   0   0   0   0        read(111,*) params(1:10)
 ENDFluidBlocks
 SolidBody
