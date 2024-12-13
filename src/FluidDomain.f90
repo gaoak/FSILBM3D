@@ -72,6 +72,29 @@ module FluidDomain
         close(111)
     END SUBROUTINE
 
+    ! Check whether the calculation is continued
+    SUBROUTINE check_is_continue(filename,step,time,isContinue)
+        implicit none
+        character(LEN=40),intent(in):: filename
+        integer,intent(out):: step
+        real(8),intent(out):: time
+        integer:: isContinue,iblock
+        logical:: alive
+        inquire(file=filename, exist=alive)
+        if (isContinue==1 .and. alive) then
+            write(*,*)  '=============================================='
+            write(*,*)  '==============Continue computing=============='
+            write(*,*)  '=============================================='
+            do iblock = 1,m_nblock
+                call LBMblks(iblock)%read_continue(filename,step,time)
+            enddo
+        else
+            write(*,*)  '=============================================='
+            write(*,*)  '=================New computing================'
+            write(*,*)  '=============================================='
+        endif
+    END SUBROUTINE
+
     !=================================================================================================
     ! Functions to iterate over each block
     SUBROUTINE allocate_fuild_memory_blocks()
@@ -99,22 +122,11 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE read_continue_blocks(filename,step,time)
-        implicit none
-        character(LEN=40),intent(in):: filename
-        integer,intent(out):: step
-        real(8),intent(out):: time
-        integer:: iblock
-        do iblock = 1,m_nblock
-            call LBMblks(iblock)%read_continue(filename,step,time)
-        enddo
-    END SUBROUTINE
-
     SUBROUTINE write_continue_blocks(filename,step,time)
         implicit none
         character(LEN=40),intent(in):: filename
-        integer,intent(out):: step
-        real(8),intent(out):: time
+        integer:: step
+        real(8):: time
         integer:: iblock
         do iblock = 1,m_nblock
             call LBMblks(iblock)%write_continue(filename,step,time)
@@ -411,7 +423,7 @@ module FluidDomain
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
                 call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,1,1:SpaceDim),fTmp(0:lbmDim))
+                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,1,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
             enddo
             enddo
@@ -470,7 +482,7 @@ module FluidDomain
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
                 call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,this%xDim,1:SpaceDim),fTmp(0:lbmDim))
+                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,this%xDim,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
@@ -529,7 +541,7 @@ module FluidDomain
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
                 call evaluate_shear_velocity(zCoord,this%ymin,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,1,x,1:SpaceDim),fTmp(0:lbmDim))
+                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,1,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
             enddo
             enddo
@@ -538,7 +550,7 @@ module FluidDomain
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
                 call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,this%xDim,1:SpaceDim),fTmp(0:lbmDim))
+                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,this%xDim,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
@@ -597,7 +609,7 @@ module FluidDomain
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
                 call evaluate_shear_velocity(zCoord,this%ymax,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,this%yDim,x,1:SpaceDim),fTmp(0:lbmDim))
+                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,this%yDim,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
@@ -656,7 +668,7 @@ module FluidDomain
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
                 call evaluate_shear_velocity(this%zmin,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(1,y,x,1:SpaceDim),fTmp(0:lbmDim))
+                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(1,y,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
@@ -715,7 +727,7 @@ module FluidDomain
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
                 call evaluate_shear_velocity(this%zmax,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(this%zDim,y,x,1:SpaceDim),fTmp(0:lbmDim))
+                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(this%zDim,y,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
             enddo
@@ -939,12 +951,11 @@ module FluidDomain
         integer,parameter::nameLen=10,idfile=100
         character (LEN=nameLen):: fileName
         real(8):: invUref
-        real(8):: get_cpu_time, waittime
-        integer,dimension(8) :: values0,values1
-        call date_and_time(VALUES=values0)
+        real(8):: waittime,time_begine,time_end
+        call get_now_time(time_begine)
         call mywait()
-        call date_and_time(VALUES=values1)
-        waittime = get_cpu_time(values1)-get_cpu_time(values0)
+        call get_now_time(time_end)
+        waittime = time_end - time_begine
         if(waittime.gt.1.d-1) then
             write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
         endif

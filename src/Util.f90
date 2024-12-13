@@ -151,7 +151,7 @@
         do while(IOstatus.eq.0)
             read(fileID, *, IOSTAT=IOstatus) readString
             call to_lowercase(readString)
-            call adjustl(readString)
+            readString = adjustl(readString)
             if (index(readString, keyword) .GT. 0) then
                 exit
             endif
@@ -184,7 +184,7 @@
                 write(*, *) 'end of file encounter in readNextData', ifile
                 stop
             endif
-            call adjustl(buffer)
+            buffer = adjustl(buffer)
             if(buffer(1:1).ne.'#') then
                 exit
             endif
@@ -201,30 +201,9 @@
                 write(*, *) 'end of file encounter in readequal', ifile
                 stop
             endif
-            call adjustl(buffer)
+            buffer = adjustl(buffer)
             if(buffer(1:1).eq.'=') then
                 exit
             endif
         enddo
-    END SUBROUTINE
-
-    ! Check whether the calculation is continued
-    SUBROUTINE check_is_continue(filename,step,time,isContinue)
-        implicit none
-        character(LEN=40),intent(in):: filename
-        integer,intent(out):: step
-        real(8),intent(out):: time
-        integer:: isContinue
-        logical:: alive
-        inquire(file=filename, exist=alive)
-        if (isContinue==1 .and. alive) then
-            write(*,*)  '=============================================='
-            write(*,*)  '==============Continue computing=============='
-            write(*,*)  '=============================================='
-            call read_continue_blocks(filename,step,time)
-        else
-            write(*,*)  '=============================================='
-            write(*,*)  '=================New computing================'
-            write(*,*)  '=============================================='
-        endif
     END SUBROUTINE

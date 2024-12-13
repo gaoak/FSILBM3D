@@ -687,18 +687,18 @@ module SolidBody
             do k_=-1,2
                 ix_(k_) = i_ + k_
                 if (ix_(k_)<1) then
-                    if(boundaryConditions_(1).eq.BCPeriodic) then
+                    if(boundaryConditions_(1).eq.Periodic) then
                         ix_(k_) = ix_(k_) + xDim_
-                    else if((boundaryConditions_(1).eq.BCSYMMETRIC .or. boundaryConditions_(1).eq.BCwall) .and. ix_(k_).eq.0) then
+                    else if((boundaryConditions_(1).eq.Symmetric .or. boundaryConditions_(1).eq.stationary_Wall) .and. ix_(k_).eq.0) then
                         ix_(k_) = 2
                     else
                         write(*,*) 'index out of xmin bound', ix_(k_)
                         stop
                     endif
                 else if(ix_(k_)>xDim_) then
-                    if(boundaryConditions_(2).eq.BCPeriodic) then
+                    if(boundaryConditions_(2).eq.Periodic) then
                         ix_(k_) = ix_(k_) - xDim_
-                    else if((boundaryConditions_(2).eq.BCSYMMETRIC .or. boundaryConditions_(2).eq.BCwall) .and. ix_(k_).eq.xDim_+1) then
+                    else if((boundaryConditions_(2).eq.Symmetric .or. boundaryConditions_(2).eq.stationary_Wall) .and. ix_(k_).eq.xDim_+1) then
                         ix_(k_) = xDim_ - 1
                     else
                         write(*,*) 'index out of xmax bound', ix_(k_)
