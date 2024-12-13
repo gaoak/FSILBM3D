@@ -11,7 +11,7 @@ PROGRAM main
     USE SolidBody
     USE FluidDomain
     implicit none
-    character(LEN=40):: parameterFile='inflow.dat',continueFile='continue.dat'
+    character(LEN=40):: parameterFile='inflow.dat',continueFile='continue.dat',checkFile='check.dat'
     integer:: isubstep=0,step=0
     real(8):: dt_solid, dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
@@ -31,6 +31,7 @@ PROGRAM main
     call calculate_reference_params(flow)
     call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(1)%BndConds,&
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref)
+    call write_parameter_check_file(checkFile)
     !==================================================================================================
     ! Initialization before simulation
     call initialise_solid_bodies(0.d0, g)

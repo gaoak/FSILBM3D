@@ -2,7 +2,7 @@ module FlowCondition
     implicit none
     private
     public :: FlowCondType,flow
-    public :: read_flow_conditions
+    public :: read_flow_conditions,write_parameter_check_file
     type :: FlowCondType
         integer :: isConCmpt,numsubstep
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
@@ -12,8 +12,7 @@ module FlowCondition
         real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
         real(8) :: Uref,Lref,Tref
         real(8) :: Aref,Fref,Eref,Pref
-        !real(8) :: velocityType,velocityAmp,velocityFreq,velocityPhi
-        real(8):: Asfac,Lchod,Lspan,AR ! fish area, length
+        real(8) :: Asfac,Lchod,Lspan,AR 
     end type FlowCondType
     type(FlowCondType) :: flow
 
@@ -53,4 +52,26 @@ module FlowCondition
         close(111)
     END SUBROUTINE
 
+    SUBROUTINE  write_parameter_check_file(filename)
+        implicit none
+        character(LEN=40):: filename
+        open(111,file=filename)
+        write(111,'(A      )')'===================================================================='
+        write(111,'(A,F20.10)')'Re   =', flow%Re
+        write(111,'(A,F20.10)')'dt   =', flow%dt
+        write(111,'(A,F20.10)')'den  =', flow%denIn
+        write(111,'(A      )')'===================================================================='
+        write(111,'(A,F20.10)')'Nu   =', flow%Nu
+        write(111,'(A,F20.10)')'Mu   =', flow%Mu
+        write(111,'(A      )')'===================================================================='
+        write(111,'(A,F20.10)')'Lref =', flow%Lref
+        write(111,'(A,F20.10)')'Uref =', flow%Uref
+        write(111,'(A,F20.10)')'Tref =', flow%Tref
+        write(111,'(A,F20.10)')'Aref =', flow%Aref
+        write(111,'(A,F20.10)')'Pref =', flow%Pref
+        write(111,'(A,F20.10)')'Eref =', flow%Eref
+        write(111,'(A,F20.10)')'Fref =', flow%Fref
+        write(111,'(A      )')'===================================================================='
+        close(111)
+    END SUBROUTINE
 end module FlowCondition

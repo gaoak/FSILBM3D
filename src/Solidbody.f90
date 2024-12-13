@@ -4,7 +4,6 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
-    public :: set_solidbody_parameters ! use for calculating reference values in flow condition
     integer:: m_nFish, m_ntolLBM
     real(8):: m_dtolLBM, m_IBPenaltyBeta, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
@@ -14,7 +13,7 @@ module SolidBody
     ! Pbeta     coefficient in penalty force calculation
     public :: VBodies,read_solid_files,allocate_solid_memory,Initialise_solid_bodies,Write_solid_v_bodies,FSInteraction_force, &
               Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check,Write_solid_Data,Write_SampBodyNode, &
-              calculate_reference_params
+              calculate_reference_params,set_solidbody_parameters
     type :: VirtualBody
         type(BeamSolver):: rbm
         !!!virtual infomation
