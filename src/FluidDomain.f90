@@ -338,14 +338,6 @@ module FluidDomain
         END SUBROUTINE initialize_flow
     END SUBROUTINE initialise_
 
-    !SUBROUTINE evaluateShearVelocity(xCoord,yCoord,zCoord,velocity)
-    !    implicit none
-    !    real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
-    !    velocity(1) = m_uuuIn(1) + 0 * m_shearRateIn(1) + yCoord * m_shearRateIn(2) + zCoord * m_shearRateIn(3)
-    !    velocity(2) = m_uuuIn(2) + xCoord * m_shearRateIn(1) + 0 * m_shearRateIn(2) + zCoord * m_shearRateIn(3)
-    !    velocity(3) = m_uuuIn(3) + xCoord * m_shearRateIn(1) + yCoord * m_shearRateIn(2) + 0 * m_shearRateIn(3)
-    !END SUBROUTINE
-
     !SUBROUTINE evaluateOscillatoryVelocity(velocity,time)
     !    implicit none
     !    real(8):: velocity(1:SpaceDim)
