@@ -85,16 +85,16 @@ module FluidDomain
         logical:: alive
         inquire(file=filename, exist=alive)
         if (isContinue==1 .and. alive) then
-            write(*,*)  '=============================================='
-            write(*,*)  '==============Continue computing=============='
-            write(*,*)  '=============================================='
+            write(*,'(A)') '========================================================='
+            write(*,'(A)') '=================== Continue computing =================='
+            write(*,'(A)') '========================================================='
             do iblock = 1,m_nblock
                 call LBMblks(iblock)%read_continue(filename,step,time)
             enddo
         else
-            write(*,*)  '=============================================='
-            write(*,*)  '=================New computing================'
-            write(*,*)  '=============================================='
+            write(*,'(A)') '========================================================='
+            write(*,'(A)') '====================== New computing ===================='
+            write(*,'(A)') '========================================================='
         endif
     END SUBROUTINE
 
@@ -331,16 +331,16 @@ module FluidDomain
 
         SUBROUTINE initialize_flow()
             implicit none
-            real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim)
+            real(8):: fEq(0:lbmDim)
             real(8):: xCoord,yCoord,zCoord
             integer:: x, y, z
             ! calculating initial flow velocity
             do  x = 1, this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1, this%yDim
-                yCoord = this%ymin + this%dh * (x - 1);
+                yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1, this%zDim
-                zCoord = this%zmin + this%dh * (x - 1);
+                zCoord = this%zmin + this%dh * (z - 1);
                 call evaluate_shear_velocity(zCoord,yCoord,xCoord,flow%uvwIn,this%uuu,flow%shearRateIn)
             enddo
             enddo
@@ -350,10 +350,7 @@ module FluidDomain
             do  x = 1, this%xDim
             do  y = 1, this%yDim
             do  z = 1, this%zDim
-                uSqr           = sum(this%uuu(z,y,x,1:3)**2)
-                uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
-                fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
-                
+                call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:3) ,fEq(0:lbmDim))
                 this%fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
             enddo
             enddo

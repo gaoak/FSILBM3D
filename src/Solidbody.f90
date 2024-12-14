@@ -246,7 +246,7 @@ module SolidBody
         real(8),intent(out):: Asfac,Lchod,Lspan,AR
         real(8) :: nAsfac(m_nFish),nLchod(m_nFish)
         integer :: iFish,maxN
-        write(*,'(A)') '=============================================================================='
+        write(*,'(A)') '========================================================='
         do iFish = 1,m_nFish
             if (dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3))-0.d0) .gt. 1e-5 .or. &
                 dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3))-0.d0) .gt. 1e-5) then

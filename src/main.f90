@@ -51,7 +51,7 @@ PROGRAM main
     call Write_solid_v_bodies(time)
     call get_now_time(time_end1)             ! end time for the preparation before computing
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
-    write(*,'(A)') '========================================================'
+    write(*,'(A)') '========================================================='
     !==================================================================================================
     dt_fluid = flow%dt                       !time step of the fluid 
     dt_solid = flow%dt/flow%numsubstep       !time step of the solid
@@ -60,9 +60,9 @@ PROGRAM main
         call get_now_time(time_begine1)
         time = time + dt_fluid
         step = step + 1
-        write(*,'(A)') '========================================================'
+        write(*,'(A)') '========================================================='
         write(*,'(A,I6,A,F15.10)')' Steps:',step,'    Time/Tref:',time/flow%Tref
-        write(*,'(A)')' ----------------------fluid solver----------------------'
+        write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
         call get_now_time(time_begine2)
         CALL streaming_blocks()
@@ -80,15 +80,18 @@ PROGRAM main
         call get_now_time(time_begine2)
         call collision_blocks()
         call get_now_time(time_end2)
-        write(*,*)'time for collision_step:', (time_end2 - time_begine2)
+        write(*,*)'Time for collision step:', (time_end2 - time_begine2)
         !IBM solver
-        write(*,'(A)')' ----------------------solid solver----------------------'
+        write(*,'(A)')' --------------------- solid solver ---------------------'
+        call get_now_time(time_begine2)
         do isubstep=1,flow%numsubstep
             call Solver(time,isubstep,dt_fluid,dt_solid)
         enddo !do isubstep=1,numsubstep
-        write(*,'(A)')' --------------------------------------------------------'
+        call get_now_time(time_end2)
+        write(*,*)'Time   for  solid  step:', (time_end2 - time_begine2)
+        write(*,'(A)')' ----------------------- one step -----------------------'
         call get_now_time(time_end1)
-        write(*,*)'time   for   one   step:', (time_end1 - time_begine1)
+        write(*,*)'Time   for   one   step:', (time_end1 - time_begine1)
         ! write data for continue computing
         if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
             call write_continue_blocks(continueFile,step,time)
