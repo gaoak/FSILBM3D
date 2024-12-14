@@ -48,26 +48,13 @@ SolidBody
  0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAAmpl(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAPhi(1:3,iFish)
  ===
- 1          1          1          1           read(111,*) fishNum(fishGroup),numX,numY,numZ
- Beam.dat                                     read(111,*) FEmeshName(iFish)
- 1          1                                 read(111,*) iBodyModel(iFish),iBodyType(iFish)
- 1          1          1                      read(111,*) isMotionGiven(1:3,iFish)
- 1          1          1                      read(111,*) isMotionGiven(4:6,iFish)
- 1.000D-0   0.250D+0                          read(111,*) denR(iFish), psR(iFish)
- 1.000D+3   1.000D+3                          read(111,*) [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
- 0.010D+0   0.000D+0                          read(111,*) freq(iFish),St(iFish)
- 0.000D+0   0.000D+0   0.000D+0               read(111,*) firstXYZ(1:3)
- 0.000D+0   0.000D+0   0.000D+0               read(111,*) deltaXYZ(1:3)
- 0.000D+0   0.000D+0   0.000D+0               read(111,*) XYZAmpl(1:3,iFish)
- 0.000D+0   0.000D+0   0.000D+0               read(111,*) XYZPhi(1:3,iFish)
- 0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAo(1:3,iFish)
- 0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAAmpl(1:3,iFish)
- 0.000D+0   0.000D+0   0.000D+0               read(111,*) AoAPhi(1:3,iFish)
 ENDSolidBody
-Probing
- 1                                            read(111,*) fluidProbingNum
- 0.000d+0   0.000D+0   1.000D+0               read(111,*) fluidProbingCoords(fluidProbingNum,1:3)
-===
- 1                                            read(111,*) solidProbingNum
- 50                                           read(111,*) solidProbingNode(solidProbingNum)
+ProbingFluid
+ 0                                            read(111,*) fluidProbingNum (0: no output)
+ 1.500d+0   0.000D+0   0.500D+0               read(111,*) fluidProbingCoords(1,1:3)
+ 1.500d+0   0.000D+0   0.500D+0               read(111,*) fluidProbingCoords(2,1:3)
+ProbingSolid
+ 0                                            read(111,*) solidProbingNum (0: no output)
+ 100                                          read(111,*) solidProbingNode(solidProbingNum)
+ 200                                          read(111,*) solidProbingNode(solidProbingNum)
 ENDProbing

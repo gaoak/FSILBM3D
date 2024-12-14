@@ -23,7 +23,11 @@ PROGRAM main
     call read_flow_conditions(parameterFile)
     call read_solid_files(parameterFile)
     call read_fuild_blocks(parameterFile)
+    call read_probe_params(parameterFile)
+    !==================================================================================================
+    ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)
+    !==================================================================================================
     ! Allocate the memory for simulation
     call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
     call allocate_fuild_memory_blocks(flow%npsize)
@@ -40,7 +44,7 @@ PROGRAM main
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)
-    !call write_information_titles()
+    call write_information_titles(m_nFish)
     !==================================================================================================
     ! Update the volumn forces and calculate the macro quantities
     call update_volumn_force_blocks(time)
@@ -63,7 +67,7 @@ PROGRAM main
         time = time + dt_fluid
         step = step + 1
         write(*,'(A)') '========================================================='
-        write(*,'(A,I6,A,F15.10)')' Steps:',step,'    Time/Tref:',time/flow%Tref
+        write(*,'(A,I6,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
         call get_now_time(time_begine2)
@@ -92,9 +96,8 @@ PROGRAM main
         enddo !do isubstep=1,numsubstep
         call get_now_time(time_end2)
         write(*,*)'Time   for  solid  step:', (time_end2 - time_begine2)
-        write(*,'(A)')' ----------------------- one step -----------------------'
-        call get_now_time(time_end1)
-        write(*,*)'Time   for   one   step:', (time_end1 - time_begine1)
+        write(*,'(A)')' ---------------------- write infos ---------------------'
+        call get_now_time(time_begine2)
         ! write data for continue computing
         if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
             call write_continue_blocks(continueFile,step,time)
@@ -111,8 +114,14 @@ PROGRAM main
         endif
         ! write processing informations
         !if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
-        !    call write_information()
+        !    call write_processing_information()
+        !    call write_probes_information()
         !endif
+        call get_now_time(time_end2)
+        write(*,*)'Time  for writing  step:', (time_end2 - time_begine2)
+        write(*,'(A)')' ----------------------- one step -----------------------'
+        call get_now_time(time_end1)
+        write(*,*)'Time   for   one   step:', (time_end1 - time_begine1)
     enddo
     ! write validation informations
     call computeFieldStat_blocks()

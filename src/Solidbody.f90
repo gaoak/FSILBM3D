@@ -4,6 +4,7 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
+    public :: m_nFish
     integer:: m_nFish, m_ntolLBM
     real(8):: m_dtolLBM, m_IBPenaltyAlpha, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
@@ -63,7 +64,7 @@ module SolidBody
         implicit none
         character(LEN=40),intent(in):: filename
         character(LEN=256):: buffer
-        real(8):: IBPenaltyalpha,alphaf,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
+        real(8):: alphaf,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
         integer:: nfishGroup,isKB,ntolFEM
         integer:: iFish,ifishGroup,numX,numY,numZ
         character(LEN=40) :: t_FEmeshName,keywordstr

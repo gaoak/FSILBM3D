@@ -109,26 +109,6 @@
     TTT=matmul(rrx,TTT)
 
     end subroutine
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   write  string to unit=idfile  in binary format
-!   copyright@ RuNanHua
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine dumpstring(instring,idfile)
-    implicit none
-    character(40) instring
-    integer:: nascii,ii,len,idfile
-
-    len=LEN_TRIM(instring)
-
-    do    ii=1,len
-        nascii=ICHAR(instring(ii:ii))
-        write(idfile) nascii
-    enddo
-
-    write(idfile) 0
-
-    return
-    endsubroutine dumpstring
 
     ! get the time right now
     SUBROUTINE get_now_time(now_time) 
