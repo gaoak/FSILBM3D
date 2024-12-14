@@ -22,7 +22,7 @@ FluidBlocks
  801       100       50                       read(111,*) xDim,yDim,zDim
  0.020D+0  -6.000D+0  -1.000D+0  0.000D+0     read(111,*) dh,xmin,ymin,zmin
  102   103   301   301   301   301            read(111,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0   0   0   0   0   0   0   0   0   0        read(111,*) params(1:10)
+ 0.25   0   0   0   0   0   0   0   0   0     read(111,*) params(1:10)
 ENDFluidBlocks
 SolidBody
 # general parameters for solid solver
