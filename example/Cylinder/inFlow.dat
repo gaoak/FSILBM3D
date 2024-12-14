@@ -14,7 +14,7 @@ FlowCondition
  0.000D+0   0.000D+0   0.000D+0               read(111,*) volumeForceAmp,volumeForceFreq,volumeForcePhi
  0          100.0D+0                          read(111,*) TrefType,Tref
  0          0.010D+0                          read(111,*) UrefType,Uref
- 10         0.001D+0                          read(111,*) ntolLBM,dtolLBM
+ 10         0.010D+0                          read(111,*) ntolLBM,dtolLBM
 ENDFlowCondition
 FluidBlocks
  16                                           read(111,*) m_npsize
