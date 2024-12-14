@@ -30,7 +30,7 @@ SolidBody
  0.500d+0   1.000d+0                          read(111,*) NewmarkGamma,NewmarkBeta
  0.000d+0   0.000d+0                          read(111,*) dampK,dampM
  1.000D-6   100			                      read(111,*) dtolFEM,ntolFEM
- 2          2          1          1           read(111,*) nFish,nfishGroup,isKB
+ 1          1          1          1           read(111,*) nFish,nfishGroup,isKB
 # parameters for each body
  1          1          1          1           read(111,*) fishNum(fishGroup),numX,numY,numZ
  Beam.dat                                     read(111,*) FEmeshName(iFish)
