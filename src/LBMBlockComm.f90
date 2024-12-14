@@ -69,7 +69,7 @@ module LBMBlockComm
         endif
         if(pair%sondirs(6).eq.1) then
             LBMblks(pair%sonId)%fIn(1:szD,1:syD,szD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS:fzE,fyS:fyE,fxE,0:lbmDim)
-            LBMblks(pair%fatherId)%fIn((fzS+1):(fzE-1),(fyE-1),(fxS+1):(fxE-1),0:lbmDim) = LBMblks(pair%sonId).fIn(2:(szD-1),(syD-1),2:(sxD-1),0:lbmDim)
+            LBMblks(pair%fatherId)%fIn((fzS+1):(fzE-1),(fyE-1),(fxS+1):(fxE-1),0:lbmDim) = LBMblks(pair%sonId)%fIn(2:(szD-1),(syD-1),2:(sxD-1),0:lbmDim)
         endif
     end subroutine ExchangeDataSerial
 end module LBMBlockComm
