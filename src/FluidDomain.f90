@@ -385,7 +385,7 @@ module FluidDomain
         real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
         real(8):: fEq(0:lbmDim),fEqi(0:lbmDim),fTmp(0:lbmDim)
         ! set the x direction (inlet) --------------------------------------------------------------------
-        if (this%BndConds(1) .eq. Eq_DirecletU) then
+        if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -395,7 +395,7 @@ module FluidDomain
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim))
             enddo
             enddo
-        elseif(this%BndConds(1) .eq. nEq_DirecletU)then
+        elseif(this%BndConds(1) .eq. BCnEq_DirecletU)then
             ! non-equilibriun extrapoltion scheme
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -410,18 +410,18 @@ module FluidDomain
                 this%fIn(z,y,1,[1,7,9,11,13]) = fEq([1,7,9,11,13]) + (this%fIn(z,y,2,[1,7,9,11,13]) - fEqi([1,7,9,11,13]))
             enddo
             enddo
-        elseif(this%BndConds(1) .eq. order1_Extrapolate)then
+        elseif(this%BndConds(1) .eq. BCorder1_Extrapolate)then
             this%fIn(:,:,1,[1,7,9,11,13]) = this%fIn(:,:,2,[1,7,9,11,13])
-        elseif(this%BndConds(1) .eq. order2_Extrapolate)then
+        elseif(this%BndConds(1) .eq. BCorder2_Extrapolate)then
             this%fIn(:,:,1,[1,7,9,11,13]) = 2.0*this%fIn(:,:,2,[1,7,9,11,13]) - this%fIn(:,:,3,[1,7,9,11,13])
-        elseif(this%BndConds(1) .eq. stationary_Wall)then
+        elseif(this%BndConds(1) .eq. BCstationary_Wall)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
                 fTmp([1,7,9,11,13]) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
             enddo
             enddo
-        elseif(this%BndConds(1) .eq. moving_Wall)then 
+        elseif(this%BndConds(1) .eq. BCmoving_Wall)then
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
@@ -431,20 +431,20 @@ module FluidDomain
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
             enddo
             enddo
-        elseif(this%BndConds(1) .eq. Symmetric)then
+        elseif(this%BndConds(1) .eq. BCSymmetric)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
                 fTmp([1,7,9,11,13]) = this%fIn(z,y,1,[2,8,10,12,14])
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
             enddo
             enddo
-        elseif(this%BndConds(1) .eq. Periodic)then
+        elseif(this%BndConds(1) .eq. BCPeriodic .or. this%BndConds(1) .eq. BCfluid)then
             ! no need to set
         else
             stop 'inlet (xmin) has no such boundary condition'
         endif
         ! set the x direction (outlet) -------------------------------------------------------------------
-        if (this%BndConds(2) .eq. Eq_DirecletU) then
+        if (this%BndConds(2) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -454,7 +454,7 @@ module FluidDomain
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,this%xDim,0:lbmDim))
             enddo
             enddo
-        elseif(this%BndConds(2) .eq. nEq_DirecletU)then
+        elseif(this%BndConds(2) .eq. BCnEq_DirecletU)then
             ! non-equilibriun extrapoltion scheme
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -469,18 +469,18 @@ module FluidDomain
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fEq([2,8,10,12,14]) + (this%fIn(z,y,this%xDim-1,[2,8,10,12,14]) - fEqi([2,8,10,12,14]))
             enddo
             enddo
-        elseif(this%BndConds(2) .eq. order1_Extrapolate)then
+        elseif(this%BndConds(2) .eq. BCorder1_Extrapolate)then
             this%fIn(:,:,this%xDim,[2,8,10,12,14]) = this%fIn(:,:,this%xDim-1,[2,8,10,12,14])
-        elseif(this%BndConds(2) .eq. order2_Extrapolate)then
+        elseif(this%BndConds(2) .eq. BCorder2_Extrapolate)then
             this%fIn(:,:,this%xDim,[2,8,10,12,14]) = 2.0*this%fIn(:,:,this%xDim-1,[2,8,10,12,14])-this%fIn(:,:,this%xDim-2,[2,8,10,12,14])
-        elseif(this%BndConds(2) .eq. stationary_Wall)then
+        elseif(this%BndConds(2) .eq. BCstationary_Wall)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
                 fTmp([2,8,10,12,14]) = this%fIn(z,y,this%xDim,oppo([2,8,10,12,14]))
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
-        elseif(this%BndConds(2) .eq. moving_Wall)then 
+        elseif(this%BndConds(2) .eq. BCmoving_Wall)then
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
@@ -490,20 +490,20 @@ module FluidDomain
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
-        elseif(this%BndConds(2) .eq. Symmetric)then
+        elseif(this%BndConds(2) .eq. BCSymmetric)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
                 fTmp([2,8,10,12,14]) = this%fIn(z,y,this%xDim,[1,7,9,11,13])
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
-        elseif(this%BndConds(2) .eq. Periodic)then
+        elseif(this%BndConds(2) .eq. BCPeriodic .or. this%BndConds(2) .eq. BCfluid)then
             ! no need to set
         else
             stop 'outlet (xmax) has no such boundary condition'
         endif
         ! set the y direction (lower) --------------------------------------------------------------------
-        if (this%BndConds(3) .eq. Eq_DirecletU) then
+        if (this%BndConds(3) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -513,7 +513,7 @@ module FluidDomain
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,1,x,0:lbmDim))
             enddo
             enddo
-        elseif(this%BndConds(3) .eq. nEq_DirecletU)then
+        elseif(this%BndConds(3) .eq. BCnEq_DirecletU)then
             ! non-equilibriun extrapoltion scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -528,18 +528,18 @@ module FluidDomain
                 this%fIn(z,1,x,[3,7,8,15,17]) = fEq([3,7,8,15,17]) + (this%fIn(z,2,x,[3,7,8,15,17]) - fEqi([3,7,8,15,17]))
             enddo
             enddo
-        elseif(this%BndConds(3) .eq. order1_Extrapolate)then
+        elseif(this%BndConds(3) .eq. BCorder1_Extrapolate)then
             this%fIn(:,1,:,[3,7,8,15,17]) = this%fIn(:,2,:,[3,7,8,15,17])
-        elseif(this%BndConds(3) .eq. order2_Extrapolate)then
+        elseif(this%BndConds(3) .eq. BCorder2_Extrapolate)then
             this%fIn(:,1,:,[3,7,8,15,17]) = 2.0*this%fIn(:,2,:,[3,7,8,15,17]) - this%fIn(:,3,:,[3,7,8,15,17])
-        elseif(this%BndConds(3) .eq. stationary_Wall)then
+        elseif(this%BndConds(3) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
                 fTmp([3,7,8,15,17]) = this%fIn(z,1,x,oppo([3,7,8,15,17]))
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
             enddo
             enddo
-        elseif(this%BndConds(3) .eq. moving_Wall)then 
+        elseif(this%BndConds(3) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
@@ -549,20 +549,20 @@ module FluidDomain
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
             enddo
             enddo
-        elseif(this%BndConds(3) .eq. Symmetric)then
+        elseif(this%BndConds(3) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
                 fTmp([3,7,8,15,17]) = this%fIn(z,1,x,[4,9,10,16,18])
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
             enddo
             enddo
-        elseif(this%BndConds(3) .eq. Periodic)then
+        elseif(this%BndConds(3) .eq. BCPeriodic .or. this%BndConds(3) .eq. BCfluid)then
             ! no need to set
         else
             stop 'lower boundary (ymin) has no such boundary condition'
         endif
         ! set the y direction (higher) -------------------------------------------------------------------
-        if (this%BndConds(4) .eq. Eq_DirecletU) then
+        if (this%BndConds(4) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -572,7 +572,7 @@ module FluidDomain
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,this%yDim,x,0:lbmDim))
             enddo
             enddo
-        elseif(this%BndConds(4) .eq. nEq_DirecletU)then
+        elseif(this%BndConds(4) .eq. BCnEq_DirecletU)then
             ! non-equilibriun extrapoltion scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -587,18 +587,18 @@ module FluidDomain
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fEq([4,9,10,16,18]) + (this%fIn(z,this%yDim-1,x,[4,9,10,16,18]) - fEqi([4,9,10,16,18]))
             enddo
             enddo
-        elseif(this%BndConds(4) .eq. order1_Extrapolate)then
+        elseif(this%BndConds(4) .eq. BCorder1_Extrapolate)then
             this%fIn(:,this%yDim,:,[4,9,10,16,18]) = this%fIn(:,this%yDim-1,:,[4,9,10,16,18])
-        elseif(this%BndConds(4) .eq. order2_Extrapolate)then
+        elseif(this%BndConds(4) .eq. BCorder2_Extrapolate)then
             this%fIn(:,this%yDim,:,[4,9,10,16,18]) = 2.0*this%fIn(:,this%yDim-1,:,[4,9,10,16,18]) - this%fIn(:,this%yDim-2,:,[4,9,10,16,18])
-        elseif(this%BndConds(4) .eq. stationary_Wall)then
+        elseif(this%BndConds(4) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
                 fTmp([4,9,10,16,18]) = this%fIn(z,this%yDim,x,oppo([4,9,10,16,18]))
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
-        elseif(this%BndConds(4) .eq. moving_Wall)then 
+        elseif(this%BndConds(4) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
@@ -608,20 +608,20 @@ module FluidDomain
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
-        elseif(this%BndConds(4) .eq. Symmetric)then
+        elseif(this%BndConds(4) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
                 fTmp([4,9,10,16,18]) = this%fIn(z,this%yDim,x,[3,7,8,15,17])
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
-        elseif(this%BndConds(4) .eq. Periodic)then
+        elseif(this%BndConds(4) .eq. BCPeriodic .or. this%BndConds(4) .eq. BCfluid)then
             ! no need to set
         else
             stop 'higher boundary (ymax) has no such boundary condition'
         endif
         ! set the z direction (front) --------------------------------------------------------------------
-        if (this%BndConds(5) .eq. Eq_DirecletU) then
+        if (this%BndConds(5) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -631,7 +631,7 @@ module FluidDomain
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(1,y,x,0:lbmDim))
             enddo
             enddo
-        elseif(this%BndConds(5) .eq. nEq_DirecletU)then
+        elseif(this%BndConds(5) .eq. BCnEq_DirecletU)then
             ! non-equilibriun extrapoltion scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -646,18 +646,18 @@ module FluidDomain
                 this%fIn(1,y,x,[5,11,12,15,16]) = fEq([5,11,12,15,16]) + (this%fIn(2,y,x,[5,11,12,15,16]) - fEqi([5,11,12,15,16]))
             enddo
             enddo
-        elseif(this%BndConds(5) .eq. order1_Extrapolate)then
+        elseif(this%BndConds(5) .eq. BCorder1_Extrapolate)then
             this%fIn(1,:,:,[5,11,12,15,16]) = this%fIn(2,:,:,[5,11,12,15,16])
-        elseif(this%BndConds(5) .eq. order2_Extrapolate)then
+        elseif(this%BndConds(5) .eq. BCorder2_Extrapolate)then
             this%fIn(1,:,:,[5,11,12,15,16]) = 2.0*this%fIn(2,:,:,[5,11,12,15,16]) - this%fIn(3,:,:,[5,11,12,15,16])
-        elseif(this%BndConds(5) .eq. stationary_Wall)then
+        elseif(this%BndConds(5) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
                 fTmp([5,11,12,15,16]) = this%fIn(1,y,x,oppo([5,11,12,15,16]))
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
-        elseif(this%BndConds(5) .eq. moving_Wall)then 
+        elseif(this%BndConds(5) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
@@ -667,20 +667,20 @@ module FluidDomain
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
-        elseif(this%BndConds(5) .eq. Symmetric)then
+        elseif(this%BndConds(5) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
                 fTmp([5,11,12,15,16]) = this%fIn(1,y,x,[6,13,14,17,18])
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
-        elseif(this%BndConds(5) .eq. Periodic)then
+        elseif(this%BndConds(5) .eq. BCPeriodic .or. this%BndConds(5) .eq. BCfluid)then
             ! no need to set
         else
             stop 'front boundary (zmin) has no such boundary condition'
         endif
         ! set the z direction (back) -------------------------------------------------------------------
-        if (this%BndConds(6) .eq. Eq_DirecletU) then
+        if (this%BndConds(6) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -690,7 +690,7 @@ module FluidDomain
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(this%zDim,y,x,0:lbmDim))
             enddo
             enddo
-        elseif(this%BndConds(6) .eq. nEq_DirecletU)then
+        elseif(this%BndConds(6) .eq. BCnEq_DirecletU)then
             ! non-equilibriun extrapoltion scheme
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -705,18 +705,18 @@ module FluidDomain
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fEq([6,13,14,17,18]) + (this%fIn(this%zDim-1,y,x,[6,13,14,17,18]) - fEqi([6,13,14,17,18]))
             enddo
             enddo
-        elseif(this%BndConds(6) .eq. order1_Extrapolate)then
+        elseif(this%BndConds(6) .eq. BCorder1_Extrapolate)then
             this%fIn(this%zDim,:,:,[6,13,14,17,18]) = this%fIn(this%zDim-1,:,:,[6,13,14,17,18])
-        elseif(this%BndConds(6) .eq. order2_Extrapolate)then
+        elseif(this%BndConds(6) .eq. BCorder2_Extrapolate)then
             this%fIn(this%zDim,:,:,[6,13,14,17,18]) = 2.0*this%fIn(this%zDim-1,:,:,[6,13,14,17,18])-this%fIn(this%zDim-2,:,:,[6,13,14,17,18])
-        elseif(this%BndConds(6) .eq. stationary_Wall)then
+        elseif(this%BndConds(6) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
                 fTmp([6,13,14,17,18]) = this%fIn(this%zDim,y,x,oppo([6,13,14,17,18]))
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
             enddo
-        elseif(this%BndConds(6) .eq. moving_Wall)then 
+        elseif(this%BndConds(6) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
@@ -726,14 +726,14 @@ module FluidDomain
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
             enddo
-        elseif(this%BndConds(6) .eq. Symmetric)then
+        elseif(this%BndConds(6) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
                 fTmp([6,13,14,17,18]) = this%fIn(this%zDim,y,x,[5,11,12,15,16])
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
             enddo
-        elseif(this%BndConds(6) .eq. Periodic)then
+        elseif(this%BndConds(6) .eq. BCPeriodic .or. this%BndConds(6) .eq. BCfluid)then
             ! no need to set
         else
             stop 'back boundary (zmax) has no such boundary condition'
