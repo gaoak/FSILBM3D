@@ -75,6 +75,7 @@ PROGRAM main
         call calculate_macro_quantities_blocks()
         ! Compute volume force exerted on fluids
         call get_now_time(time_begine2)
+        call Clear_VolumeForce()
         CALL FSInteraction_force(dt_fluid,LBMblks(1)%dh,LBMblks(1)%xmin,LBMblks(1)%ymin,LBMblks(1)%zmin,LBMblks(1)%xDim,LBMblks(1)%yDim,LBMblks(1)%zDim,LBMblks(1)%uuu,LBMblks(1)%force)
         call get_now_time(time_end2)
         write(*,*)'Time   for   IBM   step:', (time_end2 - time_begine2)

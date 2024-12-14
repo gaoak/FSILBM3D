@@ -6,7 +6,7 @@ module FluidDomain
     integer :: m_nblock, m_npsize
     public:: LBMblks,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
              check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_blocks,collision_blocks, &
-             write_continue_blocks,streaming_blocks,computeFieldStat_blocks
+             write_continue_blocks,streaming_blocks,computeFieldStat_blocks,Clear_VolumeForce
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput
         integer :: xDim,yDim,zDim
@@ -31,6 +31,7 @@ module FluidDomain
         procedure :: write_flow => write_flow_
         procedure :: write_continue => write_continue_
         procedure :: ComputeFieldStat => ComputeFieldStat_
+        procedure :: ResetVolumeForce => ResetVolumeForce_
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
 
@@ -105,6 +106,14 @@ module FluidDomain
         m_npsize = npsize
         do iblock = 1,m_nblock
             call LBMblks(iblock)%allocate_fluid()
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE Clear_VolumeForce()
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%ResetVolumeForce()
         enddo
     END SUBROUTINE
 
@@ -763,7 +772,7 @@ module FluidDomain
         this%volumeForce(3) = flow%volumeForceIn(3)
     END SUBROUTINE
 
-    SUBROUTINE addVolumForc(this)
+    SUBROUTINE addVolumForc_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x
@@ -772,6 +781,19 @@ module FluidDomain
             this%force(:,:,x,1) = this%force(:,:,x,1) + this%volumeForce(1)
             this%force(:,:,x,2) = this%force(:,:,x,2) + this%volumeForce(2)
             this%force(:,:,x,3) = this%force(:,:,x,3) + this%volumeForce(3)
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE
+
+    SUBROUTINE ResetVolumeForce_(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer:: x
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
+        do x=1,this%xDim
+            this%force(:,:,x,1) = 0.d0
+            this%force(:,:,x,2) = 0.d0
+            this%force(:,:,x,3) = 0.d0
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE
