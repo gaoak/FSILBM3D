@@ -1058,12 +1058,12 @@ module FluidDomain
             !$OMP END PARALLEL DO
             uL2(i) = dsqrt(uL2(i) / (dble(this%xDim) * dble(this%yDim) * dble(this%zDim)))
         enddo
-        write(*,'(A,F18.12)')'FIELDSTAT L2 u ', uL2(1)
-        write(*,'(A,F18.12)')'FIELDSTAT L2 v ', uL2(2)
-        write(*,'(A,F18.12)')'FIELDSTAT L2 w ', uL2(3)
-        write(*,'(A,F18.12)')'FIELDSTAT Linfinity u ', uLinfty(1)
-        write(*,'(A,F18.12)')'FIELDSTAT Linfinity v ', uLinfty(2)
-        write(*,'(A,F18.12)')'FIELDSTAT Linfinity w ', uLinfty(3)
+        write(*,'(A,F18.12)')' FIELDSTAT L2 u ', uL2(1)
+        write(*,'(A,F18.12)')' FIELDSTAT L2 v ', uL2(2)
+        write(*,'(A,F18.12)')' FIELDSTAT L2 w ', uL2(3)
+        write(*,'(A,F18.12)')' FIELDSTAT Linfinity u ', uLinfty(1)
+        write(*,'(A,F18.12)')' FIELDSTAT Linfinity v ', uLinfty(2)
+        write(*,'(A,F18.12)')' FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine
 
     SUBROUTINE write_continue_(this,filename,step,time)

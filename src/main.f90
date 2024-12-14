@@ -113,10 +113,10 @@ PROGRAM main
             endif
         endif
         ! write processing informations
-        !if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
-        !    call write_processing_information()
-        !    call write_probes_information()
-        !endif
+        if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
+            call write_fluid_information(time,LBMblks(1)%dh,LBMblks(1)%xmin,LBMblks(1)%ymin,LBMblks(1)%zmin,LBMblks(1)%xDim,LBMblks(1)%yDim,LBMblks(1)%zDim,LBMblks(1)%uuu)
+            call write_solid_information(time,m_nFish)
+        endif
         call get_now_time(time_end2)
         write(*,*)'Time  for writing  step:', (time_end2 - time_begine2)
         write(*,'(A)')' ----------------------- one step -----------------------'
@@ -124,5 +124,6 @@ PROGRAM main
         write(*,*)'Time   for   one   step:', (time_end1 - time_begine1)
     enddo
     ! write validation informations
+    write(*,'(A)') '========================================================='
     call computeFieldStat_blocks()
 END PROGRAM main

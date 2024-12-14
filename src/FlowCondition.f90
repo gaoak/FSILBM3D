@@ -2,7 +2,7 @@ module FlowCondition
     implicit none
     private
     public :: FlowCondType,flow
-    public :: read_flow_conditions,write_parameter_check_file,read_probe_params,write_information_titles
+    public :: read_flow_conditions,write_parameter_check_file,read_probe_params,write_information_titles,write_fluid_information,write_solid_information
     type :: FlowCondType
         integer :: isConCmpt,numsubstep,npsize
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
@@ -160,9 +160,96 @@ module FlowCondition
         do  i=1,flow%fluidProbingNum
             write(probeNum,'(I3.3)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt')
-            write(111,*) 'variables= "t"  "p"  "u"  "v"  "w" '
+            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w" '
             close(111)
         enddo
     END SUBROUTINE
+
+    SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocity)
+        implicit none
+        integer:: i,xDim,yDim,zDim,xNum,yNum,zNum
+        real(8):: time,xmin,ymin,zmin,dh,velocity(zDim,yDim,xDim,1:3)
+        integer,parameter::nameLen=3
+        character (LEN=nameLen):: probeNum
+        ! write fluid probing information
+        do  i=1,flow%fluidProbingNum
+            xNum = NINT((flow%fluidProbingCoords(i,1) - xmin)/dh) + 1
+            yNum = NINT((flow%fluidProbingCoords(i,2) - ymin)/dh) + 1
+            zNum = NINT((flow%fluidProbingCoords(i,3) - zmin)/dh) + 1
+            write(probeNum,'(I3.3)') i
+            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt',position='append')
+            write(111,'(7E20.10)') time/flow%Tref,flow%fluidProbingCoords(i,1:3),velocity(zNum,yNum,xNum,1:3)/flow%Uref
+            close(111)
+        enddo
+        END SUBROUTINE
+
+        SUBROUTINE write_solid_information(time,nFish)
+            implicit none
+            integer:: i,iFish,nFish
+            real(8):: time
+            integer,parameter::nameLen=3
+            character (LEN=nameLen):: fishNum,probeNum
+        
+            do iFish=1,nFish
+                ! get fish numbers
+                write(fishNum,'(I3)') iFish
+                fishNum = adjustr(fishNum)
+                do  i=1,nameLen
+                        if(fishNum(i:i)==' ') fishNum(i:i)='0'
+                enddo
+                ! write forces
+                open(111,file='./DatInfo/FishForce_'//trim(fishNum)//'.plt',position='append')
+                write(111,*) 'test'
+                !write(111,'(4E20.10)') time/flow%Tref,sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
+                close(111)
+                ! write average information
+                open(111,file='./DatInfo/FishMeanInfo_'//trim(fishNum)//'.plt',position='append')
+                write(111,*) 'test'
+                !write(111,'(10E20.10)')time/flow%Tref,sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref, &
+                !                                      sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref
+                close(111)
+                ! write power
+                open(111,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt',position='append')
+                !Pax=sum(extful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
+                !Pay=sum(extful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
+                !Paz=sum(extful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
+                !Pix=-sum(mssful(1:nND(iFish),1,iFish)*accful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
+                !Piy=-sum(mssful(1:nND(iFish),2,iFish)*accful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
+                !Piz=-sum(mssful(1:nND(iFish),3,iFish)*accful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
+                !Paero=Pax+Pay+Paz
+                !Piner=Pix+Piy+Piz
+                !Ptot=Paero+Piner
+                !write(111,'(10E20.10)')time/flow%Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+                write(111,*) 'test'
+                close(111)
+                ! write energy title
+                open(111,file='./DatInfo/FishEnergy_'//trim(fishNum)//'.plt', position='append')
+                !call strain_energy_D(strainEnergy(1:nEL(iFish),1:2,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
+                !                        xyzful(1:nND(iFish),1,iFish), xyzful(1:nND(iFish),2,iFish), xyzful(1:nND(iFish),3,iFish),ele(1:nEL(iFish),1:5,iFish), prop(1:nMT(iFish),1:10,iFish), &
+                !                        triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
+                !                        triad_ee(1:3,1:3,1:nEL(iFish),iFish), &
+                !                        nND(iFish),nEL(iFish),nMT(iFish))
+                !EEE(1)=sum(strainEnergy(1:nEL(iFish),1,iFish))
+                !EEE(2)=sum(strainEnergy(1:nEL(iFish),2,iFish))
+                !Es=EEE(1)/Eref
+                !Eb=EEE(2)/Eref
+                !Ep=Es+Eb
+                !Ew=Ew+Paero*timeOutInfo
+                !Ek=0.5*sum(mssful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish))/Eref
+                !Et=Ek+Ep
+                !write(111,'(7E20.10)')time/flow%Tref,Es,Eb,Ep,Ek,Ew,Et
+                write(111,*) 'test'
+                close(111)
+                
+                ! probing informations
+                do  i=1,flow%solidProbingNum
+                    write(probeNum,'(I3.3)') i
+                    open(111,file='./DatInfo/FishProbes_'//trim(fishNum)//'_'//trim(probeNum)//'.plt',position='append')
+                !    write(111,'(5E20.10)') time/flow%Tref,  Pressure/(0.5*denIn*Uref**2), velocity(1:3)/Uref
+                    write(111,*) 'test'
+                    close(111)
+                enddo
+            enddo   
+        END SUBROUTINE
 
 end module FlowCondition
