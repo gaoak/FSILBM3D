@@ -62,9 +62,9 @@ SolidBody
 ENDSolidBody
 ProbingFluid
  3                                            read(111,*) fluidProbingNum (0: no output)
- 0.600D+0   0.000D+0   0.500D+0               read(111,*) fluidProbingCoords(1,1:3)
- 0.800D+0   0.000D+0   0.500D+0               read(111,*) fluidProbingCoords(2,1:3)
- 1.000D+0   0.000D+0   0.500D+0               read(111,*) fluidProbingCoords(3,1:3)
+-0.550D+0   0.000D+0   0.500D+0               read(111,*) fluidProbingCoords(1,1:3)
+ 0.550D+0   0.550D+0   0.500D+0               read(111,*) fluidProbingCoords(2,1:3)
+ 0.550D+0   0.000D+0   0.500D+0               read(111,*) fluidProbingCoords(3,1:3)
 ProbingSolid
  2                                            read(111,*) solidProbingNum (0: no output)
  100                                          read(111,*) solidProbingNode(1)

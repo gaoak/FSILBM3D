@@ -65,36 +65,36 @@ module LBMBlockComm
         fxE = fxS + sxD - 1
         fyE = fyS + syD - 1
         fzE = fzS + szD - 1
-        f = pair.sondirs
+        f = pair%sondirs
         ! x direction
-        if(pair%sondirs(1).eq.1) then
+        if(f(1).eq.1) then
             LBMblks(pair%sonId)%fIn(1:szD,1:syD,1,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS:fzE,fyS:fyE,fxS,0:lbmDim)
             LBMblks(pair%fatherId)%fIn((fzS+f(6)):(fzE-f(5)),(fyS+f(4)):(fyE-f(3)),(fxS+1),0:lbmDim) =&
                 LBMblks(pair%sonId)%fIn((1+f(6)):(szD-f(5)),(1+f(4)):(syD-f(3)),2,0:lbmDim)
         endif
-        if(pair%sondirs(2).eq.1) then
+        if(f(2).eq.1) then
             LBMblks(pair%sonId)%fIn(1:szD,1:syD,sxD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS:fzE,fyS:fyE,fxE,0:lbmDim)
             LBMblks(pair%fatherId)%fIn((fzS+f(6)):(fzE-f(5)),(fyS+f(4)):(fyE-f(3)),(fxE-1),0:lbmDim) =&
                 LBMblks(pair%sonId)%fIn((1+f(6)):(szD-f(5)),(1+f(4)):(syD-f(3)),sxD-1,0:lbmDim)
         endif
         ! y direction
-        if(pair%sondirs(3).eq.1) then
-            LBMblks(pair%sonId)%fIn(1:szD,1,1:szD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS:fzE,fyS,fxS:fxE,0:lbmDim)
+        if(f(3).eq.1) then
+            LBMblks(pair%sonId)%fIn(1:szD,1,1:sxD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS:fzE,fyS,fxS:fxE,0:lbmDim)
             LBMblks(pair%fatherId)%fIn((fzS+f(6)):(fzE-f(5)),(fyS+1),(fxS+f(2)):(fxE-f(1)),0:lbmDim) =&
                 LBMblks(pair%sonId)%fIn((1+f(6)):(szD-f(5)),2,(1+f(2)):(sxD-f(1)),0:lbmDim)
         endif
-        if(pair%sondirs(4).eq.1) then
-            LBMblks(pair%sonId)%fIn(1:szD,syD,1:szD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS:fzE,fyE,fxS:fxE,0:lbmDim)
+        if(f(4).eq.1) then
+            LBMblks(pair%sonId)%fIn(1:szD,syD,1:sxD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS:fzE,fyE,fxS:fxE,0:lbmDim)
             LBMblks(pair%fatherId)%fIn((fzS+f(6)):(fzE-f(5)),(fyE-1),(fxS+f(2)):(fxE-f(1)),0:lbmDim) =&
                 LBMblks(pair%sonId)%fIn((1+f(6)):(szD-f(5)),(syD-1),(1+f(2)):(sxD-f(1)),0:lbmDim)
         endif
         ! z direction
-        if(pair%sondirs(5).eq.1) then
+        if(f(5).eq.1) then
             LBMblks(pair%sonId)%fIn(1,1:syD,1:sxD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzS,fyS:fyE,fxS:fxE,0:lbmDim)
             LBMblks(pair%fatherId)%fIn((fzS+1),(fyS+f(4)):(fyE-f(3)),(fxS+f(2)):(fxE-f(1)),0:lbmDim) =&
                 LBMblks(pair%sonId)%fIn(2,(1+f(4)):(syD-f(3)),(1+f(2)):(sxD-f(1)),0:lbmDim)
         endif
-        if(pair%sondirs(6).eq.1) then
+        if(f(6).eq.1) then
             LBMblks(pair%sonId)%fIn(szD,1:syD,1:sxD,0:lbmDim) = LBMblks(pair%fatherId)%fIn(fzE,fyS:fyE,fxS:fxE,0:lbmDim)
             LBMblks(pair%fatherId)%fIn((fzE-1),(fyS+f(4)):(fyE-f(3)),(fxS+f(2)):(fxE-f(1)),0:lbmDim) =&
                 LBMblks(pair%sonId)%fIn((szD-1),(1+f(4)):(syD-f(3)),(1+f(2)):(sxD-f(1)),0:lbmDim)
