@@ -255,9 +255,6 @@ module FluidDomain
             call calculate_TRT_params(this%params(1))
         elseif(this%iCollidModel.eq.3) then
             call calculate_MRT_params()
-        else
-            write(*,*)' collision_step Model is not defined'
-            stop
         endif
         ! initialize flow information
         call initialize_flow()
