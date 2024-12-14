@@ -331,27 +331,18 @@ module FluidDomain
 
         SUBROUTINE initialize_flow()
             implicit none
-            real(8):: fEq(0:lbmDim)
             real(8):: xCoord,yCoord,zCoord
             integer:: x, y, z
-            ! calculating initial flow velocity
+            ! calculating initial flow velocity and the distribution function
             do  x = 1, this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1, this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1, this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,xCoord,flow%uvwIn,this%uuu,flow%shearRateIn)
-            enddo
-            enddo
-            enddo
-            this%den(1:this%zDim,1:this%yDim,1:this%xDim) = flow%denIn
-            ! calculating the distribution function
-            do  x = 1, this%xDim
-            do  y = 1, this%yDim
-            do  z = 1, this%zDim
-                call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:3) ,fEq(0:lbmDim))
-                this%fIn(z,y,x,0:lbmDim)=fEq(0:lbmDim)
+                this%den(z,y,x) = flow%denIn
+                call evaluate_shear_velocity(zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
+                call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
             enddo
             enddo
             enddo
@@ -395,8 +386,8 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
-                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(z,y,1,0:lbmDim))
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim))
             enddo
             enddo
         elseif(this%BndConds(1) .eq. nEq_DirecletU)then
@@ -405,9 +396,9 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 ! equilibriun part
-                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
                 ! non-equilibriun part
                 call calculate_distribution_funcion(this%den(z,y,2),this%uuu(z,y,2,1:SpaceDim),fEqi(0:lbmDim))
                 ! given equilibriun funciton
@@ -430,8 +421,8 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,1,0:lbmDim),fTmp(0:lbmDim))
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
             enddo
             enddo
@@ -454,8 +445,8 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
-                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(z,y,this%xDim,0:lbmDim))
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,this%xDim,0:lbmDim))
             enddo
             enddo
         elseif(this%BndConds(2) .eq. nEq_DirecletU)then
@@ -464,11 +455,11 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 ! equilibriun part
-                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
                 ! non-equilibriun part
-                call calculate_distribution_funcion(this%den(z,y,this%xDim-1),this%uuu(z,y,this%xDim-1,1:3),fEqi(0:lbmDim))
+                call calculate_distribution_funcion(this%den(z,y,this%xDim-1),this%uuu(z,y,this%xDim-1,1:SpaceDim),fEqi(0:lbmDim))
                 ! given equilibriun funciton
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fEq([2,8,10,12,14]) + (this%fIn(z,y,this%xDim-1,[2,8,10,12,14]) - fEqi([2,8,10,12,14]))
             enddo
@@ -489,8 +480,8 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,this%xDim,0:lbmDim),fTmp(0:lbmDim))
+                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,this%xDim,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
@@ -513,8 +504,8 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,this%ymin,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(z,1,x,0:lbmDim))
+                call evaluate_shear_velocity(zCoord,this%ymin,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,1,x,0:lbmDim))
             enddo
             enddo
         elseif(this%BndConds(3) .eq. nEq_DirecletU)then
@@ -523,9 +514,9 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,this%ymin,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
+                call evaluate_shear_velocity(zCoord,this%ymin,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 ! equilibriun part
-                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
                 ! non-equilibriun part
                 call calculate_distribution_funcion(this%den(z,2,x),this%uuu(z,2,x,1:SpaceDim),fEqi(0:lbmDim))
                 ! given equilibriun funciton
@@ -548,18 +539,9 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,this%ymin,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,1,x,0:lbmDim),fTmp(0:lbmDim))
+                call evaluate_shear_velocity(zCoord,this%ymin,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn(z,1,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
-            enddo
-            enddo
-        do  y = 1,this%yDim
-                yCoord = this%ymin + this%dh * (y - 1);
-            do  z = 1,this%zDim
-                zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,yCoord,this%xmax,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,y,this%xDim,0:lbmDim),fTmp(0:lbmDim))
-                this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
         elseif(this%BndConds(3) .eq. Symmetric)then
@@ -581,8 +563,8 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,this%ymax,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(z,this%yDim,x,0:lbmDim))
+                call evaluate_shear_velocity(zCoord,this%ymax,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,this%yDim,x,0:lbmDim))
             enddo
             enddo
         elseif(this%BndConds(4) .eq. nEq_DirecletU)then
@@ -591,11 +573,11 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,this%ymax,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
+                call evaluate_shear_velocity(zCoord,this%ymax,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 ! equilibriun part
-                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
                 ! non-equilibriun part
-                call calculate_distribution_funcion(this%den(z,this%yDim-1,x),this%uuu(z,this%yDim-1,x,1:3),fEqi(0:lbmDim))
+                call calculate_distribution_funcion(this%den(z,this%yDim-1,x),this%uuu(z,this%yDim-1,x,1:SpaceDim),fEqi(0:lbmDim))
                 ! given equilibriun funciton
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fEq([4,9,10,16,18]) + (this%fIn(z,this%yDim-1,x,[4,9,10,16,18]) - fEqi([4,9,10,16,18]))
             enddo
@@ -616,8 +598,8 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_shear_velocity(zCoord,this%ymax,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(z,this%yDim,x,0:lbmDim),fTmp(0:lbmDim))
+                call evaluate_shear_velocity(zCoord,this%ymax,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn(z,this%yDim,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
@@ -640,8 +622,8 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
-                call evaluate_shear_velocity(this%zmin,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(1,y,x,0:lbmDim))
+                call evaluate_shear_velocity(this%zmin,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(1,y,x,0:lbmDim))
             enddo
             enddo
         elseif(this%BndConds(5) .eq. nEq_DirecletU)then
@@ -650,9 +632,9 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
-                call evaluate_shear_velocity(this%zmin,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
+                call evaluate_shear_velocity(this%zmin,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 ! equilibriun part
-                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
                 ! non-equilibriun part
                 call calculate_distribution_funcion(this%den(2,y,x),this%uuu(2,y,x,1:SpaceDim),fEqi(0:lbmDim))
                 ! given equilibriun funciton
@@ -675,8 +657,8 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
-                call evaluate_shear_velocity(this%zmin,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(1,y,x,0:lbmDim),fTmp(0:lbmDim))
+                call evaluate_shear_velocity(this%zmin,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn(1,y,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
@@ -699,8 +681,8 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
                 zCoord = this%zmin + this%dh * (y - 1);
-                call evaluate_shear_velocity(this%zmax,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call calculate_distribution_funcion(flow%denIn,velocity,this%fIn(this%zDim,y,x,0:lbmDim))
+                call evaluate_shear_velocity(this%zmax,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(this%zDim,y,x,0:lbmDim))
             enddo
             enddo
         elseif(this%BndConds(6) .eq. nEq_DirecletU)then
@@ -709,9 +691,9 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
                 zCoord = this%zmin + this%dh * (y - 1);
-                call evaluate_shear_velocity(this%zmax,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
+                call evaluate_shear_velocity(this%zmax,yCoord,xCoord,flow%uvwIn,velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 ! equilibriun part
-                call calculate_distribution_funcion(flow%denIn,velocity,fEq(0:lbmDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
                 ! non-equilibriun part
                 call calculate_distribution_funcion(this%den(this%zDim-1,y,x),this%uuu(this%zDim-1,y,x,1:3),fEqi(0:lbmDim))
                 ! given equilibriun funciton
@@ -734,8 +716,8 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
-                call evaluate_shear_velocity(this%zmax,yCoord,xCoord,flow%uvwIn,velocity,flow%shearRateIn)
-                call evaluate_moving_wall(flow%denIn,velocity,this%fIn(this%zDim,y,x,0:lbmDim),fTmp(0:lbmDim))
+                call evaluate_shear_velocity(this%zmax,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn(this%zDim,y,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
             enddo
@@ -1083,7 +1065,7 @@ module FluidDomain
     SUBROUTINE evaluate_shear_velocity(zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)
         implicit none
         real(8):: zCoord,yCoord,xCoord
-        real(8):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:SpaceDim)
+        real(8):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:3)
         velocityOut(1) = velocityIn(1) + 0*shearRate(1) + yCoord*shearRate(2) + zCoord*shearRate(3);
         velocityOut(2) = velocityIn(2) + xCoord*shearRate(1) + 0*shearRate(2) + zCoord*shearRate(3);
         velocityOut(3) = velocityIn(3) + xCoord*shearRate(1) + yCoord*shearRate(2) + 0*shearRate(3);
