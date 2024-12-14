@@ -4,11 +4,11 @@ module FluidDomain
     implicit none
     private
     integer :: m_nblock, m_npsize
-    public:: LBMblks,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
+    public:: LBMblks,LBMblksIndex,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
              check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_blocks,collision_blocks, &
              write_continue_blocks,streaming_blocks,computeFieldStat_blocks,Clear_VolumeForce
     type :: LBMBlock
-        integer :: ID,iCollidModel,offsetOutput
+        integer :: ID,iCollidModel,offsetOutput,isoutput
         integer :: xDim,yDim,zDim
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
         integer :: BndConds(1:6)
@@ -34,6 +34,7 @@ module FluidDomain
         procedure :: ResetVolumeForce => ResetVolumeForce_
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
+    integer,allocatable:: LBMblksIndex(:)
 
     contains
 
@@ -49,10 +50,10 @@ module FluidDomain
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*) m_nblock
-        allocate(LBMblks(m_nblock))
+        allocate(LBMblks(m_nblock),LBMblksIndex(m_nblock))
         do iblock = 1,m_nblock
             call readNextData(111, buffer)
-            read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput
+            read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput,LBMblks(iblock)%isoutput
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%xDim,LBMblks(iblock)%yDim,LBMblks(iblock)%zDim
             call readNextData(111, buffer)
@@ -61,6 +62,8 @@ module FluidDomain
             read(buffer,*)    LBMblks(iblock)%BndConds(1:6)
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%params(1:10)
+            call readequal(111)
+            LBMblksIndex(LBMblks(iblock)%ID) = iblock
             ! check bounds
             if (LBMblks(iblock)%xDim.gt.32767 .or. LBMblks(iblock)%yDim.gt.32767 .or. LBMblks(iblock)%zDim.gt.32767) then
                 write(*,*) "Grid number exceeds 32767, please try to reduced the grid size."
@@ -182,6 +185,16 @@ module FluidDomain
         implicit none
         real(8),intent(in):: time
         integer:: iblock
+        real(8):: waittime,time_begine,time_end
+        call get_now_time(time_begine)
+        do iblock = 1,m_nblock
+            call mywait()
+        enddo
+        call get_now_time(time_end)
+        waittime = time_end - time_begine
+        if(waittime.gt.1.d-1) then
+            write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
+        endif
         do iblock = 1,m_nblock
             call LBMblks(iblock)%write_flow(time)
         enddo
@@ -957,17 +970,11 @@ module FluidDomain
         integer:: x,y,z,pid,i
         real(8)::xmin,ymin,zmin
         integer::nxs,nxe,nys,nye,nzs,nze
-        integer,parameter::nameLen=10,idfile=100
+        integer,parameter::nameLen=10,blockLen=3,idfile=100
         character (LEN=nameLen):: fileName
+        character (LEN=blockLen):: blockName
         real(8):: invUref
-        real(8):: waittime,time_begine,time_end
-        call get_now_time(time_begine)
-        call mywait()
-        call get_now_time(time_end)
-        waittime = time_end - time_begine
-        if(waittime.gt.1.d-1) then
-            write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
-        endif
+        if(this%isoutput.lt.1) return
         nxs = 1 + this%offsetOutput
         nys = 1 + this%offsetOutput
         nzs = 1 + this%offsetOutput
@@ -978,7 +985,7 @@ module FluidDomain
         ymin = this%ymin + this%offsetOutput * this%dh
         zmin = this%zmin + this%offsetOutput * this%dh
         invUref = 1.d0/flow%Uref
-        
+
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do x=nxs, nxe
             do y=nys, nye
@@ -1019,7 +1026,12 @@ module FluidDomain
             do  i=1,nameLen
                 if(fileName(i:i)==' ')fileName(i:i)='0'
             enddo
-            open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.binary',form='unformatted',access='stream')
+            write(blockName,'(I3)') this%ID
+            blockName = adjustr(blockName)
+            do  i=1,blockLen
+                if(blockName(i:i)==' ')blockName(i:i)='0'
+            enddo
+            open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
             nxe = nxe-nxs+1
             nye = nye-nys+1
             nze = nze-nzs+1
