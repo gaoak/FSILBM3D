@@ -27,7 +27,7 @@
  1.000d+0                                    read(111,*)     denIn
  1.000D-2   10                               read(111,*)     dtolLBM,ntolLBM
 ===================================================================================================solid number
- 3          1        1                       read(111,*)     nFish,FishKind,iForce2Body
+ 3          1          1                     read(111,*)     nFish,FishKind,iForce2Body
 ===================================================================================================structure property
  3          3          1                     read(111,*)     FishNum(FishKind),NumX,NumY
  1          1     Beam.dat                   read(111,*)     iBodyModel(iFish),iBodyType(iFish),FEmeshName(iFish)

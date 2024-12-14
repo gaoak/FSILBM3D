@@ -5,7 +5,7 @@ BUILD ?=
 #######CMP settings###########
 ifeq ($(CMP),intel)
 FC = ifort
-FFLAGS = -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32 -double-size 64
+FFLAGS = -diag-disable=10448 -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32 -double-size 64
 else ifeq ($(CMP),gcc)
 FC = gfortran
 FFLAGS = -O3
@@ -22,7 +22,7 @@ SRCDIR = ./src
 
 ### List of files for the main code
 OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
-SRC = $(SRCDIR)/Modules.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/LatticeBoltzmannSolver.f90 $(SRCDIR)/PostProcessing.f90 $(SRCDIR)/Util.f90 $(SRCDIR)/Initialization.f90 $(SRCDIR)/main.f90
+SRC = $(SRCDIR)/ConstParams.f90 $(SRCDIR)/FlowCondition.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/FluidDomain.f90 $(SRCDIR)/Util.f90 $(SRCDIR)/main.f90
 CSRC = $(SRCDIR)/forkthread.c
 CPPSRC = $(SRCDIR)/velocitymap.cpp
 OBJ = $(SRC:%.f90=%.o)

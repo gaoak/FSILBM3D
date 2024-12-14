@@ -1,259 +1,3 @@
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    write files' header
-!    copyright@ RuNanHua
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE wrtInfoTitl()
-    USE simParam
-    implicit none
-    integer:: i,iFish
-    integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName,Nodename
-
-    do iFish=1,nFish
-
-        write(fileName,'(I4)') iFish
-        fileName = adjustr(fileName)
-        do  i=1,nameLen
-             if(fileName(i:i)==' ')fileName(i:i)='0'
-        enddo
-
-        if    (iForce2Body==1)then   !Same force as flow
-        open(111,file='./DatInfo/ForceDirect_'//trim(filename)//'.plt')
-        write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
-        close(111)
-        elseif(iForce2Body==2)then   !stress force
-        open(111,file='./DatInfo/ForceStress_'//trim(filename)//'.plt')
-        write(111,*)'variables= "t"  "Fx"  "Fy"  "Fz"'
-        close(111)
-        endif
-
-        !===============================================================================
-        open(111,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-        !===============================================================================
-        open(111,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyNodeCenter_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "u"  "v"  "ax"  "ay" '
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyMean_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-        close(111)
-
-        open(111,file='./DatInfo/SampBodyAngular_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
-        close(111)
-
-        open(111,file='./DatInfo/Power_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t" "Ptot" "Paero" "Piner" "Pax" "Pay" "Paz" "Pix" "Piy" "Piz"'
-        close(111)
-
-        open(111,file='./DatInfo/Area_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t"  "Area"  '
-        close(111)
-
-        open(111,file='./DatInfo/Energy_'//trim(fileName)//'.plt')
-        write(111,*)'variables= "t","Es","Eb","Ep","Ek","Ew","Et"'
-        close(111)
-    enddo
-
-    if(isBodyOutput==1)then
-        do iFish=1,nFish
-            write(fileName,'(I4)') iFish
-            fileName = adjustr(fileName)
-            do  i=1,nameLen
-                if(fileName(i:i)==' ')fileName(i:i)='0'
-            enddo
-            do  i=1,numSampBody
-                write(Nodename,'(I4.4)') SampBodyNode(i,iFish)
-                open(111,file='./DatInfo/SampBodyNode_'//trim(fileName)//'_'//trim(Nodename)//'.plt')
-                write(111,*)'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az" '
-                close(111)
-            enddo
-        enddo !iFish
-    endif
-
-    if(isFluidOutput==1)then
-    do  i=1,numSampFlow
-        write(Nodename,'(I4.4)') i
-        open(111,file='./DatInfo/SampFlowPint_'//trim(Nodename)//'.plt')
-        write(111,*)'variables= "t"  "p" "u"  "v"  "w" '
-        close(111)
-    enddo
-    endif
-    END SUBROUTINE
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!     write data
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE wrtInfo()
-    USE simParam
-    USE SolidBody
-    implicit none
-    integer:: i,z,y,x,zbgn,ybgn,xbgn,zend,yend,xend
-    real(8):: weightm,velocity(1:3),Pressure
-    integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName
-
-    call Write_solid_Data(111,time,timeOutInfo,Asfac)
-
-    if(isBodyOutput==1)then
-        call Write_SampBodyNode(111,time,numSampBody,SampBodyNode)
-    endif
-
-    if(isFluidOutput==1)then
-    do  i=1,numSampFlow
-        x=minloc(dabs(SampFlowPint(i,1)-xGrid(1:xDim)),1)
-        if(SampFlowPint(i,1)-xGrid(x)>0.0d0)then
-                xbgn=x; xend=x+1
-        else
-                xbgn=x-1;xend=x
-        endif
-        if(xend.eq.xDim+1) then
-            xbgn = xDim - 1
-            xend = xDim
-        else if(xbgn.eq.0) then
-            xbgn = 1
-            xend = 2
-        endif
-        y=minloc(dabs(SampFlowPint(i,2)-yGrid(1:yDim)),1)
-        if(SampFlowPint(i,2)-yGrid(y)>0.0d0)then
-                ybgn=y; yend=y+1
-        else
-                ybgn=y-1;yend=y
-        endif
-        if(yend.eq.yDim+1) then
-            ybgn = yDim - 1
-            yend = yDim
-        else if(ybgn.eq.0) then
-            ybgn = 1
-            yend = 2
-        endif
-        z=minloc(dabs(SampFlowPint(i,3)-zGrid(1:zDim)),1)
-        if(SampFlowPint(i,3)-zGrid(z)>0.0d0)then
-                zbgn=z; zend=z+1
-        else
-                zbgn=z-1;zend=z
-        endif
-        if(zend.eq.zDim+1) then
-            zbgn = zDim - 1
-            zend = zDim
-        else if(zbgn.eq.0) then
-            zbgn = 1
-            zend = 2
-        endif
-
-        velocity(1:3)=0.0d0
-        Pressure=0.0d0
-
-        do    x=xbgn,xend
-        do    y=ybgn,yend
-        do    z=zbgn,zend
-            weightm=(dx(x)-dabs(xGrid(x)-SampFlowPint(i,1)))*(dy(y)-dabs(yGrid(y)-SampFlowPint(i,2)))*(dz(z)-dabs(zGrid(z)-SampFlowPint(i,3)))
-            velocity(1:3)=velocity(1:3)+uuu(z,y,x,1:3)*weightm/(dx(x)*dy(y)*dz(z))
-            Pressure=Pressure+prs(z,y,x)*weightm/(dx(x)*dy(y)*dz(z))
-        enddo
-        enddo
-        enddo
-
-        write(fileName,'(I4.4)') i
-        open(111,file='./DatInfo/SampFlowPint'//trim(fileName)//'.plt',position='append')
-        write(111,'(5E20.10)') time/Tref,  Pressure/(0.5*denIn*Uref**2), velocity(1:3)/Uref
-        close(111)
-    enddo
-    endif
-    END SUBROUTINE
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE movGrid(dim,direction)
-    USE simParam
-    implicit none
-    integer:: dim,direction
-
-    if    (dim==1)then      !x
-        if(direction<0)       then      !move to -x
-            fIn(:,:,2:xDim,:)=fIn(:,:,1:xDim-1,:)
-            xGrid(:)=xGrid(:)-dx
-        elseif(direction>0)    then     !move to +x
-            fIn(:,:,1:xDim-1,:)=fIn(:,:,2:xDim,:)
-            xGrid(:)=xGrid(:)+dx
-        else
-        endif
-    elseif(dim==2)then      !y
-        if(direction<0)        then     !move to -y
-            fIn(:,2:yDim,:,:)=fIn(:,1:yDim-1,:,:)
-            yGrid(:)=yGrid(:)-dy
-        elseif(direction>0)    then     !move to +y
-            fIn(:,1:yDim-1,:,:)=fIn(:,2:yDim,:,:)
-            yGrid(:)=yGrid(:)+dy
-        else
-        endif
-    elseif(dim==3)then      !z
-        if(direction<0)        then     !move to -z
-            fIn(2:zDim,:,:,:)=fIn(1:zDim-1,:,:,:)
-            zGrid(:)=zGrid(:)-dz
-        elseif(direction>0)    then     !move to +z
-            fIn(1:zDim-1,:,:,:)=fIn(2:zDim,:,:,:)
-            zGrid(:)=zGrid(:)+dz
-        else
-        endif
-    else
-    endif
-    END SUBROUTINE
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    Counting the number of steps the grid has moved
-!    Determine if the grd is moving left or right
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine  cptMove(move,xB,xG,d,MoveOutputIref)
-    implicit none
-    integer:: move(3),i,MoveOutputIref(3)
-    real(8):: xB(3),xG(3),d
-    do  i=1,3
-        if    (xB(i)-xG(i)> d)then
-            move(i)=1
-            MoveOutputIref(i)=MoveOutputIref(i)+1
-        elseif(xB(i)-xG(i)<-d)then
-            move(i)=-1
-            MoveOutputIref(i)=MoveOutputIref(i)-1
-        else
-            move(i)=0
-        endif
-    enddo
-    end subroutine
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    find reference point, moving grid
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine cptIref(NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim,xyzful,xGrid,yGrid,zGrid,Xref,Yref,Zref)
-    implicit none
-    integer:: NDref,IXref,IYref,IZref,nND,xDim,yDim,zDim
-    real(8):: xyzful(1:nND,1:3),xGrid(xDim),yGrid(yDim),zGrid(zDim),Xref,Yref,Zref
-
-    NDref=minloc(dsqrt((xyzful(1:nND,1)-Xref)**2+(xyzful(1:nND,2)-Yref)**2+(xyzful(1:nND,3)-Zref)**2),1)
-    IXref=minloc(dabs(xyzful(NDref,1)-xGrid(1:xDim)),1)
-    IYref=minloc(dabs(xyzful(NDref,2)-yGrid(1:yDim)),1)
-    IZref=minloc(dabs(xyzful(NDref,3)-zGrid(1:zDim)),1)
-
-    end subroutine
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine cptArea(areaElem,nND,nEL,ele,xyzful)
     implicit none
     integer:: nND,nEL,ele(nEL,5)
@@ -365,158 +109,82 @@
     TTT=matmul(rrx,TTT)
 
     end subroutine
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   write  string to unit=idfile  in binary format
-!    copyright@ RuNanHua
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine dumpstring(instring,idfile)
-    implicit none
-    character(40) instring
-    integer:: nascii,ii,len,idfile
-!
-    len=LEN_TRIM(instring)
 
-    do    ii=1,len
-        nascii=ICHAR(instring(ii:ii))
-        write(idfile) nascii
-    enddo
-
-    write(idfile) 0
-!
-    return
-    endsubroutine dumpstring
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine  initDisturb()
-    USE simParam
-    implicit none
-
-    integer:: x, y,z
-    do  z = 1, zDim
-    do  y = 1, yDim
-    do  x = 1, xDim
-        uuu(z,y,x,1)=uuu(z,y,x,1)+AmplInitDist(1)*Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-        uuu(z,y,x,2)=uuu(z,y,x,2)+AmplInitDist(2)*Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-        uuu(z,y,x,3)=uuu(z,y,x,3)+AmplInitDist(3)*Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-    enddo
-    enddo
-    enddo
-
-    end
-
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!    copyright@ RuNanHua
-!    ��Ȩ���У������ϣ��й��ƴ������ѧϵ��
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine  forcDisturb()
-    USE simParam
-    implicit none
-    integer:: x, y, z,xbgn,xend,ybgn,yend,zbgn,zend
-    real(8):: rx,ry,rz
-
-    xbgn    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)-3
-    xend    = minloc(dabs(posiForcDist(1)-xGrid(1:xDim)),1)+4
-    ybgn    = minloc(dabs(posiForcDist(2)-yGrid(1:yDim)),1)-3
-    yend    = minloc(dabs(posiForcDist(2)-yGrid(1:yDim)),1)+4
-    zbgn    = minloc(dabs(posiForcDist(3)-zGrid(1:zDim)),1)-3
-    zend    = minloc(dabs(posiForcDist(3)-zGrid(1:zDim)),1)+4
-    do    x=xbgn,xend
-    do    y=ybgn,yend
-    do    z=zbgn,zend
-        rx=(posiForcDist(1)-xGrid(x))/dx(x)
-        ry=(posiForcDist(2)-yGrid(y))/dy(y)
-        rz=(posiForcDist(3)-zGrid(z))/dz(z)
-
-        force(z,y,x,1)=force(z,y,x,1)+AmplforcDist(1)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
-        force(z,y,x,2)=force(z,y,x,2)+AmplforcDist(2)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
-        force(z,y,x,3)=force(z,y,x,3)+AmplforcDist(3)*(0.5*denIn*Uref**2*Asfac)*dsin(2.0*pi*FreqforcDist*time/Tref)*Phi(rx)*Phi(ry)*Phi(rz)/(dx(x)*dy(y)*dz(z))
-    enddo
-    enddo
-    enddo
-    contains
-    FUNCTION Phi(x_)
+    ! get the time right now
+    SUBROUTINE get_now_time(now_time) 
         IMPLICIT NONE
-        real(8)::Phi,x_,r
-        r=dabs(x_)
-        if(r<1.0d0)then
-            Phi=(3.d0-2.d0*r+dsqrt( 1.d0+4.d0*r*(1.d0-r)))*0.125d0
-        elseif(r<2.0d0)then
-            Phi=(5.d0-2.d0*r-dsqrt(-7.d0+4.d0*r*(3.d0-r)))*0.125d0
-        else
-            Phi=0.0d0
+        real(8)::now_time
+        integer,dimension(8) :: cpu_time
+        call date_and_time(VALUES=cpu_time)
+        now_time = cpu_time(6)*60.d0 + cpu_time(7)*1.d0 + cpu_time(8)*0.001d0
+    END SUBROUTINE
+
+    ! Found keyword in inflow.dat for next parameters read
+    SUBROUTINE found_keyword(fileID,keyword)
+        implicit none
+        integer:: fileID, IOstatus
+        character(LEN=40) :: keyword
+        character(len=50) :: readString
+        readString = 'null'
+        IOstatus = 0
+        call to_lowercase(keyword)
+        do while(IOstatus.eq.0)
+            read(fileID, *, IOSTAT=IOstatus) readString
+            call to_lowercase(readString)
+            readString = adjustl(readString)
+            if (index(readString, keyword) .GT. 0) then
+                exit
+            endif
+        enddo
+        if (index(readString, keyword) .EQ. 0) then
+            write(*,*) trim(keyword)//' is not found in inFlow.dat'
+            stop
         endif
-    ENDFUNCTION Phi
-    end
+    END SUBROUTINE
 
-    SUBROUTINE OMPPartition(xDim, np, partition, parindex)
+    ! Convert an uppercase string to lowercase
+    SUBROUTINE to_lowercase(string)
         implicit none
-        integer:: np, xDim
-        integer:: partition(1:np), parindex(1:np+1)
-        integer:: psize, p, residual
-        psize = xDim/np
-        residual = xDim - psize * np
-        parindex(1) = 1
-        parindex(np+1) = xDim + 1
-        do p=1,np
-            if (p .gt. np-residual) then
-                partition(p) = psize + 1
-            else
-                partition(p) = psize
+        character:: string
+        integer :: i
+        do i = 1, len_trim(string)
+            if (iachar(string(i:i)) .ge. iachar('A') .and. iachar(string(i:i)).le. iachar('Z')) then
+                string(i:i) = achar(iachar(string(i:i)) + iachar('a') - iachar('A'))
+            end if
+        end do
+    END SUBROUTINE
+
+    SUBROUTINE readNextData(ifile, buffer)
+        implicit none
+        character(LEN=256):: buffer
+        integer:: ifile, IOstatus
+        do while(.true.)
+            read(ifile, '(a)', IOSTAT=IOstatus) buffer
+            if (IOstatus.ne.0) then
+                write(*, *) 'end of file encounter in readNextData', ifile
+                stop
             endif
-            if (p .gt. 1) then
-                parindex(p) = parindex(p-1) + partition(p-1)
+            buffer = adjustl(buffer)
+            if(buffer(1:1).ne.'#') then
+                exit
             endif
         enddo
-    endsubroutine
+    END SUBROUTINE readNextData
 
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   lxguang 2023.02 Add Shear flow velocity boundary
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE evaluateShearVelocity(x, y, z, vel)
-    USE simParam
-    real(8):: x, y, z, vel(1:SpcDim)
-    vel(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)
-    vel(2) = uuuIn(2) + x * shearRateIn(1) + 0 * shearRateIn(2) + z * shearRateIn(3)
-    vel(3) = uuuIn(3) + x * shearRateIn(1) + y * shearRateIn(2) + 0 * shearRateIn(3)
-    END SUBROUTINE
-
-    SUBROUTINE evaluateOscillatoryVelocity(vel)
-        USE simParam
-        real(8):: vel(1:SpcDim)
-        vel(1) = uuuIn(1) + VelocityAmp * dcos(2*pi*VelocityFreq*time + VelocityPhi/180.0*pi)
-        vel(2) = uuuIn(2)
-        vel(3) = uuuIn(3)
-    END SUBROUTINE
-
-    SUBROUTINE updateVolumForc()
-        USE simParam
+    SUBROUTINE readequal(ifile)
         implicit none
-        VolumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2.d0 * pi * VolumeForceFreq * time + VolumeForcePhi/180.0*pi)
-        VolumeForce(2) = VolumeForceIn(2)
-        VolumeForce(3) = VolumeForceIn(3)
-    END SUBROUTINE
-
-    SUBROUTINE addVolumForc()
-        USE simParam
-        implicit none
-        integer:: x
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-        do x=1,xDim
-            force(:,:,x,1) = force(:,:,x,1) + VolumeForce(1)
-            force(:,:,x,2) = force(:,:,x,2) + VolumeForce(2)
-            force(:,:,x,3) = force(:,:,x,3) + VolumeForce(3)
+        integer:: IOstatus, ifile
+        character (40):: buffer
+        do while(.true.)
+            read(ifile, *, IOSTAT=IOstatus) buffer
+            if (IOstatus.ne.0) then
+                write(*, *) 'end of file encounter in readequal', ifile
+                stop
+            endif
+            buffer = adjustl(buffer)
+            if(buffer(1:1).eq.'=') then
+                exit
+            endif
         enddo
-        !$OMP END PARALLEL DO
     END SUBROUTINE
-
-    FUNCTION CPUtime(values)
-        IMPLICIT NONE
-        real(8)::CPUtime
-        integer,dimension(8) :: values
-        CPUtime = dble(values(6))*60.d0+dble(values(7))*1.d0+dble(values(8))*0.001d0
-    ENDFUNCTION
+    
