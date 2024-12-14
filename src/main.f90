@@ -6,6 +6,7 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 PROGRAM main
+    use omp_lib
     USE ConstParams
     USE FlowCondition
     USE SolidBody
@@ -22,10 +23,10 @@ PROGRAM main
     call read_flow_conditions(parameterFile)
     call read_solid_files(parameterFile)
     call read_fuild_blocks(parameterFile)
-    !==================================================================================================
+    call omp_set_num_threads(flow%npsize)
     ! Allocate the memory for simulation
     call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
-    call allocate_fuild_memory_blocks()
+    call allocate_fuild_memory_blocks(flow%npsize)
     !==================================================================================================
     ! Calculate all the reference values
     call calculate_reference_params(flow)

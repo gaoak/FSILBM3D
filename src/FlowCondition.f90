@@ -12,7 +12,8 @@ module FlowCondition
         real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
         real(8) :: Uref,Lref,Tref
         real(8) :: Aref,Fref,Eref,Pref
-        real(8) :: Asfac,Lchod,Lspan,AR 
+        real(8) :: Asfac,Lchod,Lspan,AR
+        integer:: npsize
     end type FlowCondType
     type(FlowCondType) :: flow
 
@@ -25,6 +26,10 @@ module FlowCondition
         character(LEN=256):: buffer
         character(LEN=40):: keywordstr
         open(unit=111, file=filename, status='old', action='read')
+        keywordstr = 'Parallel'
+        call found_keyword(111,keywordstr)
+        call readNextData(111, buffer)
+        read(buffer,*)    flow%npsize
         keywordstr = 'FlowCondition'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)

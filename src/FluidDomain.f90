@@ -47,8 +47,6 @@ module FluidDomain
         keywordstr = 'FluidBlocks'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(buffer,*)   m_npsize
-        call readNextData(111, buffer)
         read(buffer,*) m_nblock
         allocate(LBMblks(m_nblock))
         do iblock = 1,m_nblock
@@ -100,9 +98,11 @@ module FluidDomain
 
     !=================================================================================================
     ! Functions to iterate over each block
-    SUBROUTINE allocate_fuild_memory_blocks()
+    SUBROUTINE allocate_fuild_memory_blocks(npsize)
         implicit none
+        integer,intent(in):: npsize
         integer:: iblock
+        m_npsize = npsize
         do iblock = 1,m_nblock
             call LBMblks(iblock)%allocate_fluid()
         enddo
@@ -790,9 +790,9 @@ module FluidDomain
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
-                              (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
-                             +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
-                             +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
+                 (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
+                +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
+                +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
             if(this%iCollidModel==1)then
                 ! SRT collision
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*fEq(0:lbmDim) + (1.d0-0.5d0*this%Omega)*Flb(0:lbmDim)

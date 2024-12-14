@@ -1,6 +1,6 @@
 Parallel
 # parameter for mpi
- 8                                            read(111,*) npsize
+ 16                                            read(111,*) npsize
 EndParallel
 FlowCondition
  1          1                                 read(111,*) isConCmpt,numsubstep
@@ -17,7 +17,6 @@ FlowCondition
  10         0.010D+0                          read(111,*) ntolLBM,dtolLBM
 ENDFlowCondition
 FluidBlocks
- 16                                           read(111,*) m_npsize
  1                                            read(111,*) nblock
  1         1         0                        read(111,*) ID,iCollideModel,offsetOutput
  801       100       50                       read(111,*) xDim,yDim,zDim
