@@ -250,14 +250,14 @@ module FluidDomain
         class(LBMBlock),intent(inout) :: this
         type(FlowCondType),intent(inout) :: flow
         ! select the collision model
-        if(this%iCollidModel.eq.1) then
-            call calculate_SRT_params()
-        elseif(this%iCollidModel.eq.2) then
+        call calculate_SRT_params()
+        if(this%iCollidModel.eq.2) then
             call calculate_TRT_params(this%params(1))
         elseif(this%iCollidModel.eq.3) then
             call calculate_MRT_params()
         else
             write(*,*)' collision_step Model is not defined'
+            stop
         endif
         ! initialize flow information
         call initialize_flow()
@@ -272,12 +272,11 @@ module FluidDomain
         END SUBROUTINE calculate_SRT_params
 
         SUBROUTINE calculate_TRT_params(lambda)
+            ! lambda = (1/omegap - 0.5) (1/omegam - 0.5)
             implicit none
-            real(8):: tau, lambda
-            tau   =  flow%nu/(this%dh*Cs2)+0.5d0
-            this%Omega =  1.0d0 / tau
-            this%Omega2 = 0.d0 ! to be updated
-            lambda = 1.0d0/4.0d0;
+            real(8):: tmp, lambda
+            tmp = (lambda * 4.d0 -1.d0) * this%Omega + 2.D0
+            this%Omega2 = 2.d0*(2.d0 - this%Omega) / tmp
         END SUBROUTINE calculate_TRT_params
 
         SUBROUTINE calculate_MRT_params()
