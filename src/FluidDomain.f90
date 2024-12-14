@@ -955,7 +955,8 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         real(8), intent(in):: time
         integer:: x,y,z,pid,i
-        integer::xmin,xmax,ymin,ymax,zmin,zmax
+        real(8)::xmin,ymin,zmin
+        integer::nxs,nxe,nys,nye,nzs,nze
         integer,parameter::nameLen=10,idfile=100
         character (LEN=nameLen):: fileName
         real(8):: invUref
@@ -967,36 +968,39 @@ module FluidDomain
         if(waittime.gt.1.d-1) then
             write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
         endif
-        xmin = 1 + this%offsetOutput
-        ymin = 1 + this%offsetOutput
-        zmin = 1 + this%offsetOutput
-        xmax = this%xDim - this%offsetOutput
-        ymax = this%yDim - this%offsetOutput
-        zmax = this%zDim - this%offsetOutput
+        nxs = 1 + this%offsetOutput
+        nys = 1 + this%offsetOutput
+        nzs = 1 + this%offsetOutput
+        nxe = this%xDim - this%offsetOutput
+        nye = this%yDim - this%offsetOutput
+        nze = this%zDim - this%offsetOutput
+        xmin = this%xmin + this%offsetOutput * this%dh
+        ymin = this%ymin + this%offsetOutput * this%dh
+        zmin = this%zmin + this%offsetOutput * this%dh
         invUref = 1.d0/flow%Uref
         
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do x=xmin, xmax
-            do y=ymin, ymax
-                do z=zmin, zmax
+        do x=nxs, nxe
+            do y=nys, nye
+                do z=nzs, nze
                     this%oututmp(z,y,x) = this%uuu(z,y,x,1)*invUref
                 enddo
             enddo
         enddo
         !$OMP END PARALLEL DO
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do x=xmin, xmax
-            do y=ymin, ymax
-                do z=zmin, zmax
+        do x=nxs, nxe
+            do y=nys, nye
+                do z=nzs, nze
                     this%outvtmp(z,y,x) = this%uuu(z,y,x,2)*invUref
                 enddo
             enddo
         enddo
         !$OMP END PARALLEL DO
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do x=xmin, xmax
-            do y=ymin, ymax
-                do z=zmin, zmax
+        do x=nxs, nxe
+            do y=nys, nye
+                do z=nzs, nze
                     this%outwtmp(z,y,x) = this%uuu(z,y,x,3)*invUref
                 enddo
             enddo
@@ -1015,9 +1019,12 @@ module FluidDomain
             do  i=1,nameLen
                 if(fileName(i:i)==' ')fileName(i:i)='0'
             enddo
-            open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.plt',form='unformatted',access='stream')
-            WRITE(idfile) xmin,xmax,ymin,ymax,zmin,zmax
-            WRITE(idfile) this%offsetMoveGrid(1:3)
+            open(idfile,file='./DatFlow/Flow'//trim(fileName)//'.binary',form='unformatted',access='stream')
+            nxe = nxe-nxs+1
+            nye = nye-nys+1
+            nze = nze-nzs+1
+            WRITE(idfile) nxe,nye,nze,this%ID
+            WRITE(idfile) xmin,ymin,zmin,this%dh
             write(idfile) this%oututmp,this%outvtmp,this%outwtmp
             close(idfile)
             call myexit(0)

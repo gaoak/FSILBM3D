@@ -190,42 +190,29 @@ void readGridFiles(const std::string &igridfile, std::vector<OUTREAL> &xcData,
 //   }
 // }
 
-void stackDataFromFiles(const std::string filename, const std::string mesh_file,
+void stackDataFromFiles(const std::string filename,
                         std::vector<std::vector<OUTREAL>> &Stacks, size_t &NXc,
                         size_t &NYc, size_t &NZc) {
-  std::vector<OUTREAL> xcData;
-  std::vector<OUTREAL> ycData;
-  std::vector<OUTREAL> zcData;
   std::vector<std::vector<OUTREAL>> tempStacks;
-  int xmin, xmax, ymin, ymax, zmin, zmax;
-  float offsetMoveGrid[3];
-
-  // Read files in sorted order
-  // std::set<int> zids;
-  // for (int i = 1; i <= NZc; ++i) {
-  //   zids.insert(i);
-  // }
-
   std::ifstream infile(filename, std::ios::binary);
   if (!infile.is_open()) {
     std::cerr << "Failed to open file: " << filename << std::endl;
     return;
   }
+  int nx, ny, nz, id;
+  infile.read(reinterpret_cast<char *>(&nx), sizeof(nx));
+  infile.read(reinterpret_cast<char *>(&ny), sizeof(ny));
+  infile.read(reinterpret_cast<char *>(&nz), sizeof(nz));
+  infile.read(reinterpret_cast<char *>(&id), sizeof(id));
+  double xmin, ymin, zmin, dh;
   infile.read(reinterpret_cast<char *>(&xmin), sizeof(xmin));
-  infile.read(reinterpret_cast<char *>(&xmax), sizeof(xmax));
   infile.read(reinterpret_cast<char *>(&ymin), sizeof(ymin));
-  infile.read(reinterpret_cast<char *>(&ymax), sizeof(ymax));
   infile.read(reinterpret_cast<char *>(&zmin), sizeof(zmin));
-  infile.read(reinterpret_cast<char *>(&zmax), sizeof(zmax));
-  NXc = xmax - xmin + 1;
-  NYc = ymax - ymin + 1;
-  NZc = zmax - zmin + 1;
+  infile.read(reinterpret_cast<char *>(&dh), sizeof(dh));
 
-  for (size_t i = 0; i < 3; ++i) {
-    infile.read(reinterpret_cast<char *>(&offsetMoveGrid[i]), sizeof(offsetMoveGrid[i]));
-  }
-
-  readGridFiles(mesh_file, xcData, ycData, zcData);
+  NXc = nx;
+  NYc = ny;
+  NZc = nz;
   Stacks.resize(6);
   for (size_t i = 0; i < Stacks.size(); ++i) {
     Stacks[i].resize(NXc * NYc * NZc);
@@ -233,18 +220,6 @@ void stackDataFromFiles(const std::string filename, const std::string mesh_file,
   tempStacks.resize(3);
   for (size_t i = 0; i < tempStacks.size(); ++i) {
     tempStacks[i].resize(NXc * NYc * NZc);
-  }
-
-  size_t count = 0;
-  for (size_t k = zmin - 1; k < zmax; ++k) {
-    for (size_t j = ymin - 1; j < ymax; ++j) {
-      for (size_t i = xmin - 1; i < xmax; ++i) {
-        Stacks[0][count] = xcData[i] + offsetMoveGrid[0];
-        Stacks[1][count] = ycData[j] + offsetMoveGrid[1];
-        Stacks[2][count] = zcData[k] + offsetMoveGrid[2];
-        ++count;
-      }
-    }
   }
 
   // Read data
@@ -265,10 +240,16 @@ void stackDataFromFiles(const std::string filename, const std::string mesh_file,
     }
   }
   for (size_t i = 0; i < NXc; ++i) {
+    double x = xmin + i * dh;
     for (size_t j = 0; j < NYc; ++j) {
+      double y = ymin + j * dh;
       for (size_t k = 0; k < NZc; ++k) {
+        double z = zmin + k * dh;
         size_t idx1d = k * NYc * NXc + j * NXc + i; //  x, y, z
         size_t idx3d = i * NYc * NZc + j * NZc + k; //  z, y, x
+        Stacks[0][idx1d] = x;
+        Stacks[1][idx1d] = y;
+        Stacks[2][idx1d] = z;
         Stacks[3][idx1d] = tempStacks[0][idx3d];
         Stacks[4][idx1d] = tempStacks[1][idx3d];
         Stacks[5][idx1d] = tempStacks[2][idx3d];
@@ -297,9 +278,9 @@ void stackDataFromFiles(const std::string filename, const std::string mesh_file,
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 4) {
+  if (argc < 3) {
     std::cout << "Error, insufficient input parameters, Usage: Combine "
-                 "FluidMesh.dat DatFlow/Flow0000.00000 0.plt"
+                 "DatFlow/Flow0000.00000 0.plt"
               << std::endl;
     exit(-1);
   }
@@ -319,16 +300,15 @@ int main(int argc, char *argv[]) {
   //     break;
   //   }
   // }
-  std::string mesh_file(argv[1]);
-  std::string flow_file(argv[2]);
-  std::string plt_file(argv[3]);
+  std::string flow_file(argv[1]);
+  std::string plt_file(argv[2]);
   std::vector<size_t> rawN(3);
   std::vector<std::vector<OUTREAL>> Stacks;
   std::vector<std::string> var = {"x", "y", "z", "u", "v", "w"};
   // if (showIb) {
   //   var.push_back("Ib");
   // }
-  stackDataFromFiles(flow_file, mesh_file, Stacks, rawN[0], rawN[1], rawN[2]);
+  stackDataFromFiles(flow_file, Stacks, rawN[0], rawN[1], rawN[2]);
   OutputTec360_binary(plt_file, var, rawN, Stacks);
   std::cout << "Write " << plt_file << std::endl;
   // if (showError) {
