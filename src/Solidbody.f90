@@ -5,7 +5,7 @@ module SolidBody
     private
     ! Immersed boundary method parameters
     integer:: m_nFish, m_ntolLBM
-    real(8):: m_dtolLBM, m_IBPenaltyBeta, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
+    real(8):: m_dtolLBM, m_IBPenaltyAlpha, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
@@ -83,7 +83,7 @@ module SolidBody
         keywordstr = 'SolidBody'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(buffer,*)    IBPenaltyalpha,alphaf
+        read(buffer,*)    m_IBPenaltyAlpha,alphaf
         call readNextData(111, buffer)
         read(buffer,*)    NewmarkGamma,NewmarkBeta
         call readNextData(111, buffer)
@@ -92,7 +92,10 @@ module SolidBody
         read(buffer,*)    dtolFEM,ntolFEM
         call readNextData(111, buffer)
         read(buffer,*)    m_nFish,nfishGroup,isKB
-        m_IBPenaltyBeta = - IBPenaltyalpha* 2.0d0*m_denIn
+        if(m_IBPenaltyAlpha.le.1.d-6) then
+            write(*,*) 'ERROR: IBPenaltyalpha should be positive (default 1)', m_IBPenaltyAlpha
+            stop
+        endif
         ! set solid solver global parameters
         call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
         allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish),denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish),XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish),AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
@@ -274,10 +277,10 @@ module SolidBody
     end subroutine allocate_solid_memory
 
     subroutine set_solidbody_parameters(denIn,uvwIn,BndConds,&
-        Aref,Eref,Fref,Lref,Pref,Tref,Uref)
+        Aref,Eref,Fref,Lref,Pref,Tref,Uref,ntolLBM,dtolLBM)
         implicit none
-        real(8),intent(in):: denIn,uvwIn(1:3),Aref,Eref,Fref,Lref,Pref,Tref,Uref
-        integer,intent(in):: BndConds(1:6)
+        real(8),intent(in):: denIn,uvwIn(1:3),Aref,Eref,Fref,Lref,Pref,Tref,Uref,dtolLBM
+        integer,intent(in):: BndConds(1:6),ntolLBM
         real(8):: Lthck,uMax
         ! set gobal parameters
         m_denIn = denIn
@@ -290,6 +293,8 @@ module SolidBody
         m_Pref = Pref
         m_Tref = Tref
         m_Uref = Uref
+        m_ntolLBM = ntolLBM
+        m_dtolLBM = dtolLBM
         call Calculate_Solid_params(uMax,Lthck)
     end subroutine set_solidbody_parameters
 
@@ -462,7 +467,8 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         integer :: i,s,cnt,i1,i2
         real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3), dirc(3)
-        real(8) :: dh, left, len, dl, ls, area, dirc_norm
+        real(8) :: dh, left, len, dl, ls, area, dirc_norm, IBPenaltyBeta
+        IBPenaltyBeta = - m_IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)
             i2 = this%rbm%ele(i,2)
@@ -473,7 +479,7 @@ module SolidBody
             dl = len / dble(this%rbm%r_Nspan(i))
             tmpdx = this%rbm%xyzful(i2,1:3) - this%rbm%xyzful(i1,1:3)
             dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3))
-            area = dl * dh * m_IBPenaltyBeta
+            area = dl * dh * IBPenaltyBeta
             dirc(1:3) = this%rbm%r_dirc(i1,1:3) + this%rbm%r_dirc(i2,1:3)
             dirc_norm = dsqrt(sum(dirc**2))
             if (dirc_norm .gt. 1e-10) then
@@ -500,7 +506,8 @@ module SolidBody
         real(8) :: Surfacetmpxyz(3,Surfacetmpnpts)
         integer :: Surfacetmpele(3,Surfacetmpnelmts)
         integer :: i,i1,i2,i3
-        real(8) :: A(3),B(3),C(3),tmparea
+        real(8) :: A(3),B(3),C(3),tmparea,IBPenaltyBeta
+        IBPenaltyBeta = - m_IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,Surfacetmpnelmts
             i1 = Surfacetmpele(1,i)
             i2 = Surfacetmpele(2,i)
@@ -510,7 +517,7 @@ module SolidBody
             C = Surfacetmpxyz(1:3,i3)
             call cpt_incenter(this%v_Exyz(1:3,i))
             call cpt_area(tmparea)
-            this%v_Ea(i) = tmparea*m_IBPenaltyBeta
+            this%v_Ea(i) = tmparea*IBPenaltyBeta
         enddo
         allocate(this%v_Exyz0(3,this%v_nelmts))
         this%v_Exyz0 = this%v_Exyz

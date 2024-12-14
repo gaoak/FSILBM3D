@@ -30,7 +30,7 @@ PROGRAM main
     ! Calculate all the reference values
     call calculate_reference_params(flow)
     call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(1)%BndConds,&
-        flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref)
+        flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
     call write_parameter_check_file(checkFile)
     !==================================================================================================
     ! Initialization before simulation

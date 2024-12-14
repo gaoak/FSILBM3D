@@ -27,7 +27,7 @@ FluidBlocks
 ENDFluidBlocks
 SolidBody
 # general parameters for solid solver
- 0.000D+0   0.000d+0                          read(111,*) IBPenaltyalpha,alphaf
+ 1.000D+0   0.000d+0                          read(111,*) IBPenaltyalpha,alphaf
  0.500d+0   1.000d+0                          read(111,*) NewmarkGamma,NewmarkBeta
  0.000d+0   0.000d+0                          read(111,*) dampK,dampM
  1.000D-6   100			                      read(111,*) dtolFEM,ntolFEM
