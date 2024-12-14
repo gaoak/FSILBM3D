@@ -11,6 +11,7 @@ PROGRAM main
     USE FlowCondition
     USE SolidBody
     USE FluidDomain
+    USE LBMBlockComm
     implicit none
     character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
     integer:: isubstep=0,step=0
@@ -24,6 +25,7 @@ PROGRAM main
     call read_solid_files(parameterFile)
     call read_fuild_blocks(parameterFile)
     call read_probe_params(parameterFile)
+    call Read_Comm_Pair(parameterFile)
     !==================================================================================================
     ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)
@@ -76,6 +78,7 @@ PROGRAM main
         write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
         ! Set fluid boundary conditions
         call set_boundary_conditions_blocks()
+        call ExchangeFluidInterface()
         call calculate_macro_quantities_blocks()
         ! Compute volume force exerted on fluids
         call get_now_time(time_begine2)

@@ -22,7 +22,7 @@ SRCDIR = ./src
 
 ### List of files for the main code
 OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
-SRC = $(SRCDIR)/ConstParams.f90 $(SRCDIR)/FlowCondition.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/FluidDomain.f90 $(SRCDIR)/Util.f90 $(SRCDIR)/main.f90
+SRC = $(SRCDIR)/ConstParams.f90 $(SRCDIR)/FlowCondition.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/FluidDomain.f90 $(SRCDIR)/LBMBlockComm.f90 $(SRCDIR)/Util.f90 $(SRCDIR)/main.f90
 CSRC = $(SRCDIR)/forkthread.c
 CPPSRC = $(SRCDIR)/velocitymap.cpp
 OBJ = $(SRC:%.f90=%.o)

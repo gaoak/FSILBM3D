@@ -23,10 +23,10 @@ module ConstParams
     real(8), parameter::s0=0.0d0,s1=1.19d0,s2=1.4d0,s4=1.2d0,s10=1.4d0,s16=1.98d0
 
     !   MODULE BoundCondParams
-    integer, parameter:: Eq_DirecletU = 101,nEq_DirecletU = 102,order1_Extrapolate = 103,order2_Extrapolate = 104
+    integer, parameter:: BCEq_DirecletU = 101,BCnEq_DirecletU = 102,BCorder1_Extrapolate = 103,BCorder2_Extrapolate = 104
                         !given balance function,unbalanced extrapolation,1st order extrapolate,2nd order extrapolate
-    integer, parameter:: stationary_Wall = 201, moving_Wall = 202
-    integer, parameter:: Periodic = 301,Symmetric = 302
+    integer, parameter:: BCstationary_Wall = 201, BCmoving_Wall = 202
+    integer, parameter:: BCPeriodic = 301,BCSymmetric = 302,BCfluid = 0
 
     real(8), parameter:: Pi = 3.141592653589793d0,eps = 1.0d-5
     integer, parameter:: DOFDim = 6
