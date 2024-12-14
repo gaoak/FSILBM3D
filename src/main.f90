@@ -43,6 +43,7 @@ PROGRAM main
     !==================================================================================================
     ! Update the volumn forces and calculate the macro quantities
     call update_volumn_force_blocks(time)
+    call set_boundary_conditions_blocks()
     call calculate_macro_quantities_blocks()
     !==================================================================================================
     ! Write the initial fluid and solid data
