@@ -22,7 +22,7 @@ FlowCondition
  10         0.010D+0                          read(buffer,*) ntolLBM,dtolLBM
 ENDFlowCondition
 FluidBlocks
- 2                                            read(buffer,*) nblock
+ 2                                            read(buffer,*) nblock (should be m_npairs + 1)
  1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
  801        100        50                     read(buffer,*) xDim,yDim,zDim
  0.020D+0  -6.000D+0  -1.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
