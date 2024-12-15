@@ -3,6 +3,12 @@ module LBMBlockComm
     use FluidDomain
     implicit none
     !include 'mpif.h'
+    type :: blockTreeNode
+        integer:: fatherId
+        integer:: nsons
+        integer,allocatable:: sons(:)
+        integer,allocatable:: pairId(:)
+    end type blockTreeNode
     type :: CommPair
         integer:: fatherId
         integer:: sonId
@@ -11,6 +17,8 @@ module LBMBlockComm
         integer:: islocal ! local (0) or mpi (1)
     end type CommPair
     integer:: m_npairs,m_containSolidId,m_gridDelta
+    integer:: blockTreeRoot ! assume there is only one root
+    type(blockTreeNode),allocatable:: blockTree(:)
     type(CommPair),allocatable:: commpairs(:)
 
     contains
@@ -69,6 +77,45 @@ module LBMBlockComm
         endif
         close(111)
     end subroutine read_blocks_comunication
+
+    subroutine bluid_block_tree()
+        implicit none
+        integer:: i,f,s,ns(1:m_nblock)
+        ! initialise blocktree
+        allocate(blockTree(1:m_nblock))
+        do i=1,m_nblock
+            blockTree(i)%fatherId = 0
+            blockTree(i)%nsons = 0
+        enddo
+        ! get number of sons and father Id
+        do i=1,m_npairs
+            f = commpairs(i)%fatherId
+            s = commpairs(i)%sonId
+            blockTree(f)%nsons = blockTree(f)%nsons + 1
+            blockTree(s)%fatherId = f
+        enddo
+        ! allocate sons and determine tree root
+        blockTreeRoot = -1111
+        do i=1,m_nblock
+            allocate(blockTree(i)%sons(blockTree(i)%nsons),blockTree(i)%pairId(blockTree(i)%nsons))
+            if(blockTree(i)%fatherId .eq. 0) then
+                if(blockTreeRoot.ne.-1111) then
+                    write(*,*) 'Error: there are more than one root block', i, blockTreeRoot
+                    stop
+                endif
+                blockTreeRoot = i
+            endif
+        enddo
+        ! set sons
+        ns = 0
+        do i=1,m_npairs
+            f = commpairs(i)%fatherId
+            s = commpairs(i)%sonId
+            ns(f) = ns(f) + 1
+            blockTree(f)%sons(ns(f)) = s
+            blockTree(f)%pairId(ns(f)) = i
+        enddo
+    endsubroutine bluid_block_tree
 
     SUBROUTINE ExchangeFluidInterface()
         implicit none
