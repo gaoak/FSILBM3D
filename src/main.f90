@@ -46,7 +46,7 @@ PROGRAM main
     call initialise_fuild_blocks(flow)
     !==================================================================================================
     ! Check blocks number and calculate the tau of each block
-    call check_blocks_number(m_npairs)
+    call check_blocks_params(m_nblock)
     call calculate_blocks_tau(flow%nu)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
@@ -88,9 +88,8 @@ PROGRAM main
             call set_boundary_conditions_block(1)
             write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
         elseif(m_npairs .eq. 1) then ! two blocks
-            if(LBMblks(1)%dh .ne. LBMblks(2)%dh*m_gridDelta) stop 'grid points do not match between fluid blocks'
             call get_now_time(time_begine2)
-            call calculating_public_distribution()
+            call calculating_public_distribution(m_npairs)
             call collision_block(commpairs(1)%fatherId)
             call streaming_block(commpairs(1)%fatherId)
             call set_boundary_conditions_block(commpairs(1)%fatherId)

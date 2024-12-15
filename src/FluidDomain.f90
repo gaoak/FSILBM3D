@@ -4,8 +4,9 @@ module FluidDomain
     implicit none
     private
     integer:: m_nblock, m_npsize
-    public:: LBMblks,LBMblksIndex,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
-             check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block,check_blocks_number, &
+    public:: LBMblks,LBMblksIndex,m_nblock
+    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
+             check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
@@ -127,13 +128,6 @@ module FluidDomain
         do iblock = 1,m_nblock
             call LBMblks(iblock)%initialise(flow)
         enddo
-    END SUBROUTINE
-
-    SUBROUTINE check_blocks_number(npairs)
-        implicit none
-        integer:: npairs
-        ! verify the number of fluid blocks
-        if(m_nblock .ne. (npairs + 1)) stop 'the number of fluid blocks is wrong (should equal to n_pairs + 1) '
     END SUBROUTINE
 
     SUBROUTINE write_continue_blocks(filename,step,time)
