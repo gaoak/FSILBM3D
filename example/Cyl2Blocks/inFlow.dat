@@ -3,7 +3,7 @@ Parallel
  16                                           read(buffer,*) npsize
 EndParallel
 Communication
- 1          1                                 read(buffer,*) m_npairs,m_containSolidId
+ 1          1                                 read(buffer,*) m_npairs(0: single block),m_containSolidId
 # fatherid, sonid, local(0) mpi(1)
  2          1          0                      read(buffer,*) fatherId,sonId,containSolidId,type
 EndCommunication

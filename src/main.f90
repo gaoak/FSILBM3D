@@ -78,7 +78,7 @@ PROGRAM main
         write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
         ! Set fluid boundary conditions
         call set_boundary_conditions_blocks()
-        call ExchangeFluidInterface()
+        if(m_npairs .ne. 0) call ExchangeFluidInterface()
         call calculate_macro_quantities_blocks()
         ! Compute volume force exerted on fluids
         call get_now_time(time_begine2)

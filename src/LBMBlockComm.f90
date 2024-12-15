@@ -29,6 +29,7 @@ module LBMBlockComm
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*) m_npairs,m_containSolidId
+        if(m_npairs .ne. 0) then
         allocate(commpairs(m_npairs))
         do i=1,m_npairs
             call readNextData(111, buffer)
@@ -67,6 +68,7 @@ module LBMBlockComm
             commpairs(i)%si(1:6) = commpairs(i)%s(1:6) + commpairs(i)%sds(1:6)
             commpairs(i)%fi(1:6) = commpairs(i)%f(1:6) + commpairs(i)%sds(1:6)
         enddo
+        endif
         close(111)
     end subroutine Read_Comm_Pair
 

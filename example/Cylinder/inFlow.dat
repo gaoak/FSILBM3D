@@ -2,11 +2,16 @@ Parallel
 # parameter for mpi
  16                                           read(buffer,*) npsize
 EndParallel
+Communication
+ 0          1                                 read(buffer,*) m_npairs(0: single block),m_containSolidId
+# fatherid, sonid, local(0) mpi(1)
+ 2          1          0                      read(buffer,*) fatherId,sonId,containSolidId,type
+EndCommunication
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
- 1.000D+0   1.000D+0                          read(buffer,*) timeSimTotal,timeContiDelta
+ 0.020D+0   1.000D+0                          read(buffer,*) timeSimTotal,timeContiDelta
  0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
- 0.100D+0   0.100D+0   0.010D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
+ 0.020D+0   0.020D+0   0.010D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
  40.00D+0   0.020D+0   1.000D+0               read(buffer,*) Re,dt,denIn
  0.010D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) shearRateIn(1:3)
@@ -18,11 +23,12 @@ FlowCondition
 ENDFlowCondition
 FluidBlocks
  1                                            read(buffer,*) nblock
- 1         1         0                        read(buffer,*) ID,iCollideModel,offsetOutput
- 801       100       50                       read(buffer,*) xDim,yDim,zDim
+ 1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput
+ 801        100        50                     read(buffer,*) xDim,yDim,zDim
  0.020D+0  -6.000D+0  -1.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
  101   103   301   301   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+=====================
 ENDFluidBlocks
 SolidBody
 # general parameters for solid solver
@@ -50,7 +56,7 @@ SolidBody
  ===
 ENDSolidBody
 ProbingFluid
- 3                                            read(buffer,*) fluidProbingNum (0: no output)
+ 3          1                                 read(buffer,*) fluidProbingNum (0: no output)
  0.600D+0   0.000D+0   0.500D+0               read(buffer,*) fluidProbingCoords(1,1:3)
  0.800D+0   0.000D+0   0.500D+0               read(buffer,*) fluidProbingCoords(2,1:3)
  1.000D+0   0.000D+0   0.500D+0               read(buffer,*) fluidProbingCoords(3,1:3)
