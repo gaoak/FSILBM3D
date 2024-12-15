@@ -3,7 +3,7 @@ module LBMBlockComm
     use FluidDomain
     implicit none
     !include 'mpif.h'
-    public:: Read_Comm_Pair,ExchangeFluidInterface
+    public:: read_blocks_comunication,ExchangeFluidInterface,commpairs
     type :: CommPair
         integer:: fatherId
         integer:: sonId
@@ -16,7 +16,7 @@ module LBMBlockComm
 
     contains
 
-    SUBROUTINE Read_Comm_Pair(filename)
+    SUBROUTINE read_blocks_comunication(filename)
         implicit none
         character(LEN=40),intent(in):: filename
         character(LEN=40):: keywordstr
@@ -69,7 +69,7 @@ module LBMBlockComm
         enddo
         endif
         close(111)
-    end subroutine Read_Comm_Pair
+    end subroutine read_blocks_comunication
 
     SUBROUTINE ExchangeFluidInterface()
         implicit none
@@ -129,6 +129,21 @@ module LBMBlockComm
                 LBMblks(pair%sonId)%fIn(si(6),si(3):si(4),si(1):si(2),0:lbmDim)
         endif
     end subroutine ExchangeDataSerial
+        
+    SUBROUTINE blocks_interpolation(n_pairs)
+        implicit none
+        integer:: n_pairs
+        ! interpolating from coase grids to finer grids
+
+    end subroutine
+
+    SUBROUTINE calculating_public_distribution()
+        implicit none
+        integer:: n_pairs
+        ! calculating the public node distribution function
+
+    end subroutine
+
 end module LBMBlockComm
 
 ! subroutine testmpiomp

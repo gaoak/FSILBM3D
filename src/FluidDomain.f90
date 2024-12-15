@@ -1,18 +1,19 @@
 module FluidDomain
     use ConstParams
     use FlowCondition
+    use LBMBlockComm
     implicit none
     private
     integer :: m_nblock, m_npsize
     public:: LBMblks,LBMblksIndex,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
-             check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_blocks,collision_blocks, &
-             write_continue_blocks,streaming_blocks,computeFieldStat_blocks,clear_volume_force
+             check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block,calculate_blocks_tau, &
+             write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
         integer :: xDim,yDim,zDim
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
         integer :: BndConds(1:6)
-        real(8) :: params(1:10),Omega,Omega2 ! single time, two time relaxation
+        real(8) :: params(1:10),tau,Omega,Omega2 ! single time, two time relaxation
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
@@ -77,6 +78,27 @@ module FluidDomain
         close(111)
     END SUBROUTINE
 
+    SUBROUTINE calculate_blocks_tau()
+        ! ensure the Reynolds numbers of each block are the same
+        implicit none
+        integer:: i
+        if(m_npairs .eq. 0) then
+            LBMblks(1)%tau = flow%nu/(this%dh*Cs2) + 0.5d0
+        elseif(m_npairs .ge. 1) then
+            LBMblks(commpairs(1)%fatherId)%tau = flow%nu/(this%dh*Cs2) + 0.5d0
+            LBMblks(commpairs(1)%sonId)%tau    = 0.50d0 + m_gridDelta*(LBMblks(commpairs(1)%fatherId)%tau - 0.50d0)
+            if(m_npairs .ge. 2) then
+                do i=2,m_npairs
+                    LBMblks(commpairs(i)%sonId)%tau = 0.50d0 + m_gridDelta*(LBMblks(commpairs(i)%fatherId)%tau - 0.50d0)
+                enddo
+            endif
+        else
+            stop 'wrong block pairs (npairs) input'
+        endif
+        ! verify the number of fluid blocks
+        if(m_nblock .ne. (m_npairs + 1)) stop 'the number of fluid blocks is wrong (should equal to n_pairs + 1) '
+    END SUBROUTINE
+
     ! Check whether the calculation is continued
     SUBROUTINE check_is_continue(filename,step,time,isContinue)
         implicit none
@@ -129,14 +151,6 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE set_boundary_conditions_blocks()
-        implicit none
-        integer:: iblock
-        do iblock = 1,m_nblock
-            call LBMblks(iblock)%set_boundary_conditions()
-        enddo
-    END SUBROUTINE
-
     SUBROUTINE write_continue_blocks(filename,step,time)
         implicit none
         character(LEN=40),intent(in):: filename
@@ -157,20 +171,22 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE streaming_blocks()
+    SUBROUTINE streaming_block(nblock)
         implicit none
-        integer:: iblock
-        do iblock = 1,m_nblock
-            call LBMblks(iblock)%streaming()
-        enddo
+        integer:: nblock
+        call LBMblks(nblock)%streaming()
     END SUBROUTINE
 
-    SUBROUTINE collision_blocks()
+    SUBROUTINE collision_block(nblock)
         implicit none
-        integer:: iblock
-        do iblock = 1,m_nblock
-            call LBMblks(iblock)%collision()
-        enddo
+        integer:: nblock
+        call LBMblks(nblock)%collision()
+    END SUBROUTINE
+
+    SUBROUTINE set_boundary_conditions_block(nblock)
+        implicit none
+        integer:: nblock
+        call LBMblks(nblock)%set_boundary_conditions()
     END SUBROUTINE
 
     SUBROUTINE calculate_macro_quantities_blocks()
@@ -277,8 +293,7 @@ module FluidDomain
         SUBROUTINE calculate_SRT_params()
             implicit none
             real(8):: tau
-            tau   =  flow%nu/(this%dh*Cs2)+0.5d0
-            this%Omega =  1.0d0 / tau
+            this%Omega =  1.0d0 / this%tau
         END SUBROUTINE calculate_SRT_params
 
         SUBROUTINE calculate_TRT_params(lambda)
