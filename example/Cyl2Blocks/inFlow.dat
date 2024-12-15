@@ -3,7 +3,7 @@ Parallel
  16                                           read(buffer,*) npsize
 EndParallel
 Communication
- 1          2          2                      read(buffer,*) npairs(0: single block),gridDelta,containSolidId
+ 1          1          1                      read(buffer,*) npairs(0: single block),gridDelta,containSolidId
 # fatherid, sonid, local(0) mpi(1)
  1          2          0                      read(buffer,*) fatherId,sonId,containSolidId,type
 EndCommunication

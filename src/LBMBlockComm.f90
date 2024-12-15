@@ -195,17 +195,38 @@ module LBMBlockComm
         endif
     END SUBROUTINE
 
+    ! verify the parameters of fluid blocks
+    SUBROUTINE check_blocks_params(nblock)
+        implicit none
+        integer:: i,nblock
+        logical:: flag
+        flag = (1 .eq. 2) ! default flase
+        if(nblock .ne. (m_npairs + 1)) stop 'the number of fluid blocks is wrong (should equal to n_pairs + 1) '
+        if(m_npairs .ge. 1 .and. m_gridDelta .ne. 1) then
+            do i=1,m_npairs
+                flag = (LBMblks(commpairs(i)%fatherId)%dh .ne. LBMblks(commpairs(i)%sonId)%dh*m_gridDelta .or. mod(LBMblks(commpairs(i)%sonId)%xDim,m_gridDelta) .ne. 1 .or. &
+                        mod(LBMblks(commpairs(i)%sonId)%yDim,m_gridDelta) .ne. 1 .or. mod(LBMblks(commpairs(i)%sonId)%zDim,m_gridDelta) .ne. 1)
+                if(flag) stop 'grid points do not match between fluid blocks'
+            enddo
+        endif
+    END SUBROUTINE
+
+    SUBROUTINE calculating_public_distribution(n_pairs)
+        implicit none
+        integer:: n_pairs
+        ! calculating the public node distribution function
+        if(n_pairs .eq. 1) then
+             
+
+        else
+
+        endif
+    end subroutine
+
     SUBROUTINE blocks_interpolation(n_pairs)
         implicit none
         integer:: n_pairs
         ! interpolating from coase grids to finer grids
-
-    end subroutine
-
-    SUBROUTINE calculating_public_distribution()
-        implicit none
-        integer:: n_pairs
-        ! calculating the public node distribution function
 
     end subroutine
 

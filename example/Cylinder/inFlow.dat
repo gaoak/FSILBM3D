@@ -5,7 +5,7 @@ EndParallel
 Communication
  0          1          1                      read(buffer,*) npairs(0: single block),gridDelta,containSolidId
 # fatherid, sonid, local(0) mpi(1)
- 2          1          0                      read(buffer,*) fatherId,sonId,containSolidId,type
+ 1          2          0                      read(buffer,*) fatherId,sonId,containSolidId,type
 EndCommunication
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
