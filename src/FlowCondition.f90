@@ -13,7 +13,7 @@ module FlowCondition
         real(8) :: Uref,Lref,Tref
         real(8) :: Aref,Fref,Eref,Pref
         real(8) :: Asfac,Lchod,Lspan,AR 
-        integer :: fluidProbingNum,solidProbingNum
+        integer :: fluidProbingNum,inWhichBlock,solidProbingNum
         integer, allocatable :: solidProbingNode(:)
         real(8), allocatable :: fluidProbingCoords(:,:)
     end type FlowCondType
@@ -71,7 +71,7 @@ module FlowCondition
         keywordstr = 'ProbingFluid'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(buffer,*)    flow%fluidProbingNum
+        read(buffer,*)    flow%fluidProbingNum,flow%inWhichBlock
         if (flow%fluidProbingNum .ne. 0) then
             allocate(flow%fluidProbingCoords(flow%fluidProbingNum,1:3))
             do i=1,flow%fluidProbingNum
@@ -165,20 +165,32 @@ module FlowCondition
         enddo
     END SUBROUTINE
 
-    SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocity)
+    SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocityIn)
         implicit none
-        integer:: i,xDim,yDim,zDim,xNum,yNum,zNum
-        real(8):: time,xmin,ymin,zmin,dh,velocity(zDim,yDim,xDim,1:3)
+        integer:: i,j,xDim,yDim,zDim
+        real(8):: time,dh,xmin,ymin,zmin,xmax,ymax,zmax
+        real(8):: velocityIn(zDim,yDim,xDim,1:3),velocityOut(1:3)
         integer,parameter::nameLen=3
         character (LEN=nameLen):: probeNum
         ! write fluid probing information
         do  i=1,flow%fluidProbingNum
-            xNum = NINT((flow%fluidProbingCoords(i,1) - xmin)/dh) + 1
-            yNum = NINT((flow%fluidProbingCoords(i,2) - ymin)/dh) + 1
-            zNum = NINT((flow%fluidProbingCoords(i,3) - zmin)/dh) + 1
+            xmax = xmin + dh * (xDim - 1)
+            ymax = ymin + dh * (yDim - 1)
+            zmax = zmin + dh * (zDim - 1)
+            if(flow%fluidProbingCoords(i,1) .lt. xmin .or. flow%fluidProbingCoords(i,1) .gt. xmax .or. & 
+               flow%fluidProbingCoords(i,2) .lt. ymin .or. flow%fluidProbingCoords(i,2) .gt. ymax .or. &
+               flow%fluidProbingCoords(i,3) .lt. zmin .or. flow%fluidProbingCoords(i,3) .gt. zmax) then 
+                write(*,'(A,I2,A)') 'fluid probe', i ,' is not in selected block'
+                stop
+            endif
+            ! velocity interpolation
+            do j=1,3
+                call grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,flow%fluidProbingCoords(i,1:3),velocityIn(zDim,yDim,xDim,j),velocityOut(j))
+            enddo
+            ! write file
             write(probeNum,'(I3.3)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt',position='append')
-            write(111,'(7E20.10)') time/flow%Tref,flow%fluidProbingCoords(i,1:3),velocity(zNum,yNum,xNum,1:3)/flow%Uref
+            write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
         END SUBROUTINE

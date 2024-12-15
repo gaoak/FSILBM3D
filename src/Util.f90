@@ -188,3 +188,47 @@
         enddo
     END SUBROUTINE
     
+    SUBROUTINE grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,Coord,valueIn,valueOut)
+        implicit none
+        integer:: xDim,yDim,zDim
+        integer:: x1,y1,z1,x2,y2,z2
+        real(8):: dh,xmin,ymin,zmin,Coord(3)
+        real(8):: dx1,dy1,dz1,dx2,dy2,dz2
+        real(8):: coffe,c1,c2,c3,c4,c5,c6,c7,c8
+        real(8):: valueIn(zDim,yDim,xDim),valueOut
+        !real(8):: interCoord(3)
+        ! coordinate number of the surrounding grid points
+        x1 = FLOOR((Coord(1)-xmin)/dh + 1)
+        y1 = FLOOR((Coord(2)-ymin)/dh + 1)
+        z1 = FLOOR((Coord(3)-zmin)/dh + 1)
+        x2 = x1 + 1
+        y2 = y1 + 1
+        z2 = z1 + 1
+        ! coordinate difference between the point and the surrounding grid points
+        dx1 = Coord(1) - (xmin + dh*(x1 - 1))
+        dy1 = Coord(2) - (ymin + dh*(y1 - 1))
+        dz1 = Coord(3) - (zmin + dh*(z1 - 1))
+        dx2 = dh - dx1
+        dy2 = dh - dy1
+        dz2 = dh - dz1
+        ! interpolation coefficient
+        coffe = 1.0d0/(dh*dh*dh)
+        c1 = dx2*dy2*dz2*coffe
+        c2 = dx2*dy2*dz1*coffe
+        c3 = dx2*dy1*dz2*coffe
+        c4 = dx1*dy2*dz2*coffe
+        c5 = dx2*dy1*dz1*coffe
+        c6 = dx1*dy2*dz1*coffe
+        c7 = dx1*dy1*dz2*coffe
+        c8 = dx1*dy1*dz1*coffe
+        ! interpolation
+        valueOut = c1*valueIn(x1,y1,z1) + c2*valueIn(x1,y1,z2) + c3*valueIn(x1,y2,z1) + c4*valueIn(x2,y1,z1) + &
+                   c5*valueIn(x1,y2,z2) + c6*valueIn(x2,y1,z2) + c7*valueIn(x2,y2,z1) + c8*valueIn(x2,y2,z2)
+        ! test interpolation coordinate
+        !interCoord(1) = c1*(xmin + dh*(x1 - 1)) + c2*(xmin + dh*(x1 - 1)) + c3*(xmin + dh*(x1 - 1)) + c4*(xmin + dh*(x2 - 1)) + &
+        !                c5*(xmin + dh*(x1 - 1)) + c6*(xmin + dh*(x2 - 1)) + c7*(xmin + dh*(x2 - 1)) + c8*(xmin + dh*(x2 - 1))
+        !interCoord(2) = c1*(ymin + dh*(y1 - 1)) + c2*(ymin + dh*(y1 - 1)) + c3*(ymin + dh*(y2 - 1)) + c4*(ymin + dh*(y1 - 1)) + &
+        !                c5*(ymin + dh*(y2 - 1)) + c6*(ymin + dh*(y1 - 1)) + c7*(ymin + dh*(y2 - 1)) + c8*(ymin + dh*(y2 - 1))
+        !interCoord(3) = c1*(zmin + dh*(z1 - 1)) + c2*(zmin + dh*(z2 - 1)) + c3*(zmin + dh*(z1 - 1)) + c4*(zmin + dh*(z1 - 1)) + &
+        !                c5*(zmin + dh*(z2 - 1)) + c6*(zmin + dh*(z2 - 1)) + c7*(zmin + dh*(z1 - 1)) + c8*(zmin + dh*(z2 - 1))
+    END SUBROUTINE

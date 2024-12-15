@@ -3,6 +3,7 @@ module LBMBlockComm
     use FluidDomain
     implicit none
     !include 'mpif.h'
+    public:: m_containSolidId
     public:: Read_Comm_Pair,ExchangeFluidInterface
     type :: CommPair
         integer:: fatherId
@@ -11,7 +12,7 @@ module LBMBlockComm
         integer:: s(1:6),f(1:6),si(1:6),fi(1:6) ! s son's boundary layer; si son's first inner layer
         integer:: islocal ! local (0) or mpi (1)
     end type CommPair
-    integer:: m_npairs
+    integer:: m_npairs,m_containSolidId
     type(CommPair),allocatable:: commpairs(:)
 
     contains
@@ -27,7 +28,7 @@ module LBMBlockComm
         keywordstr = 'Communication'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(buffer,*) m_npairs
+        read(buffer,*) m_npairs,m_containSolidId
         allocate(commpairs(m_npairs))
         do i=1,m_npairs
             call readNextData(111, buffer)
