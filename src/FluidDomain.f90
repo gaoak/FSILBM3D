@@ -6,7 +6,7 @@ module FluidDomain
     integer :: m_nblock, m_npsize
     public:: LBMblks,LBMblksIndex,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
              check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_blocks,collision_blocks, &
-             write_continue_blocks,streaming_blocks,computeFieldStat_blocks,Clear_VolumeForce
+             write_continue_blocks,streaming_blocks,computeFieldStat_blocks,clear_volume_force
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
         integer :: xDim,yDim,zDim
@@ -112,7 +112,7 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE Clear_VolumeForce()
+    SUBROUTINE clear_volume_force()
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock

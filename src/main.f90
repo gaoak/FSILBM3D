@@ -82,7 +82,7 @@ PROGRAM main
         call calculate_macro_quantities_blocks()
         ! Compute volume force exerted on fluids
         call get_now_time(time_begine2)
-        call Clear_VolumeForce()
+        call clear_volume_force()
         call FSInteraction_force(dt_fluid,LBMblks(m_containSolidId)%dh,LBMblks(m_containSolidId)%xmin,LBMblks(m_containSolidId)%ymin,LBMblks(m_containSolidId)%zmin, &
                                  LBMblks(m_containSolidId)%xDim,LBMblks(m_containSolidId)%yDim,LBMblks(m_containSolidId)%zDim,LBMblks(m_containSolidId)%uuu,LBMblks(m_containSolidId)%force)
         call get_now_time(time_end2)
