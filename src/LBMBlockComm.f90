@@ -184,7 +184,7 @@ module LBMBlockComm
         if(m_npairs .eq. 0) then
             ! no need to set
         elseif(m_npairs .ge. 1) then
-            LBMblks(commpairs(1)%sonId)%tau    = 0.50d0 + m_gridDelta*(LBMblks(commpairs(1)%fatherId)%tau - 0.50d0)
+            LBMblks(commpairs(1)%sonId)%tau = 0.50d0 + m_gridDelta*(LBMblks(commpairs(1)%fatherId)%tau - 0.50d0)
             if(m_npairs .ge. 2) then
                 do i=2,m_npairs
                     LBMblks(commpairs(i)%sonId)%tau = 0.50d0 + m_gridDelta*(LBMblks(commpairs(i)%fatherId)%tau - 0.50d0)
@@ -211,24 +211,179 @@ module LBMBlockComm
         endif
     END SUBROUTINE
 
-    SUBROUTINE calculating_public_distribution(n_pairs)
+    SUBROUTINE deliver_son_to_father(pair)
+        use FluidDomain
         implicit none
-        integer:: n_pairs
-        ! calculating the public node distribution function
-        if(n_pairs .eq. 1) then
-             
+        type(CommPair),intent(in):: pair
+        integer:: xS,yS,zS
+        ! x direction slices
+        do xS=1,(m_gridDelta+1),m_gridDelta
+        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        do xS=(LBMblks(pair%sonId)%xDim - m_gridDelta),LBMblks(pair%sonId)%xDim,m_gridDelta
+        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        ! y direction slices
+        do yS=1,(m_gridDelta+1),m_gridDelta
+        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        do yS=(LBMblks(pair%sonId)%yDim - m_gridDelta),LBMblks(pair%sonId)%yDim,m_gridDelta
+        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        ! z direction slices
+        do zS=1,(m_gridDelta+1),m_gridDelta
+        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        do zS=(LBMblks(pair%sonId)%zDim - m_gridDelta),LBMblks(pair%sonId)%zDim,m_gridDelta
+        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+    end subroutine 
 
-        else
+    SUBROUTINE deliver_grid_distribution(father,son,xS,yS,zS)
+        implicit none
+        integer:: father,son
+        integer:: xS,yS,zS,xF,yF,zF
+        real(8):: xCoordSon,yCoordSon,zCoordSon
+        ! calcualte the pubilc grid coordinates in son block
+        xCoordSon = LBMblks(son)%xmin + LBMblks(son)%dh*(xS - 1)
+        yCoordSon = LBMblks(son)%ymin + LBMblks(son)%dh*(yS - 1)
+        zCoordSon = LBMblks(son)%zmin + LBMblks(son)%dh*(zS - 1)
+        ! calcualte the pubilc grid number in father block
+        xF = NINT((xCoordSon - LBMblks(father)%xmin)/LBMblks(father)%dh + 1)
+        yF = NINT((yCoordSon - LBMblks(father)%ymin)/LBMblks(father)%dh + 1)
+        zF = NINT((zCoordSon - LBMblks(father)%zmin)/LBMblks(father)%dh + 1)
+        ! deliver distribution function from son block to father block
+        LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = LBMblks(son)%fIn(zS,yS,xS,0:lbmDim)
+    end subroutine 
 
-        endif
+    SUBROUTINE interpolation_father_to_son(pair,fIn_F1,fIn_F2,n_timeStep)
+        implicit none
+        type(CommPair),intent(in):: pair
+        integer:: n_timeStep,xS,yS,zS
+        real(8):: fIn_F1(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) !   n   time step father fIn
+        real(8):: fIn_F2(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) ! n + 1 time step father fIn
+        ! x direction
+        do xS=1,2
+        do yS=1,LBMblks(pair%sonId)%yDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+        enddo
+        enddo
+        enddo
+        do xS=(LBMblks(pair%sonId)%xDim - 1),LBMblks(pair%sonId)%xDim
+        do yS=1,LBMblks(pair%sonId)%yDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+        enddo
+        enddo
+        enddo
+        ! y direction
+        do yS=1,2
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+        enddo
+        enddo
+        enddo
+        do yS=(LBMblks(pair%sonId)%yDim-1),LBMblks(pair%sonId)%yDim
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+        enddo
+        enddo
+        enddo
+        ! z direction
+        do zS=1,2
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do yS=1,LBMblks(pair%sonId)%yDim
+            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+        enddo
+        enddo
+        enddo
+        do zS=(LBMblks(pair%sonId)%zDim - 1),LBMblks(pair%sonId)%zDim
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do yS=1,LBMblks(pair%sonId)%yDim
+            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+        enddo
+        enddo
+        enddo
     end subroutine
 
-    SUBROUTINE blocks_interpolation(n_pairs)
+    SUBROUTINE interpolation_grid_distribution(father,son,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+        ! interpolating distribution function from father block to son block
         implicit none
-        integer:: n_pairs
-        ! interpolating from coase grids to finer grids
-
-    end subroutine
+        integer:: father,son,n_timeStep,xS,yS,zS
+        integer:: xF1,yF1,zF1,xF2,yF2,zF2
+        real(8):: xCoordSon,yCoordSon,zCoordSon
+        real(8):: dx1,dy1,dz1,dx2,dy2,dz2
+        real(8):: coffe,c1,c2,c3,c4,c5,c6,c7,c8
+        real(8):: fIn_S1(0:lbmDim),fIn_S2(0:lbmDim)
+        real(8):: fIn_F1(LBMblks(father)%zDim,LBMblks(father)%yDim,LBMblks(father)%xDim,0:lbmDim) !   n   time step father fIn
+        real(8):: fIn_F2(LBMblks(father)%zDim,LBMblks(father)%yDim,LBMblks(father)%xDim,0:lbmDim) ! n + 1 time step father fIn
+        ! calcualte the pubilc grid coordinates in son block
+        xCoordSon = LBMblks(son)%xmin + LBMblks(son)%dh*(xS - 1)
+        yCoordSon = LBMblks(son)%ymin + LBMblks(son)%dh*(yS - 1)
+        zCoordSon = LBMblks(son)%zmin + LBMblks(son)%dh*(zS - 1)
+        ! calcualte the father grids around the son gird
+        xF1 = FLOOR((xCoordSon - LBMblks(father)%xmin)/LBMblks(father)%dh + 1)
+        yF1 = FLOOR((yCoordSon - LBMblks(father)%ymin)/LBMblks(father)%dh + 1)
+        zF1 = FLOOR((zCoordSon - LBMblks(father)%zmin)/LBMblks(father)%dh + 1)
+        xF2 = xF1 + 1
+        yF2 = yF1 + 1
+        zF2 = zF1 + 1
+        ! coordinate difference between the son gird and around father grids
+        dx1 = xCoordSon - (LBMblks(father)%xmin + LBMblks(father)%dh*(xF1 - 1))
+        dy1 = yCoordSon - (LBMblks(father)%ymin + LBMblks(father)%dh*(yF1 - 1))
+        dz1 = zCoordSon - (LBMblks(father)%zmin + LBMblks(father)%dh*(zF1 - 1))
+        dx2 = LBMblks(father)%dh - dx1
+        dy2 = LBMblks(father)%dh - dy1
+        dz2 = LBMblks(father)%dh - dz1
+        ! space interpolation coefficient
+        coffe = 1.0d0/(LBMblks(father)%dh**3)
+        c1 = dx2*dy2*dz2*coffe
+        c2 = dx2*dy2*dz1*coffe
+        c3 = dx2*dy1*dz2*coffe
+        c4 = dx1*dy2*dz2*coffe
+        c5 = dx2*dy1*dz1*coffe
+        c6 = dx1*dy2*dz1*coffe
+        c7 = dx1*dy1*dz2*coffe
+        c8 = dx1*dy1*dz1*coffe
+        ! space interpolation distribution function from father block to son block
+        fIn_S1(0:lbmDim) = c1*fIn_F1(zF1,yF1,xF1,0:lbmDim) + c2*fIn_F1(zF2,yF1,xF1,0:lbmDim) + &
+                           c3*fIn_F1(zF1,yF2,xF1,0:lbmDim) + c4*fIn_F1(zF1,yF1,xF2,0:lbmDim) + &
+                           c5*fIn_F1(zF2,yF2,xF1,0:lbmDim) + c6*fIn_F1(zF2,yF1,xF2,0:lbmDim) + &
+                           c7*fIn_F1(zF1,yF2,xF2,0:lbmDim) + c8*fIn_F1(zF2,yF2,xF2,0:lbmDim)
+        fIn_S2(0:lbmDim) = c1*fIn_F2(zF1,yF1,xF1,0:lbmDim) + c2*fIn_F2(zF2,yF1,xF1,0:lbmDim) + &
+                           c3*fIn_F2(zF1,yF2,xF1,0:lbmDim) + c4*fIn_F2(zF1,yF1,xF2,0:lbmDim) + &
+                           c5*fIn_F2(zF2,yF2,xF1,0:lbmDim) + c6*fIn_F2(zF2,yF1,xF2,0:lbmDim) + &
+                           c7*fIn_F2(zF1,yF2,xF2,0:lbmDim) + c8*fIn_F2(zF2,yF2,xF2,0:lbmDim)
+        ! time interpolation distribution function from father block to son block
+        LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = (n_timeStep - 0)/m_gridDelta * fIn_S2(0:lbmDim) + (m_gridDelta - n_timeStep)/m_gridDelta * fIn_S1(0:lbmDim)
+    end subroutine 
 
 end module LBMBlockComm
 

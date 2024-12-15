@@ -3,11 +3,11 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
-    integer:: m_nblock, m_npsize
     public:: LBMblks,LBMblksIndex,m_nblock
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
              check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force
+    integer:: m_nblock, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
         integer :: xDim,yDim,zDim
@@ -36,7 +36,6 @@ module FluidDomain
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
     integer,allocatable:: LBMblksIndex(:)
-
     contains
 
     SUBROUTINE read_fuild_blocks(filename)

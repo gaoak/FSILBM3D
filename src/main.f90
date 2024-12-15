@@ -89,7 +89,7 @@ PROGRAM main
             write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
         elseif(m_npairs .eq. 1) then ! two blocks
             call get_now_time(time_begine2)
-            call calculating_public_distribution(m_npairs)
+            !call calculating_public_distribution(m_npairs)
             call collision_block(commpairs(1)%fatherId)
             call streaming_block(commpairs(1)%fatherId)
             call set_boundary_conditions_block(commpairs(1)%fatherId)
@@ -97,7 +97,7 @@ PROGRAM main
             write(*,*)'Time  for  coarse block:', (time_end2 - time_begine2)
             call get_now_time(time_begine2)
             do n_gridDelta=1,m_gridDelta
-                call blocks_interpolation(1)
+                !call blocks_interpolation(1)
                 call collision_block(commpairs(1)%sonId)
                 call streaming_block(commpairs(1)%sonId)
             enddo
