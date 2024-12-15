@@ -88,23 +88,31 @@ PROGRAM main
             call set_boundary_conditions_block(1)
             write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
         elseif(m_npairs .eq. 1) then ! two blocks
+            if(LBMblks(1)%dh .ne. LBMblks(2)%dh*m_gridDelta) stop 'grid points do not match between fluid blocks'
+            call get_now_time(time_begine2)
             call calculating_public_distribution()
             call collision_block(commpairs(1)%fatherId)
             call streaming_block(commpairs(1)%fatherId)
             call set_boundary_conditions_block(commpairs(1)%fatherId)
+            call get_now_time(time_end2)
+            write(*,*)'Time  for  coarse block:', (time_end2 - time_begine2)
+            call get_now_time(time_begine2)
             do n_gridDelta=1,m_gridDelta
                 call blocks_interpolation(1)
                 call collision_block(commpairs(1)%sonId)
                 call streaming_block(commpairs(1)%sonId)
             enddo
+            call get_now_time(time_end2)
+            write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
             if(m_npairs .ge. 2) then ! multi-blocks
-                do n_pairs=2,m_npairs
-                    do n_gridDelta=1,m_gridDelta
-                        call blocks_interpolation(n_pairs)
-                        call collision_block(commpairs(n_pairs)%sonId)
-                        call streaming_block(commpairs(n_pairs)%sonId)
-                    enddo
-                enddo
+                stop 'the part has not been realized yet.'
+                !do n_pairs=2,m_npairs
+                !    do n_gridDelta=1,m_gridDelta
+                !        call blocks_interpolation(n_pairs)
+                !        call collision_block(commpairs(n_pairs)%sonId)
+                !        call streaming_block(commpairs(n_pairs)%sonId)
+                !    enddo
+                !enddo
             endif
         endif
         call get_now_time(time_begine2)
