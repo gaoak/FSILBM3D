@@ -3,7 +3,6 @@ module LBMBlockComm
     use FluidDomain
     implicit none
     !include 'mpif.h'
-    public:: read_blocks_comunication,ExchangeFluidInterface,commpairs
     type :: CommPair
         integer:: fatherId
         integer:: sonId
@@ -130,6 +129,25 @@ module LBMBlockComm
         endif
     end subroutine ExchangeDataSerial
         
+    SUBROUTINE calculate_blocks_tau(flow_nu)
+        ! ensure the Reynolds numbers of each block are the same
+        implicit none
+        integer:: i,nblock
+        real(8):: flow_nu
+        if(m_npairs .eq. 0) then
+            ! no need to set
+        elseif(m_npairs .ge. 1) then
+            LBMblks(commpairs(1)%sonId)%tau    = 0.50d0 + m_gridDelta*(LBMblks(commpairs(1)%fatherId)%tau - 0.50d0)
+            if(m_npairs .ge. 2) then
+                do i=2,m_npairs
+                    LBMblks(commpairs(i)%sonId)%tau = 0.50d0 + m_gridDelta*(LBMblks(commpairs(i)%fatherId)%tau - 0.50d0)
+                enddo
+            endif
+        else
+            stop 'wrong block pairs (npairs) input'
+        endif
+    END SUBROUTINE
+
     SUBROUTINE blocks_interpolation(n_pairs)
         implicit none
         integer:: n_pairs

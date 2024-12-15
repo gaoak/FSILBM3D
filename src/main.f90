@@ -35,9 +35,6 @@ PROGRAM main
     call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
     call allocate_fuild_memory_blocks(flow%npsize)
     !==================================================================================================
-    ! Calculate the tau of each block
-    call calculate_blocks_tau()
-    !==================================================================================================
     ! Calculate all the reference values
     call calculate_reference_params(flow)
     call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(1)%BndConds,&
@@ -48,13 +45,17 @@ PROGRAM main
     call initialise_solid_bodies(0.d0, g)
     call initialise_fuild_blocks(flow)
     !==================================================================================================
+    ! Check blocks number and calculate the tau of each block
+    call check_blocks_number(m_npairs)
+    call calculate_blocks_tau(flow%nu)
+    !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)
     call write_information_titles(m_nFish)
     !==================================================================================================
     ! Update the volumn forces and calculate the macro quantities
     call update_volumn_force_blocks(time)
-    call set_boundary_conditions_block()
+    call set_boundary_conditions_block(1)
     call calculate_macro_quantities_blocks()
     !==================================================================================================
     ! Write the initial fluid and solid data
@@ -84,11 +85,13 @@ PROGRAM main
             call get_now_time(time_begine2)
             call streaming_block(1)
             call get_now_time(time_end2)
+            call set_boundary_conditions_block(1)
             write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
         elseif(m_npairs .eq. 1) then ! two blocks
             call calculating_public_distribution()
             call collision_block(commpairs(1)%fatherId)
             call streaming_block(commpairs(1)%fatherId)
+            call set_boundary_conditions_block(commpairs(1)%fatherId)
             do n_gridDelta=1,m_gridDelta
                 call blocks_interpolation(1)
                 call collision_block(commpairs(1)%sonId)
@@ -103,46 +106,22 @@ PROGRAM main
                     enddo
                 enddo
             endif
-            call set_boundary_conditions_block(commpairs(1)%fatherId)
         endif
-        call set_boundary_conditions_block(1)
-        call calculate_macro_quantities_blocks()
-        write(*,'(A)')' --------------------- solid solver ---------------------'
-        call clear_volume_force()
         call get_now_time(time_begine2)
+        call calculate_macro_quantities_blocks()
+        call clear_volume_force()
         call FSInteraction_force(dt_fluid,LBMblks(m_containSolidId)%dh,LBMblks(m_containSolidId)%xmin,LBMblks(m_containSolidId)%ymin,LBMblks(m_containSolidId)%zmin, &
                                 LBMblks(m_containSolidId)%xDim,LBMblks(m_containSolidId)%yDim,LBMblks(m_containSolidId)%zDim,LBMblks(m_containSolidId)%uuu,LBMblks(m_containSolidId)%force)
         call get_now_time(time_end2)
         write(*,*)'Time   for   IBM   step:', (time_end2 - time_begine2)
-        !call get_now_time(time_begine2)
-        !call streaming_block()
-        !call get_now_time(time_end2)
-        !write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
-        ! Set fluid boundary conditions
-        !call set_boundary_conditions_block()
-        !if(m_npairs .ne. 0) call ExchangeFluidInterface()
-        !call calculate_macro_quantities_blocks()
-        ! Compute volume force exerted on fluids
-        !call get_now_time(time_begine2)
-        !call clear_volume_force()
-        !call FSInteraction_force(dt_fluid,LBMblks(m_containSolidId)%dh,LBMblks(m_containSolidId)%xmin,LBMblks(m_containSolidId)%ymin,LBMblks(m_containSolidId)%zmin, &
-        !                         LBMblks(m_containSolidId)%xDim,LBMblks(m_containSolidId)%yDim,LBMblks(m_containSolidId)%zDim,LBMblks(m_containSolidId)%uuu,LBMblks(m_containSolidId)%force)
-        !call get_now_time(time_end2)
-        !write(*,*)'Time   for   IBM   step:', (time_end2 - time_begine2)
-        ! Fluid collision
-        !call get_now_time(time_begine2)
-        !call collision_block()
-        !call get_now_time(time_end2)
-        !write(*,*)'Time for collision step:', (time_end2 - time_begine2)
-        !IBM solver
-        !write(*,'(A)')' --------------------- solid solver ---------------------'
+        write(*,'(A)')' --------------------- solid solver ---------------------'
         call get_now_time(time_begine2)
         do isubstep=1,flow%numsubstep
             call Solver(time,isubstep,dt_fluid,dt_solid)
         enddo !do isubstep=1,numsubstep
         call get_now_time(time_end2)
         write(*,*)'Time   for  solid  step:', (time_end2 - time_begine2)
-        write(*,'(A)')' ---------------------- write infos ---------------------'
+        write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
         if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
