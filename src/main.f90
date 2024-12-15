@@ -85,7 +85,7 @@ PROGRAM main
             call streaming_block(1)
             call get_now_time(time_end2)
             write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
-        elseif(m_npairs .eq. 1) then
+        elseif(m_npairs .eq. 1) then ! two blocks
             call calculating_public_distribution()
             call collision_block(commpairs(1)%fatherId)
             call streaming_block(commpairs(1)%fatherId)
@@ -94,7 +94,7 @@ PROGRAM main
                 call collision_block(commpairs(1)%sonId)
                 call streaming_block(commpairs(1)%sonId)
             enddo
-            if(m_npairs .ge. 2) then
+            if(m_npairs .ge. 2) then ! multi-blocks
                 do n_pairs=2,m_npairs
                     do n_gridDelta=1,m_gridDelta
                         call blocks_interpolation(n_pairs)
