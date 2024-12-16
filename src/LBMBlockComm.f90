@@ -130,6 +130,7 @@ module LBMBlockComm
                 s = blockTree(treenode)%sons(i)
                 if(dabs(LBMblks(treenode).dh / LBMblks(s).dh - 1.) .lt. 1d-6) then
                     call call set_block_tree_nt(s, nt)
+                    write(*,*) 'Warning: imbeded grid with the same grid size is not suggested'
                 else
                     call set_block_tree_nt(s, 2*nt)
                 endif
