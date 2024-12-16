@@ -4,8 +4,8 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
-    public :: m_nFish
-    integer:: m_nFish, m_ntolLBM
+    public :: m_nFish,m_carrierFluidId
+    integer:: m_nFish, m_carrierFluidId,m_ntolLBM
     real(8):: m_dtolLBM, m_IBPenaltyAlpha, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
@@ -92,7 +92,7 @@ module SolidBody
         call readNextData(111, buffer)
         read(buffer,*)    dtolFEM,ntolFEM
         call readNextData(111, buffer)
-        read(buffer,*)    m_nFish,nfishGroup,isKB
+        read(buffer,*)    m_nFish,nfishGroup,m_carrierFluidId,isKB
         if(m_IBPenaltyAlpha.le.1.d-6) then
             write(*,*) 'ERROR: IBPenaltyalpha should be positive (default 1)', m_IBPenaltyAlpha
             stop

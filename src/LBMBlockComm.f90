@@ -6,6 +6,7 @@ module LBMBlockComm
     type :: blockTreeNode
         integer:: fatherId
         integer:: nsons
+        integer:: nt
         integer,allocatable:: sons(:)
         integer,allocatable:: pairId(:)
     end type blockTreeNode
@@ -16,7 +17,7 @@ module LBMBlockComm
         integer:: s(1:6),f(1:6),si(1:6),fi(1:6) ! s son's boundary layer; si son's first inner layer
         integer:: islocal ! local (0) or mpi (1)
     end type CommPair
-    integer:: m_npairs,m_containSolidId,m_gridDelta
+    integer:: m_npairs
     integer:: blockTreeRoot ! assume there is only one root
     type(blockTreeNode),allocatable:: blockTree(:)
     type(CommPair),allocatable:: commpairs(:)
@@ -34,7 +35,7 @@ module LBMBlockComm
         keywordstr = 'Communication'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(buffer,*) m_npairs,m_gridDelta,m_containSolidId
+        read(buffer,*) m_npairs
         if(m_npairs .ne. 0) then
         allocate(commpairs(m_npairs))
         do i=1,m_npairs
@@ -115,7 +116,26 @@ module LBMBlockComm
             blockTree(f)%sons(ns(f)) = s
             blockTree(f)%pairId(ns(f)) = i
         enddo
+        ! set tree n times
+        call set_block_tree_nt(blockTreeRoot, 1)
     endsubroutine bluid_block_tree
+
+    recursive subroutine set_block_tree_nt(treenode, nt)
+        implicit none
+        integer:: i, n, s
+        if(blockTree(treenode)%nsons.eq.0) then
+            blockTree(treenode)%nt = nt
+        else
+            do i=1,blockTree(treenode)%nsons
+                s = blockTree(treenode)%sons(i)
+                if(dabs(LBMblks(treenode).dh / LBMblks(s).dh - 1.) .lt. 1d-6) then
+                    call call set_block_tree_nt(s, nt)
+                else
+                    call set_block_tree_nt(s, 2*nt)
+                endif
+            enddo
+        endif
+    end subroutine set_block_tree_nt
 
     SUBROUTINE ExchangeFluidInterface()
         implicit none

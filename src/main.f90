@@ -117,8 +117,8 @@ PROGRAM main
         call get_now_time(time_begine2)
         call calculate_macro_quantities_blocks()
         call clear_volume_force()
-        call FSInteraction_force(dt_fluid,LBMblks(m_containSolidId)%dh,LBMblks(m_containSolidId)%xmin,LBMblks(m_containSolidId)%ymin,LBMblks(m_containSolidId)%zmin, &
-                                LBMblks(m_containSolidId)%xDim,LBMblks(m_containSolidId)%yDim,LBMblks(m_containSolidId)%zDim,LBMblks(m_containSolidId)%uuu,LBMblks(m_containSolidId)%force)
+        call FSInteraction_force(dt_fluid,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
+                                LBMblks(m_carrierFluidId)%xDim,LBMblks(m_carrierFluidId)%yDim,LBMblks(m_carrierFluidId)%zDim,LBMblks(m_carrierFluidId)%uuu,LBMblks(m_carrierFluidId)%force)
         call get_now_time(time_end2)
         write(*,*)'Time   for   IBM   step:', (time_end2 - time_begine2)
         write(*,'(A)')' --------------------- solid solver ---------------------'
