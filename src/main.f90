@@ -103,16 +103,19 @@ PROGRAM main
             enddo
             call get_now_time(time_end2)
             write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
-            if(m_npairs .ge. 2) then ! multi-blocks
-                stop 'the part has not been realized yet.'
-                !do n_pairs=2,m_npairs
-                !    do n_gridDelta=1,m_gridDelta
-                !        call blocks_interpolation(n_pairs)
-                !        call collision_block(commpairs(n_pairs)%sonId)
-                !        call streaming_block(commpairs(n_pairs)%sonId)
-                !    enddo
-                !enddo
-            endif
+        elseif(m_npairs .ge. 2) then ! multi-blocks
+            stop 'the part has not been realized yet.'
+            ! do n_pairs=2,m_npairs
+            !     call get_now_time(time_begine2)
+            !     call deliver_son_to_father(commpairs(n_pairs))
+            !     call collision_block(commpairs(n_pairs)%fatherId)
+            !     call streaming_block(commpairs(n_pairs)%fatherId)
+            !     do n_gridDelta=1,m_gridDelta
+            !         call interpolation_father_to_son(commpairs(n_pairs),fIn_F1,fIn_F2,n_timeStep)
+            !         call collision_block(commpairs(n_pairs)%sonId)
+            !         call streaming_block(commpairs(n_pairs)%sonId)
+            !     enddo
+            ! enddo
         endif
         call get_now_time(time_begine2)
         call calculate_macro_quantities_blocks()
