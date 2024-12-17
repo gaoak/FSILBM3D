@@ -17,7 +17,7 @@ module LBMBlockComm
         integer:: s(1:6),f(1:6),si(1:6),fi(1:6) ! s son's boundary layer; si son's first inner layer
         integer:: islocal ! local (0) or mpi (1)
     end type CommPair
-    integer:: m_npairs
+    integer:: m_npairs,m_gridDelta
     integer:: blockTreeRoot ! assume there is only one root
     type(blockTreeNode),allocatable:: blockTree(:)
     type(CommPair),allocatable:: commpairs(:)
@@ -122,21 +122,21 @@ module LBMBlockComm
 
     recursive subroutine set_block_tree_nt(treenode, nt)
         implicit none
-        integer:: i, n, s
+        integer:: i, n, s, treenode, nt
         if(blockTree(treenode)%nsons.eq.0) then
             blockTree(treenode)%nt = nt
         else
             do i=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%sons(i)
-                if(dabs(LBMblks(treenode).dh / LBMblks(s).dh - 1.) .lt. 1d-6) then
-                    call call set_block_tree_nt(s, nt)
+                if(dabs(LBMblks(treenode)%dh / LBMblks(s)%dh - 1.) .lt. 1d-6) then
+                    call set_block_tree_nt(s, nt)
                     write(*,*) 'Warning: imbeded grid with the same grid size is not suggested'
                 else
                     call set_block_tree_nt(s, 2*nt)
                 endif
             enddo
         endif
-    end subroutine set_block_tree_nt
+    endsubroutine set_block_tree_nt
 
     SUBROUTINE ExchangeFluidInterface()
         implicit none
@@ -406,6 +406,75 @@ module LBMBlockComm
         LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = (n_timeStep - 0)/m_gridDelta * fIn_S2(0:lbmDim) + (m_gridDelta - n_timeStep)/m_gridDelta * fIn_S1(0:lbmDim)
     end subroutine 
 
+    SUBROUTINE fIn_transtion(pair,fIn_F1,fIn_F2,n_timeStep)
+        implicit none
+        type(CommPair),intent(in):: pair
+        integer:: n_timeStep,xS,yS,zS
+        real(8):: fIn_F1(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) !   n   time step father fIn
+        real(8):: fIn_F2(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) ! n + 1 time step father fIn
+        ! x direction
+        do xS=1,2
+        do yS=1,LBMblks(pair%sonId)%yDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        do xS=(LBMblks(pair%sonId)%xDim - 1),LBMblks(pair%sonId)%xDim
+        do yS=1,LBMblks(pair%sonId)%yDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        ! y direction
+        do yS=1,2
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        do yS=(LBMblks(pair%sonId)%yDim-1),LBMblks(pair%sonId)%yDim
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do zS=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        ! z direction
+        do zS=1,2
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do yS=1,LBMblks(pair%sonId)%yDim
+            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+        do zS=(LBMblks(pair%sonId)%zDim - 1),LBMblks(pair%sonId)%zDim
+        do xS=1,LBMblks(pair%sonId)%xDim
+        do yS=1,LBMblks(pair%sonId)%yDim
+            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
+        enddo
+        enddo
+        enddo
+    end subroutine
+
+    subroutine fIn_son_father_trans(relation1,realation2,x,y,z)! Dupius-Chopard method
+        implicit none
+        if     (relation1 .eq. father .and. relation2 .eq. son) then
+            uSqr           = sum(LBMblks(relation1)%uuu(z,y,x,1:3)**2)
+            uxyz(0:lbmDim) = LBMblks(relation1)%uuu(z,y,x,1) * ee(0:lbmDim,1) + LBMblks(relation1)%uuu(z,y,x,2) * ee(0:lbmDim,2)+LBMblks(relation1)%uuu(z,y,x,3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(relation1)%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
+            coffe = (LBMblks(relation2)%tau / LBMblks(relation1)%tau) / m_gridDelta
+            LBMblks(relation2)%fIn(z,y,x,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(relation1)%(z,y,x,0:lbmDim) - fEq(0:lbmDim))
+        elseif (relation2 .eq. father .and. relation1 .eq. son) then
+            uSqr           = sum(LBMblks(relation2)%uuu(z,y,x,1:3)**2)
+            uxyz(0:lbmDim) = LBMblks(relation2)%uuu(z,y,x,1) * ee(0:lbmDim,1) + LBMblks(relation2)%uuu(z,y,x,2) * ee(0:lbmDim,2)+LBMblks(relation2)%uuu(z,y,x,3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(relation2)%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
+            coffe = (LBMblks(relation2)%tau / LBMblks(relation2)%tau) * m_gridDelta
+            LBMblks(relation2)%fIn(z,y,x,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(relation2)%(z,y,x,0:lbmDim) - fEq(0:lbmDim))
+        endif
+    end subroutine
 end module LBMBlockComm
 
 ! subroutine testmpiomp
