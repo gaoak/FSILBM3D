@@ -301,7 +301,7 @@ module LBMBlockComm
         LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = LBMblks(son)%fIn(zS,yS,xS,0:lbmDim)
     end subroutine 
 
-    SUBROUTINE interpolation_father_to_son(pair,fIn_F1,fIn_F2,n_timeStep)
+    SUBROUTINE relationship_father_to_son(pair,fIn_F1,fIn_F2,n_timeStep)
         implicit none
         type(CommPair),intent(in):: pair
         integer:: n_timeStep,xS,yS,zS
@@ -312,6 +312,7 @@ module LBMBlockComm
         do yS=1,LBMblks(pair%sonId)%yDim
         do zS=1,LBMblks(pair%sonId)%zDim
             call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
         enddo
         enddo
         enddo
@@ -319,6 +320,7 @@ module LBMBlockComm
         do yS=1,LBMblks(pair%sonId)%yDim
         do zS=1,LBMblks(pair%sonId)%zDim
             call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
         enddo
         enddo
         enddo
@@ -327,6 +329,7 @@ module LBMBlockComm
         do xS=1,LBMblks(pair%sonId)%xDim
         do zS=1,LBMblks(pair%sonId)%zDim
             call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
         enddo
         enddo
         enddo
@@ -334,6 +337,7 @@ module LBMBlockComm
         do xS=1,LBMblks(pair%sonId)%xDim
         do zS=1,LBMblks(pair%sonId)%zDim
             call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
         enddo
         enddo
         enddo
@@ -342,6 +346,7 @@ module LBMBlockComm
         do xS=1,LBMblks(pair%sonId)%xDim
         do yS=1,LBMblks(pair%sonId)%yDim
             call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
         enddo
         enddo
         enddo
@@ -349,6 +354,7 @@ module LBMBlockComm
         do xS=1,LBMblks(pair%sonId)%xDim
         do yS=1,LBMblks(pair%sonId)%yDim
             call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
         enddo
         enddo
         enddo
@@ -404,76 +410,78 @@ module LBMBlockComm
                            c7*fIn_F2(zF1,yF2,xF2,0:lbmDim) + c8*fIn_F2(zF2,yF2,xF2,0:lbmDim)
         ! time interpolation distribution function from father block to son block
         LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = (n_timeStep - 0)/m_gridDelta * fIn_S2(0:lbmDim) + (m_gridDelta - n_timeStep)/m_gridDelta * fIn_S1(0:lbmDim)
-    end subroutine 
-
-    SUBROUTINE fIn_transtion(pair,fIn_F1,fIn_F2,n_timeStep)
-        implicit none
-        type(CommPair),intent(in):: pair
-        integer:: n_timeStep,xS,yS,zS
-        real(8):: fIn_F1(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) !   n   time step father fIn
-        real(8):: fIn_F2(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) ! n + 1 time step father fIn
-        ! x direction
-        do xS=1,2
-        do yS=1,LBMblks(pair%sonId)%yDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        do xS=(LBMblks(pair%sonId)%xDim - 1),LBMblks(pair%sonId)%xDim
-        do yS=1,LBMblks(pair%sonId)%yDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        ! y direction
-        do yS=1,2
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        do yS=(LBMblks(pair%sonId)%yDim-1),LBMblks(pair%sonId)%yDim
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        ! z direction
-        do zS=1,2
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do yS=1,LBMblks(pair%sonId)%yDim
-            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        do zS=(LBMblks(pair%sonId)%zDim - 1),LBMblks(pair%sonId)%zDim
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do yS=1,LBMblks(pair%sonId)%yDim
-            call fIn_son_father_trans(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
     end subroutine
 
-    subroutine fIn_son_father_trans(relation1,realation2,x,y,z)! Dupius-Chopard method
+    SUBROUTINE relationship_son_to_father(pair)
         implicit none
-        if     (relation1 .eq. father .and. relation2 .eq. son) then
-            uSqr           = sum(LBMblks(relation1)%uuu(z,y,x,1:3)**2)
-            uxyz(0:lbmDim) = LBMblks(relation1)%uuu(z,y,x,1) * ee(0:lbmDim,1) + LBMblks(relation1)%uuu(z,y,x,2) * ee(0:lbmDim,2)+LBMblks(relation1)%uuu(z,y,x,3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(relation1)%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
-            coffe = (LBMblks(relation2)%tau / LBMblks(relation1)%tau) / m_gridDelta
-            LBMblks(relation2)%fIn(z,y,x,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(relation1)%(z,y,x,0:lbmDim) - fEq(0:lbmDim))
-        elseif (relation2 .eq. father .and. relation1 .eq. son) then
-            uSqr           = sum(LBMblks(relation2)%uuu(z,y,x,1:3)**2)
-            uxyz(0:lbmDim) = LBMblks(relation2)%uuu(z,y,x,1) * ee(0:lbmDim,1) + LBMblks(relation2)%uuu(z,y,x,2) * ee(0:lbmDim,2)+LBMblks(relation2)%uuu(z,y,x,3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(relation2)%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
-            coffe = (LBMblks(relation2)%tau / LBMblks(relation2)%tau) * m_gridDelta
-            LBMblks(relation2)%fIn(z,y,x,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(relation2)%(z,y,x,0:lbmDim) - fEq(0:lbmDim))
-        endif
+        type(CommPair),intent(in):: pair
+        integer:: xF,yF,zF,xS,yS,zS
+        ! x direction
+        ! do xF=1,2
+        ! do yF=1,LBMblks(pair%sonId)%yDim
+        ! do zF=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF,xS,yS,zS)
+        ! enddo
+        ! enddo
+        ! enddo
+        ! do xF=(LBMblks(pair%sonId)%xDim - 1),LBMblks(pair%sonId)%xDim
+        ! do yF=1,LBMblks(pair%sonId)%yDim
+        ! do zF=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF,xS,yS,zS)
+        ! enddo
+        ! enddo
+        ! enddo
+        ! y direction
+        ! do yF=1,2
+        ! do xF=1,LBMblks(pair%sonId)%xDim
+        ! do zF=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF,xS,yS,zS)
+        ! enddo
+        ! enddo
+        ! enddo
+        ! do yF=(LBMblks(pair%sonId)%yDim-1),LBMblks(pair%sonId)%yDim
+        ! do xF=1,LBMblks(pair%sonId)%xDim
+        ! do zF=1,LBMblks(pair%sonId)%zDim
+            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF,xS,yS,zS)
+        ! enddo
+        ! enddo
+        ! enddo
+        ! z direction
+        ! do zF=1,2
+        ! do xF=1,LBMblks(pair%sonId)%xDim
+        ! do yF=1,LBMblks(pair%sonId)%yDim
+            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF,xS,yS,zS)
+        ! enddo
+        ! enddo
+        ! enddo
+        ! do zF=(LBMblks(pair%sonId)%zDim - 1),LBMblks(pair%sonId)%zDim
+        ! do xF=1,LBMblks(pair%sonId)%xDim
+        ! do yF=1,LBMblks(pair%sonId)%yDim
+            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF,xS,yS,zS)
+        ! enddo
+        ! enddo
+        ! enddo
+    end subroutine
+
+    subroutine fIn_father_to_son(father,son,xS,yS,zS)! Dupius-Chopard method
+        implicit none
+        integer:: father,son,xS,yS,zS
+        real(8):: fEq(0:lbmDim),coffe
+        ! Guo 2008 P97 6.1.8
+        call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
+        coffe = (LBMblks(son)%tau / LBMblks(father)%tau) / m_gridDelta
+        LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) - fEq(0:lbmDim))
+    end subroutine
+
+    subroutine fIn_son_to_father(father,son,xF,yF,zF,xS,yS,zS)! Dupius-Chopard method
+        implicit none
+        integer:: father,son,xS,yS,zS
+        integer:: xF,yF,zF
+        real(8):: fEq(0:lbmDim),coffe
+        ! Guo 2008 P97 6.1.8
+        call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
+        coffe = (LBMblks(father)%tau / LBMblks(son)%tau) * m_gridDelta
+        LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) - fEq(0:lbmDim))
     end subroutine
 end module LBMBlockComm
 
