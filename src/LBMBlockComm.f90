@@ -79,64 +79,64 @@ module LBMBlockComm
         close(111)
     end subroutine read_blocks_comunication
 
-    ! subroutine bluid_block_tree()
-    !     implicit none
-    !     integer:: i,f,s,ns(1:m_nblock)
-    !     ! initialise blocktree
-    !     allocate(blockTree(1:m_nblock))
-    !     do i=1,m_nblock
-    !         blockTree(i)%fatherId = 0
-    !         blockTree(i)%nsons = 0
-    !     enddo
-    !     ! get number of sons and father Id
-    !     do i=1,m_npairs
-    !         f = commpairs(i)%fatherId
-    !         s = commpairs(i)%sonId
-    !         blockTree(f)%nsons = blockTree(f)%nsons + 1
-    !         blockTree(s)%fatherId = f
-    !     enddo
-    !     ! allocate sons and determine tree root
-    !     blockTreeRoot = -1111
-    !     do i=1,m_nblock
-    !         allocate(blockTree(i)%sons(blockTree(i)%nsons),blockTree(i)%pairId(blockTree(i)%nsons))
-    !         if(blockTree(i)%fatherId .eq. 0) then
-    !             if(blockTreeRoot.ne.-1111) then
-    !                 write(*,*) 'Error: there are more than one root block', i, blockTreeRoot
-    !                 stop
-    !             endif
-    !             blockTreeRoot = i
-    !         endif
-    !     enddo
-    !     ! set sons
-    !     ns = 0
-    !     do i=1,m_npairs
-    !         f = commpairs(i)%fatherId
-    !         s = commpairs(i)%sonId
-    !         ns(f) = ns(f) + 1
-    !         blockTree(f)%sons(ns(f)) = s
-    !         blockTree(f)%pairId(ns(f)) = i
-    !     enddo
-    !     ! set tree n times
-    !     call set_block_tree_nt(blockTreeRoot, 1)
-    ! endsubroutine bluid_block_tree
+    subroutine bluid_block_tree()
+        implicit none
+        integer:: i,f,s,ns(1:m_nblock)
+        ! initialise blocktree
+        allocate(blockTree(1:m_nblock))
+        do i=1,m_nblock
+            blockTree(i)%fatherId = 0
+            blockTree(i)%nsons = 0
+        enddo
+        ! get number of sons and father Id
+        do i=1,m_npairs
+            f = commpairs(i)%fatherId
+            s = commpairs(i)%sonId
+            blockTree(f)%nsons = blockTree(f)%nsons + 1
+            blockTree(s)%fatherId = f
+        enddo
+        ! allocate sons and determine tree root
+        blockTreeRoot = -1111
+        do i=1,m_nblock
+            allocate(blockTree(i)%sons(blockTree(i)%nsons),blockTree(i)%pairId(blockTree(i)%nsons))
+            if(blockTree(i)%fatherId .eq. 0) then
+                if(blockTreeRoot.ne.-1111) then
+                    write(*,*) 'Error: there are more than one root block', i, blockTreeRoot
+                    stop
+                endif
+                blockTreeRoot = i
+            endif
+        enddo
+        ! set sons
+        ns = 0
+        do i=1,m_npairs
+            f = commpairs(i)%fatherId
+            s = commpairs(i)%sonId
+            ns(f) = ns(f) + 1
+            blockTree(f)%sons(ns(f)) = s
+            blockTree(f)%pairId(ns(f)) = i
+        enddo
+        ! set tree n times
+        call set_block_tree_nt(blockTreeRoot, 1)
+    endsubroutine bluid_block_tree
 
-    ! recursive subroutine set_block_tree_nt(treenode, nt)
-    !     implicit none
-    !     integer:: i, n, s, treenode, nt
-    !     if(blockTree(treenode)%nsons.eq.0) then
-    !         blockTree(treenode)%nt = nt
-    !     else
-    !         do i=1,blockTree(treenode)%nsons
-    !             s = blockTree(treenode)%sons(i)
-    !             if(dabs(LBMblks(treenode)%dh / LBMblks(s)%dh - 1.) .lt. 1d-6) then
-    !                 call set_block_tree_nt(s, nt)
-    !                 write(*,*) 'Warning: imbeded grid with the same grid size is not suggested'
-    !             else
-    !                 call set_block_tree_nt(s, 2*nt)
-    !             endif
-    !         enddo
-    !     endif
-    ! endsubroutine set_block_tree_nt
+    recursive subroutine set_block_tree_nt(treenode, nt)
+        implicit none
+        integer:: i, n, s, treenode, nt
+        if(blockTree(treenode)%nsons.eq.0) then
+            blockTree(treenode)%nt = nt
+        else
+            do i=1,blockTree(treenode)%nsons
+                s = blockTree(treenode)%sons(i)
+                if(dabs(LBMblks(treenode)%dh / LBMblks(s)%dh - 1.) .lt. 1d-6) then
+                    call set_block_tree_nt(s, nt)
+                    write(*,*) 'Warning: imbeded grid with the same grid size is not suggested'
+                else
+                    call set_block_tree_nt(s, 2*nt)
+                endif
+            enddo
+        endif
+    endsubroutine set_block_tree_nt
 
     recursive subroutine tree_collision_streaming(treenode)
         implicit none
