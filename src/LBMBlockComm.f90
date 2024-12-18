@@ -154,7 +154,7 @@ module LBMBlockComm
                     call collision_block(treenode)
                     fIn_F2 = LBMblks(treenode)%fIn
                     call streaming_block(treenode)
-                    do n_gridDelta=1,m_gridDelta
+                    do n_gridDelta=0,m_gridDelta-1
                         call interpolation_father_to_son(commpairs(i),fIn_F1,fIn_F2,n_gridDelta)
                         call tree_collision_streaming(s)
                     enddo
