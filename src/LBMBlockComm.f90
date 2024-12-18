@@ -79,64 +79,88 @@ module LBMBlockComm
         close(111)
     end subroutine read_blocks_comunication
 
-    subroutine bluid_block_tree()
-        implicit none
-        integer:: i,f,s,ns(1:m_nblock)
-        ! initialise blocktree
-        allocate(blockTree(1:m_nblock))
-        do i=1,m_nblock
-            blockTree(i)%fatherId = 0
-            blockTree(i)%nsons = 0
-        enddo
-        ! get number of sons and father Id
-        do i=1,m_npairs
-            f = commpairs(i)%fatherId
-            s = commpairs(i)%sonId
-            blockTree(f)%nsons = blockTree(f)%nsons + 1
-            blockTree(s)%fatherId = f
-        enddo
-        ! allocate sons and determine tree root
-        blockTreeRoot = -1111
-        do i=1,m_nblock
-            allocate(blockTree(i)%sons(blockTree(i)%nsons),blockTree(i)%pairId(blockTree(i)%nsons))
-            if(blockTree(i)%fatherId .eq. 0) then
-                if(blockTreeRoot.ne.-1111) then
-                    write(*,*) 'Error: there are more than one root block', i, blockTreeRoot
-                    stop
-                endif
-                blockTreeRoot = i
-            endif
-        enddo
-        ! set sons
-        ns = 0
-        do i=1,m_npairs
-            f = commpairs(i)%fatherId
-            s = commpairs(i)%sonId
-            ns(f) = ns(f) + 1
-            blockTree(f)%sons(ns(f)) = s
-            blockTree(f)%pairId(ns(f)) = i
-        enddo
-        ! set tree n times
-        call set_block_tree_nt(blockTreeRoot, 1)
-    endsubroutine bluid_block_tree
+    ! subroutine bluid_block_tree()
+    !     implicit none
+    !     integer:: i,f,s,ns(1:m_nblock)
+    !     ! initialise blocktree
+    !     allocate(blockTree(1:m_nblock))
+    !     do i=1,m_nblock
+    !         blockTree(i)%fatherId = 0
+    !         blockTree(i)%nsons = 0
+    !     enddo
+    !     ! get number of sons and father Id
+    !     do i=1,m_npairs
+    !         f = commpairs(i)%fatherId
+    !         s = commpairs(i)%sonId
+    !         blockTree(f)%nsons = blockTree(f)%nsons + 1
+    !         blockTree(s)%fatherId = f
+    !     enddo
+    !     ! allocate sons and determine tree root
+    !     blockTreeRoot = -1111
+    !     do i=1,m_nblock
+    !         allocate(blockTree(i)%sons(blockTree(i)%nsons),blockTree(i)%pairId(blockTree(i)%nsons))
+    !         if(blockTree(i)%fatherId .eq. 0) then
+    !             if(blockTreeRoot.ne.-1111) then
+    !                 write(*,*) 'Error: there are more than one root block', i, blockTreeRoot
+    !                 stop
+    !             endif
+    !             blockTreeRoot = i
+    !         endif
+    !     enddo
+    !     ! set sons
+    !     ns = 0
+    !     do i=1,m_npairs
+    !         f = commpairs(i)%fatherId
+    !         s = commpairs(i)%sonId
+    !         ns(f) = ns(f) + 1
+    !         blockTree(f)%sons(ns(f)) = s
+    !         blockTree(f)%pairId(ns(f)) = i
+    !     enddo
+    !     ! set tree n times
+    !     call set_block_tree_nt(blockTreeRoot, 1)
+    ! endsubroutine bluid_block_tree
 
-    recursive subroutine set_block_tree_nt(treenode, nt)
+    ! recursive subroutine set_block_tree_nt(treenode, nt)
+    !     implicit none
+    !     integer:: i, n, s, treenode, nt
+    !     if(blockTree(treenode)%nsons.eq.0) then
+    !         blockTree(treenode)%nt = nt
+    !     else
+    !         do i=1,blockTree(treenode)%nsons
+    !             s = blockTree(treenode)%sons(i)
+    !             if(dabs(LBMblks(treenode)%dh / LBMblks(s)%dh - 1.) .lt. 1d-6) then
+    !                 call set_block_tree_nt(s, nt)
+    !                 write(*,*) 'Warning: imbeded grid with the same grid size is not suggested'
+    !             else
+    !                 call set_block_tree_nt(s, 2*nt)
+    !             endif
+    !         enddo
+    !     endif
+    ! endsubroutine set_block_tree_nt
+
+    recursive subroutine tree_collision_streaming(treenode)
         implicit none
-        integer:: i, n, s, treenode, nt
-        if(blockTree(treenode)%nsons.eq.0) then
-            blockTree(treenode)%nt = nt
-        else
-            do i=1,blockTree(treenode)%nsons
-                s = blockTree(treenode)%sons(i)
-                if(dabs(LBMblks(treenode)%dh / LBMblks(s)%dh - 1.) .lt. 1d-6) then
-                    call set_block_tree_nt(s, nt)
-                    write(*,*) 'Warning: imbeded grid with the same grid size is not suggested'
-                else
-                    call set_block_tree_nt(s, 2*nt)
-                endif
-            enddo
-        endif
-    endsubroutine set_block_tree_nt
+        integer:: i, n, s, treenode, nt, n_gridDelta
+        real(8):: fIn_F1(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim) !   n   time step father fIn
+        real(8):: fIn_F2(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim) ! n + 1 time step father fIn
+            if(blockTree(treenode)%nsons.eq.0) then
+                call collision_block(treenode)
+                call streaming_block(treenode)
+            else
+                do i=1,blockTree(treenode)%nsons
+                    s = blockTree(treenode)%sons(i)
+                    call deliver_son_to_father(commpairs(i)) ! to be check
+                    fIn_F1 = LBMblks(treenode)%fIn
+                    call collision_block(treenode)
+                    fIn_F2 = LBMblks(treenode)%fIn
+                    call streaming_block(treenode)
+                    do n_gridDelta=1,m_gridDelta
+                        call interpolation_father_to_son(commpairs(i),fIn_F1,fIn_F2,n_gridDelta)
+                        call tree_collision_streaming(s)
+                    enddo
+                enddo
+            endif
+    endsubroutine tree_collision_streaming
 
     SUBROUTINE ExchangeFluidInterface()
         implicit none
@@ -238,56 +262,62 @@ module LBMBlockComm
         type(CommPair),intent(in):: pair
         integer:: xS,yS,zS,zF,yF,xF
         ! x direction slices
-        do xS=1,(m_gridDelta+1),m_gridDelta
-        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
-        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
-            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
-            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
-        enddo
-        enddo
-        enddo
-        do xS=(LBMblks(pair%sonId)%xDim - m_gridDelta),LBMblks(pair%sonId)%xDim,m_gridDelta
-        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
-        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
-            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
-            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
-        enddo
-        enddo
-        enddo
+        if(pair%sds(1).eq.1) then
+            do  yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+            do  zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+                xS=m_gridDelta+1
+                call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
+                call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
+            enddo
+            enddo
+        endif
+        if(pair%sds(2).eq.-1) then
+            do  yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+            do  zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+                xS=LBMblks(pair%sonId)%xDim - m_gridDelta
+                call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
+                call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
+            enddo
+            enddo
+        endif
         ! y direction slices
-        do yS=1,(m_gridDelta+1),m_gridDelta
-        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
-        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
-            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
-            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
-        enddo
-        enddo
-        enddo
-        do yS=(LBMblks(pair%sonId)%yDim - m_gridDelta),LBMblks(pair%sonId)%yDim,m_gridDelta
-        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
-        do zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
-            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
-            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
-        enddo
-        enddo
-        enddo
+        if(pair%sds(3).eq.1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+            do  zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+                yS=m_gridDelta+1
+                call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
+                call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
+            enddo
+            enddo
+        endif
+        if(pair%sds(4).eq.-1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+            do  zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
+                yS=LBMblks(pair%sonId)%yDim - m_gridDelta
+                call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
+                call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
+            enddo
+            enddo
+        endif
         ! z direction slices
-        do zS=1,(m_gridDelta+1),m_gridDelta
-        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
-        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
-            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
-            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
-        enddo
-        enddo
-        enddo
-        do zS=(LBMblks(pair%sonId)%zDim - m_gridDelta),LBMblks(pair%sonId)%zDim,m_gridDelta
-        do xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
-        do yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
-            call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
-            call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
-        enddo
-        enddo
-        enddo
+        if(pair%sds(5).eq.1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+            do  yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+                zS=m_gridDelta+1
+                call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
+                call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
+            enddo
+            enddo
+        endif
+        if(pair%sds(6).eq.-1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim,m_gridDelta
+            do  yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
+                zS=LBMblks(pair%sonId)%zDim - m_gridDelta
+                call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,zF,yF,xF)
+                call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
+            enddo
+            enddo
+        endif
     end subroutine 
 
     SUBROUTINE deliver_grid_distribution(father,son,xS,yS,zS,zF,yF,xF)
@@ -305,7 +335,7 @@ module LBMBlockComm
         zF = NINT((zCoordSon - LBMblks(father)%zmin)/LBMblks(father)%dh + 1)
         ! deliver distribution function from son block to father block
         LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = LBMblks(son)%fIn(zS,yS,xS,0:lbmDim)
-    end subroutine 
+    end subroutine
 
     SUBROUTINE interpolation_father_to_son(pair,fIn_F1,fIn_F2,n_timeStep)
         implicit none
@@ -314,56 +344,62 @@ module LBMBlockComm
         real(8):: fIn_F1(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) !   n   time step father fIn
         real(8):: fIn_F2(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim) ! n + 1 time step father fIn
         ! x direction
-        do xS=1,2
-        do yS=1,LBMblks(pair%sonId)%yDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
-            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        do xS=(LBMblks(pair%sonId)%xDim - 1),LBMblks(pair%sonId)%xDim
-        do yS=1,LBMblks(pair%sonId)%yDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
-            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
+        if(pair%sds(1).eq.1) then
+            do  yS=1,LBMblks(pair%sonId)%yDim
+            do  zS=1,LBMblks(pair%sonId)%zDim
+                xS=1
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+                call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
+            enddo
+            enddo
+        endif
+        if(pair%sds(2).eq.-1) then
+            do  yS=1,LBMblks(pair%sonId)%yDim
+            do  zS=1,LBMblks(pair%sonId)%zDim
+                xS=  LBMblks(pair%sonId)%xDim
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+                call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
+            enddo
+            enddo
+        endif
         ! y direction
-        do yS=1,2
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
-            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        do yS=(LBMblks(pair%sonId)%yDim-1),LBMblks(pair%sonId)%yDim
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do zS=1,LBMblks(pair%sonId)%zDim
-            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
-            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
+        if(pair%sds(3).eq.1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim
+            do  zS=1,LBMblks(pair%sonId)%zDim
+                yS=1
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+                call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
+            enddo
+            enddo
+        endif
+        if(pair%sds(4).eq.-1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim
+            do  zS=1,LBMblks(pair%sonId)%zDim
+                yS=  LBMblks(pair%sonId)%yDim
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+                call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
+            enddo
+            enddo
+        endif
         ! z direction
-        do zS=1,2
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do yS=1,LBMblks(pair%sonId)%yDim
-            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
-            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
-        do zS=(LBMblks(pair%sonId)%zDim - 1),LBMblks(pair%sonId)%zDim
-        do xS=1,LBMblks(pair%sonId)%xDim
-        do yS=1,LBMblks(pair%sonId)%yDim
-            call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
-            call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
-        enddo
-        enddo
-        enddo
+        if(pair%sds(5).eq.1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim
+            do  yS=1,LBMblks(pair%sonId)%yDim
+                zS=1
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+                call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
+            enddo
+            enddo
+        endif
+        if(pair%sds(6).eq.-1) then
+            do  xS=1,LBMblks(pair%sonId)%xDim
+            do  yS=1,LBMblks(pair%sonId)%yDim
+                zS=  LBMblks(pair%sonId)%zDim
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)
+                call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
+            enddo
+            enddo
+        endif
     end subroutine
 
     SUBROUTINE interpolation_grid_distribution(father,son,xS,yS,zS,fIn_F1,fIn_F2,n_timeStep)

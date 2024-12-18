@@ -105,13 +105,13 @@ PROGRAM main
             write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
         elseif(m_npairs .ge. 2) then ! multi-blocks
             stop 'the part has not been realized yet.'
+            call tree_collision_streaming(blockTreeRoot)
             ! do n_pairs=2,m_npairs
-            !     call get_now_time(time_begine2)
             !     call deliver_son_to_father(commpairs(n_pairs))
             !     call collision_block(commpairs(n_pairs)%fatherId)
             !     call streaming_block(commpairs(n_pairs)%fatherId)
             !     do n_gridDelta=1,m_gridDelta
-            !         call interpolation_father_to_son(commpairs(n_pairs),fIn_F1,fIn_F2,n_timeStep)
+            !         call interpolation_father_to_son(commpairs(n_pairs),fIn_F1,fIn_F2,dt_fluid*n_gridDelta/m_gridDelta)
             !         call collision_block(commpairs(n_pairs)%sonId)
             !         call streaming_block(commpairs(n_pairs)%sonId)
             !     enddo
