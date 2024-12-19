@@ -30,6 +30,7 @@ PROGRAM main
     !==================================================================================================
     ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)
+    call bluid_block_tree()
     !==================================================================================================
     ! Allocate the memory for simulation
     call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
@@ -37,7 +38,7 @@ PROGRAM main
     !==================================================================================================
     ! Calculate all the reference values
     call calculate_reference_params(flow)
-    call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(1)%BndConds,&
+    call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(blockTreeRoot)%BndConds,&
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
     call write_parameter_check_file(checkFile)
     !==================================================================================================
@@ -55,7 +56,7 @@ PROGRAM main
     !==================================================================================================
     ! Update the volumn forces and calculate the macro quantities
     call update_volumn_force_blocks(time)
-    call set_boundary_conditions_block(1)
+    call set_boundary_conditions_block(blockTreeRoot)
     call calculate_macro_quantities_blocks()
     !==================================================================================================
     ! Write the initial fluid and solid data
@@ -78,31 +79,33 @@ PROGRAM main
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
         if(m_npairs .eq. 0) then ! single block
-            call get_now_time(time_begine2)
-            call collision_block(1)
-            call get_now_time(time_end2)
-            write(*,*)'Time for collision step:', (time_end2 - time_begine2)
-            call get_now_time(time_begine2)
-            call streaming_block(1)
-            call get_now_time(time_end2)
-            call set_boundary_conditions_block(1)
-            write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
+            call tree_collision_streaming(blockTreeRoot)
+            ! call get_now_time(time_begine2)
+            ! call collision_block(1)
+            ! call get_now_time(time_end2)
+            ! write(*,*)'Time for collision step:', (time_end2 - time_begine2)
+            ! call get_now_time(time_begine2)
+            ! call streaming_block(1)
+            ! call get_now_time(time_end2)
+            ! call set_boundary_conditions_block(1)
+            ! write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
         elseif(m_npairs .eq. 1) then ! two blocks
-            call get_now_time(time_begine2)
-            !call calculating_public_distribution(m_npairs)
-            call collision_block(commpairs(1)%fatherId)
-            call streaming_block(commpairs(1)%fatherId)
-            call set_boundary_conditions_block(commpairs(1)%fatherId)
-            call get_now_time(time_end2)
-            write(*,*)'Time  for  coarse block:', (time_end2 - time_begine2)
-            call get_now_time(time_begine2)
-            do n_gridDelta=1,m_gridDelta
-                !call blocks_interpolation(1)
-                call collision_block(commpairs(1)%sonId)
-                call streaming_block(commpairs(1)%sonId)
-            enddo
-            call get_now_time(time_end2)
-            write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
+            call tree_collision_streaming(blockTreeRoot)
+            ! call get_now_time(time_begine2)
+            ! !call calculating_public_distribution(m_npairs)
+            ! call collision_block(commpairs(1)%fatherId)
+            ! call streaming_block(commpairs(1)%fatherId)
+            ! call set_boundary_conditions_block(commpairs(1)%fatherId)
+            ! call get_now_time(time_end2)
+            ! write(*,*)'Time  for  coarse block:', (time_end2 - time_begine2)
+            ! call get_now_time(time_begine2)
+            ! do n_gridDelta=1,m_gridDelta
+            !     !call blocks_interpolation(1)
+            !     call collision_block(commpairs(1)%sonId)
+            !     call streaming_block(commpairs(1)%sonId)
+            ! enddo
+            ! call get_now_time(time_end2)
+            ! write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
         elseif(m_npairs .ge. 2) then ! multi-blocks
             stop 'the part has not been realized yet.'
             call tree_collision_streaming(blockTreeRoot)

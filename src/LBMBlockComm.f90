@@ -141,6 +141,7 @@ module LBMBlockComm
     recursive subroutine tree_collision_streaming(treenode)
         implicit none
         integer:: i, s, treenode, n_gridDelta
+        real(8):: time_begine2,time_end2
         real(8):: fIn_Fx1(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,2,0:lbmDim) !   n   time step father fIn
         real(8):: fIn_Fy1(LBMblks(treenode)%zDim,2,LBMblks(treenode)%xDim,0:lbmDim)
         real(8):: fIn_Fz1(2,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim)
@@ -153,8 +154,15 @@ module LBMBlockComm
         fIn_Fy1(:,2,:,:) = LBMblks(treenode)%fIn(:,LBMblks(treenode)%yDim,:,:)
         fIn_Fz1(1,:,:,:) = LBMblks(treenode)%fIn(1,:,:,:)
         fIn_Fz1(2,:,:,:) = LBMblks(treenode)%fIn(LBMblks(treenode)%zDim,:,:,:)
+        call get_now_time(time_begine2)
         call collision_block(treenode)
+        call get_now_time(time_end2)
+        write(*,*)'Time for collision step:', (time_end2 - time_begine2)
+        call get_now_time(time_begine2)
         call streaming_block(treenode)
+        call get_now_time(time_end2)
+        write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
+        call set_boundary_conditions_block(treenode)
         fIn_Fx2(:,:,1,:) = LBMblks(treenode)%fIn(:,:,1,:)
         fIn_Fx2(:,:,2,:) = LBMblks(treenode)%fIn(:,:,LBMblks(treenode)%xDim,:)
         fIn_Fy2(:,1,:,:) = LBMblks(treenode)%fIn(:,1,:,:)
