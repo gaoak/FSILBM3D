@@ -148,12 +148,7 @@ module LBMBlockComm
         real(8):: fIn_Fx2(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,2,0:lbmDim) ! n + 1 time step father fIn
         real(8):: fIn_Fy2(LBMblks(treenode)%zDim,2,LBMblks(treenode)%xDim,0:lbmDim)
         real(8):: fIn_Fz2(2,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim)
-        fIn_Fx1(:,:,1,:) = LBMblks(treenode)%fIn(:,:,1,:)
-        fIn_Fx1(:,:,2,:) = LBMblks(treenode)%fIn(:,:,LBMblks(treenode)%xDim,:)
-        fIn_Fy1(:,1,:,:) = LBMblks(treenode)%fIn(:,1,:,:)
-        fIn_Fy1(:,2,:,:) = LBMblks(treenode)%fIn(:,LBMblks(treenode)%yDim,:,:)
-        fIn_Fz1(1,:,:,:) = LBMblks(treenode)%fIn(1,:,:,:)
-        fIn_Fz1(2,:,:,:) = LBMblks(treenode)%fIn(LBMblks(treenode)%zDim,:,:,:)
+        call extract_inner_layer(treenode,fIn_Fx1,fIn_Fy1,fIn_Fz1)
         call get_now_time(time_begine2)
         call collision_block(treenode)
         call get_now_time(time_end2)
@@ -163,12 +158,7 @@ module LBMBlockComm
         call get_now_time(time_end2)
         write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
         call set_boundary_conditions_block(treenode)
-        fIn_Fx2(:,:,1,:) = LBMblks(treenode)%fIn(:,:,1,:)
-        fIn_Fx2(:,:,2,:) = LBMblks(treenode)%fIn(:,:,LBMblks(treenode)%xDim,:)
-        fIn_Fy2(:,1,:,:) = LBMblks(treenode)%fIn(:,1,:,:)
-        fIn_Fy2(:,2,:,:) = LBMblks(treenode)%fIn(:,LBMblks(treenode)%yDim,:,:)
-        fIn_Fz2(1,:,:,:) = LBMblks(treenode)%fIn(1,:,:,:)
-        fIn_Fz2(2,:,:,:) = LBMblks(treenode)%fIn(LBMblks(treenode)%zDim,:,:,:)
+        call extract_inner_layer(treenode,fIn_Fx2,fIn_Fy2,fIn_Fz2)
         if(blockTree(treenode)%nsons.gt.1) then
             do i=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%sons(i)
@@ -181,6 +171,19 @@ module LBMBlockComm
             enddo
         endif
     endsubroutine tree_collision_streaming
+
+    subroutine extract_inner_layer(treenode,fIn_Fx,fIn_Fy,fIn_Fz)
+        integer:: treenode
+        real(8):: fIn_Fx(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,2,0:lbmDim)
+        real(8):: fIn_Fy(LBMblks(treenode)%zDim,2,LBMblks(treenode)%xDim,0:lbmDim)
+        real(8):: fIn_Fz(2,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim)
+        fIn_Fx(:,:,1,:) = LBMblks(treenode)%fIn(:,:,2,:)
+        fIn_Fx(:,:,2,:) = LBMblks(treenode)%fIn(:,:,LBMblks(treenode)%xDim-1,:)
+        fIn_Fy(:,1,:,:) = LBMblks(treenode)%fIn(:,2,:,:)
+        fIn_Fy(:,2,:,:) = LBMblks(treenode)%fIn(:,LBMblks(treenode)%yDim-1,:,:)
+        fIn_Fz(1,:,:,:) = LBMblks(treenode)%fIn(2,:,:,:)
+        fIn_Fz(2,:,:,:) = LBMblks(treenode)%fIn(LBMblks(treenode)%zDim-1,:,:,:)
+    endsubroutine
 
     SUBROUTINE ExchangeFluidInterface()
         implicit none
@@ -372,7 +375,8 @@ module LBMBlockComm
             do  yS=1,LBMblks(pair%sonId)%yDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 xS=1
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,1)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
+                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,1)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -381,7 +385,8 @@ module LBMBlockComm
             do  yS=1,LBMblks(pair%sonId)%yDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 xS=  LBMblks(pair%sonId)%xDim
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,2)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
+                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,2)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -391,7 +396,8 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 yS=1
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,3)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
+                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,3)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -400,7 +406,8 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 yS=  LBMblks(pair%sonId)%yDim
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,4)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
+                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,4)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -410,7 +417,8 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  yS=1,LBMblks(pair%sonId)%yDim
                 zS=1
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,5)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
+                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,5)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -419,7 +427,8 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  yS=1,LBMblks(pair%sonId)%yDim
                 zS=  LBMblks(pair%sonId)%zDim
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,6)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
+                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,6)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
