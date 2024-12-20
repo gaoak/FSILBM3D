@@ -107,6 +107,36 @@ module LBMBlockComm
                 blockTreeRoot = i
             endif
         enddo
+        do i=1,m_npairs
+            f = commpairs(i)%fatherId
+            s = commpairs(i)%sonId
+            if(f .ne. 0) then
+                if(LBMblks(s)%BndConds(1).eq.BCfluid) then
+                    allocate(LBMblks(s)%fIn_Fx1t1(LBMblks(f)%zDim,LBMblks(f)%yDim,1,0:lbmDim))
+                    allocate(LBMblks(s)%fIn_Fx1t2(LBMblks(f)%zDim,LBMblks(f)%yDim,1,0:lbmDim))
+                endif
+                if(LBMblks(s)%BndConds(2).eq.BCfluid) then
+                    allocate(LBMblks(s)%fIn_Fx2t1(LBMblks(f)%zDim,LBMblks(f)%yDim,1,0:lbmDim))
+                    allocate(LBMblks(s)%fIn_Fx2t2(LBMblks(f)%zDim,LBMblks(f)%yDim,1,0:lbmDim))
+                endif
+                if(LBMblks(s)%BndConds(3).eq.BCfluid) then
+                    allocate(LBMblks(s)%fIn_Fy1t1(LBMblks(f)%zDim,1,LBMblks(f)%xDim,0:lbmDim))
+                    allocate(LBMblks(s)%fIn_Fy1t2(LBMblks(f)%zDim,1,LBMblks(f)%xDim,0:lbmDim))
+                endif
+                if(LBMblks(s)%BndConds(4).eq.BCfluid) then
+                    allocate(LBMblks(s)%fIn_Fy2t1(LBMblks(f)%zDim,1,LBMblks(f)%xDim,0:lbmDim))
+                    allocate(LBMblks(s)%fIn_Fy2t2(LBMblks(f)%zDim,1,LBMblks(f)%xDim,0:lbmDim))
+                endif
+                if(LBMblks(s)%BndConds(5).eq.BCfluid) then
+                    allocate(LBMblks(s)%fIn_Fz1t1(1,LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
+                    allocate(LBMblks(s)%fIn_Fz1t2(1,LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
+                endif
+                if(LBMblks(s)%BndConds(6).eq.BCfluid) then
+                    allocate(LBMblks(s)%fIn_Fz2t1(1,LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
+                    allocate(LBMblks(s)%fIn_Fz2t2(1,LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
+                endif
+            endif
+        enddo
         ! set sons
         ns = 0
         do i=1,m_npairs
@@ -142,13 +172,7 @@ module LBMBlockComm
         implicit none
         integer:: i, s, treenode, n_gridDelta
         real(8):: time_begine2,time_end2
-        real(8):: fIn_Fx1(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,2,0:lbmDim) !   n   time step father fIn
-        real(8):: fIn_Fy1(LBMblks(treenode)%zDim,2,LBMblks(treenode)%xDim,0:lbmDim)
-        real(8):: fIn_Fz1(2,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim)
-        real(8):: fIn_Fx2(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,2,0:lbmDim) ! n + 1 time step father fIn
-        real(8):: fIn_Fy2(LBMblks(treenode)%zDim,2,LBMblks(treenode)%xDim,0:lbmDim)
-        real(8):: fIn_Fz2(2,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim)
-        call extract_inner_layer(treenode,fIn_Fx1,fIn_Fy1,fIn_Fz1)
+        call extract_inner_layer(treenode,1)
         call get_now_time(time_begine2)
         call collision_block(treenode)
         call get_now_time(time_end2)
@@ -158,13 +182,12 @@ module LBMBlockComm
         call get_now_time(time_end2)
         write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
         call set_boundary_conditions_block(treenode)
-        call extract_inner_layer(treenode,fIn_Fx2,fIn_Fy2,fIn_Fz2)
+        call extract_inner_layer(treenode,2)
         if(blockTree(treenode)%nsons.gt.1) then
             do i=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%sons(i)
                 do n_gridDelta=0,m_gridDelta-1
-                    call interpolation_father_to_son(commpairs(blockTree(treenode)%pairId(i)), &
-                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_gridDelta)
+                    call interpolation_father_to_son(commpairs(blockTree(treenode)%pairId(i)),n_gridDelta)
                     call tree_collision_streaming(s)
                 enddo
                 call deliver_son_to_father(commpairs(blockTree(treenode)%pairId(i))) ! to be check
@@ -172,17 +195,36 @@ module LBMBlockComm
         endif
     endsubroutine tree_collision_streaming
 
-    subroutine extract_inner_layer(treenode,fIn_Fx,fIn_Fy,fIn_Fz)
-        integer:: treenode
-        real(8):: fIn_Fx(LBMblks(treenode)%zDim,LBMblks(treenode)%yDim,2,0:lbmDim)
-        real(8):: fIn_Fy(LBMblks(treenode)%zDim,2,LBMblks(treenode)%xDim,0:lbmDim)
-        real(8):: fIn_Fz(2,LBMblks(treenode)%yDim,LBMblks(treenode)%xDim,0:lbmDim)
-        fIn_Fx(:,:,1,:) = LBMblks(treenode)%fIn(:,:,2,:)
-        fIn_Fx(:,:,2,:) = LBMblks(treenode)%fIn(:,:,LBMblks(treenode)%xDim-1,:)
-        fIn_Fy(:,1,:,:) = LBMblks(treenode)%fIn(:,2,:,:)
-        fIn_Fy(:,2,:,:) = LBMblks(treenode)%fIn(:,LBMblks(treenode)%yDim-1,:,:)
-        fIn_Fz(1,:,:,:) = LBMblks(treenode)%fIn(2,:,:,:)
-        fIn_Fz(2,:,:,:) = LBMblks(treenode)%fIn(LBMblks(treenode)%zDim-1,:,:,:)
+    subroutine extract_inner_layer(treenode,time)
+        integer:: treenode, time, f, s
+        f = blockTree(treenode)%fatherId
+        s = treenode
+        if(f .ne. 0) then
+            if(LBMblks(s)%BndConds(1).eq.BCfluid) then
+                if (time .eq. 1) LBMblks(s)%fIn_Fx1t1(:,:,1,:) = LBMblks(f)%fIn(:,:,2,:)
+                if (time .eq. 2) LBMblks(s)%fIn_Fx1t2(:,:,1,:) = LBMblks(f)%fIn(:,:,2,:)
+            endif
+            if(LBMblks(s)%BndConds(2).eq.BCfluid) then
+                if (time .eq. 1) LBMblks(s)%fIn_Fx2t1(:,:,1,:) = LBMblks(f)%fIn(:,:,LBMblks(f)%xDim-1,:)
+                if (time .eq. 2) LBMblks(s)%fIn_Fx2t2(:,:,1,:) = LBMblks(f)%fIn(:,:,LBMblks(f)%xDim-1,:)
+            endif
+            if(LBMblks(s)%BndConds(3).eq.BCfluid) then
+                if (time .eq. 1) LBMblks(s)%fIn_Fy1t1(:,1,:,:) = LBMblks(f)%fIn(:,2,:,:)
+                if (time .eq. 2) LBMblks(s)%fIn_Fy1t2(:,1,:,:) = LBMblks(f)%fIn(:,2,:,:)
+            endif
+            if(LBMblks(s)%BndConds(4).eq.BCfluid) then
+                if (time .eq. 1) LBMblks(s)%fIn_Fy2t1(:,1,:,:) = LBMblks(f)%fIn(:,LBMblks(f)%yDim-1,:,:)
+                if (time .eq. 2) LBMblks(s)%fIn_Fy2t2(:,1,:,:) = LBMblks(f)%fIn(:,LBMblks(f)%yDim-1,:,:)
+            endif
+            if(LBMblks(s)%BndConds(5).eq.BCfluid) then
+                if (time .eq. 1) LBMblks(s)%fIn_Fz1t1(1,:,:,:) = LBMblks(f)%fIn(2,:,:,:)
+                if (time .eq. 2) LBMblks(s)%fIn_Fz1t2(1,:,:,:) = LBMblks(f)%fIn(2,:,:,:)
+            endif
+            if(LBMblks(s)%BndConds(6).eq.BCfluid) then
+                if (time .eq. 1) LBMblks(s)%fIn_Fz2t1(1,:,:,:) = LBMblks(f)%fIn(LBMblks(f)%zDim-1,:,:,:)
+                if (time .eq. 2) LBMblks(s)%fIn_Fz2t2(1,:,:,:) = LBMblks(f)%fIn(LBMblks(f)%zDim-1,:,:,:)
+            endif
+        endif
     endsubroutine
 
     SUBROUTINE ExchangeFluidInterface()
@@ -360,23 +402,16 @@ module LBMBlockComm
         LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = LBMblks(son)%fIn(zS,yS,xS,0:lbmDim)
     end subroutine
 
-    SUBROUTINE interpolation_father_to_son(pair,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep)
+    SUBROUTINE interpolation_father_to_son(pair,n_timeStep)
         implicit none
         type(CommPair),intent(in):: pair
         integer:: n_timeStep,xS,yS,zS
-        real(8):: fIn_Fx1(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,2,0:lbmDim) !   n   time step father fIn
-        real(8):: fIn_Fy1(LBMblks(pair%fatherId)%zDim,2,LBMblks(pair%fatherId)%xDim,0:lbmDim)
-        real(8):: fIn_Fz1(2,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim)
-        real(8):: fIn_Fx2(LBMblks(pair%fatherId)%zDim,LBMblks(pair%fatherId)%yDim,2,0:lbmDim) ! n + 1 time step father fIn
-        real(8):: fIn_Fy2(LBMblks(pair%fatherId)%zDim,2,LBMblks(pair%fatherId)%xDim,0:lbmDim)
-        real(8):: fIn_Fz2(2,LBMblks(pair%fatherId)%yDim,LBMblks(pair%fatherId)%xDim,0:lbmDim)
         ! x direction
         if(pair%sds(1).eq.1) then
             do  yS=1,LBMblks(pair%sonId)%yDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 xS=1
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
-                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,1)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,n_timeStep,1)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -385,8 +420,7 @@ module LBMBlockComm
             do  yS=1,LBMblks(pair%sonId)%yDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 xS=  LBMblks(pair%sonId)%xDim
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
-                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,2)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,n_timeStep,2)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -396,8 +430,7 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 yS=1
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
-                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,3)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,n_timeStep,3)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -406,8 +439,7 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  zS=1,LBMblks(pair%sonId)%zDim
                 yS=  LBMblks(pair%sonId)%yDim
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
-                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,4)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,n_timeStep,4)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -417,8 +449,7 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  yS=1,LBMblks(pair%sonId)%yDim
                 zS=1
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
-                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,5)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,n_timeStep,5)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
@@ -427,15 +458,14 @@ module LBMBlockComm
             do  xS=1,LBMblks(pair%sonId)%xDim
             do  yS=1,LBMblks(pair%sonId)%yDim
                 zS=  LBMblks(pair%sonId)%zDim
-                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS, &
-                                                     fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,6)
+                call interpolation_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,n_timeStep,6)
                 call fIn_father_to_son(pair%fatherId,pair%sonId,xS,yS,zS)
             enddo
             enddo
         endif
     end subroutine
 
-    SUBROUTINE interpolation_grid_distribution(father,son,xS,yS,zS,fIn_Fx1,fIn_Fy1,fIn_Fz1,fIn_Fx2,fIn_Fy2,fIn_Fz2,n_timeStep,xyz)
+    SUBROUTINE interpolation_grid_distribution(father,son,xS,yS,zS,n_timeStep,xyz)
         ! interpolating distribution function from father block to son block
         implicit none
         integer:: father,son,n_timeStep,xS,yS,zS,xyz
@@ -444,12 +474,6 @@ module LBMBlockComm
         real(8):: dx1,dy1,dz1,dx2,dy2,dz2
         real(8):: coffe,c1,c2,c3,c4,c5,c6,c7,c8
         real(8):: fIn_S1(0:lbmDim),fIn_S2(0:lbmDim)
-        real(8):: fIn_Fx1(LBMblks(father)%zDim,LBMblks(father)%yDim,2,0:lbmDim) !   n   time step father fIn
-        real(8):: fIn_Fy1(LBMblks(father)%zDim,2,LBMblks(father)%xDim,0:lbmDim)
-        real(8):: fIn_Fz1(2,LBMblks(father)%yDim,LBMblks(father)%xDim,0:lbmDim)
-        real(8):: fIn_Fx2(LBMblks(father)%zDim,LBMblks(father)%yDim,2,0:lbmDim) ! n + 1 time step father fIn
-        real(8):: fIn_Fy2(LBMblks(father)%zDim,2,LBMblks(father)%xDim,0:lbmDim)
-        real(8):: fIn_Fz2(2,LBMblks(father)%yDim,LBMblks(father)%xDim,0:lbmDim)
         ! calcualte the pubilc grid coordinates in son block
         xCoordSon = LBMblks(son)%xmin + LBMblks(son)%dh*(xS - 1)
         yCoordSon = LBMblks(son)%ymin + LBMblks(son)%dh*(yS - 1)
@@ -464,9 +488,9 @@ module LBMBlockComm
         if (xyz .eq. 1 .or. xyz .eq. 2) xF2 = xF1
         if (xyz .eq. 3 .or. xyz .eq. 4) yF2 = yF1
         if (xyz .eq. 5 .or. xyz .eq. 6) zF2 = zF1
-        if (xF2 .gt. LBMblks(father)%xDim) xF2 = xF1
-        if (yF2 .gt. LBMblks(father)%yDim) xF2 = yF1
-        if (zF2 .gt. LBMblks(father)%zDim) zF2 = zF1
+        ! if (xF2 .gt. LBMblks(father)%xDim) xF2 = xF1
+        ! if (yF2 .gt. LBMblks(father)%yDim) xF2 = yF1
+        ! if (zF2 .gt. LBMblks(father)%zDim) zF2 = zF1
         ! coordinate difference between the son gird and around father grids
         dx1 = xCoordSon - (LBMblks(father)%xmin + LBMblks(father)%dh*(xF1 - 1))
         dy1 = yCoordSon - (LBMblks(father)%ymin + LBMblks(father)%dh*(yF1 - 1))
@@ -485,35 +509,65 @@ module LBMBlockComm
         c7 = dx1*dy1*dz2*coffe
         c8 = dx1*dy1*dz1*coffe
         ! space interpolation distribution function from father block to son block
-        if (xyz .eq. 1 .or. xyz .eq. 2) then
-            fIn_S1(0:lbmDim) = c1*fIn_Fx1(zF1,yF1,xF1,0:lbmDim) + c2*fIn_Fx1(zF2,yF1,xF1,0:lbmDim) + &
-                               c3*fIn_Fx1(zF1,yF2,xF1,0:lbmDim) + c4*fIn_Fx1(zF1,yF1,xF2,0:lbmDim) + &
-                               c5*fIn_Fx1(zF2,yF2,xF1,0:lbmDim) + c6*fIn_Fx1(zF2,yF1,xF2,0:lbmDim) + &
-                               c7*fIn_Fx1(zF1,yF2,xF2,0:lbmDim) + c8*fIn_Fx1(zF2,yF2,xF2,0:lbmDim)
-            fIn_S2(0:lbmDim) = c1*fIn_Fx2(zF1,yF1,xF1,0:lbmDim) + c2*fIn_Fx2(zF2,yF1,xF1,0:lbmDim) + &
-                               c3*fIn_Fx2(zF1,yF2,xF1,0:lbmDim) + c4*fIn_Fx2(zF1,yF1,xF2,0:lbmDim) + &
-                               c5*fIn_Fx2(zF2,yF2,xF1,0:lbmDim) + c6*fIn_Fx2(zF2,yF1,xF2,0:lbmDim) + &
-                               c7*fIn_Fx2(zF1,yF2,xF2,0:lbmDim) + c8*fIn_Fx2(zF2,yF2,xF2,0:lbmDim)
+        if (xyz .eq. 1) then
+            fIn_S1(0:lbmDim) = c1*LBMblks(son)%fIn_Fx1t1(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fx1t1(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fx1t1(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fx1t1(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fx1t1(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fx1t1(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fx1t1(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fx1t1(zF2,yF2,xF2,0:lbmDim)
+            fIn_S2(0:lbmDim) = c1*LBMblks(son)%fIn_Fx1t2(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fx1t2(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fx1t2(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fx1t2(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fx1t2(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fx1t2(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fx1t2(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fx1t2(zF2,yF2,xF2,0:lbmDim)
         endif
-        if (xyz .eq. 3 .or. xyz .eq. 4) then
-            fIn_S1(0:lbmDim) = c1*fIn_Fy1(zF1,yF1,xF1,0:lbmDim) + c2*fIn_Fy1(zF2,yF1,xF1,0:lbmDim) + &
-                               c3*fIn_Fy1(zF1,yF2,xF1,0:lbmDim) + c4*fIn_Fy1(zF1,yF1,xF2,0:lbmDim) + &
-                               c5*fIn_Fy1(zF2,yF2,xF1,0:lbmDim) + c6*fIn_Fy1(zF2,yF1,xF2,0:lbmDim) + &
-                               c7*fIn_Fy1(zF1,yF2,xF2,0:lbmDim) + c8*fIn_Fy1(zF2,yF2,xF2,0:lbmDim)
-            fIn_S2(0:lbmDim) = c1*fIn_Fy2(zF1,yF1,xF1,0:lbmDim) + c2*fIn_Fy2(zF2,yF1,xF1,0:lbmDim) + &
-                               c3*fIn_Fy2(zF1,yF2,xF1,0:lbmDim) + c4*fIn_Fy2(zF1,yF1,xF2,0:lbmDim) + &
-                               c5*fIn_Fy2(zF2,yF2,xF1,0:lbmDim) + c6*fIn_Fy2(zF2,yF1,xF2,0:lbmDim) + &
-                               c7*fIn_Fy2(zF1,yF2,xF2,0:lbmDim) + c8*fIn_Fy2(zF2,yF2,xF2,0:lbmDim)
+        if (xyz .eq. 2) then
+            fIn_S1(0:lbmDim) = c1*LBMblks(son)%fIn_Fx2t1(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fx2t1(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fx2t1(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fx2t1(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fx2t1(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fx2t1(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fx2t1(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fx2t1(zF2,yF2,xF2,0:lbmDim)
+            fIn_S2(0:lbmDim) = c1*LBMblks(son)%fIn_Fx2t2(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fx2t2(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fx2t2(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fx2t2(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fx2t2(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fx2t2(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fx2t2(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fx2t2(zF2,yF2,xF2,0:lbmDim)
         endif
-        if (xyz .eq. 5 .or. xyz .eq. 6) then
-            fIn_S1(0:lbmDim) = c1*fIn_Fz1(zF1,yF1,xF1,0:lbmDim) + c2*fIn_Fz1(zF2,yF1,xF1,0:lbmDim) + &
-                               c3*fIn_Fz1(zF1,yF2,xF1,0:lbmDim) + c4*fIn_Fz1(zF1,yF1,xF2,0:lbmDim) + &
-                               c5*fIn_Fz1(zF2,yF2,xF1,0:lbmDim) + c6*fIn_Fz1(zF2,yF1,xF2,0:lbmDim) + &
-                               c7*fIn_Fz1(zF1,yF2,xF2,0:lbmDim) + c8*fIn_Fz1(zF2,yF2,xF2,0:lbmDim)
-            fIn_S2(0:lbmDim) = c1*fIn_Fz2(zF1,yF1,xF1,0:lbmDim) + c2*fIn_Fz2(zF2,yF1,xF1,0:lbmDim) + &
-                               c3*fIn_Fz2(zF1,yF2,xF1,0:lbmDim) + c4*fIn_Fz2(zF1,yF1,xF2,0:lbmDim) + &
-                               c5*fIn_Fz2(zF2,yF2,xF1,0:lbmDim) + c6*fIn_Fz2(zF2,yF1,xF2,0:lbmDim) + &
-                               c7*fIn_Fz2(zF1,yF2,xF2,0:lbmDim) + c8*fIn_Fz2(zF2,yF2,xF2,0:lbmDim)
+        if (xyz .eq. 3) then
+            fIn_S1(0:lbmDim) = c1*LBMblks(son)%fIn_Fy1t1(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fy1t1(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fy1t1(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fy1t1(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fy1t1(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fy1t1(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fy1t1(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fy1t1(zF2,yF2,xF2,0:lbmDim)
+            fIn_S2(0:lbmDim) = c1*LBMblks(son)%fIn_Fy1t2(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fy1t2(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fy1t2(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fy1t2(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fy1t2(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fy1t2(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fy1t2(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fy1t2(zF2,yF2,xF2,0:lbmDim)
+        endif
+        if (xyz .eq. 4) then
+            fIn_S1(0:lbmDim) = c1*LBMblks(son)%fIn_Fy2t1(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fy2t1(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fy2t1(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fy2t1(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fy2t1(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fy2t1(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fy2t1(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fy2t1(zF2,yF2,xF2,0:lbmDim)
+            fIn_S2(0:lbmDim) = c1*LBMblks(son)%fIn_Fy2t2(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fy2t2(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fy2t2(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fy2t2(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fy2t2(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fy2t2(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fy2t2(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fy2t2(zF2,yF2,xF2,0:lbmDim)
+        endif
+        if (xyz .eq. 5) then
+            fIn_S1(0:lbmDim) = c1*LBMblks(son)%fIn_Fz1t1(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fz1t1(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fz1t1(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fz1t1(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fz1t1(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fz1t1(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fz1t1(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fz1t1(zF2,yF2,xF2,0:lbmDim)
+            fIn_S2(0:lbmDim) = c1*LBMblks(son)%fIn_Fz1t2(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fz1t2(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fz1t2(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fz1t2(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fz1t2(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fz1t2(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fz1t2(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fz1t2(zF2,yF2,xF2,0:lbmDim)
+        endif
+        if (xyz .eq. 6) then
+            fIn_S1(0:lbmDim) = c1*LBMblks(son)%fIn_Fz2t1(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fz2t1(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fz2t1(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fz2t1(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fz2t1(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fz2t1(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fz2t1(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fz2t1(zF2,yF2,xF2,0:lbmDim)
+            fIn_S2(0:lbmDim) = c1*LBMblks(son)%fIn_Fz2t2(zF1,yF1,xF1,0:lbmDim) + c2*LBMblks(son)%fIn_Fz2t2(zF2,yF1,xF1,0:lbmDim) + &
+                               c3*LBMblks(son)%fIn_Fz2t2(zF1,yF2,xF1,0:lbmDim) + c4*LBMblks(son)%fIn_Fz2t2(zF1,yF1,xF2,0:lbmDim) + &
+                               c5*LBMblks(son)%fIn_Fz2t2(zF2,yF2,xF1,0:lbmDim) + c6*LBMblks(son)%fIn_Fz2t2(zF2,yF1,xF2,0:lbmDim) + &
+                               c7*LBMblks(son)%fIn_Fz2t2(zF1,yF2,xF2,0:lbmDim) + c8*LBMblks(son)%fIn_Fz2t2(zF2,yF2,xF2,0:lbmDim)
         endif
         ! time interpolation distribution function from father block to son block
         LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = (n_timeStep - 0)/m_gridDelta * fIn_S2(0:lbmDim) + (m_gridDelta - n_timeStep)/m_gridDelta * fIn_S1(0:lbmDim)
