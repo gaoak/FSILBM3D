@@ -593,7 +593,7 @@ module LBMBlockComm
         uSqr           = sum(LBMblks(father)%uuu(zF,yF,xF,1:3)**2)
         uxyz(0:lbmDim) = LBMblks(father)%uuu(zF,yF,xF,1) * ee(0:lbmDim,1) + LBMblks(father)%uuu(zF,yF,xF,2) * ee(0:lbmDim,2)+LBMblks(father)%uuu(zF,yF,xF,3) * ee(0:lbmDim,3)
         fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(father)%den(zF,yF,xF) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
-        coffe = ((LBMblks(father)%tau-1) / (LBMblks(son)%tau-1)) * m_gridDelta
+        coffe = (LBMblks(father)%tau / LBMblks(son)%tau) * m_gridDelta
         LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) - fEq(0:lbmDim))
     end subroutine
 end module LBMBlockComm
