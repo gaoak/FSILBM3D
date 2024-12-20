@@ -168,27 +168,27 @@ module LBMBlockComm
         endif
     endsubroutine set_block_tree_nt
 
-    recursive subroutine tree_collision_streaming(treenode)
+    recursive subroutine tree_collision_streaming(treenode,time_collision,time_streaming)
         implicit none
         integer:: i, s, treenode, n_gridDelta
-        real(8):: time_begine2,time_end2
+        real(8):: time_collision,time_streaming,time_begine2,time_end2
         call extract_inner_layer(treenode,1)
         call get_now_time(time_begine2)
         call collision_block(treenode)
         call get_now_time(time_end2)
-        write(*,*)'Time for collision step:', (time_end2 - time_begine2)
+        time_collision = time_collision + (time_end2 - time_begine2)
         call get_now_time(time_begine2)
         call streaming_block(treenode)
         call get_now_time(time_end2)
-        write(*,*)'Time for streaming step:', (time_end2 - time_begine2)
+        time_streaming = time_streaming + (time_end2 - time_begine2)
         call set_boundary_conditions_block(treenode)
         call extract_inner_layer(treenode,2)
-        if(blockTree(treenode)%nsons.gt.1) then
+        if(blockTree(treenode)%nsons.gt.0) then
             do i=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%sons(i)
                 do n_gridDelta=0,m_gridDelta-1
                     call interpolation_father_to_son(commpairs(blockTree(treenode)%pairId(i)),n_gridDelta)
-                    call tree_collision_streaming(s)
+                    call tree_collision_streaming(s,time_collision,time_streaming)
                 enddo
                 call deliver_son_to_father(commpairs(blockTree(treenode)%pairId(i))) ! to be check
             enddo

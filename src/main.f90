@@ -18,7 +18,7 @@ PROGRAM main
     integer:: n_pairs,n_gridDelta
     real(8):: dt_solid, dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
-    real(8):: time_begine1,time_begine2,time_end1,time_end2
+    real(8):: time_collision,time_streaming,time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
@@ -79,7 +79,11 @@ PROGRAM main
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
         if(m_npairs .eq. 0) then ! single block
-            call tree_collision_streaming(blockTreeRoot)
+            time_collision = 0.d0
+            time_streaming = 0.d0
+            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming)
+            write(*,*)'Time for collision step:', time_collision
+            write(*,*)'Time for streaming step:', time_streaming
             ! call get_now_time(time_begine2)
             ! call collision_block(1)
             ! call get_now_time(time_end2)
@@ -90,7 +94,11 @@ PROGRAM main
             ! call set_boundary_conditions_block(1)
             ! write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
         elseif(m_npairs .eq. 1) then ! two blocks
-            call tree_collision_streaming(blockTreeRoot)
+            time_collision = 0.d0
+            time_streaming = 0.d0
+            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming)
+            write(*,*)'Time for collision step:', time_collision
+            write(*,*)'Time for streaming step:', time_streaming
             ! call get_now_time(time_begine2)
             ! !call calculating_public_distribution(m_npairs)
             ! call collision_block(commpairs(1)%fatherId)
@@ -107,8 +115,12 @@ PROGRAM main
             ! call get_now_time(time_end2)
             ! write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
         elseif(m_npairs .ge. 2) then ! multi-blocks
-            stop 'the part has not been realized yet.'
-            call tree_collision_streaming(blockTreeRoot)
+            ! stop 'the part has not been realized yet.'
+            time_collision = 0.d0
+            time_streaming = 0.d0
+            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming)
+            write(*,*)'Time for collision step:', time_collision
+            write(*,*)'Time for streaming step:', time_streaming
             ! do n_pairs=2,m_npairs
             !     call deliver_son_to_father(commpairs(n_pairs))
             !     call collision_block(commpairs(n_pairs)%fatherId)
