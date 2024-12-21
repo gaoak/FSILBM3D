@@ -222,8 +222,8 @@
         c7 = dx1*dy1*dz2*coffe
         c8 = dx1*dy1*dz1*coffe
         ! interpolation
-        valueOut = c1*valueIn(x1,y1,z1) + c2*valueIn(x1,y1,z2) + c3*valueIn(x1,y2,z1) + c4*valueIn(x2,y1,z1) + &
-                   c5*valueIn(x1,y2,z2) + c6*valueIn(x2,y1,z2) + c7*valueIn(x2,y2,z1) + c8*valueIn(x2,y2,z2)
+        valueOut = c1*valueIn(z1,y1,x1) + c2*valueIn(z2,y1,x1) + c3*valueIn(z1,y2,x1) + c4*valueIn(z1,y1,x2) + &
+                   c5*valueIn(z2,y2,x1) + c6*valueIn(z2,y1,x2) + c7*valueIn(z1,y2,x2) + c8*valueIn(z2,y2,x2)
         ! test interpolation coordinate
         !interCoord(1) = c1*(xmin + dh*(x1 - 1)) + c2*(xmin + dh*(x1 - 1)) + c3*(xmin + dh*(x1 - 1)) + c4*(xmin + dh*(x2 - 1)) + &
         !                c5*(xmin + dh*(x1 - 1)) + c6*(xmin + dh*(x2 - 1)) + c7*(xmin + dh*(x2 - 1)) + c8*(xmin + dh*(x2 - 1))

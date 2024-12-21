@@ -19,9 +19,9 @@ module FluidDomain
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
-        real(8), allocatable :: fIn_Fx1t1(:,:,:,:),fIn_Fx1t2(:,:,:,:),fIn_Fx2t1(:,:,:,:),fIn_Fx2t2(:,:,:,:)
-        real(8), allocatable :: fIn_Fy1t1(:,:,:,:),fIn_Fy1t2(:,:,:,:),fIn_Fy2t1(:,:,:,:),fIn_Fy2t2(:,:,:,:)
-        real(8), allocatable :: fIn_Fz1t1(:,:,:,:),fIn_Fz1t2(:,:,:,:),fIn_Fz2t1(:,:,:,:),fIn_Fz2t2(:,:,:,:)
+        real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
+        real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
+        real(8), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
     contains
         procedure :: allocate_fluid => allocate_fluid_
