@@ -48,14 +48,13 @@ PROGRAM main
     !==================================================================================================
     ! Check blocks number and calculate the tau of each block
     call check_blocks_params(m_nblock)
-    call calculate_blocks_tau(flow%nu)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)
     call write_information_titles(m_nFish)
     !==================================================================================================
-    ! Update the volumn forces and calculate the macro quantities
-    call update_volumn_force_blocks(time)
+    ! Update the volume forces and calculate the macro quantities
+    call update_volume_force_blocks(time)
     call set_boundary_conditions_block(blockTreeRoot)
     call calculate_macro_quantities_blocks()
     !==================================================================================================
@@ -133,10 +132,11 @@ PROGRAM main
             ! enddo
         endif
         call get_now_time(time_begine2)
-        call calculate_macro_quantities_blocks()
+        call update_volume_force_blocks(time)
         call clear_volume_force()
         call FSInteraction_force(dt_fluid,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
                                 LBMblks(m_carrierFluidId)%xDim,LBMblks(m_carrierFluidId)%yDim,LBMblks(m_carrierFluidId)%zDim,LBMblks(m_carrierFluidId)%uuu,LBMblks(m_carrierFluidId)%force)
+        call add_volume_force_blocks()
         call get_now_time(time_end2)
         write(*,*)'Time   for   IBM   step:', (time_end2 - time_begine2)
         write(*,'(A)')' --------------------- solid solver ---------------------'

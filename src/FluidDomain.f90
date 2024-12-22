@@ -4,8 +4,8 @@ module FluidDomain
     implicit none
     private
     public:: LBMblks,LBMblksIndex,m_nblock
-    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
-             check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
+    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
+             check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force
     integer:: m_nblock, m_npsize
     type :: LBMBlock
@@ -22,6 +22,9 @@ module FluidDomain
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
         real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
         real(8), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
+        real(8), allocatable :: uuu_Fx1t1(:,:,:),uuu_Fx1t2(:,:,:),uuu_Fx2t1(:,:,:),uuu_Fx2t2(:,:,:)
+        real(8), allocatable :: uuu_Fy1t1(:,:,:),uuu_Fy1t2(:,:,:),uuu_Fy2t1(:,:,:),uuu_Fy2t2(:,:,:)
+        real(8), allocatable :: uuu_Fz1t1(:,:,:),uuu_Fz1t2(:,:,:),uuu_Fz2t1(:,:,:),uuu_Fz2t2(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
     contains
         procedure :: allocate_fluid => allocate_fluid_
@@ -31,7 +34,8 @@ module FluidDomain
         procedure :: collision => collision_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
-        procedure :: update_volumn_force => update_volumn_force_
+        procedure :: update_volume_force => update_volume_force_
+        procedure :: add_volume_force => add_volume_force_
         procedure :: write_flow => write_flow_
         procedure :: write_continue => write_continue_
         procedure :: ComputeFieldStat => ComputeFieldStat_
@@ -143,12 +147,20 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE update_volumn_force_blocks(time)
+    SUBROUTINE update_volume_force_blocks(time)
         implicit none
         real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblock
-            call LBMblks(iblock)%update_volumn_force(time)
+            call LBMblks(iblock)%update_volume_force(time)
+        enddo
+    END SUBROUTINE
+
+    SUBROUTINE add_volume_force_blocks()
+        implicit none
+        integer:: iblock
+        do iblock = 1,m_nblock
+            call LBMblks(iblock)%add_volume_force()
         enddo
     END SUBROUTINE
 
@@ -176,6 +188,12 @@ module FluidDomain
         do iblock = 1,m_nblock
             call LBMblks(iblock)%calculate_macro_quantities()
         enddo
+    END SUBROUTINE
+
+    SUBROUTINE calculate_macro_quantities_iblock(iblock)
+        implicit none
+        integer:: iblock
+        call LBMblks(iblock)%calculate_macro_quantities()
     END SUBROUTINE
 
     SUBROUTINE write_flow_blocks(time)
@@ -768,7 +786,7 @@ module FluidDomain
         !$OMP END PARALLEL DO
     END SUBROUTINE
 
-    SUBROUTINE update_volumn_force_(this,time)
+    SUBROUTINE update_volume_force_(this,time)
         implicit none
         class(LBMBlock), intent(inout) :: this
         real(8):: time
@@ -777,7 +795,7 @@ module FluidDomain
         this%volumeForce(3) = flow%volumeForceIn(3)
     END SUBROUTINE
 
-    SUBROUTINE addVolumForc_(this)
+    SUBROUTINE add_volume_force_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x
