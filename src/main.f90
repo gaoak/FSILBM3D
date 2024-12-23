@@ -132,6 +132,7 @@ PROGRAM main
             ! enddo
         endif
         call get_now_time(time_begine2)
+        call calculate_macro_quantities_blocks()
         call update_volume_force_blocks(time)
         call clear_volume_force()
         call FSInteraction_force(dt_fluid,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
