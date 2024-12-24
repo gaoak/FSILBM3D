@@ -124,7 +124,7 @@ PROGRAM main
         call update_volume_force_blocks(time)
         call calculate_macro_quantities_blocks()
         call clear_volume_force()
-        if (m_nFish .gt. 1) then
+        if (m_nFish .gt. 0) then
             call FSInteraction_force(dt_fluid,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
                                     LBMblks(m_carrierFluidId)%xDim,LBMblks(m_carrierFluidId)%yDim,LBMblks(m_carrierFluidId)%zDim,LBMblks(m_carrierFluidId)%uuu,LBMblks(m_carrierFluidId)%force)
         endif
