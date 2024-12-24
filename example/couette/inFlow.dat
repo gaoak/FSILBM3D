@@ -15,7 +15,7 @@ FlowCondition
  5.000D+0   0.050D+0   1.000D+0               read(buffer,*) Re,dt,denIn
  0.100D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) shearRateIn(1:3)
- 0.00032D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
+ 0.00016D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceAmp,volumeForceFreq,volumeForcePhi
  0          100.0D+0                          read(buffer,*) TrefType,Tref
  0          0.100D+0                          read(buffer,*) UrefType,Uref
