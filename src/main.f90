@@ -16,9 +16,9 @@ PROGRAM main
     character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
     integer:: isubstep=0,step=0
     integer:: n_pairs,n_gridDelta
-    real(8):: dt_solid, dt_fluid
+    real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
-    real(8):: time_collision,time_streaming,time_begine1,time_begine2,time_end1,time_end2
+    real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2,time_IBM_FEM
     !==================================================================================================
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
@@ -67,7 +67,6 @@ PROGRAM main
     write(*,'(A)') '========================================================='
     !==================================================================================================
     dt_fluid = flow%dt                       !time step of the fluid 
-    dt_solid = flow%dt/flow%numsubstep       !time step of the solid
     write(*,*) 'Time loop beginning'
     do while(time/flow%Tref < flow%timeSimTotal)
         call get_now_time(time_begine1)
@@ -80,9 +79,15 @@ PROGRAM main
         if(m_npairs .eq. 0) then ! single block
             time_collision = 0.d0
             time_streaming = 0.d0
-            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming)
+            time_IBM       = 0.d0
+            time_FEM       = 0.d0
+            time_IBM_FEM = time
+            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
             write(*,*)'Time for collision step:', time_collision
             write(*,*)'Time for streaming step:', time_streaming
+            write(*,*)'Time   for   IBM   step:', time_IBM
+            write(*,'(A)')' --------------------- solid solver ---------------------'
+            write(*,*)'Time   for  solid  step:', time_FEM
             ! call get_now_time(time_begine2)
             ! call collision_block(1)
             ! call get_now_time(time_end2)
@@ -95,9 +100,15 @@ PROGRAM main
         elseif(m_npairs .eq. 1) then ! two blocks
             time_collision = 0.d0
             time_streaming = 0.d0
-            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming)
+            time_IBM       = 0.d0
+            time_FEM       = 0.d0
+            time_IBM_FEM = time
+            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
             write(*,*)'Time for collision step:', time_collision
             write(*,*)'Time for streaming step:', time_streaming
+            write(*,*)'Time   for   IBM   step:', time_IBM
+            write(*,'(A)')' --------------------- solid solver ---------------------'
+            write(*,*)'Time   for  solid  step:', time_FEM
             ! call get_now_time(time_begine2)
             ! !call calculating_public_distribution(m_npairs)
             ! call collision_block(commpairs(1)%fatherId)
@@ -116,28 +127,16 @@ PROGRAM main
         elseif(m_npairs .ge. 2) then ! multi-blocks
             time_collision = 0.d0
             time_streaming = 0.d0
-            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming)
+            time_IBM       = 0.d0
+            time_FEM       = 0.d0
+            time_IBM_FEM   = time
+            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
             write(*,*)'Time for collision step:', time_collision
             write(*,*)'Time for streaming step:', time_streaming
+            write(*,*)'Time   for   IBM   step:', time_IBM
+            write(*,'(A)')' --------------------- solid solver ---------------------'
+            write(*,*)'Time   for  solid  step:', time_FEM
         endif
-        call get_now_time(time_begine2)
-        call update_volume_force_blocks(time)
-        call calculate_macro_quantities_blocks()
-        call clear_volume_force()
-        if (m_nFish .gt. 0) then
-            call FSInteraction_force(dt_fluid,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
-                                    LBMblks(m_carrierFluidId)%xDim,LBMblks(m_carrierFluidId)%yDim,LBMblks(m_carrierFluidId)%zDim,LBMblks(m_carrierFluidId)%uuu,LBMblks(m_carrierFluidId)%force)
-        endif
-        call add_volume_force_blocks()
-        call get_now_time(time_end2)
-        write(*,*)'Time   for   IBM   step:', (time_end2 - time_begine2)
-        write(*,'(A)')' --------------------- solid solver ---------------------'
-        call get_now_time(time_begine2)
-        do isubstep=1,flow%numsubstep
-            call Solver(time,isubstep,dt_fluid,dt_solid)
-        enddo !do isubstep=1,numsubstep
-        call get_now_time(time_end2)
-        write(*,*)'Time   for  solid  step:', (time_end2 - time_begine2)
         write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
