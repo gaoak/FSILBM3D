@@ -114,26 +114,15 @@ PROGRAM main
             ! call get_now_time(time_end2)
             ! write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
         elseif(m_npairs .ge. 2) then ! multi-blocks
-            ! stop 'the part has not been realized yet.'
             time_collision = 0.d0
             time_streaming = 0.d0
             call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming)
             write(*,*)'Time for collision step:', time_collision
             write(*,*)'Time for streaming step:', time_streaming
-            ! do n_pairs=2,m_npairs
-            !     call deliver_son_to_father(commpairs(n_pairs))
-            !     call collision_block(commpairs(n_pairs)%fatherId)
-            !     call streaming_block(commpairs(n_pairs)%fatherId)
-            !     do n_gridDelta=1,m_gridDelta
-            !         call interpolation_father_to_son(commpairs(n_pairs),fIn_F1,fIn_F2,dt_fluid*n_gridDelta/m_gridDelta)
-            !         call collision_block(commpairs(n_pairs)%sonId)
-            !         call streaming_block(commpairs(n_pairs)%sonId)
-            !     enddo
-            ! enddo
         endif
         call get_now_time(time_begine2)
-        call calculate_macro_quantities_blocks()
         call update_volume_force_blocks(time)
+        call calculate_macro_quantities_blocks()
         call clear_volume_force()
         call FSInteraction_force(dt_fluid,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
                                 LBMblks(m_carrierFluidId)%xDim,LBMblks(m_carrierFluidId)%yDim,LBMblks(m_carrierFluidId)%zDim,LBMblks(m_carrierFluidId)%uuu,LBMblks(m_carrierFluidId)%force)

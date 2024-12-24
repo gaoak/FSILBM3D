@@ -1138,6 +1138,6 @@ module FluidDomain
         real(8):: distributionIn(0:lbmDim),distributionOut(0:lbmDim)
         real(8):: uxyz(0:lbmDim),density,velocity(1:SpaceDim)
         uxyz(0:lbmDim) = velocity(1) * ee(0:lbmDim,1) + velocity(2) * ee(0:lbmDim,2) + velocity(3) * ee(0:lbmDim,3)
-        distributionOut(0:lbmDim) = distributionIn(0:lbmDim) + 2.0*wt(0:lbmDim)*density*uxyz(0:lbmDim)*3.0
+        distributionOut(0:lbmDim) = distributionIn(oppo(0:lbmDim)) + 2.0*wt(0:lbmDim)*density*uxyz(0:lbmDim)*3.0
         ENDSUBROUTINE
 end module FluidDomain

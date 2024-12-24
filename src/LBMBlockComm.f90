@@ -546,6 +546,9 @@ module LBMBlockComm
         xF2 = xF1 + 1
         yF2 = yF1 + 1
         zF2 = zF1 + 1
+        if (xF2 .gt. LBMblks(father)%xDim) xF2 = xF1
+        if (yF2 .gt. LBMblks(father)%yDim) yF2 = yF1
+        if (zF2 .gt. LBMblks(father)%zDim) zF2 = zF1
         if (xyz .eq. 1 .or. xyz .eq. 2) then
             a1 = yF1
             a2 = yF2
