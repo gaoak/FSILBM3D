@@ -27,13 +27,13 @@ FluidBlocks
  801        100        50                     read(buffer,*) xDim,yDim,zDim
  0.020D+0  -6.000D+0  -1.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
  101   103   301   301   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+ 0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
  2          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
- 61         61         50                     read(buffer,*) xDim,yDim,zDim
- 0.020D+0  -0.600D+0  -0.600D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
+ 1001         181         99                    read(buffer,*) xDim,yDim,zDim
+ 0.010D+0  -4.00D+0  -0.900D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
  0   0   0   0   301   301                    read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+ 0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
 ENDFluidBlocks
 SolidBody
@@ -42,7 +42,7 @@ SolidBody
  0.500D+0   1.000D+0                          read(buffer,*) NewmarkGamma,NewmarkBeta
  0.000D+0   0.000D+0                          read(buffer,*) dampK,dampM
  1.000D-6   100			                      read(buffer,*) dtolFEM,ntolFEM
- 1          1          1          1           read(buffer,*) nFish,nfishGroup,carrierFluidId,isKB
+ 1          1          2          1           read(buffer,*) nFish,nfishGroup,carrierFluidId,isKB
 # parameters for each body
  1          1          1          1           read(buffer,*) fishNum(fishGroup),FluidBlockID,numX,numY,numZ
  cylinder.dat                                 read(buffer,*) FEmeshName(iFish)
