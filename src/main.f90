@@ -88,15 +88,6 @@ PROGRAM main
             write(*,*)'Time   for   IBM   step:', time_IBM
             write(*,'(A)')' --------------------- solid solver ---------------------'
             write(*,*)'Time   for  solid  step:', time_FEM
-            ! call get_now_time(time_begine2)
-            ! call collision_block(1)
-            ! call get_now_time(time_end2)
-            ! write(*,*)'Time for collision step:', (time_end2 - time_begine2)
-            ! call get_now_time(time_begine2)
-            ! call streaming_block(1)
-            ! call get_now_time(time_end2)
-            ! call set_boundary_conditions_block(1)
-            ! write(*,*)'Time for streaming step:', (time_end2 - time_begine2) 
         elseif(m_npairs .eq. 1) then ! two blocks
             time_collision = 0.d0
             time_streaming = 0.d0
@@ -109,21 +100,6 @@ PROGRAM main
             write(*,*)'Time   for   IBM   step:', time_IBM
             write(*,'(A)')' --------------------- solid solver ---------------------'
             write(*,*)'Time   for  solid  step:', time_FEM
-            ! call get_now_time(time_begine2)
-            ! !call calculating_public_distribution(m_npairs)
-            ! call collision_block(commpairs(1)%fatherId)
-            ! call streaming_block(commpairs(1)%fatherId)
-            ! call set_boundary_conditions_block(commpairs(1)%fatherId)
-            ! call get_now_time(time_end2)
-            ! write(*,*)'Time  for  coarse block:', (time_end2 - time_begine2)
-            ! call get_now_time(time_begine2)
-            ! do n_gridDelta=1,m_gridDelta
-            !     !call blocks_interpolation(1)
-            !     call collision_block(commpairs(1)%sonId)
-            !     call streaming_block(commpairs(1)%sonId)
-            ! enddo
-            ! call get_now_time(time_end2)
-            ! write(*,*)'Time  for  finer  block:', (time_end2 - time_begine2) 
         elseif(m_npairs .ge. 2) then ! multi-blocks
             time_collision = 0.d0
             time_streaming = 0.d0
