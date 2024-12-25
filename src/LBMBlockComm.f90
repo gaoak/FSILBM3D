@@ -179,6 +179,15 @@ module LBMBlockComm
         real(8):: time,time_collision,time_streaming,time_IBM,time_FEM,time_begine2,time_end2
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
         call calculate_macro_quantities_iblock(treenode)
+        if (blockTree(treenode)%nsons .eq. 0) then
+            if (treenode .ne. m_carrierFluidId) then
+                write(*,*) 'Error: solid is not inside in smallest block. smallest bolckID = ', treenode, 'solid in blockID = ', m_carrierFluidId
+                stop
+            else
+                call IBM_FEM(time_IBM,time_FEM,time)
+                time = time + LBMblks(m_carrierFluidId)%dh
+            end if
+        endif
         ! extract interpolation layer for old time
         call extract_inner_layer(treenode,1)
         ! collision
@@ -195,15 +204,6 @@ module LBMBlockComm
         call extract_inner_layer(treenode,2)
         !set boundary
         call set_boundary_conditions_block(treenode)
-        if (blockTree(treenode)%nsons .eq. 0) then
-            if (treenode .ne. m_carrierFluidId) then
-                write(*,*) 'Error: solid is not inside in smallest block. smallest bolckID = ', treenode, 'solid in blockID = ', m_carrierFluidId
-                stop
-            else
-                call IBM_FEM(time_IBM,time_FEM,time)
-                time = time + LBMblks(m_carrierFluidId)%dh
-            end if
-        endif
         ! tree cycle
         if(blockTree(treenode)%nsons.gt.0) then
             do i=1,blockTree(treenode)%nsons
@@ -218,7 +218,7 @@ module LBMBlockComm
     endsubroutine tree_collision_streaming
 
     subroutine IBM_FEM(time_IBM,time_FEM,time)
-        use SolidBody, only: m_carrierFluidId,m_nFish
+        use SolidBody, only: m_carrierFluidId,m_nFish,Solver,FSInteraction_force
         use FlowCondition, only: flow
         implicit none
         real(8):: time,dt_solid,time_IBM,time_FEM,time_begine2,time_end2
