@@ -42,7 +42,7 @@ SolidBody
  0.500D+0   1.000D+0                          read(buffer,*) NewmarkGamma,NewmarkBeta
  0.000D+0   0.000D+0                          read(buffer,*) dampK,dampM
  1.000D-6   100			                      read(buffer,*) dtolFEM,ntolFEM
- 0          0          1          1           read(buffer,*) nFish,nfishGroup,carrierFluidId,isKB
+ 0          0          2          1           read(buffer,*) nFish,nfishGroup,carrierFluidId,isKB
 # parameters for each body
  1          1          1          1           read(buffer,*) fishNum(fishGroup),FluidBlockID,numX,numY,numZ
  cylinder.dat                                 read(buffer,*) FEmeshName(iFish)
