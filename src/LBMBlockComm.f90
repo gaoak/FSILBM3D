@@ -206,7 +206,6 @@ module LBMBlockComm
         dt_solid = LBMblks(m_carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
         call get_now_time(time_begine2)
         call update_volume_force_blocks(time)
-        call calculate_macro_quantities_blocks()
         call clear_volume_force()
         if (m_nFish .gt. 0) then
             call FSInteraction_force(LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
