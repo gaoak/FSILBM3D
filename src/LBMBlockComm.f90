@@ -172,7 +172,7 @@ module LBMBlockComm
         endif
     endsubroutine set_block_tree_nt
 
-    recursive subroutine tree_collision_streaming(treenode,time_collision,time_streaming,time_IBM,time_FEM,time)
+    recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM,time)
         use SolidBody, only: m_carrierFluidId
         implicit none
         integer:: i, s, treenode, n_timeStep
@@ -209,13 +209,13 @@ module LBMBlockComm
             do i=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%sons(i)
                 do n_timeStep=0,m_gridDelta-1! one divides intwo
-                    call tree_collision_streaming(s,time_collision,time_streaming,time_IBM,time_FEM,time)
+                    call tree_collision_streaming_IBM_FEM(s,time_collision,time_streaming,time_IBM,time_FEM,time)
                     call interpolation_father_to_son(commpairs(blockTree(treenode)%pairId(i)),n_timeStep)
                 enddo
                 call deliver_son_to_father(commpairs(blockTree(treenode)%pairId(i)))
             enddo
         endif
-    endsubroutine tree_collision_streaming
+    endsubroutine tree_collision_streaming_IBM_FEM
 
     subroutine IBM_FEM(time_IBM,time_FEM,time)
         use SolidBody, only: m_carrierFluidId,m_nFish,Solver,FSInteraction_force
@@ -223,7 +223,7 @@ module LBMBlockComm
         implicit none
         real(8):: time,dt_solid,time_IBM,time_FEM,time_begine2,time_end2
         integer:: isubstep=0
-        dt_solid = LBMblks(m_carrierFluidId)%dh/flow%numsubstep       !time step of the solid
+        dt_solid = LBMblks(m_carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
         call get_now_time(time_begine2)
         call update_volume_force_blocks(time)
         call calculate_macro_quantities_blocks()

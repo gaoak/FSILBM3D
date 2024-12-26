@@ -1,5 +1,5 @@
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    copyright@ RuNanHua
+!    copyright@ An-Kang Gao
 !    The main program, 3D Lattice Boltzmann Method
 !    flow past a flexible plate (uniform flow past a flag or flapping plate, and so on)
 !    flexible Plates or shells move in fluid.
@@ -76,43 +76,17 @@ PROGRAM main
         write(*,'(A,I6,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
-        if(m_npairs .eq. 0) then ! single block
-            time_collision = 0.d0
-            time_streaming = 0.d0
-            time_IBM       = 0.d0
-            time_FEM       = 0.d0
-            time_IBM_FEM = time
-            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
-            write(*,*)'Time for collision step:', time_collision
-            write(*,*)'Time for streaming step:', time_streaming
-            write(*,*)'Time   for   IBM   step:', time_IBM
-            write(*,'(A)')' --------------------- solid solver ---------------------'
-            write(*,*)'Time   for  solid  step:', time_FEM
-        elseif(m_npairs .eq. 1) then ! two blocks
-            time_collision = 0.d0
-            time_streaming = 0.d0
-            time_IBM       = 0.d0
-            time_FEM       = 0.d0
-            time_IBM_FEM = time
-            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
-            write(*,*)'Time for collision step:', time_collision
-            write(*,*)'Time for streaming step:', time_streaming
-            write(*,*)'Time   for   IBM   step:', time_IBM
-            write(*,'(A)')' --------------------- solid solver ---------------------'
-            write(*,*)'Time   for  solid  step:', time_FEM
-        elseif(m_npairs .ge. 2) then ! multi-blocks
-            time_collision = 0.d0
-            time_streaming = 0.d0
-            time_IBM       = 0.d0
-            time_FEM       = 0.d0
-            time_IBM_FEM   = time
-            call tree_collision_streaming(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
-            write(*,*)'Time for collision step:', time_collision
-            write(*,*)'Time for streaming step:', time_streaming
-            write(*,*)'Time   for   IBM   step:', time_IBM
-            write(*,'(A)')' --------------------- solid solver ---------------------'
-            write(*,*)'Time   for  solid  step:', time_FEM
-        endif
+        time_collision = 0.d0
+        time_streaming = 0.d0
+        time_IBM       = 0.d0
+        time_FEM       = 0.d0
+        time_IBM_FEM = time
+        call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
+        write(*,*)'Time for collision step:', time_collision
+        write(*,*)'Time for streaming step:', time_streaming
+        write(*,*)'Time   for   IBM   step:', time_IBM
+        write(*,'(A)')' --------------------- solid solver ---------------------'
+        write(*,*)'Time   for  solid  step:', time_FEM
         write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
