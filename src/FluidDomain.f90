@@ -26,6 +26,7 @@ module FluidDomain
         real(8), allocatable :: uuu_Fy1t1(:,:,:),uuu_Fy2t1(:,:,:)
         real(8), allocatable :: uuu_Fz1t1(:,:,:),uuu_Fz2t1(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
+        real(8) :: blktime
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_

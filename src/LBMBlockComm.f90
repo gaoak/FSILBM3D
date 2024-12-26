@@ -152,22 +152,24 @@ module LBMBlockComm
         enddo
     endsubroutine bluid_block_tree
 
-    recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM,time)
+    recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM)
         use SolidBody, only: m_carrierFluidId
         implicit none
         integer:: i, s, treenode, n_timeStep
-        real(8):: time,time_collision,time_streaming,time_IBM,time_FEM,time_begine2,time_end2
+        real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine2,time_end2
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
-        call calculate_macro_quantities_iblock(treenode)
+        call LBMblks(treenode)%calculate_macro_quantities()
+        call LBMblks(treenode)%update_volume_force(LBMblks(treenode)%blktime)
+        call LBMblks(treenode)%ResetVolumeForce()
         if (blockTree(treenode)%nsons .eq. 0) then
             if (treenode .ne. m_carrierFluidId) then
                 write(*,*) 'Error: solid is not inside in smallest block. smallest bolckID = ', treenode, 'solid in blockID = ', m_carrierFluidId
                 stop
             else
-                call IBM_FEM(time_IBM,time_FEM,time)
-                time = time + LBMblks(m_carrierFluidId)%dh
-            end if
+                call IBM_FEM(time_IBM,time_FEM,LBMblks(m_carrierFluidId)%blktime)
+            endif
         endif
+        call LBMblks(treenode)%add_volume_force()
         ! extract interpolation layer for old time
         call extract_inner_layer(treenode,1)
         ! collision
@@ -189,7 +191,8 @@ module LBMBlockComm
             do i=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%sons(i)
                 do n_timeStep=0,m_gridDelta-1! one divides intwo
-                    call tree_collision_streaming_IBM_FEM(s,time_collision,time_streaming,time_IBM,time_FEM,time)
+                    LBMblks(s)%blktime = LBMblks(s)%blktime + dble(n_timeStep) * LBMblks(s)%dh
+                    call tree_collision_streaming_IBM_FEM(s,time_collision,time_streaming,time_IBM,time_FEM)
                     call interpolation_father_to_son(commpairs(blockTree(treenode)%pairId(i)),n_timeStep)
                 enddo
                 call deliver_son_to_father(commpairs(blockTree(treenode)%pairId(i)))
@@ -205,13 +208,10 @@ module LBMBlockComm
         integer:: isubstep=0
         dt_solid = LBMblks(m_carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
         call get_now_time(time_begine2)
-        call update_volume_force_blocks(time)
-        call clear_volume_force()
         if (m_nFish .gt. 0) then
             call FSInteraction_force(LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%dh,LBMblks(m_carrierFluidId)%xmin,LBMblks(m_carrierFluidId)%ymin,LBMblks(m_carrierFluidId)%zmin, &
                                     LBMblks(m_carrierFluidId)%xDim,LBMblks(m_carrierFluidId)%yDim,LBMblks(m_carrierFluidId)%zDim,LBMblks(m_carrierFluidId)%uuu,LBMblks(m_carrierFluidId)%force)
         endif
-        call add_volume_force_blocks()
         call get_now_time(time_end2)
         time_IBM = time_IBM + (time_end2 - time_begine2)
         call get_now_time(time_begine2)

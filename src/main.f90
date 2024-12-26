@@ -66,12 +66,13 @@ PROGRAM main
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================='
     !==================================================================================================
-    dt_fluid = flow%dt                       !time step of the fluid 
+    dt_fluid = LBMblks(blockTreeRoot)%dh                       !time step of the fluid 
     write(*,*) 'Time loop beginning'
     do while(time/flow%Tref < flow%timeSimTotal)
         call get_now_time(time_begine1)
         time = time + dt_fluid
         step = step + 1
+        LBMblks(:)%blktime = time
         write(*,'(A)') '========================================================='
         write(*,'(A,I6,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
         write(*,'(A)')' --------------------- fluid solver ---------------------'
