@@ -3,21 +3,28 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
-    integer :: m_nblock, m_npsize
-    public:: LBMblks,LBMblksIndex,read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,initialise_fuild_blocks, &
-             check_is_continue,update_volumn_force_blocks,write_flow_blocks,set_boundary_conditions_blocks,collision_blocks, &
-             write_continue_blocks,streaming_blocks,computeFieldStat_blocks,Clear_VolumeForce
+    public:: LBMblks,LBMblksIndex,m_nblock
+    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
+             check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
+             write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force
+    integer:: m_nblock, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
         integer :: xDim,yDim,zDim
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
         integer :: BndConds(1:6)
-        real(8) :: params(1:10),Omega,Omega2 ! single time, two time relaxation
+        real(8) :: params(1:10),tau,Omega,Omega2 ! single time, two time relaxation
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
+        real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
+        real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
+        real(8), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
+        real(8), allocatable :: uuu_Fx1t1(:,:,:),uuu_Fx2t1(:,:,:)
+        real(8), allocatable :: uuu_Fy1t1(:,:,:),uuu_Fy2t1(:,:,:)
+        real(8), allocatable :: uuu_Fz1t1(:,:,:),uuu_Fz2t1(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
     contains
         procedure :: allocate_fluid => allocate_fluid_
@@ -27,7 +34,8 @@ module FluidDomain
         procedure :: collision => collision_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
-        procedure :: update_volumn_force => update_volumn_force_
+        procedure :: update_volume_force => update_volume_force_
+        procedure :: add_volume_force => add_volume_force_
         procedure :: write_flow => write_flow_
         procedure :: write_continue => write_continue_
         procedure :: ComputeFieldStat => ComputeFieldStat_
@@ -35,7 +43,6 @@ module FluidDomain
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
     integer,allocatable:: LBMblksIndex(:)
-
     contains
 
     SUBROUTINE read_fuild_blocks(filename)
@@ -112,7 +119,7 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE Clear_VolumeForce()
+    SUBROUTINE clear_volume_force()
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock
@@ -129,14 +136,6 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE set_boundary_conditions_blocks()
-        implicit none
-        integer:: iblock
-        do iblock = 1,m_nblock
-            call LBMblks(iblock)%set_boundary_conditions()
-        enddo
-    END SUBROUTINE
-
     SUBROUTINE write_continue_blocks(filename,step,time)
         implicit none
         character(LEN=40),intent(in):: filename
@@ -148,29 +147,39 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE update_volumn_force_blocks(time)
+    SUBROUTINE update_volume_force_blocks(time)
         implicit none
         real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblock
-            call LBMblks(iblock)%update_volumn_force(time)
+            call LBMblks(iblock)%update_volume_force(time)
         enddo
     END SUBROUTINE
 
-    SUBROUTINE streaming_blocks()
+    SUBROUTINE add_volume_force_blocks()
         implicit none
         integer:: iblock
         do iblock = 1,m_nblock
-            call LBMblks(iblock)%streaming()
+            call LBMblks(iblock)%add_volume_force()
         enddo
     END SUBROUTINE
 
-    SUBROUTINE collision_blocks()
+    SUBROUTINE streaming_block(nblock)
         implicit none
-        integer:: iblock
-        do iblock = 1,m_nblock
-            call LBMblks(iblock)%collision()
-        enddo
+        integer:: nblock
+        call LBMblks(nblock)%streaming()
+    END SUBROUTINE
+
+    SUBROUTINE collision_block(nblock)
+        implicit none
+        integer:: nblock
+        call LBMblks(nblock)%collision()
+    END SUBROUTINE
+
+    SUBROUTINE set_boundary_conditions_block(nblock)
+        implicit none
+        integer:: nblock
+        call LBMblks(nblock)%set_boundary_conditions()
     END SUBROUTINE
 
     SUBROUTINE calculate_macro_quantities_blocks()
@@ -179,6 +188,12 @@ module FluidDomain
         do iblock = 1,m_nblock
             call LBMblks(iblock)%calculate_macro_quantities()
         enddo
+    END SUBROUTINE
+
+    SUBROUTINE calculate_macro_quantities_iblock(iblock)
+        implicit none
+        integer:: iblock
+        call LBMblks(iblock)%calculate_macro_quantities()
     END SUBROUTINE
 
     SUBROUTINE write_flow_blocks(time)
@@ -276,9 +291,8 @@ module FluidDomain
 
         SUBROUTINE calculate_SRT_params()
             implicit none
-            real(8):: tau
-            tau   =  flow%nu/(this%dh*Cs2)+0.5d0
-            this%Omega =  1.0d0 / tau
+            this%tau = flow%nu/(this%dh*Cs2)+0.5d0
+            this%Omega =  1.0d0 / this%tau
         END SUBROUTINE calculate_SRT_params
 
         SUBROUTINE calculate_TRT_params(lambda)
@@ -772,7 +786,7 @@ module FluidDomain
         !$OMP END PARALLEL DO
     END SUBROUTINE
 
-    SUBROUTINE update_volumn_force_(this,time)
+    SUBROUTINE update_volume_force_(this,time)
         implicit none
         class(LBMBlock), intent(inout) :: this
         real(8):: time
@@ -781,7 +795,7 @@ module FluidDomain
         this%volumeForce(3) = flow%volumeForceIn(3)
     END SUBROUTINE
 
-    SUBROUTINE addVolumForc_(this)
+    SUBROUTINE add_volume_force_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x
@@ -1124,6 +1138,6 @@ module FluidDomain
         real(8):: distributionIn(0:lbmDim),distributionOut(0:lbmDim)
         real(8):: uxyz(0:lbmDim),density,velocity(1:SpaceDim)
         uxyz(0:lbmDim) = velocity(1) * ee(0:lbmDim,1) + velocity(2) * ee(0:lbmDim,2) + velocity(3) * ee(0:lbmDim,3)
-        distributionOut(0:lbmDim) = distributionIn(0:lbmDim) + 2.0*wt(0:lbmDim)*density*uxyz(0:lbmDim)*3.0
+        distributionOut(0:lbmDim) = distributionIn(oppo(0:lbmDim)) + 2.0*wt(0:lbmDim)*density*uxyz(0:lbmDim)*3.0
         ENDSUBROUTINE
 end module FluidDomain

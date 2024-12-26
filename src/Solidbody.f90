@@ -4,8 +4,8 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
-    public :: m_nFish
-    integer:: m_nFish, m_ntolLBM
+    public :: m_nFish,m_carrierFluidId
+    integer:: m_nFish, m_carrierFluidId,m_ntolLBM
     real(8):: m_dtolLBM, m_IBPenaltyAlpha, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
@@ -92,7 +92,7 @@ module SolidBody
         call readNextData(111, buffer)
         read(buffer,*)    dtolFEM,ntolFEM
         call readNextData(111, buffer)
-        read(buffer,*)    m_nFish,nfishGroup,isKB
+        read(buffer,*)    m_nFish,nfishGroup,m_carrierFluidId,isKB
         if(m_IBPenaltyAlpha.le.1.d-6) then
             write(*,*) 'ERROR: IBPenaltyalpha should be positive (default 1)', m_IBPenaltyAlpha
             stop
@@ -259,21 +259,28 @@ module SolidBody
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
             write(*,*)'read FEMeshFile ',iFish,' end' 
         enddo
-        !Use the object with the largest area as the reference object
-        maxN  = maxloc(nAsfac, dim=1)
-        Asfac = nAsfac(maxN)
-        Lchod = nLchod(maxN)
-        if (VBodies(maxN)%v_type .eq. 1) then
-            Lspan = sum(VBodies(maxN)%rbm%r_Lspan(:)+VBodies(maxN)%rbm%r_Rspan(:))/dble(VBodies(maxN)%rbm%nND)
+        if (m_nFish .gt. 0) then
+            !Use the object with the largest area as the reference object
+            maxN  = maxloc(nAsfac, dim=1)
+            Asfac = nAsfac(maxN)
+            Lchod = nLchod(maxN)
+            if (VBodies(maxN)%v_type .eq. 1) then
+                Lspan = sum(VBodies(maxN)%rbm%r_Lspan(:)+VBodies(maxN)%rbm%r_Rspan(:))/dble(VBodies(maxN)%rbm%nND)
+            else
+                Lspan = maxval(VBodies(maxN)%rbm%xyzful00(:,3))-minval(VBodies(maxN)%rbm%xyzful00(:,3))
+            endif
+            if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
+            if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
+            if (VBodies(maxN)%v_type .eq. 1) then
+                AR    = Lspan**2/Asfac
+            else
+                AR    = 1.d0
+            endif
         else
-            Lspan = maxval(VBodies(maxN)%rbm%xyzful00(:,3))-minval(VBodies(maxN)%rbm%xyzful00(:,3))
-        endif
-        if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
-        if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
-        if (VBodies(maxN)%v_type .eq. 1) then
-            AR    = Lspan**2/Asfac
-        else
-            AR    = 1.d0
+            Asfac = 0.d0
+            Lchod = 0.d0
+            Lspan = 0.d0
+            AR = 0.d0
         endif
     end subroutine allocate_solid_memory
 
@@ -737,20 +744,22 @@ module SolidBody
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
-        ! calculate interaction force using immersed-boundary method
-        iterLBM=0
-        dmaxLBM=1d10
-        do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
-            dmaxLBM = 0.d0
-            dsum=0.0d0
-            do iFish=1,m_nFish
-                call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
-                dmaxLBM = dmaxLBM + tol
-                dsum = dsum + ntol
+        if (m_nFish .gt. 0) then
+            ! calculate interaction force using immersed-boundary method
+            iterLBM=0
+            dmaxLBM=1d10
+            do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
+                dmaxLBM = 0.d0
+                dsum=0.0d0
+                do iFish=1,m_nFish
+                    call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
+                    dmaxLBM = dmaxLBM + tol
+                    dsum = dsum + ntol
+                enddo
+                dmaxLBM=dmaxLBM/(dsum * m_Uref)
+                iterLBM=iterLBM+1
             enddo
-            dmaxLBM=dmaxLBM/(dsum * m_Uref)
-            iterLBM=iterLBM+1
-        enddo
+        endif
         ! update body load and fluid force
         do iFish=1,m_nFish
             VBodies(iFish)%rbm%extful = 0.0d0
