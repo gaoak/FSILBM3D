@@ -18,7 +18,7 @@ PROGRAM main
     integer:: n_pairs,n_gridDelta
     real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
-    real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2,time_IBM_FEM
+    real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
@@ -81,8 +81,7 @@ PROGRAM main
         time_streaming = 0.d0
         time_IBM       = 0.d0
         time_FEM       = 0.d0
-        time_IBM_FEM = time
-        call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
+        call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
         call calculate_macro_quantities_blocks()
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming

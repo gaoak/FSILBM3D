@@ -12,7 +12,7 @@ FlowCondition
  0.020D+0   1.000D+0                          read(buffer,*) timeSimTotal,timeContiDelta
  0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
  0.020D+0   0.020D+0   0.010D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
- 40.00D+0   0.020D+0   1.000D+0               read(buffer,*) Re,dt,denIn
+ 40.00D+0   0.040D+0   1.000D+0               read(buffer,*) Re,dt,denIn
  0.010D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) shearRateIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
@@ -24,14 +24,14 @@ ENDFlowCondition
 FluidBlocks
  2                                            read(buffer,*) nblock (should be npairs + 1)
  1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
- 801        100        50                     read(buffer,*) xDim,yDim,zDim
- 0.020D+0  -6.000D+0  -1.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
+ 401        50        25                     read(buffer,*) xDim,yDim,zDim
+ 0.040D+0  -6.000D+0  -1.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
  101   103   301   301   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
  2          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
- 1001         181         99                    read(buffer,*) xDim,yDim,zDim
- 0.010D+0  -4.00D+0  -0.900D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
+ 501         91         49                    read(buffer,*) xDim,yDim,zDim
+ 0.020D+0  -4.00D+0  -0.920D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
  0   0   0   0   301   301                    read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
