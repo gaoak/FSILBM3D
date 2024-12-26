@@ -150,27 +150,7 @@ module LBMBlockComm
             blockTree(f)%sons(ns(f)) = s
             blockTree(f)%pairId(ns(f)) = i
         enddo
-        ! set tree n times
-        call set_block_tree_nt(blockTreeRoot, 1)
     endsubroutine bluid_block_tree
-
-    recursive subroutine set_block_tree_nt(treenode, nt)
-        implicit none
-        integer:: i, n, s, treenode, nt
-        if(blockTree(treenode)%nsons.eq.0) then
-            blockTree(treenode)%nt = nt
-        else
-            do i=1,blockTree(treenode)%nsons
-                s = blockTree(treenode)%sons(i)
-                if(dabs(LBMblks(treenode)%dh / LBMblks(s)%dh - 1.) .lt. 1d-6) then
-                    call set_block_tree_nt(s, nt)
-                    write(*,*) 'Warning: imbeded grid with the same grid size is not suggested'
-                else
-                    call set_block_tree_nt(s, 2*nt)
-                endif
-            enddo
-        endif
-    endsubroutine set_block_tree_nt
 
     recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM,time)
         use SolidBody, only: m_carrierFluidId
@@ -304,80 +284,80 @@ module LBMBlockComm
         endif
     endsubroutine
 
-    SUBROUTINE ExchangeFluidInterface()
-        implicit none
-        integer:: ip
-        ! allocate and read commpairs from file
-        do ip = 1,m_npairs
-            call ExchangeDataSerial(commpairs(ip))
-        enddo
-    end subroutine ExchangeFluidInterface
+    ! SUBROUTINE ExchangeFluidInterface()
+    !     implicit none
+    !     integer:: ip
+    !     ! allocate and read commpairs from file
+    !     do ip = 1,m_npairs
+    !         call ExchangeDataSerial(commpairs(IP))
+    !     enddo
+    ! end subroutine ExchangeFluidInterface
 
-    SUBROUTINE ExchangeDataSerial(pair)
-        use FluidDomain
-        implicit none
-        type(CommPair),intent(in):: pair
-        integer:: s(1:6),f(1:6),si(1:6),fi(1:6)
-        ! x direction
-        s = pair%s
-        f = pair%f
-        si = pair%si
-        fi = pair%fi
-        if(pair%sds(1).eq.1) then
-            LBMblks(pair%sonId)%fIn(s(5):s(6),s(3):s(4),s(1),0:lbmDim) =&
-                LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3):f(4),f(1),0:lbmDim)
-            LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3):fi(4),fi(1),0:lbmDim) =&
-                LBMblks(pair%sonId)%fIn(si(5):si(6),si(3):si(4),si(1),0:lbmDim)
-        endif
-        if(pair%sds(2).eq.-1) then
-            LBMblks(pair%sonId)%fIn(s(5):s(6),s(3):s(4),s(2),0:lbmDim) =&
-                LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3):f(4),f(2),0:lbmDim)
-            LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3):fi(4),fi(2),0:lbmDim) =&
-                LBMblks(pair%sonId)%fIn(si(5):si(6),si(3):si(4),si(2),0:lbmDim)
-        endif
-        ! y direction
-        if(pair%sds(3).eq.1) then
-            LBMblks(pair%sonId)%fIn(s(5):s(6),s(3),s(1):s(2),0:lbmDim) =&
-                LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3),f(1):f(2),0:lbmDim)
-            LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3),fi(1):fi(2),0:lbmDim) =&
-                LBMblks(pair%sonId)%fIn(si(5):si(6),si(3),si(1):si(2),0:lbmDim)
-        endif
-        if(pair%sds(4).eq.-1) then
-            LBMblks(pair%sonId)%fIn(s(5):s(6),s(4),s(1):s(2),0:lbmDim) =&
-                LBMblks(pair%fatherId)%fIn(f(5):f(6),f(4),f(1):f(2),0:lbmDim)
-            LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(4),fi(1):fi(2),0:lbmDim) =&
-                LBMblks(pair%sonId)%fIn(si(5):si(6),si(4),si(1):si(2),0:lbmDim)
-        endif
-        ! z direction
-        if(pair%sds(5).eq.1) then
-            LBMblks(pair%sonId)%fIn(s(5),s(3):s(4),s(1):s(2),0:lbmDim) =&
-                LBMblks(pair%fatherId)%fIn(f(5),f(3):f(4),f(1):f(2),0:lbmDim)
-            LBMblks(pair%fatherId)%fIn(fi(5),fi(3):fi(4),fi(1):fi(2),0:lbmDim) =&
-                LBMblks(pair%sonId)%fIn(si(5),si(3):si(4),si(1):si(2),0:lbmDim)
-        endif
-        if(pair%sds(6).eq.-1) then
-            LBMblks(pair%sonId)%fIn(s(6),s(3):s(4),s(1):s(2),0:lbmDim) =&
-                LBMblks(pair%fatherId)%fIn(f(6),f(3):f(4),f(1):f(2),0:lbmDim)
-            LBMblks(pair%fatherId)%fIn(fi(6),fi(3):fi(4),fi(1):fi(2),0:lbmDim) =&
-                LBMblks(pair%sonId)%fIn(si(6),si(3):si(4),si(1):si(2),0:lbmDim)
-        endif
-    end subroutine ExchangeDataSerial
+    ! SUBROUTINE ExchangeDataSerial(pair)
+    !     use FluidDomain
+    !     implicit none
+    !     type(CommPair),intent(in):: pair
+    !     integer:: s(1:6),f(1:6),si(1:6),fi(1:6)
+    !     ! x direction
+    !     s = pair%s
+    !     f = pair%f
+    !     si = pair%si
+    !     fi = pair%fi
+    !     if(pair%sds(1).eq.1) then
+    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(3):s(4),s(1),0:lbmDim) =&
+    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3):f(4),f(1),0:lbmDim)
+    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3):fi(4),fi(1),0:lbmDim) =&
+    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(3):si(4),si(1),0:lbmDim)
+    !     endif
+    !     if(pair%sds(2).eq.-1) then
+    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(3):s(4),s(2),0:lbmDim) =&
+    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3):f(4),f(2),0:lbmDim)
+    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3):fi(4),fi(2),0:lbmDim) =&
+    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(3):si(4),si(2),0:lbmDim)
+    !     endif
+    !     ! y direction
+    !     if(pair%sds(3).eq.1) then
+    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(3),s(1):s(2),0:lbmDim) =&
+    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3),f(1):f(2),0:lbmDim)
+    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3),fi(1):fi(2),0:lbmDim) =&
+    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(3),si(1):si(2),0:lbmDim)
+    !     endif
+    !     if(pair%sds(4).eq.-1) then
+    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(4),s(1):s(2),0:lbmDim) =&
+    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(4),f(1):f(2),0:lbmDim)
+    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(4),fi(1):fi(2),0:lbmDim) =&
+    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(4),si(1):si(2),0:lbmDim)
+    !     endif
+    !     ! z direction
+    !     if(pair%sds(5).eq.1) then
+    !         LBMblks(pair%sonId)%fIn(s(5),s(3):s(4),s(1):s(2),0:lbmDim) =&
+    !             LBMblks(pair%fatherId)%fIn(f(5),f(3):f(4),f(1):f(2),0:lbmDim)
+    !         LBMblks(pair%fatherId)%fIn(fi(5),fi(3):fi(4),fi(1):fi(2),0:lbmDim) =&
+    !             LBMblks(pair%sonId)%fIn(si(5),si(3):si(4),si(1):si(2),0:lbmDim)
+    !     endif
+    !     if(pair%sds(6).eq.-1) then
+    !         LBMblks(pair%sonId)%fIn(s(6),s(3):s(4),s(1):s(2),0:lbmDim) =&
+    !             LBMblks(pair%fatherId)%fIn(f(6),f(3):f(4),f(1):f(2),0:lbmDim)
+    !         LBMblks(pair%fatherId)%fIn(fi(6),fi(3):fi(4),fi(1):fi(2),0:lbmDim) =&
+    !             LBMblks(pair%sonId)%fIn(si(6),si(3):si(4),si(1):si(2),0:lbmDim)
+    !     endif
+    ! end subroutine ExchangeDataSerial
         
-    SUBROUTINE calculate_blocks_tau(flow_nu)
-        ! ensure the Reynolds numbers of each block are the same
-        implicit none
-        integer:: i,nblock
-        real(8):: flow_nu
-        if(m_npairs .eq. 0) then
-            ! no need to set
-        elseif(m_npairs .ge. 1) then
-            do i=1,m_npairs
-                LBMblks(commpairs(i)%sonId)%tau = 0.50d0 + dble(m_gridDelta) *(LBMblks(commpairs(i)%fatherId)%tau - 0.50d0)
-            enddo
-        else
-            stop 'wrong block pairs (npairs) input'
-        endif
-    END SUBROUTINE
+    ! SUBROUTINE calculate_blocks_tau(flow_nu)
+    !     ! ensure the Reynolds numbers of each block are the same
+    !     implicit none
+    !     integer:: i,block
+    !     real(8):: flow_nu
+    !     if(m_npairs .eq. 0) then
+    !         ! no need to set
+    !     elseif(m_npairs .ge. 1) then
+    !         do i=1,m_npairs
+    !             LBMblks(commpairs(i)%sonId)%tau = 0.50d0 + dble(m_gridDelta) *(LBMblks(commpairs(i)%fatherId)%tau - 0.50d0)
+    !         enddo
+    !     else
+    !         stop 'wrong block pairs (npairs) input'
+    !     endif
+    ! END SUBROUTINE
 
     ! verify the parameters of fluid blocks
     SUBROUTINE check_blocks_params(nblock)
