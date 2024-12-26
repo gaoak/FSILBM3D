@@ -82,6 +82,7 @@ PROGRAM main
         time_FEM       = 0.d0
         time_IBM_FEM = time
         call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
+        call calculate_macro_quantities_blocks()
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming
         write(*,*)'Time   for   IBM   step:', time_IBM
