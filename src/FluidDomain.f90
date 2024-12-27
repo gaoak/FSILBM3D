@@ -70,7 +70,7 @@ module FluidDomain
             read(buffer,*)    LBMblks(iblock)%BndConds(1:6)
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%params(1:10)
-            call readequal(111)
+            if(iblock.lt.m_nblock) call readequal(111)
             LBMblksIndex(LBMblks(iblock)%ID) = iblock
             ! check bounds
             if (LBMblks(iblock)%xDim.gt.32767 .or. LBMblks(iblock)%yDim.gt.32767 .or. LBMblks(iblock)%zDim.gt.32767) then

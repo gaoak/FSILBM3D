@@ -143,7 +143,7 @@ module SolidBody
             read(buffer,*)    t_AoAAmpl(1:3)
             call readNextData(111, buffer)
             read(buffer,*)    t_AoAPhi(1:3)
-            call readequal(111)
+            if(ifishGroup .lt. nfishGroup) call readequal(111)
             order1 = order1 + fishNum(ifishGroup  );
             order2 = order2 + fishNum(ifishGroup+1);
             ! read parameters for each fish
