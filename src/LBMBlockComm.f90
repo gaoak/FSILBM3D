@@ -144,15 +144,15 @@ module LBMBlockComm
 
     subroutine bluid_block_tree()
         implicit none
-        integer:: i,f,s,ns(1:m_nblock),iblocks(1:m_nblock),nb
+        integer:: i,f,s,ns(1:m_nblocks),iblocks(1:m_nblocks),nb
         ! initialise blocktree
-        allocate(blockTree(1:m_nblock))
-        do i=1,m_nblock
+        allocate(blockTree(1:m_nblocks))
+        do i=1,m_nblocks
             blockTree(i)%fatherId = 0
             blockTree(i)%nsons = 0
             iblocks = i
         enddo
-        nb = m_nblock
+        nb = m_nblocks
         call findremove_blockTreeRoot(iblocks,nb,blockTreeRoot)
         call array_to_tree(iblocks,nb,blockTreeRoot)
         call build_blocks_comunication(blockTreeRoot)

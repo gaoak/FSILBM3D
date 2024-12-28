@@ -3,12 +3,12 @@ module FluidDomain
     use FlowCondition
     implicit none
     private
-    public:: LBMblks,LBMblksIndex,m_nblock
+    public:: LBMblks,LBMblksIndex,m_nblocks
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
-             CompareBlocks
-    integer:: m_nblock, m_npsize
+             CompareBlocks,FindCarrierFluidBlock
+    integer:: m_nblocks, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
         integer :: xDim,yDim,zDim
@@ -58,9 +58,9 @@ module FluidDomain
         keywordstr = 'FluidBlocks'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(buffer,*) m_nblock
-        allocate(LBMblks(m_nblock),LBMblksIndex(m_nblock))
-        do iblock = 1,m_nblock
+        read(buffer,*) m_nblocks
+        allocate(LBMblks(m_nblocks),LBMblksIndex(m_nblocks))
+        do iblock = 1,m_nblocks
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput,LBMblks(iblock)%isoutput
             call readNextData(111, buffer)
@@ -71,7 +71,7 @@ module FluidDomain
             read(buffer,*)    LBMblks(iblock)%BndConds(1:6)
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%params(1:10)
-            if(iblock.lt.m_nblock) call readequal(111)
+            if(iblock.lt.m_nblocks) call readequal(111)
             LBMblksIndex(LBMblks(iblock)%ID) = iblock
             ! check bounds
             if (LBMblks(iblock)%xDim.gt.32767 .or. LBMblks(iblock)%yDim.gt.32767 .or. LBMblks(iblock)%zDim.gt.32767) then
@@ -99,7 +99,7 @@ module FluidDomain
             write(*,'(A)') '========================================================='
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
-            do iblock = 1,m_nblock
+            do iblock = 1,m_nblocks
                 call LBMblks(iblock)%read_continue(filename,step,time)
             enddo
         else
@@ -116,7 +116,7 @@ module FluidDomain
         integer,intent(in):: npsize
         integer:: iblock
         m_npsize = npsize
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%allocate_fluid()
         enddo
     END SUBROUTINE
@@ -124,7 +124,7 @@ module FluidDomain
     SUBROUTINE clear_volume_force()
         implicit none
         integer:: iblock
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%ResetVolumeForce()
         enddo
     END SUBROUTINE
@@ -133,7 +133,7 @@ module FluidDomain
         implicit none
         real(8),intent(in):: time
         integer:: iblock
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%initialise(time)
         enddo
     END SUBROUTINE
@@ -144,7 +144,7 @@ module FluidDomain
         integer:: step
         real(8):: time
         integer:: iblock
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%write_continue(filename,step,time)
         enddo
     END SUBROUTINE
@@ -152,7 +152,7 @@ module FluidDomain
     SUBROUTINE update_volume_force_blocks()
         implicit none
         integer:: iblock
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%update_volume_force()
         enddo
     END SUBROUTINE
@@ -160,7 +160,7 @@ module FluidDomain
     SUBROUTINE add_volume_force_blocks()
         implicit none
         integer:: iblock
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%add_volume_force()
         enddo
     END SUBROUTINE
@@ -186,7 +186,7 @@ module FluidDomain
     SUBROUTINE calculate_macro_quantities_blocks()
         implicit none
         integer:: iblock
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%calculate_macro_quantities()
         enddo
     END SUBROUTINE
@@ -203,7 +203,7 @@ module FluidDomain
         integer:: iblock
         real(8):: waittime,time_begine,time_end
         call get_now_time(time_begine)
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call mywait()
         enddo
         call get_now_time(time_end)
@@ -211,7 +211,7 @@ module FluidDomain
         if(waittime.gt.1.d-1) then
             write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
         endif
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%write_flow(time)
         enddo
     END SUBROUTINE
@@ -219,7 +219,7 @@ module FluidDomain
     SUBROUTINE computeFieldStat_blocks()
         implicit none
         integer:: iblock
-        do iblock = 1,m_nblock
+        do iblock = 1,m_nblocks
             call LBMblks(iblock)%ComputeFieldStat()
         enddo
     END SUBROUTINE
@@ -1192,4 +1192,37 @@ module FluidDomain
             stop
         endif
     end function CompareBlocks
+
+    subroutine find_carrier_fluidblock(x, n)
+        implicit none
+        real(8)::x(1:SpaceDim)
+        integer,intent(out):: n
+        integer::i
+        real(8)::dh
+        dh = 1.d10
+        n = -1
+        do i=1,m_nblocks
+            if( LBMblks(i)%xmin.lt.x(1) .and. x(1).lt.LBMblks(i)%xmax .and. &
+                LBMblks(i)%ymin.lt.x(2) .and. x(2).lt.LBMblks(i)%ymax .and. &
+                LBMblks(i)%zmin.lt.x(3) .and. x(3).lt.LBMblks(i)%zmax) then
+                if(LBMblks(i)%dh .lt. dh) then
+                    dh = LBMblks(i)%dh
+                    n = i
+                endif
+            endif
+        enddo
+        if(n.eq.-1) then
+            write(*,*) 'Error: carrier fluid block not found', x
+            stop
+        endif
+    end subroutine
+
+    subroutine FindCarrierFluidBlock()
+        use SolidBody, only: m_nFish,VBodies
+        implicit none
+        integer:: i
+        do i=1,m_nFish
+            call find_carrier_fluidblock(VBodies(i)%v_Exyz(1:3,1), VBodies(i)%v_carrierFluidId)
+        enddo
+    end subroutine
 end module FluidDomain

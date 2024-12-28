@@ -43,10 +43,11 @@ PROGRAM main
     !==================================================================================================
     ! Initialization before simulation
     call initialise_solid_bodies(0.d0, g)
+    call FindCarrierFluidBlock()
     call initialise_fuild_blocks(time)
     !==================================================================================================
     ! Check blocks number and calculate the tau of each block
-    call check_blocks_params(m_nblock)
+    call check_blocks_params(m_nblocks)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)
