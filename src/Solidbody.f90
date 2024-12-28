@@ -70,7 +70,6 @@ module SolidBody
         integer:: nfishGroup,isKB,ntolFEM
         integer:: iFish,ifishGroup,numX,numY,numZ
         character(LEN=40) :: t_FEmeshName,keywordstr
-        integer:: t_carrierFluidId
         integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
         real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
         real(8):: t_freq,firstXYZ(1:3),deltaXYZ(1:3)
@@ -78,7 +77,7 @@ module SolidBody
         integer:: order1=0,order2=0,order3=0,lineX,lineY,lineZ
         character(LEN=40),allocatable:: FEmeshName(:)
         integer,allocatable:: fishNum(:)
-        integer,allocatable:: carrierFluidId(:),iBodyModel(:),iBodyType(:),isMotionGiven(:,:)
+        integer,allocatable:: iBodyModel(:),iBodyType(:),isMotionGiven(:,:)
         real(8),allocatable:: denR(:),psR(:),EmR(:),tcR(:),KB(:),KS(:)
         real(8),allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
         real(8),allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
@@ -102,7 +101,7 @@ module SolidBody
         endif
         ! set solid solver global parameters
         call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
-        allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),carrierFluidId(m_nFish),isMotionGiven(6,m_nFish), &
+        allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish), &
                 denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish), &
                 XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish), &
                 AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
@@ -114,7 +113,7 @@ module SolidBody
             call readNextData(111, buffer)
             read(buffer,*)    t_FEmeshName
             call readNextData(111, buffer)
-            read(buffer,*)    t_iBodyModel,t_iBodyType,t_carrierFluidId
+            read(buffer,*)    t_iBodyModel,t_iBodyType
             call readNextData(111, buffer)
             read(buffer,*)    t_isMotionGiven(1:3)
             call readNextData(111, buffer)
@@ -151,7 +150,6 @@ module SolidBody
                 FEmeshName(iFish) = t_FEmeshName
                 iBodyModel(iFish) = t_iBodyModel
                 iBodyType (iFish) = t_iBodyType
-                carrierFluidId(iFish) = t_carrierFluidId
                 isMotionGiven(1:6,iFish)=t_isMotionGiven(1:6)
                 denR(iFish)= t_denR
                 psR(iFish) = t_psR
@@ -184,7 +182,6 @@ module SolidBody
         allocate(VBodies(m_nFish))
         do iFish = 1,m_nFish
             VBodies(iFish)%v_type = iBodyType(iFish)
-            VBodies(iFish)%v_carrierFluidId = carrierFluidId(iFish)
             if (iBodyType(iFish).eq.-1) then
                 call SurfacetoBeam_write(FEmeshName(iFish))
             endif

@@ -24,26 +24,26 @@ FlowCondition
 ENDFlowCondition
 FluidBlocks
  3                                            read(buffer,*) nblock (should be npairs + 1)
- 1          3          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 1          2          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
  401        101         100                     read(buffer,*) xDim,yDim,zDim
  0.040D+0  -6.00D+0  -2.00D+0  -2.00D+0     read(buffer,*) dh,xmin,ymin,zmin
  # BCEq_DirecletU = 101,BCnEq_DirecletU = 102,BCorder1_Extrapolate = 103,BCorder2_Extrapolate = 104
  # BCstationary_Wall = 201, BCmoving_Wall = 202
  # BCPeriodic = 301,BCSymmetric = 302,BCfluid = 0
  101   103   301   301   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+ 0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
- 2          3          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 2          2          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
  91         41         91                    read(buffer,*) xDim,yDim,zDim
  0.020D+0  -0.40D+0  -0.40D+0  -0.40D+0     read(buffer,*) dh,xmin,ymin,zmin
  0   0   0   0   0   0                    read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+ 0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
  =====================
- 3          3          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 3          2          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
  121         41         121                    read(buffer,*) xDim,yDim,zDim
  0.010D+0  -0.10D+0  -0.30D+0  -0.10D+0     read(buffer,*) dh,xmin,ymin,zmin
  0   0   0   0   0   0                    read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+ 0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
 ENDFluidBlocks
 SolidBody
