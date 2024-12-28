@@ -81,31 +81,37 @@ module LBMBlockComm
     recursive subroutine array_to_tree(iblocks, nb, rootnode)
         implicit none
         integer, intent(in):: nb, iblocks(1:nb)
-        integer:: nr, roots(1:nb)
+        integer:: nr, roots(1:nb),fa(1:nb),subblock(1:nb)
         integer:: i, j, tmp,cr,cb
         if(nb.eq.0) return
         ! compare all blocks
-        roots = iblock
+        fa = -1
         do i=1,nb-1
             do j=i+1,nb
                 tmp = CompareBlocks(iblocks(i), iblocks(j))
                 if(tmp.eq.1) then
-                    roots(j) = -1
+                    fa(j) = iblocks(i)
                 elseif(tmp.eq.-1) then
-                    roots(i) = -1
+                    fa(i) = iblocks(j)
+                endif
+            enddo
+        enddo
+        tmp = 1
+        do while(tmp.gt.0)
+            tmp = 0
+            do i=1,nb
+                if(fa(fa(i)).le.0) then
+                    fa(i) = fa(fa(i))
+                    tmp = 1
                 endif
             enddo
         enddo
         ! find all roots
         cr = 0
-        cb = 0
         do i=1,nb
-            if(roots(i).gt.0) then
+            if(fa(i).lt.0) then
                 cr = cr + 1
-                roots(cr) = roots(i)
-            else
-                cb = cb + 1
-                iblocks(cb) = iblocks(i)
+                roots(cr) = iblocks(i)
             endif
         enddo
         ! build one layer tree for root node
@@ -116,7 +122,15 @@ module LBMBlockComm
             blockTree(roots(i))%fatherId = rootnode
         enddo
         ! devide works
-        do i=1,cb
+        do i=1,cr
+            cb = 0
+            do j=1,nb
+                if(fa(j).eq.roots(i)) then
+                    cb = cb + 1
+                    subblock(cb) = iblocks(j)
+                endif
+            enddo
+            call array_to_tree(subblock, cb, roots(i))
         enddo
     end subroutine
 
