@@ -26,24 +26,47 @@ module LBMBlockComm
     recursive SUBROUTINE build_blocks_comunication(treenode)
         implicit none
         integer,intent(in):: treenode
-        integer:: nsons,i,j
+        integer:: nsons,i,j,sxD,syD,szD,ratio,fId,sId,islocal
+        type(CommPair)::pair
         nsons = blockTree(treenode)%nsons
         if(nsons .eq. 0) return
         allocate(blockTree(treenode)%comm(nsons))
         do i=1,nsons
-            blockTree(treenode)%comm(i)%fatherId = treenode
-            blockTree(treenode)%comm(i)%sonId = blockTree(treenode)%sons(i)
-            blockTree(treenode)%comm(i)%islocal = 0
+            pair%fatherId = treenode
+            pair%sonId = blockTree(treenode)%sons(i)
+            fId = pair%fatherId
+            sId = pair%sonId
+            pair%islocal = 0
             do j=1,6
                 if(LBMblks(blockTree(treenode)%sons(i))%BndConds(j).eq.BCfluid) then
                     if(mod(j,2).eq.1) then
-                        blockTree(treenode)%comm(i)%sds(j) = 1
+                        pair%sds(j) = 1
                     else
-                        blockTree(treenode)%comm(i)%sds(j) = -1
+                        pair%sds(j) = -1
                     endif
                 else
-                    blockTree(treenode)%comm(i)%sds(j) = 0
+                    pair%sds(j) = 0
                 endif
+                sxD = LBMblks(sId)%xDim
+                syD = LBMblks(sId)%yDim
+                szD = LBMblks(sId)%zDim
+                pair%s([1,3,5]) = 1
+                pair%s(2) = sxD
+                pair%s(4) = syD
+                pair%s(6) = szD
+                pair%f(1) = floor((LBMblks(sId)%xmin - LBMblks(fId)%xmin) / LBMblks(fId)%dh + 1.5d0)
+                pair%f(3) = floor((LBMblks(sId)%ymin - LBMblks(fId)%ymin) / LBMblks(fId)%dh + 1.5d0)
+                pair%f(5) = floor((LBMblks(sId)%zmin - LBMblks(fId)%zmin) / LBMblks(fId)%dh + 1.5d0)
+                ratio = floor(LBMblks(fId)%dh / LBMblks(sId)%dh + 0.5d0)
+                sxD = (sxD - 1) / ratio
+                syD = (syD - 1) / ratio
+                szD = (szD - 1) / ratio
+                pair%f(2) = pair%f(1) + sxD
+                pair%f(4) = pair%f(3) + syD
+                pair%f(6) = pair%f(5) + szD
+                pair%si(1:6) = pair%s(1:6) + pair%sds(1:6)
+                pair%fi(1:6) = pair%f(1:6) + pair%sds(1:6)
+                blockTree(treenode)%comm(i) = pair
             enddo
             call build_blocks_comunication(blockTree(treenode)%sons(i))
         enddo
