@@ -23,64 +23,72 @@ module LBMBlockComm
 
     contains
 
-    SUBROUTINE read_blocks_comunication(filename)
+    recursive SUBROUTINE build_blocks_comunication(treenode)
         implicit none
-        character(LEN=40),intent(in):: filename
-        character(LEN=40):: keywordstr
-        character(LEN=256):: buffer
-        integer:: i,j,sxD,syD,szD,ratio,fId,sId,islocal
-        ! allocate and read commpairs from file
-        open(unit=111, file=filename, status='old', action='read')
-        keywordstr = 'Communication'
-        call found_keyword(111,keywordstr)
-        call readNextData(111, buffer)
-        read(buffer,*) m_npairs
-        if(m_npairs .ne. 0) then
-        allocate(commpairs(m_npairs))
-        do i=1,m_npairs
-            call readNextData(111, buffer)
-            read(buffer,*) fId,sId,islocal
-            commpairs(i)%fatherId = fId
-            commpairs(i)%sonId = sId
-            commpairs(i)%islocal = islocal
+        integer,intent(in):: treenode
+        integer:: nsons,i,j
+        nsons = blockTree(treenode)%nsons
+        if(nsons .ne. 0) return
+        allocate(blockTree(treenode)%comm(nsons))
+        do i=1,nsons
+            blockTree(treenode)%comm(i)%fatherId = treenode
+            blockTree(treenode)%comm(i)%sonId = blockTree(treenode)%sons(i)
+            blockTree(treenode)%comm(i)%islocal = 0
             do j=1,6
-                if(LBMblks(LBMblksIndex(sId))%BndConds(j).eq.BCfluid) then
+                if(LBMblks(blockTree(treenode)%sons(i))%BndConds(j).eq.BCfluid) then
                     if(mod(j,2).eq.1) then
-                        commpairs(i)%sds(j) = 1
+                        blockTree(treenode)%comm(i)%sds(j) = 1
                     else
-                        commpairs(i)%sds(j) = -1
+                        blockTree(treenode)%comm(i)%sds(j) = -1
                     endif
                 else
-                    commpairs(i)%sds(j) = 0
+                    blockTree(treenode)%comm(i)%sds(j) = 0
                 endif
             enddo
-            sxD = LBMblks(sId)%xDim
-            syD = LBMblks(sId)%yDim
-            szD = LBMblks(sId)%zDim
-            commpairs(i)%s([1,3,5]) = 1
-            commpairs(i)%s(2) = sxD
-            commpairs(i)%s(4) = syD
-            commpairs(i)%s(6) = szD
-            commpairs(i)%f(1) = floor((LBMblks(sId)%xmin - LBMblks(fId)%xmin) / LBMblks(fId)%dh + 1.5d0)
-            commpairs(i)%f(3) = floor((LBMblks(sId)%ymin - LBMblks(fId)%ymin) / LBMblks(fId)%dh + 1.5d0)
-            commpairs(i)%f(5) = floor((LBMblks(sId)%zmin - LBMblks(fId)%zmin) / LBMblks(fId)%dh + 1.5d0)
-            ratio = floor(LBMblks(fId)%dh / LBMblks(sId)%dh + 0.5d0)
-            sxD = (sxD - 1) / ratio
-            syD = (syD - 1) / ratio
-            szD = (szD - 1) / ratio
-            commpairs(i)%f(2) = commpairs(i)%f(1) + sxD
-            commpairs(i)%f(4) = commpairs(i)%f(3) + syD
-            commpairs(i)%f(6) = commpairs(i)%f(5) + szD
-            commpairs(i)%si(1:6) = commpairs(i)%s(1:6) + commpairs(i)%sds(1:6)
-            commpairs(i)%fi(1:6) = commpairs(i)%f(1:6) + commpairs(i)%sds(1:6)
+            call build_blocks_comunication(blockTree(treenode)%sons(i))
         enddo
+    end subroutine build_blocks_comunication
+
+    subroutine findremove_blockTreeRoot(iblocks,nb,rootnode)
+        implicit none
+        integer, intent(inout):: nb,iblocks(1:nb),rootnode
+        integer:: fa(1:nb)
+        integer:: i, j, tmp,cr,cb
+        if(nb.eq.0) return
+        ! compare all blocks
+        fa = -1
+        do i=1,nb-1
+            do j=i+1,nb
+                tmp = CompareBlocks(iblocks(i), iblocks(j))
+                if(tmp.eq.1) then
+                    fa(j) = iblocks(i)
+                elseif(tmp.eq.-1) then
+                    fa(i) = iblocks(j)
+                endif
+            enddo
+        enddo
+        ! find all roots
+        cr = 0
+        cb = 0
+        do i=1,nb
+            if(fa(i).lt.0) then
+                cr = cr + 1
+                rootnode = iblocks(i)
+            else
+                cb = cb + 1
+                iblocks(cb) = iblocks(i)
+            endif
+        enddo
+        nb = nb - cr
+        if(cr.gt.1) then
+            write(*,*) 'Error: there exist more than one block tree root', rootnode
+            stop
         endif
-        close(111)
-    end subroutine read_blocks_comunication
+    end subroutine
 
     recursive subroutine array_to_tree(iblocks, nb, rootnode)
         implicit none
-        integer, intent(in):: nb, iblocks(1:nb)
+        integer, intent(in):: nb, iblocks(1:nb),rootnode
         integer:: nr, roots(1:nb),fa(1:nb),subblock(1:nb)
         integer:: i, j, tmp,cr,cb
         if(nb.eq.0) return
@@ -100,7 +108,7 @@ module LBMBlockComm
         do while(tmp.gt.0)
             tmp = 0
             do i=1,nb
-                if(fa(fa(i)).le.0) then
+                if(fa(fa(i)).gt.0 .and. fa(i).ne.fa(fa(i))) then
                     fa(i) = fa(fa(i))
                     tmp = 1
                 endif
@@ -136,7 +144,7 @@ module LBMBlockComm
 
     subroutine bluid_block_tree()
         implicit none
-        integer:: i,f,s,ns(1:m_nblock),iblocks(1:m_nblock)
+        integer:: i,f,s,ns(1:m_nblock),iblocks(1:m_nblock),nb
         ! initialise blocktree
         allocate(blockTree(1:m_nblock))
         do i=1,m_nblock
@@ -144,44 +152,21 @@ module LBMBlockComm
             blockTree(i)%nsons = 0
             iblocks = i
         enddo
-        ! get number of sons and father Id
-        do i=1,m_npairs
-            f = commpairs(i)%fatherId
-            s = commpairs(i)%sonId
-            blockTree(f)%nsons = blockTree(f)%nsons + 1
-            blockTree(s)%fatherId = f
-        enddo
-        ! allocate sons and determine tree root
-        blockTreeRoot = -1111
-        do i=1,m_nblock
-            allocate(blockTree(i)%sons(blockTree(i)%nsons),blockTree(i)%pairId(blockTree(i)%nsons))
-            if(blockTree(i)%fatherId .eq. 0) then
-                if(blockTreeRoot.ne.-1111) then
-                    write(*,*) 'Error: there are more than one root block', i, blockTreeRoot
-                    stop
-                endif
-                blockTreeRoot = i
-            endif
-        enddo
+        nb = m_nblock
+        call findremove_blockTreeRoot(iblocks,nb,blockTreeRoot)
+        call array_to_tree(iblocks,nb,blockTreeRoot)
+        call build_blocks_comunication(blockTreeRoot)
         ! allocate father slices in sons node
-        call allocate_fIn_uuu()
-        ! set sons
-        ns = 0
-        do i=1,m_npairs
-            f = commpairs(i)%fatherId
-            s = commpairs(i)%sonId
-            ns(f) = ns(f) + 1
-            blockTree(f)%sons(ns(f)) = s
-            blockTree(f)%pairId(ns(f)) = i
-        enddo
+        call allocate_fIn_uuu(blockTreeRoot)
     endsubroutine bluid_block_tree
 
-    subroutine allocate_fIn_uuu()
+    recursive subroutine allocate_fIn_uuu(treenode)
         implicit none
+        integer,intent(in):: treenode
         integer:: i,f,s
-        do i=1,m_npairs
-            f = commpairs(i)%fatherId
-            s = commpairs(i)%sonId
+        do i=1,blockTree(treenode)%nsons
+            f = blockTree(treenode)%comm(i)%fatherId
+            s = blockTree(treenode)%comm(i)%sonId
             if(LBMblks(s)%BndConds(1).eq.BCfluid) then
                 allocate(LBMblks(s)%fIn_Fx1t1(LBMblks(f)%zDim,LBMblks(f)%yDim,0:lbmDim))
                 allocate(LBMblks(s)%fIn_Fx1t2(LBMblks(f)%zDim,LBMblks(f)%yDim,0:lbmDim))
@@ -212,6 +197,7 @@ module LBMBlockComm
                 allocate(LBMblks(s)%fIn_Fz2t2(LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
                 allocate(LBMblks(s)%uuu_Fz2t1(LBMblks(f)%yDim,LBMblks(f)%xDim,1:3     ))
             endif
+            call allocate_fIn_uuu(blockTree(treenode)%sons(i))
         enddo
     endsubroutine
 
@@ -255,9 +241,9 @@ module LBMBlockComm
                 do n_timeStep=0,m_gridDelta-1! one divides intwo
                     LBMblks(s)%blktime = LBMblks(s)%blktime + dble(n_timeStep) * LBMblks(s)%dh
                     call tree_collision_streaming_IBM_FEM(s,time_collision,time_streaming,time_IBM,time_FEM)
-                    call interpolation_father_to_son(commpairs(blockTree(treenode)%pairId(i)),n_timeStep)
+                    call interpolation_father_to_son(blockTree(treenode)%comm(i),n_timeStep)
                 enddo
-                call deliver_son_to_father(commpairs(blockTree(treenode)%pairId(i)))
+                call deliver_son_to_father(blockTree(treenode)%comm(i))
             enddo
         endif
     endsubroutine tree_collision_streaming_IBM_FEM
@@ -291,7 +277,7 @@ module LBMBlockComm
             do i = 1,ns
                 s = blockTree(treenode)%sons(i)
                 if(LBMblks(s)%BndConds(1).eq.BCfluid) then
-                    xF = commpairs(blockTree(f)%pairId(i))%f(1)
+                    xF = blockTree(f)%comm(i)%f(1)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
                     do y = 1,LBMblks(f)%yDim
                     do z = 1,LBMblks(f)%zDim
@@ -303,7 +289,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(2).eq.BCfluid) then
-                    xF = commpairs(blockTree(f)%pairId(i))%f(2)
+                    xF = blockTree(f)%comm(i)%f(2)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
                     do y = 1,LBMblks(f)%yDim
                     do z = 1,LBMblks(f)%zDim
@@ -315,7 +301,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(3).eq.BCfluid) then
-                    yF = commpairs(blockTree(f)%pairId(i))%f(3)
+                    yF = blockTree(f)%comm(i)%f(3)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
                     do x = 1,LBMblks(f)%xDim
                     do z = 1,LBMblks(f)%zDim
@@ -327,7 +313,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(4).eq.BCfluid) then
-                    yF = commpairs(blockTree(f)%pairId(i))%f(4)
+                    yF = blockTree(f)%comm(i)%f(4)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
                     do x = 1,LBMblks(f)%xDim
                     do z = 1,LBMblks(f)%zDim
@@ -339,7 +325,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(5).eq.BCfluid) then
-                    zF = commpairs(blockTree(f)%pairId(i))%f(5)
+                    zF = blockTree(f)%comm(i)%f(5)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
                     do x = 1,LBMblks(f)%xDim
                     do y = 1,LBMblks(f)%yDim
@@ -351,7 +337,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(6).eq.BCfluid) then
-                    zF = commpairs(blockTree(f)%pairId(i))%f(6)
+                    zF = blockTree(f)%comm(i)%f(6)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
                     do x = 1,LBMblks(f)%xDim
                     do y = 1,LBMblks(f)%yDim
@@ -366,98 +352,27 @@ module LBMBlockComm
         endif
     endsubroutine
 
-    ! SUBROUTINE ExchangeFluidInterface()
-    !     implicit none
-    !     integer:: ip
-    !     ! allocate and read commpairs from file
-    !     do ip = 1,m_npairs
-    !         call ExchangeDataSerial(commpairs(IP))
-    !     enddo
-    ! end subroutine ExchangeFluidInterface
-
-    ! SUBROUTINE ExchangeDataSerial(pair)
-    !     use FluidDomain
-    !     implicit none
-    !     type(CommPair),intent(in):: pair
-    !     integer:: s(1:6),f(1:6),si(1:6),fi(1:6)
-    !     ! x direction
-    !     s = pair%s
-    !     f = pair%f
-    !     si = pair%si
-    !     fi = pair%fi
-    !     if(pair%sds(1).eq.1) then
-    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(3):s(4),s(1),0:lbmDim) =&
-    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3):f(4),f(1),0:lbmDim)
-    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3):fi(4),fi(1),0:lbmDim) =&
-    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(3):si(4),si(1),0:lbmDim)
-    !     endif
-    !     if(pair%sds(2).eq.-1) then
-    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(3):s(4),s(2),0:lbmDim) =&
-    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3):f(4),f(2),0:lbmDim)
-    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3):fi(4),fi(2),0:lbmDim) =&
-    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(3):si(4),si(2),0:lbmDim)
-    !     endif
-    !     ! y direction
-    !     if(pair%sds(3).eq.1) then
-    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(3),s(1):s(2),0:lbmDim) =&
-    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(3),f(1):f(2),0:lbmDim)
-    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(3),fi(1):fi(2),0:lbmDim) =&
-    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(3),si(1):si(2),0:lbmDim)
-    !     endif
-    !     if(pair%sds(4).eq.-1) then
-    !         LBMblks(pair%sonId)%fIn(s(5):s(6),s(4),s(1):s(2),0:lbmDim) =&
-    !             LBMblks(pair%fatherId)%fIn(f(5):f(6),f(4),f(1):f(2),0:lbmDim)
-    !         LBMblks(pair%fatherId)%fIn(fi(5):fi(6),fi(4),fi(1):fi(2),0:lbmDim) =&
-    !             LBMblks(pair%sonId)%fIn(si(5):si(6),si(4),si(1):si(2),0:lbmDim)
-    !     endif
-    !     ! z direction
-    !     if(pair%sds(5).eq.1) then
-    !         LBMblks(pair%sonId)%fIn(s(5),s(3):s(4),s(1):s(2),0:lbmDim) =&
-    !             LBMblks(pair%fatherId)%fIn(f(5),f(3):f(4),f(1):f(2),0:lbmDim)
-    !         LBMblks(pair%fatherId)%fIn(fi(5),fi(3):fi(4),fi(1):fi(2),0:lbmDim) =&
-    !             LBMblks(pair%sonId)%fIn(si(5),si(3):si(4),si(1):si(2),0:lbmDim)
-    !     endif
-    !     if(pair%sds(6).eq.-1) then
-    !         LBMblks(pair%sonId)%fIn(s(6),s(3):s(4),s(1):s(2),0:lbmDim) =&
-    !             LBMblks(pair%fatherId)%fIn(f(6),f(3):f(4),f(1):f(2),0:lbmDim)
-    !         LBMblks(pair%fatherId)%fIn(fi(6),fi(3):fi(4),fi(1):fi(2),0:lbmDim) =&
-    !             LBMblks(pair%sonId)%fIn(si(6),si(3):si(4),si(1):si(2),0:lbmDim)
-    !     endif
-    ! end subroutine ExchangeDataSerial
-        
-    ! SUBROUTINE calculate_blocks_tau(flow_nu)
-    !     ! ensure the Reynolds numbers of each block are the same
-    !     implicit none
-    !     integer:: i,block
-    !     real(8):: flow_nu
-    !     if(m_npairs .eq. 0) then
-    !         ! no need to set
-    !     elseif(m_npairs .ge. 1) then
-    !         do i=1,m_npairs
-    !             LBMblks(commpairs(i)%sonId)%tau = 0.50d0 + dble(m_gridDelta) *(LBMblks(commpairs(i)%fatherId)%tau - 0.50d0)
-    !         enddo
-    !     else
-    !         stop 'wrong block pairs (npairs) input'
-    !     endif
-    ! END SUBROUTINE
-
     ! verify the parameters of fluid blocks
-    SUBROUTINE check_blocks_params(nblock)
+    recursive SUBROUTINE check_blocks_params(treenode)
         implicit none
+        integer,intent(in):: treenode
         integer:: i,nblock
+        type(CommPair)::pair
         logical:: flag
-        flag = (1 .eq. 2) ! default flase
-        if(nblock .ne. (m_npairs + 1)) stop 'the number of fluid blocks is wrong (should equal to n_pairs + 1) '
-        if(m_npairs .ge. 1) then
-            do i=1,m_npairs
-                flag = (LBMblks(commpairs(i)%fatherId)%dh .ne. LBMblks(commpairs(i)%sonId)%dh*m_gridDelta .or. mod(LBMblks(commpairs(i)%sonId)%xDim,m_gridDelta) .ne. 1 .or. &
-                        mod(LBMblks(commpairs(i)%sonId)%yDim,m_gridDelta) .ne. 1 .or. mod(LBMblks(commpairs(i)%sonId)%zDim,m_gridDelta) .ne. 1 .or. &
-                        mod(NINT((LBMblks(commpairs(i)%sonId)%xmin-LBMblks(commpairs(i)%fatherId)%xmin)/LBMblks(commpairs(i)%sonId)%dh),m_gridDelta) .ne. 0 .or. &
-                        mod(NINT((LBMblks(commpairs(i)%sonId)%ymin-LBMblks(commpairs(i)%fatherId)%ymin)/LBMblks(commpairs(i)%sonId)%dh),m_gridDelta) .ne. 0 .or. &
-                        mod(NINT((LBMblks(commpairs(i)%sonId)%zmin-LBMblks(commpairs(i)%fatherId)%zmin)/LBMblks(commpairs(i)%sonId)%dh),m_gridDelta) .ne. 0)
-                if(flag) stop 'grid points do not match between fluid blocks'
-            enddo
-        endif
+        flag = .false. ! default flase
+        do i=1,blocktree(treenode)%nsons
+            pair = blocktree(treenode)%comm(i)
+            flag = (LBMblks(pair%fatherId)%dh .ne. LBMblks(pair%sonId)%dh*m_gridDelta .or. mod(LBMblks(pair%sonId)%xDim,m_gridDelta) .ne. 1 .or. &
+                mod(LBMblks(pair%sonId)%yDim,m_gridDelta) .ne. 1 .or. mod(LBMblks(pair%sonId)%zDim,m_gridDelta) .ne. 1 .or. &
+                mod(NINT((LBMblks(pair%sonId)%xmin-LBMblks(pair%fatherId)%xmin)/LBMblks(pair%sonId)%dh),m_gridDelta) .ne. 0 .or. &
+                mod(NINT((LBMblks(pair%sonId)%ymin-LBMblks(pair%fatherId)%ymin)/LBMblks(pair%sonId)%dh),m_gridDelta) .ne. 0 .or. &
+                mod(NINT((LBMblks(pair%sonId)%zmin-LBMblks(pair%fatherId)%zmin)/LBMblks(pair%sonId)%dh),m_gridDelta) .ne. 0)
+            if(flag) then
+                write(*,*) 'grid points do not match between fluid blocks',pair%fatherId,pair%sonId
+                stop
+            endif
+            call check_blocks_params(blocktree(treenode)%sons(i))
+        enddo
     END SUBROUTINE
 
     SUBROUTINE deliver_son_to_father(pair)

@@ -25,7 +25,7 @@ PROGRAM main
     call read_solid_files(parameterFile)
     call read_fuild_blocks(parameterFile)
     call read_probe_params(parameterFile)
-    call read_blocks_comunication(parameterFile)
+    call bluid_block_tree()
     !==================================================================================================
     ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)

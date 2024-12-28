@@ -1166,19 +1166,19 @@ module FluidDomain
         implicit none
         integer:: i, j, CompareBlocks, cnt
         cnt = 0
-        if(LBMblksIndex(i)%xmin.le.LBMblksIndex(j)%xmin .and. LBMblksIndex(j)%xmax.le.LBMblksIndex(i)%xmax) then
+        if(LBMblks(i)%xmin.le.LBMblks(j)%xmin .and. LBMblks(j)%xmax.le.LBMblks(i)%xmax) then
             cnt = cnt + 1
-        else if(LBMblksIndex(j)%xmin.le.LBMblksIndex(i)%xmin .and. LBMblksIndex(i)%xmax.le.LBMblksIndex(j)%xmax) then
+        else if(LBMblks(j)%xmin.le.LBMblks(i)%xmin .and. LBMblks(i)%xmax.le.LBMblks(j)%xmax) then
             cnt = cnt - 1
         endif
-        if(LBMblksIndex(i)%ymin.le.LBMblksIndex(j)%ymin .and. LBMblksIndex(j)%ymax.le.LBMblksIndex(i)%ymax) then
+        if(LBMblks(i)%ymin.le.LBMblks(j)%ymin .and. LBMblks(j)%ymax.le.LBMblks(i)%ymax) then
             cnt = cnt + 1
-        else if(LBMblksIndex(j)%ymin.le.LBMblksIndex(i)%ymin .and. LBMblksIndex(i)%ymax.le.LBMblksIndex(j)%ymax) then
+        else if(LBMblks(j)%ymin.le.LBMblks(i)%ymin .and. LBMblks(i)%ymax.le.LBMblks(j)%ymax) then
             cnt = cnt - 1
         endif
-        if(LBMblksIndex(i)%zmin.le.LBMblksIndex(j)%zmin .and. LBMblksIndex(j)%zmax.le.LBMblksIndex(i)%zmax) then
+        if(LBMblks(i)%zmin.le.LBMblks(j)%zmin .and. LBMblks(j)%zmax.le.LBMblks(i)%zmax) then
             cnt = cnt + 1
-        else if(LBMblksIndex(j)%zmin.le.LBMblksIndex(i)%zmin .and. LBMblksIndex(i)%zmax.le.LBMblksIndex(j)%zmax) then
+        else if(LBMblks(j)%zmin.le.LBMblks(i)%zmin .and. LBMblks(i)%zmax.le.LBMblks(j)%zmax) then
             cnt = cnt - 1
         endif
         if(cnt.eq.3) then
@@ -1187,8 +1187,8 @@ module FluidDomain
             CompareBlocks = -1
         else
             write(*,*) 'Error, block overlaps', i, j
-            write(*,*) LBMblksIndex(i)%xmin, LBMblksIndex(i)%xmax,LBMblksIndex(i)%ymin, LBMblksIndex(i)%ymax,LBMblksIndex(i)%zmin, LBMblksIndex(i)%zmax
-            write(*,*) LBMblksIndex(j)%xmin, LBMblksIndex(j)%xmax,LBMblksIndex(j)%ymin, LBMblksIndex(j)%ymax,LBMblksIndex(j)%zmin, LBMblksIndex(j)%zmax
+            write(*,*) LBMblks(i)%xmin, LBMblks(i)%xmax,LBMblks(i)%ymin, LBMblks(i)%ymax,LBMblks(i)%zmin, LBMblks(i)%zmax
+            write(*,*) LBMblks(j)%xmin, LBMblks(j)%xmax,LBMblks(j)%ymin, LBMblks(j)%ymax,LBMblks(j)%zmin, LBMblks(j)%zmax
             stop
         endif
     end function CompareBlocks
