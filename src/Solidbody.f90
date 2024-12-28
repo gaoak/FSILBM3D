@@ -219,8 +219,13 @@ module SolidBody
             flow%Uref = dabs(flow%uvwIn(3))
         elseif(flow%UrefType==3) then
             flow%Uref = dsqrt(flow%uvwIn(1)**2 + flow%uvwIn(2)**2 + flow%uvwIn(3)**2)
-        !elseif(flow%UrefType==4) then
-        !    Uref = dabs(VelocityAmp)  !Velocity Amplitude
+        elseif(flow%UrefType==4) then
+            if (flow%velocityKind .eq. 2) then
+                flow%Uref = dabs(flow%shearRateIn(1))  ! flow%shearRateIn(1) is Velocity Amplitude
+            else
+                write(*,*) 'oscillatory flow must set velocityKind to 2'
+                stop
+            endif
         elseif(flow%UrefType==5) then
             flow%Uref = flow%Lref * MAXVAL(VBodies(:)%rbm%Freq)
         elseif(flow%UrefType==6) then

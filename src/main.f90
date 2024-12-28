@@ -14,8 +14,7 @@ PROGRAM main
     USE LBMBlockComm
     implicit none
     character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
-    integer:: isubstep=0,step=0
-    integer:: n_pairs,n_gridDelta
+    integer:: step=0
     real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
     real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
@@ -44,7 +43,7 @@ PROGRAM main
     !==================================================================================================
     ! Initialization before simulation
     call initialise_solid_bodies(0.d0, g)
-    call initialise_fuild_blocks(flow)
+    call initialise_fuild_blocks(time)
     !==================================================================================================
     ! Check blocks number and calculate the tau of each block
     call check_blocks_params(m_nblock)
@@ -54,7 +53,7 @@ PROGRAM main
     call write_information_titles(m_nFish)
     !==================================================================================================
     ! Update the volume forces and calculate the macro quantities
-    call update_volume_force_blocks(time)
+    call update_volume_force_blocks()
     call set_boundary_conditions_block(blockTreeRoot)
     call calculate_macro_quantities_blocks()
     !==================================================================================================

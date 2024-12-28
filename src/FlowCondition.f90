@@ -8,6 +8,7 @@ module FlowCondition
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
         real(8) :: Re,dt,denIn,nu,Mu,dtolLBM
         integer :: TrefType,UrefType,ntolLBM
+        integer :: velocityKind
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
         real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
         real(8) :: Uref,Lref,Tref
@@ -46,7 +47,7 @@ module FlowCondition
         call readNextData(111, buffer)
         read(buffer,*)    flow%uvwIn(1:3)
         call readNextData(111, buffer)
-        read(buffer,*)    flow%shearRateIn(1:3)
+        read(buffer,*)    flow%shearRateIn(1:3),flow%velocityKind
         call readNextData(111, buffer)
         read(buffer,*)    flow%volumeForceIn(1:3)
         call readNextData(111, buffer)
@@ -185,12 +186,12 @@ module FlowCondition
             endif
             ! velocity interpolation
             do j=1,3
-                call grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,flow%fluidProbingCoords(i,1:3),velocityIn(zDim,yDim,xDim,j),velocityOut(j))
+                call grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,flow%fluidProbingCoords(i,1:3),velocityIn(1:zDim,1:yDim,1:xDim,j),velocityOut(j))
             enddo
             ! write file
             write(probeNum,'(I3.3)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt',position='append')
-            write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
+            write(111,'(4E20.10)') time/flow%Tref,flow%fluidProbingCoords(i,1:3)/flow%Lref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
         END SUBROUTINE
