@@ -3,13 +3,6 @@ module LBMBlockComm
     use FluidDomain
     implicit none
     !include 'mpif.h'
-    type :: blockTreeNode
-        integer:: fatherId
-        integer:: nsons
-        integer:: nt
-        integer,allocatable:: sons(:)
-        integer,allocatable:: pairId(:)
-    end type blockTreeNode
     type :: CommPair
         integer:: fatherId
         integer:: sonId
@@ -17,10 +10,16 @@ module LBMBlockComm
         integer:: s(1:6),f(1:6),si(1:6),fi(1:6) ! s son's boundary layer; si son's first inner layer
         integer:: islocal ! local (0) or mpi (1)
     end type CommPair
+    type :: blockTreeNode
+        integer:: fatherId
+        integer:: nsons
+        integer:: nt
+        integer,allocatable:: sons(:)
+        type(CommPair),allocatable:: comm(:)
+    end type blockTreeNode
     integer:: m_npairs,m_gridDelta=2! one divides intwo
     integer:: blockTreeRoot ! assume there is only one root
     type(blockTreeNode),allocatable:: blockTree(:)
-    type(CommPair),allocatable:: commpairs(:)
 
     contains
 
@@ -79,14 +78,57 @@ module LBMBlockComm
         close(111)
     end subroutine read_blocks_comunication
 
+    recursive subroutine array_to_tree(iblocks, nb, rootnode)
+        implicit none
+        integer, intent(in):: nb, iblocks(1:nb)
+        integer:: nr, roots(1:nb)
+        integer:: i, j, tmp,cr,cb
+        if(nb.eq.0) return
+        ! compare all blocks
+        roots = iblock
+        do i=1,nb-1
+            do j=i+1,nb
+                tmp = CompareBlocks(iblocks(i), iblocks(j))
+                if(tmp.eq.1) then
+                    roots(j) = -1
+                elseif(tmp.eq.-1) then
+                    roots(i) = -1
+                endif
+            enddo
+        enddo
+        ! find all roots
+        cr = 0
+        cb = 0
+        do i=1,nb
+            if(roots(i).gt.0) then
+                cr = cr + 1
+                roots(cr) = roots(i)
+            else
+                cb = cb + 1
+                iblocks(cb) = iblocks(i)
+            endif
+        enddo
+        ! build one layer tree for root node
+        blockTree(rootnode)%nsons = cr
+        allocate(blockTree(rootnode)%sons(cr))
+        do i=1,cr
+            blockTree(rootnode)%sons(i) = roots(i)
+            blockTree(roots(i))%fatherId = rootnode
+        enddo
+        ! devide works
+        do i=1,cb
+        enddo
+    end subroutine
+
     subroutine bluid_block_tree()
         implicit none
-        integer:: i,f,s,ns(1:m_nblock)
+        integer:: i,f,s,ns(1:m_nblock),iblocks(1:m_nblock)
         ! initialise blocktree
         allocate(blockTree(1:m_nblock))
         do i=1,m_nblock
             blockTree(i)%fatherId = 0
             blockTree(i)%nsons = 0
+            iblocks = i
         enddo
         ! get number of sons and father Id
         do i=1,m_npairs

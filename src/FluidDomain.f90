@@ -6,7 +6,8 @@ module FluidDomain
     public:: LBMblks,LBMblksIndex,m_nblock
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
-             write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force
+             write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
+             CompareBlocks
     integer:: m_nblock, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
@@ -1155,5 +1156,40 @@ module FluidDomain
         real(8):: uxyz(0:lbmDim),density,velocity(1:SpaceDim)
         uxyz(0:lbmDim) = velocity(1) * ee(0:lbmDim,1) + velocity(2) * ee(0:lbmDim,2) + velocity(3) * ee(0:lbmDim,3)
         distributionOut(0:lbmDim) = distributionIn(oppo(0:lbmDim)) + 2.0*wt(0:lbmDim)*density*uxyz(0:lbmDim)*3.0
-        ENDSUBROUTINE
+    ENDSUBROUTINE
+
+    function CompareBlocks(i, j)
+        ! if block i contains j, return 1
+        ! else if block i in block j, return -1
+        ! separated, return 0
+        ! partial overlaped, output error
+        implicit none
+        integer:: i, j, CompareBlocks, cnt
+        cnt = 0
+        if(LBMblksIndex(i)%xmin.le.LBMblksIndex(j)%xmin .and. LBMblksIndex(j)%xmax.le.LBMblksIndex(i)%xmax) then
+            cnt = cnt + 1
+        else if(LBMblksIndex(j)%xmin.le.LBMblksIndex(i)%xmin .and. LBMblksIndex(i)%xmax.le.LBMblksIndex(j)%xmax) then
+            cnt = cnt - 1
+        endif
+        if(LBMblksIndex(i)%ymin.le.LBMblksIndex(j)%ymin .and. LBMblksIndex(j)%ymax.le.LBMblksIndex(i)%ymax) then
+            cnt = cnt + 1
+        else if(LBMblksIndex(j)%ymin.le.LBMblksIndex(i)%ymin .and. LBMblksIndex(i)%ymax.le.LBMblksIndex(j)%ymax) then
+            cnt = cnt - 1
+        endif
+        if(LBMblksIndex(i)%zmin.le.LBMblksIndex(j)%zmin .and. LBMblksIndex(j)%zmax.le.LBMblksIndex(i)%zmax) then
+            cnt = cnt + 1
+        else if(LBMblksIndex(j)%zmin.le.LBMblksIndex(i)%zmin .and. LBMblksIndex(i)%zmax.le.LBMblksIndex(j)%zmax) then
+            cnt = cnt - 1
+        endif
+        if(cnt.eq.3) then
+            CompareBlocks = 1
+        else if(cnt.eq.-3) then
+            CompareBlocks = -1
+        else
+            write(*,*) 'Error, block overlaps', i, j
+            write(*,*) LBMblksIndex(i)%xmin, LBMblksIndex(i)%xmax,LBMblksIndex(i)%ymin, LBMblksIndex(i)%ymax,LBMblksIndex(i)%zmin, LBMblksIndex(i)%zmax
+            write(*,*) LBMblksIndex(j)%xmin, LBMblksIndex(j)%xmax,LBMblksIndex(j)%ymin, LBMblksIndex(j)%ymax,LBMblksIndex(j)%zmin, LBMblksIndex(j)%zmax
+            stop
+        endif
+    end function CompareBlocks
 end module FluidDomain
