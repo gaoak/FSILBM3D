@@ -28,7 +28,7 @@ module LBMBlockComm
         integer,intent(in):: treenode
         integer:: nsons,i,j
         nsons = blockTree(treenode)%nsons
-        if(nsons .ne. 0) return
+        if(nsons .eq. 0) return
         allocate(blockTree(treenode)%comm(nsons))
         do i=1,nsons
             blockTree(treenode)%comm(i)%fatherId = treenode
@@ -108,9 +108,11 @@ module LBMBlockComm
         do while(tmp.gt.0)
             tmp = 0
             do i=1,nb
-                if(fa(fa(i)).gt.0 .and. fa(i).ne.fa(fa(i))) then
-                    fa(i) = fa(fa(i))
-                    tmp = 1
+                if(fa(i).gt.0) then
+                    if(fa(fa(i)).gt.0 .and. fa(i).ne.fa(fa(i))) then
+                        fa(i) = fa(fa(i))
+                        tmp = 1
+                    endif
                 endif
             enddo
         enddo
@@ -150,7 +152,7 @@ module LBMBlockComm
         do i=1,m_nblocks
             blockTree(i)%fatherId = 0
             blockTree(i)%nsons = 0
-            iblocks = i
+            iblocks(i) = i
         enddo
         nb = m_nblocks
         call findremove_blockTreeRoot(iblocks,nb,blockTreeRoot)
@@ -277,7 +279,7 @@ module LBMBlockComm
             do i = 1,ns
                 s = blockTree(treenode)%sons(i)
                 if(LBMblks(s)%BndConds(1).eq.BCfluid) then
-                    xF = blockTree(f)%comm(i)%f(1)
+                    xF = blockTree(treenode)%comm(i)%f(1)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
                     do y = 1,LBMblks(f)%yDim
                     do z = 1,LBMblks(f)%zDim
@@ -289,7 +291,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(2).eq.BCfluid) then
-                    xF = blockTree(f)%comm(i)%f(2)
+                    xF = blockTree(treenode)%comm(i)%f(2)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
                     do y = 1,LBMblks(f)%yDim
                     do z = 1,LBMblks(f)%zDim
@@ -301,7 +303,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(3).eq.BCfluid) then
-                    yF = blockTree(f)%comm(i)%f(3)
+                    yF = blockTree(treenode)%comm(i)%f(3)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
                     do x = 1,LBMblks(f)%xDim
                     do z = 1,LBMblks(f)%zDim
@@ -313,7 +315,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(4).eq.BCfluid) then
-                    yF = blockTree(f)%comm(i)%f(4)
+                    yF = blockTree(treenode)%comm(i)%f(4)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
                     do x = 1,LBMblks(f)%xDim
                     do z = 1,LBMblks(f)%zDim
@@ -325,7 +327,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(5).eq.BCfluid) then
-                    zF = blockTree(f)%comm(i)%f(5)
+                    zF = blockTree(treenode)%comm(i)%f(5)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
                     do x = 1,LBMblks(f)%xDim
                     do y = 1,LBMblks(f)%yDim
@@ -337,7 +339,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(6).eq.BCfluid) then
-                    zF = blockTree(f)%comm(i)%f(6)
+                    zF = blockTree(treenode)%comm(i)%f(6)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
                     do x = 1,LBMblks(f)%xDim
                     do y = 1,LBMblks(f)%yDim

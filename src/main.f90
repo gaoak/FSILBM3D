@@ -29,7 +29,6 @@ PROGRAM main
     !==================================================================================================
     ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)
-    call bluid_block_tree()
     !==================================================================================================
     ! Allocate the memory for simulation
     call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)

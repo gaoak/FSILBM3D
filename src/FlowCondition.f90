@@ -32,6 +32,7 @@ module FlowCondition
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*)    flow%npsize
+        rewind(111)
         keywordstr = 'FlowCondition'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
