@@ -1,14 +1,14 @@
 Parallel
 # parameter for mpi
- 16                                           read(buffer,*) npsize
+ 64                                           read(buffer,*) npsize
 EndParallel
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
- 1.00D+0   1.000D+0                           read(buffer,*) timeSimTotal,timeContiDelta
- 0.0+0   100.0D+0                             read(buffer,*) timeWriteBegin,timeWriteEnd
- 0.1D+0   0.10D+0   0.010D+0                  read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
- 100.00D+0   1.000D+0                          read(buffer,*) Re,denIn
- 0.010D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
+ 100.0D+0   100.0D+0                          read(buffer,*) timeSimTotal,timeContiDelta
+ 0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
+ 1.000D+0   1.000D+0   1.000D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
+ 100.0D+0   1.000D+0                          read(buffer,*) Re,denIn
+ 0.100D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
  0.000D+0   0.000D+0   0.000D+0   0           read(buffer,*) shearRateIn(1:3),flow%velocityKind
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceAmp,volumeForceFreq,volumeForcePhi

@@ -1,33 +1,28 @@
 Parallel
 # parameter for mpi
- 16                                           read(buffer,*) npsize
+ 64                                           read(buffer,*) npsize
 EndParallel
-Communication
- 0          1          1                      read(buffer,*) npairs(0: single block),gridDelta,containSolidId
-# fatherid, sonid, local(0) mpi(1)
- 1          2          0                      read(buffer,*) fatherId,sonId,containSolidId,type
-EndCommunication
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
- 0.020D+0   1.000D+0                          read(buffer,*) timeSimTotal,timeContiDelta
+ 50.00D+0   50.00D+0                          read(buffer,*) timeSimTotal,timeContiDelta
  0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
- 0.020D+0   0.020D+0   0.010D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
- 40.00D+0   0.020D+0   1.000D+0               read(buffer,*) Re,dt,denIn
+ 0.500D+0   0.500D+0   0.500D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
+ 40.00D+0   1.000D+0                          read(buffer,*) Re,denIn
  0.010D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
- 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) shearRateIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0   0           read(buffer,*) shearRateIn(1:3)/velocityAmp,velocityFreq,velocityPhi,VelocityKind
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceAmp,volumeForceFreq,volumeForcePhi
  0          100.0D+0                          read(buffer,*) TrefType,Tref
  0          0.010D+0                          read(buffer,*) UrefType,Uref
- 10         0.010D+0                          read(buffer,*) ntolLBM,dtolLBM
+ 1          0.010D+0                          read(buffer,*) ntolLBM,dtolLBM
 ENDFlowCondition
 FluidBlocks
  1                                            read(buffer,*) nblock (should be npairs + 1)
- 1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput
- 801        100        50                     read(buffer,*) xDim,yDim,zDim
+ 1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 801        101        50                     read(buffer,*) xDim,yDim,zDim
  0.020D+0  -6.000D+0  -1.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
  101   103   301   301   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
- 0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+ 0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
 ENDFluidBlocks
 SolidBody
@@ -36,7 +31,7 @@ SolidBody
  0.500D+0   1.000D+0                          read(buffer,*) NewmarkGamma,NewmarkBeta
  0.000D+0   0.000D+0                          read(buffer,*) dampK,dampM
  1.000D-6   100			                      read(buffer,*) dtolFEM,ntolFEM
- 1          1          1          1           read(buffer,*) nFish,nfishGroup,isKB
+ 1          1          1                      read(buffer,*) nFish,nfishGroup,isKB
 # parameters for each body
  1          1          1          1           read(buffer,*) fishNum(fishGroup),numX,numY,numZ
  cylinder.dat                                 read(buffer,*) FEmeshName(iFish)
