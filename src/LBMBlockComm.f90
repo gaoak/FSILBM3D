@@ -38,7 +38,7 @@ module LBMBlockComm
             sId = pair%sonId
             pair%islocal = 0
             do j=1,6
-                if(LBMblks(blockTree(treenode)%sons(i))%BndConds(j).eq.BCfluid) then
+                if(LBMblks(blockTree(fId)%sons(i))%BndConds(j).eq.BCfluid) then
                     if(mod(j,2).eq.1) then
                         pair%sds(j) = 1
                     else
@@ -64,7 +64,7 @@ module LBMBlockComm
                 pair%f(2) = pair%f(1) + sxD
                 pair%f(4) = pair%f(3) + syD
                 pair%f(6) = pair%f(5) + szD
-                pair%si(1:6) = pair%s(1:6) + pair%sds(1:6)
+                pair%si(1:6) = pair%s(1:6) + pair%sds(1:6) * ratio
                 pair%fi(1:6) = pair%f(1:6) + pair%sds(1:6)
                 blockTree(treenode)%comm(i) = pair
             enddo
@@ -297,12 +297,12 @@ module LBMBlockComm
         integer:: treenode, time, f, s, i, ns
         integer:: xF, yF, zF, x, y, z
         f = treenode
-        ns = blockTree(treenode)%nsons
+        ns = blockTree(f)%nsons
         if(ns .ne. 0) then
             do i = 1,ns
-                s = blockTree(treenode)%sons(i)
+                s = blockTree(f)%sons(i)
                 if(LBMblks(s)%BndConds(1).eq.BCfluid) then
-                    xF = blockTree(treenode)%comm(i)%f(1)
+                    xF = blockTree(f)%comm(i)%f(1)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
                     do y = 1,LBMblks(f)%yDim
                     do z = 1,LBMblks(f)%zDim
@@ -314,7 +314,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(2).eq.BCfluid) then
-                    xF = blockTree(treenode)%comm(i)%f(2)
+                    xF = blockTree(f)%comm(i)%f(2)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
                     do y = 1,LBMblks(f)%yDim
                     do z = 1,LBMblks(f)%zDim
@@ -326,7 +326,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(3).eq.BCfluid) then
-                    yF = blockTree(treenode)%comm(i)%f(3)
+                    yF = blockTree(f)%comm(i)%f(3)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
                     do x = 1,LBMblks(f)%xDim
                     do z = 1,LBMblks(f)%zDim
@@ -338,7 +338,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(4).eq.BCfluid) then
-                    yF = blockTree(treenode)%comm(i)%f(4)
+                    yF = blockTree(f)%comm(i)%f(4)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
                     do x = 1,LBMblks(f)%xDim
                     do z = 1,LBMblks(f)%zDim
@@ -350,7 +350,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(5).eq.BCfluid) then
-                    zF = blockTree(treenode)%comm(i)%f(5)
+                    zF = blockTree(f)%comm(i)%f(5)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
                     do x = 1,LBMblks(f)%xDim
                     do y = 1,LBMblks(f)%yDim
@@ -362,7 +362,7 @@ module LBMBlockComm
                     !$OMP END PARALLEL DO
                 endif
                 if(LBMblks(s)%BndConds(6).eq.BCfluid) then
-                    zF = blockTree(treenode)%comm(i)%f(6)
+                    zF = blockTree(f)%comm(i)%f(6)
                     !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
                     do x = 1,LBMblks(f)%xDim
                     do y = 1,LBMblks(f)%yDim
@@ -382,18 +382,22 @@ module LBMBlockComm
         implicit none
         integer,intent(in):: treenode
         integer:: i,nblock
-        type(CommPair)::pair
+        type(CommPair)::p
         logical:: flag
+        real(8)::residual
         flag = .false. ! default flase
         do i=1,blocktree(treenode)%nsons
-            pair = blocktree(treenode)%comm(i)
-            flag = (LBMblks(pair%fatherId)%dh .ne. LBMblks(pair%sonId)%dh*m_gridDelta .or. mod(LBMblks(pair%sonId)%xDim,m_gridDelta) .ne. 1 .or. &
-                mod(LBMblks(pair%sonId)%yDim,m_gridDelta) .ne. 1 .or. mod(LBMblks(pair%sonId)%zDim,m_gridDelta) .ne. 1 .or. &
-                mod(NINT((LBMblks(pair%sonId)%xmin-LBMblks(pair%fatherId)%xmin)/LBMblks(pair%sonId)%dh),m_gridDelta) .ne. 0 .or. &
-                mod(NINT((LBMblks(pair%sonId)%ymin-LBMblks(pair%fatherId)%ymin)/LBMblks(pair%sonId)%dh),m_gridDelta) .ne. 0 .or. &
-                mod(NINT((LBMblks(pair%sonId)%zmin-LBMblks(pair%fatherId)%zmin)/LBMblks(pair%sonId)%dh),m_gridDelta) .ne. 0)
-            if(flag) then
-                write(*,*) 'grid points do not match between fluid blocks',pair%fatherId,pair%sonId
+            p = blocktree(treenode)%comm(i)
+            flag =  abs(LBMblks(p%fatherId)%dh - LBMblks(p%sonId)%dh*m_gridDelta).gt.1d-8 .or. &
+                    mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. 1 .or. &
+                    mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. 1 .or. &
+                    mod(LBMblks(p%sonId)%zDim,m_gridDelta) .ne. 1
+            residual = (LBMblks(p%sonId)%xmin-LBMblks(p%fatherId)%xmin)/LBMblks(p%fatherId)%dh + &
+                       (LBMblks(p%sonId)%ymin-LBMblks(p%fatherId)%ymin)/LBMblks(p%fatherId)%dh + &
+                       (LBMblks(p%sonId)%zmin-LBMblks(p%fatherId)%zmin)/LBMblks(p%fatherId)%dh
+            residual = abs(residual - dble(NINT(residual)))
+            if(flag .or. residual .gt. 1d-8) then
+                write(*,*) 'grid points do not match between fluid blocks',p%fatherId,p%sonId
                 stop
             endif
             call check_blocks_params(blocktree(treenode)%sons(i))
