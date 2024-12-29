@@ -4,7 +4,7 @@ Parallel
 EndParallel
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
- 50.00D+0   50.00D+0                          read(buffer,*) timeSimTotal,timeContiDelta
+ 0.020D+0   50.00D+0                          read(buffer,*) timeSimTotal,timeContiDelta
  0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
  0.500D+0   0.500D+0   0.500D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
  40.00D+0   1.000D+0                          read(buffer,*) Re,denIn
