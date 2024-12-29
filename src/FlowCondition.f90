@@ -2,7 +2,7 @@ module FlowCondition
     implicit none
     private
     public :: FlowCondType,flow
-    public :: read_flow_conditions,write_parameter_check_file,read_probe_params,write_information_titles,write_fluid_information,write_solid_information
+    public :: read_flow_conditions,read_probe_params,write_information_titles,write_fluid_information,write_solid_information
     type :: FlowCondType
         integer :: isConCmpt,numsubstep,npsize
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
@@ -99,28 +99,6 @@ module FlowCondition
                 read(buffer,*)    flow%solidProbingNode(i)
             enddo
         endif
-        close(111)
-    END SUBROUTINE
-
-    SUBROUTINE  write_parameter_check_file(filename)
-        implicit none
-        character(LEN=40):: filename
-        open(111,file=filename)
-        write(111,'(A      )')'===================================================================='
-        write(111,'(A,F20.10)')'Re   =', flow%Re
-        write(111,'(A,F20.10)')'den  =', flow%denIn
-        write(111,'(A      )')'===================================================================='
-        write(111,'(A,F20.10)')'Nu   =', flow%Nu
-        write(111,'(A,F20.10)')'Mu   =', flow%Mu
-        write(111,'(A      )')'===================================================================='
-        write(111,'(A,F20.10)')'Lref =', flow%Lref
-        write(111,'(A,F20.10)')'Uref =', flow%Uref
-        write(111,'(A,F20.10)')'Tref =', flow%Tref
-        write(111,'(A,F20.10)')'Aref =', flow%Aref
-        write(111,'(A,F20.10)')'Pref =', flow%Pref
-        write(111,'(A,F20.10)')'Eref =', flow%Eref
-        write(111,'(A,F20.10)')'Fref =', flow%Fref
-        write(111,'(A      )')'===================================================================='
         close(111)
     END SUBROUTINE
 

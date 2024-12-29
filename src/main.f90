@@ -38,15 +38,15 @@ PROGRAM main
     call calculate_reference_params(flow)
     call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(blockTreeRoot)%BndConds,&
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
-    call write_parameter_check_file(checkFile)
     !==================================================================================================
     ! Initialization before simulation
     call initialise_solid_bodies(0.d0, g)
     call FindCarrierFluidBlock()
     call initialise_fuild_blocks(time)
     !==================================================================================================
-    ! Check blocks number and calculate the tau of each block
+    ! Check blocks number and check the tau of each block
     call check_blocks_params(blockTreeRoot)
+    call write_parameter_check_file(checkFile)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)
