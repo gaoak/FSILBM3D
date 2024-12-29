@@ -96,7 +96,6 @@ $PBS_WDIR/$PBS_ENAME
   1. *npairs*：Number of parent-child relationships (0 represents only one fluid block)
   2.  *fatherId*: The ID of the parent block
   3. *sonId*: The ID of the son block
-  4. *type*:
 
 - **FlowCondition**
 
@@ -105,7 +104,7 @@ $PBS_WDIR/$PBS_ENAME
   2. *isConCmpt* : Determining new simulation or continue simulaion
 
      + 0 : Calculate from the beginning
-     + Calculate from last output
+     + 1: Calculate from last output
 
   3. *numsubstep*: Number of sub-steps for solid time-stepping solution
 
