@@ -1202,9 +1202,9 @@ module FluidDomain
         dh = 1.d10
         n = -1
         do i=1,m_nblocks
-            if( LBMblks(i)%xmin.lt.x(1) .and. x(1).lt.LBMblks(i)%xmax .and. &
-                LBMblks(i)%ymin.lt.x(2) .and. x(2).lt.LBMblks(i)%ymax .and. &
-                LBMblks(i)%zmin.lt.x(3) .and. x(3).lt.LBMblks(i)%zmax) then
+            if( LBMblks(i)%xmin.le.x(1) .and. x(1).lt.LBMblks(i)%xmax .and. &
+                LBMblks(i)%ymin.le.x(2) .and. x(2).lt.LBMblks(i)%ymax .and. &
+                LBMblks(i)%zmin.le.x(3) .and. x(3).lt.LBMblks(i)%zmax) then
                 if(LBMblks(i)%dh .lt. dh) then
                     dh = LBMblks(i)%dh
                     n = i
