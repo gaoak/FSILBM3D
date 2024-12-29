@@ -46,7 +46,7 @@ PROGRAM main
     call initialise_fuild_blocks(time)
     !==================================================================================================
     ! Check blocks number and calculate the tau of each block
-    call check_blocks_params(m_nblocks)
+    call check_blocks_params(blockTreeRoot)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)
