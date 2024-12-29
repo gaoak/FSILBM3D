@@ -57,7 +57,7 @@ nohup /home/gaoak/LBM/FSILBM3D/FSILBM3D &>log
 submit the PBS script (2 threads for example)
 ```
 #!/bin/sh 
-#PBS -N LBMD
+#PBS -N LBM2D
 #PBS -e stderr.txt 
 #PBS -o stdout.txt
 #PBS -l nodes=1:ppn=2
@@ -82,153 +82,220 @@ $PBS_WDIR/$PBS_ENAME
 ## Input file description
 
 - **inFlow.dat**     Simulation control parameters
-- **FluidMesh.dat**  Fluid mesh (use Carriage Return and Line Feed（CRLF）)
 - **Plate.dat**      Body mesh
 - **cleanfiles.sh**  Bash script to create/clean output directories
 
 ## Simulation control parameters
 
-- **Calculate control parameters**
-1. *npsize* : The core number used in the simulaion
-2. *isRelease* : Determining the content of the output log
-    - 0 : Output more detail (body states) 
-    - 1 : Brief output to save memory
-3. *isConCmpt* : Determining new simulation or continue simulaion
-    - 0 : Calculate from the beginning
-    - 1 : Calculate from last output (DatTemp/conwr.dat)
-4. *iCollidModel* : Determines the LBM model used in simualtion
-    - 1 : *LBGK*
-    - 2 : *MRT-LBGK*
-5. *isKB* : Determining the kind of parameters of the flexible bodies
-    - 0 : *KB, KS*
-    - 1 : *EmR, TcR*
+- **Parallel**
 
-- **Time control**
+  1. *npsize* : The core number used in the simulaion
 
-1. *timeSimTotl*  : Dimensionless total simulation time (time/Tref <= timeSimTotl)
+- **Communication**
 
-2. *timeContiDelta* (*timeOutTemp*)  : Dimensionless time interval for restart file output (for continue simulation)
+  1. *npairs*：Number of parent-child relationships (0 represents only one fluid block)
+  2.  *fatherId*: The ID of the parent block
+  3. *sonId*: The ID of the son block
+  4. *type*:
 
-3. *timeWriteFlow* (*timeOutFlow*)  : Dimensionless time interval for flow field output
+- **FlowCondition**
 
-4. *timeWriteBody* (*timeOutBody* ) : Dimensionless time interval for body output
+  1.  isConCmpt:
 
-5. *timeWriteInfo* (*timeOutInfo*)  : Dimensionless time interval for DatInfo output (force, velocity *et. al.*)
+  2. *isConCmpt* : Determining new simulation or continue simulaion
 
-6. *timeWriteBegin* (*timeOutBegin*) : Dimensionless time to start flow field and body output
+     + 0 : Calculate from the beginning
+     + Calculate from last output
 
-7. *timeWriteEnd* (*timeOutEnd*)   : Dimensionless time to end flow field and body output (output only in timeOutBegin<= time/Tref <= timeOutEnd)
+  3. *numsubstep*: Number of sub-steps for solid time-stepping solution
 
-8. *dt* : For uniform grid dt=dx=dy=dz. For non-uniform grid $(dt<min(dx, dy,dz))$
+  4. *timeSimTotal*: Dimensionless total simulation time (time/Tref <= timeSimTotl)
 
-- **Reference values**
-1. *Lref* : The reference length, whihc is the mimimum chord length of all bodies
-2. *Uref* : The reference velocity, which is determined by *RefVelocity*
-3. *RefVelocity (UrefType)*: Determining the definition of reference velocity
-    - 0  : X-incoming flow velocity $U_\infty$;
-    - 1  : Y-incoming flow velocity $V_\infty$;
-    - 2  : Incoming flow velocity magnitude $\sqrt{U_\infty^2 + V_\infty^2}$
-    - 3  : Maximum moving wall velocity
-    - 4  : Velocity amplitude of Concussion velocity
-    - 10 : Flapping frequency velocity $L f$
-    - 11 : Maximum plunging velocity $2\pi f a$
-    - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF $2\pi f a * 2$
-    - *else* : The input value $(Uref)$ in parameter file inflow.dat
-4. *RefTime(TrefType）* : Determining the definition of reference time
-    - 0  : Caculated by referece length and reference velocity $(Tref = Lref / Uref)$
-    - 1  : Caculated by the maximum frequency of the bodies $(Tref = 1 / max(frequency))$
-    - *else*  : The input value $(Tref)$ in parameter file inflow.dat
-5. *Tref=Lref/Uref* : The reference time, when Tref < 0 is defined as $(Lref/Uref)$, otherwise, it equals its input value
-6. *Freq, St* : The flapping frequence for flexible bodies;
-7. *Frod*: Inverse square of the Froude number $Frod = g L / U_{ref}^2$. Determining the gravity force exerted on the body
+  5. *timeContiDelta*: Dimensionless time interval for restart file output (for continue simulation)
 
-- **Initial conditions and boundary conditions**
+  6. *timeWriteBegin*: Dimensionless time to start flow field and body output
 
-1. *uvwIn* : The incoming Velocity ($U_\infty$, $V_\infty$, $W_\infty$), determined by the boundary kind
-2. *numsubstep*:Number of sub-steps for solid time-stepping solution
-3. *denIn*:Fluid density
-4. *ntolLBM*:Maximum number of iterations for the LBM method
-5. *dtolLBM*:Error tolerance for the LBM method
-6. *Re*:Reynolds Number
-7. *boundaryConditions(xmin, xmax, ymin, ymax, zmin, zmax)* : Boundary conditions on four boundaries
-    - 101 : Symmetric boundary
-    - 103：Periodic Boundary
-    - 200 : Fixed wall
-    - 201 : Moving wall, only for the top and bottom boundaries $(ymin, ymax)$
-    - 300 : Dirichlet boundary (DirecletUP)
-    - 301 : Dirichlet boundary (DirecletUU)
-    - 302 : Neumann boundary (Advection1)
-    - 303 : Neumann boundary (Advection2)
-    - 304 : Periodic boundary (When calculating infinite bodies, the fluid grid should be one grid less than the solid grid, i.e. fluid grid containes one end whereas solid grid contains both ends)
-8. *VelocityKind* : Especially for Direclet velocity conditions on the left and right boundaries
-    - 0, Uniform or uniform shear flow, the boundary velocity is 
-    $[uIn(1) = uuuIn(1) + 0 * shearRateIn(1) + y * shearRateIn(2) + z * shearRateIn(3)]$;
-    - 2, Vibration flow, the boundary velocity is 
-    $[uIn(1) + VelocityAmp * dcos(2 * pi * VelocityFreq * time), uIn(2)]$
-9. *shearRateIn* : Parameters for uniform shear flow
-10. *VelocityAmp,VelocityFreq* : Parameters for vibration flow
-11. *MovingKind* : Especially for moving wall conditions $(201)$ on the bottom wall (1) and upper wall (2)
-     - 0, Passive moving wall, the velocity is $uIn(1)$; 
-     - 1, Couette moving wall, the velocity is $movingVel$; 
-     - 2, Stokes moving wall, the velocity is $MovingVel * dcos(2 * pi * MovingFreq * time)$;
-12. *movingVel,movingFreq* : Parameters for moving wall boundary
-13. *AmplInitDist, FreqInitDist*
-     - Parameters for initial velocity disturbance, the velocity is 
-     $[Uin(1) + AmplInitDist(1) * dsin(2.0 * pi * FreqInitDist(1)),$
-        $Uin(2) + AmplInitDist(2) * dsin(2.0 * pi * FreqInitDist(2)),$
-        $Uin(3) + AmplInitDist(3) * dsin(2.0 * pi * FreqInitDist(3))]$;
-14. *VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi* : Parameters for Volume Force
-     According to the NS equation : $[rho * Du/Dt = rho * f_x - dp/dx]$
-     $[VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi), VolumeForceIn(2), VolumeForceIn(3)]$;
+  7. *timeWriteEnd*: Dimensionless time to end flow field and body output (output only in timeOutBegin<= time/Tref <= timeOutEnd)
+
+  8. *timeWriteFlow*: Dimensionless time interval for flow field output
+
+  9. *timeWriteBody*  : Dimensionless time interval for body output
+
+  10. *timeWriteInfo*  : Dimensionless time interval for DatInfo output (force, velocity *et. al.*)
+
+  11. *Re*: Dimensionless Reynolds Number 
+
+  12. *denIn*: Fluid density           
+
+  13. *uvwIn*: The incoming Velocity 
+      $$
+      U_\infty, V_\infty, W_\infty
+      $$
+       (determined by the boundary kind)
+
+  14. *shearRateIn*: Parameters for uniform shear flow 
+
+  15. *VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi* : Parameters for Volume Force
+
+       According to the NS equation : 
+      $$
+      rho * Du/Dt = rho * f_x - dp/dx
+      $$
+
+      $$
+      $[VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi), VolumeForceIn(2), VolumeForceIn(3)]$
+      $$
+
+  16. *TrefType*: Determining the definition of reference time
+
+      * 0  : Caculated by referece length and reference velocity 
+        $$
+        (Tref = Lref / Uref)
+        $$
+
+      * 1  : Caculated by the maximum frequency of the bodies 
+        $$
+        Tref = 1 / max(frequency)
+        $$
+
+      * *else*  : The input value Tref in parameter file inflow.dat
+
+  17. *UrefType*:  Determining the definition of reference velocity
+
+      - 0  : X-incoming flow velocity
+        $$
+        U_\infty
+        $$
+
+      - 1  : Y-incoming flow velocity 
+        $$
+        V_\infty
+        $$
+
+      - 2  : Incoming flow velocity magnitude
+        $$
+        \sqrt{U_\infty^2 + V_\infty^2}
+        $$
+
+      - 3  : Maximum moving wall velocity
+
+      - 4  : Velocity amplitude of Concussion velocity
+
+      - 10 : Flapping frequency velocity 
+        $$
+        L f
+        $$
+
+      - 11 : Maximum plunging velocity 
+        $$
+        2\pi f a
+        $$
+
+      - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF 
+        $$
+        2\pi f a * 2
+        $$
+
+      - *else* : The input value Uref in parameter file inflow.dat
+
+  18. *ntolLBM*: Maximum number of iterations for the LBM method
+
+  19. *dtolLBM*: Error tolerance for the LBM method
 
 - **FluidBlocks**
-1. *isMoveGrid (offsetOutpu)* : The computation domain moves with first body if this equals 1
-2. *nblock*:Number of fluid grid partitions
-3. *ID*:Fluid Block ID
-4. *xDim,yDim,zDim*:Number of nodes in the x, y, and z directions of the fluid block
-5. *params*:Pending (Optional) Parameters
 
-1. *iMoveDimX,Y,Z* : The grid moves space dimension, if this equals 1
-2. *isMoveOutputX,Y,Z* : Outputting the relative flow grid and body, i.e. in the moving frame of reference, if this equals 1
+  1. *nblock*: Number of fluid grid partitions
+  2. *ID*: The ID of  fluid grid
+  3. *iCollideModel*:  Determines the LBM model used in simualtion  
+     + 1 : *LBGK* ：Single Relaxation Time
+     + 2 : *MRT-LBGK*：Multiple Relaxation Time Lattice Boltzmann Method
+  4. *offsetOutput*: The computation domain moves with first body if this equals 1
+  5. *isoutput*: Outputting the relative flow grid and body, i.e. in the moving frame of reference, if this equals 1
+  6.  *xDim,yDim,zDim*: Number of nodes in the x, y, and z directions of the fluid block
+  7. *dh*: For uniform grid dh=dx=dy=dz
+  8. *xmin,ymin,zmin*: Starting position of fluid block
+  9. *boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)*: Boundary conditions on six boundaries
+     + 101 : Symmetric boundary
+     + 103：Periodic Boundary
+     + 200 : Fixed wall
+     + 201 : Moving wall, only for the top and bottom boundaries $(ymin, ymax)$
+     + 300 : Dirichlet boundary (DirecletUP)
+     + 301 : Dirichlet boundary (DirecletUU)
+     + 302 : Neumann boundary (Advection1)
+     + 303 : Neumann boundary (Advection2)
+     + 304 : Periodic boundary (When calculating infinite bodies, the fluid grid should be one grid less than the solid grid, i.e. fluid grid containes one end whereas solid grid contains both ends)
+  10. *params*: Pending Parameters
 
-- **Data probe set**
-1. *numSampFlow( fluidProbingNum)* : The number of data detection points in flow field
-2. *isFluidOutput* : Only when it equals 1 the detected fluid data will be output
-3. *SampFlowPint( The coordinates of detection points)* : The coordinates of detection points
-4. *numSampBody(solidProbingNum)* : The number of data detection points in bodies
-5. *isBodyOutput*:Only when it equals 1 the detected body data will be output
-6. *SampBodyNode(solidProbingNode)* : The serial number of each detection points in the specific body
+- **SolidBody**
 
-- **general parameters for solid solver**
-1. *dspan* : The virtual grid length of the bodies along the span
-2. *IBPenaltyalpha*:Velocity correction parameter of the penalty function in the IBM method
-3. *alphaf*:Parameter for correcting torsion in the mass matrix
-4. *NewmarkGamma,NewmarkBeta*:Parameters of the Newmark method
-5. *dampK,dampM*:Stiffness damping K, mass damping M
-6. *dtolFEM,ntolFEM*:Maximum number of iterations and error tolerance for the FEM method
-7. *theta* : The angle between the body span direction and the x-axis (have not yet implemented)
-8. *Nspan* : The number of virtual grids along the span of the bodies
-9. *FishKind* : Numbers of the solid bodies type
-10. *nFish* : Total number of the solid bodies
-12. *fishnum  (fishGroup）*: The number of the solid bodies in the specific type
-13. *numX,numY,numZ*:Number of arrangements of multiple bodies in the x, y, and z directions
-14. *FEmeshName(iFish)* : The name of the body mesh file  in the specific type
-15. *iBodyModel(iFish)* : Choose for the body models
-     - 1, rigid body;
-     - 2, flexible body;
-16. *isMotionGiven(iFish)* : Degrees of freedom in six directions
-17. *iBodyType(iFish)*：Type of virtual object
-18. *denR（iFish）* : Density ratio, $rho_b * h / rho_f * L$, $h$ is plate thickness
-19.  *psR(iFish)*：Poisson ratio
-20. *KB（iFish）, KS（iFish）* : Dimensionless tension rigidity and bending rigidity
-21. *Freq（iFish）, St（iFish）* : The flapping frequence for flexible bodies
-22. *firstXYZ（XYZointial）* : The initial position of the first point of the bodies
-23. *dXYZo（deltaXYZ)* : If there are more than one bodies in a type, *dXYZo* determines the interval between front and rear solids
-24. *waittingTime* : The dimensionaless time stayed at the peak and trough in flapping period $(t/T)$
-25. *XYZAmpl, XYZPhi* : Parameters for body flapping
-     - $XYZ = XYZAmpl * dcos(2.0 * pi * Freq * time + XYZPhi)$
-26. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
-     - $Theta = AoAo + AoAAmpl * dcos(2.0 * pi * Freq * time + AoAPhi)$
+  1. *IBPenaltyalpha*:Velocity correction parameter of the penalty function in the IBM method
+
+  2. *alphaf*:Parameter for correcting torsion in the mass matrix
+
+  3. *NewmarkGamma,NewmarkBeta*:Parameters of the Newmark method
+
+  4. *dampK,dampM*: Stiffness damping K, mass damping M
+
+  5. *dtolFEM,ntolFEM*:Maximum number of iterations and error tolerance for the FEM method
+
+  6. *nFish* : Total number of the solid bodies
+
+  7. *nfishGroup*: Numbers of the solid bodies type
+
+  8. *carrierFluidId*: Usually it's 2
+
+  9. *isKB*:  Determining the kind of parameters of the flexible bodies 
+
+     * 0 : *KB, KS*(Bending Stiffness, Stretching Stiffness)
+     * 1 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic Time Ratio)
+
+  10. *fishnum  (fishGroup）*: The number of the solid bodies in the specific type
+
+  11. *numX,numY,numZ*: Number of arrangements of multiple bodies in the x, y, and z directions   !!!!!!!!!!!
+
+  12. *FEmeshName(iFish)*: The name of the body mesh file  in the specific type
+
+  13. *iBodyModel(iFish)*: Choose for the body models
+
+      + 1: rigid body
+      + 2: flexible body
+
+  14. *iBodyType(iFish)*: Type of virtual object
+
+  15. *isMotionGiven*: Degrees of freedom in six directions
+
+  16. *denR（iFish）* : Density ratio, 
+      $$
+      rho_b * h / rho_f * L
+      $$
+      L is plate thickness
+
+  17. *psR(iFish)*: Poisson ratio
+
+  18. *Freq（iFish)* : The flapping frequence for flexible bodies
+
+  19. *firstXYZ*: The initial position of the first point of the bodies
+
+  20. *deltaXYZ*: If there are more than one bodies in a type, *deltaXYZ* determines the interval between front and rear solids
+
+  21. *XYZAmpl, XYZPhi* : Parameters for body flapping
+
+       - $$
+         XYZ = XYZAmpl * dcos(2.0 * pi * Freq * time + XYZPhi)
+         $$
+
+  22. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
+
+       - $$
+         Theta = AoAo + AoAAmpl * dcos(2.0 * pi * Freq * time + AoAPhi)
+         $$
+
+- **ProbingFluid**
+  1. *fluidProbingNum*: The number of data detection points in flow field
+  2. *fluidProbingCoords* : The coordinates of detection points
+- **ProbingSolid**
+  1. *solidProbingNum*:  The number of data detection points in bodies
+  2. *solidProbingNode*: The serial number of each detection points in the specific body
 
 ## Output file description
 - **Output files**
