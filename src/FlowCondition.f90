@@ -60,6 +60,10 @@ module FlowCondition
         call readNextData(111, buffer)
         read(buffer,*)    flow%ntolLBM,flow%dtolLBM
         close(111)
+        ! flow%denIn is not 1
+        if(abs(flow%denIn-1.d0).gt.1e-6) then
+            write(*,*) 'Warning, denIn is not 1, ', flow%denIn
+        endif
     END SUBROUTINE
 
     SUBROUTINE read_probe_params(filename)
