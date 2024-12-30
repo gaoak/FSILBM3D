@@ -231,3 +231,45 @@
         !interCoord(3) = c1*(zmin + dh*(z1 - 1)) + c2*(zmin + dh*(z2 - 1)) + c3*(zmin + dh*(z1 - 1)) + c4*(zmin + dh*(z1 - 1)) + &
         !                c5*(zmin + dh*(z2 - 1)) + c6*(zmin + dh*(z2 - 1)) + c7*(zmin + dh*(z1 - 1)) + c8*(zmin + dh*(z2 - 1))
     END SUBROUTINE
+
+    SUBROUTINE  write_parameter_check_file(filename)
+        use FlowCondition
+        use FluidDomain
+        use LBMBlockComm
+        implicit none
+        character(LEN=40):: filename
+        open(111,file=filename)
+        write(111,'(A      )')'===================================================================='
+        write(111,'(A,F20.10)')'Re   =', flow%Re
+        write(111,'(A,F20.10)')'den  =', flow%denIn
+        write(111,'(A      )')'===================================================================='
+        write(111,'(A,F20.10)')'Nu   =', flow%Nu
+        write(111,'(A,F20.10)')'Mu   =', flow%Mu
+        write(111,'(A      )')'===================================================================='
+        write(111,'(A,F20.10)')'Lref =', flow%Lref
+        write(111,'(A,F20.10)')'Uref =', flow%Uref
+        write(111,'(A,F20.10)')'Tref =', flow%Tref
+        write(111,'(A,F20.10)')'Aref =', flow%Aref
+        write(111,'(A,F20.10)')'Pref =', flow%Pref
+        write(111,'(A,F20.10)')'Eref =', flow%Eref
+        write(111,'(A,F20.10)')'Fref =', flow%Fref
+        call write_parameter_blocks(blockTreeRoot)
+        write(111,'(A      )')'===================================================================='
+        close(111)
+
+        contains
+
+        recursive subroutine write_parameter_blocks(treenode)
+            implicit none
+            integer:: treenode,i,s
+            character(len=4):: IDstr
+            write(IDstr,'(I4.4)')LBMblks(treenode)%ID
+            write(111,'(A,A,A  )')'========================== BlockID = ',IDstr,' =========================='
+            write(111,'(A,F20.10)')'Tau  =', LBMblks(treenode)%tau
+            write(111,'(A,F20.10)')'Omega=', LBMblks(treenode)%Omega
+            do i=1,blockTree(treenode)%nsons
+                s = blockTree(treenode)%comm(i)%sonId
+                call write_parameter_blocks(s)
+            enddo
+            end subroutine
+    END SUBROUTINE

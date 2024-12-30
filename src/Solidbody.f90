@@ -4,8 +4,8 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
-    public :: m_nFish,m_carrierFluidId
-    integer:: m_nFish, m_carrierFluidId,m_ntolLBM
+    public :: m_nFish
+    integer:: m_nFish,m_ntolLBM
     real(8):: m_dtolLBM, m_IBPenaltyAlpha, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
     integer:: m_boundaryConditions(1:6)
     ! nFish     number of bodies
@@ -17,6 +17,8 @@ module SolidBody
               calculate_reference_params,set_solidbody_parameters
     type :: VirtualBody
         type(BeamSolver):: rbm
+        ! vitural body in which fluid ID
+        integer :: v_carrierFluidId
         !!!virtual infomation
         !!!virtual body surface
         integer :: v_nelmts
@@ -92,14 +94,17 @@ module SolidBody
         call readNextData(111, buffer)
         read(buffer,*)    dtolFEM,ntolFEM
         call readNextData(111, buffer)
-        read(buffer,*)    m_nFish,nfishGroup,m_carrierFluidId,isKB
+        read(buffer,*)    m_nFish,nfishGroup,isKB
         if(m_IBPenaltyAlpha.le.1.d-6) then
             write(*,*) 'ERROR: IBPenaltyalpha should be positive (default 1)', m_IBPenaltyAlpha
             stop
         endif
         ! set solid solver global parameters
         call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
-        allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish),denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish),XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish),AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
+        allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish), &
+                denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish), &
+                XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish), &
+                AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
         ! read fish parameters for each type
         fishNum(1)=1
         do ifishGroup = 1,nfishGroup
@@ -137,7 +142,7 @@ module SolidBody
             read(buffer,*)    t_AoAAmpl(1:3)
             call readNextData(111, buffer)
             read(buffer,*)    t_AoAPhi(1:3)
-            call readequal(111)
+            if(ifishGroup .lt. nfishGroup) call readequal(111)
             order1 = order1 + fishNum(ifishGroup  );
             order2 = order2 + fishNum(ifishGroup+1);
             ! read parameters for each fish
@@ -181,7 +186,7 @@ module SolidBody
                 call SurfacetoBeam_write(FEmeshName(iFish))
             endif
             call VBodies(iFish)%rbm%SetSolver(FEmeshName(iFish),&
-                iBodyModel(iFish),iBodyType(iFish),isMotionGiven(1:6,iFish), &
+                iBodyModel(iFish),isMotionGiven(1:6,iFish), &
                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
                 freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
                 AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
@@ -211,8 +216,13 @@ module SolidBody
             flow%Uref = dabs(flow%uvwIn(3))
         elseif(flow%UrefType==3) then
             flow%Uref = dsqrt(flow%uvwIn(1)**2 + flow%uvwIn(2)**2 + flow%uvwIn(3)**2)
-        !elseif(flow%UrefType==4) then
-        !    Uref = dabs(VelocityAmp)  !Velocity Amplitude
+        elseif(flow%UrefType==4) then
+            if (flow%velocityKind .eq. 2) then
+                flow%Uref = dabs(flow%shearRateIn(1))  ! flow%shearRateIn(1) is Velocity Amplitude
+            else
+                write(*,*) 'oscillatory flow must set velocityKind to 2'
+                stop
+            endif
         elseif(flow%UrefType==5) then
             flow%Uref = flow%Lref * MAXVAL(VBodies(:)%rbm%Freq)
         elseif(flow%UrefType==6) then
