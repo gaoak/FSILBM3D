@@ -9,7 +9,7 @@ module SolidSolver
     public :: BeamSolver,Set_SolidSolver_Params
     type :: BeamSolver
         character (LEN=40):: FEmeshName
-        integer:: iBodyModel,iBodyType
+        integer:: iBodyModel
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
         integer, allocatable :: r_Nspan(:)
@@ -45,12 +45,12 @@ module SolidSolver
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,iBodyType_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
+    Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
                             Freq_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
         character (LEN=40),intent(in):: FEmeshName_
-        integer,intent(in):: iBodyModel_,iBodyType_,isMotionGiven_(6)
+        integer,intent(in):: iBodyModel_,isMotionGiven_(6)
         real(8),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
         real(8),intent(in):: Freq_
         real(8),intent(in):: XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
@@ -58,7 +58,6 @@ module SolidSolver
         
         this%FEmeshName = FEmeshName_
         this%iBodyModel = iBodyModel_
-        this%iBodyType = iBodyType_
         this%isMotionGiven(1:6)=isMotionGiven_(1:6)
         this%denR= denR_
         this%psR = psR_

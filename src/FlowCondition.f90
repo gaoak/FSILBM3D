@@ -2,12 +2,13 @@ module FlowCondition
     implicit none
     private
     public :: FlowCondType,flow
-    public :: read_flow_conditions,write_parameter_check_file,read_probe_params,write_information_titles,write_fluid_information,write_solid_information
+    public :: read_flow_conditions,read_probe_params,write_information_titles,write_fluid_information,write_solid_information
     type :: FlowCondType
         integer :: isConCmpt,numsubstep,npsize
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
-        real(8) :: Re,dt,denIn,nu,Mu,dtolLBM
+        real(8) :: Re,denIn,nu,Mu,dtolLBM
         integer :: TrefType,UrefType,ntolLBM
+        integer :: velocityKind
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
         real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
         real(8) :: Uref,Lref,Tref
@@ -31,6 +32,7 @@ module FlowCondition
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*)    flow%npsize
+        rewind(111)
         keywordstr = 'FlowCondition'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
@@ -42,11 +44,11 @@ module FlowCondition
         call readNextData(111, buffer)
         read(buffer,*)    flow%timeFlowDelta,flow%timeBodyDelta,flow%timeInfoDelta
         call readNextData(111, buffer)
-        read(buffer,*)    flow%Re,flow%dt,flow%denIn
+        read(buffer,*)    flow%Re,flow%denIn
         call readNextData(111, buffer)
         read(buffer,*)    flow%uvwIn(1:3)
         call readNextData(111, buffer)
-        read(buffer,*)    flow%shearRateIn(1:3)
+        read(buffer,*)    flow%shearRateIn(1:3),flow%velocityKind
         call readNextData(111, buffer)
         read(buffer,*)    flow%volumeForceIn(1:3)
         call readNextData(111, buffer)
@@ -58,6 +60,10 @@ module FlowCondition
         call readNextData(111, buffer)
         read(buffer,*)    flow%ntolLBM,flow%dtolLBM
         close(111)
+        ! flow%denIn is not 1
+        if(abs(flow%denIn-1.d0).gt.1e-6) then
+            write(*,*) 'Warning, denIn is not 1, ', flow%denIn
+        endif
     END SUBROUTINE
 
     SUBROUTINE read_probe_params(filename)
@@ -93,29 +99,6 @@ module FlowCondition
                 read(buffer,*)    flow%solidProbingNode(i)
             enddo
         endif
-        close(111)
-    END SUBROUTINE
-
-    SUBROUTINE  write_parameter_check_file(filename)
-        implicit none
-        character(LEN=40):: filename
-        open(111,file=filename)
-        write(111,'(A      )')'===================================================================='
-        write(111,'(A,F20.10)')'Re   =', flow%Re
-        write(111,'(A,F20.10)')'dt   =', flow%dt
-        write(111,'(A,F20.10)')'den  =', flow%denIn
-        write(111,'(A      )')'===================================================================='
-        write(111,'(A,F20.10)')'Nu   =', flow%Nu
-        write(111,'(A,F20.10)')'Mu   =', flow%Mu
-        write(111,'(A      )')'===================================================================='
-        write(111,'(A,F20.10)')'Lref =', flow%Lref
-        write(111,'(A,F20.10)')'Uref =', flow%Uref
-        write(111,'(A,F20.10)')'Tref =', flow%Tref
-        write(111,'(A,F20.10)')'Aref =', flow%Aref
-        write(111,'(A,F20.10)')'Pref =', flow%Pref
-        write(111,'(A,F20.10)')'Eref =', flow%Eref
-        write(111,'(A,F20.10)')'Fref =', flow%Fref
-        write(111,'(A      )')'===================================================================='
         close(111)
     END SUBROUTINE
 
@@ -185,12 +168,12 @@ module FlowCondition
             endif
             ! velocity interpolation
             do j=1,3
-                call grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,flow%fluidProbingCoords(i,1:3),velocityIn(zDim,yDim,xDim,j),velocityOut(j))
+                call grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,flow%fluidProbingCoords(i,1:3),velocityIn(1:zDim,1:yDim,1:xDim,j),velocityOut(j))
             enddo
             ! write file
             write(probeNum,'(I3.3)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt',position='append')
-            write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
+            write(111,'(4E20.10)') time/flow%Tref,flow%fluidProbingCoords(i,1:3)/flow%Lref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
         END SUBROUTINE
