@@ -93,7 +93,7 @@ $PBS_WDIR/$PBS_ENAME
 
 - **Communication**
 
-  1. *npairs*：Number of parent-child relationships (0 represents only one fluid block)
+  1. *npairs*: Number of parent-child relationships (0 represents only one fluid block)
   2.  *fatherId*: The ID of the parent block
   3. *sonId*: The ID of the son block
 
@@ -204,8 +204,8 @@ $PBS_WDIR/$PBS_ENAME
   1. *nblock*: Number of fluid grid partitions
   2. *ID*: The ID of  fluid grid
   3. *iCollideModel*:  Determines the LBM model used in simualtion  
-     + 1 : *LBGK* ：Single Relaxation Time
-     + 2 : *MRT-LBGK*：Multiple Relaxation Time Lattice Boltzmann Method
+     + 1 : *LBGK* : Single Relaxation Time
+     + 2 : *MRT-LBGK*: Multiple Relaxation Time Lattice Boltzmann Method
   4. *offsetOutput*: The computation domain moves with first body if this equals 1
   5. *isoutput*: Outputting the relative flow grid and body, i.e. in the moving frame of reference, if this equals 1
   6.  *xDim,yDim,zDim*: Number of nodes in the x, y, and z directions of the fluid block
@@ -213,7 +213,7 @@ $PBS_WDIR/$PBS_ENAME
   8. *xmin,ymin,zmin*: Starting position of fluid block
   9. *boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)*: Boundary conditions on six boundaries
      + 101 : Symmetric boundary
-     + 103：Periodic Boundary
+     + 103 : Periodic Boundary
      + 200 : Fixed wall
      + 201 : Moving wall, only for the top and bottom boundaries $(ymin, ymax)$
      + 300 : Dirichlet boundary (DirecletUP)
@@ -246,7 +246,7 @@ $PBS_WDIR/$PBS_ENAME
      * 0 : *KB, KS*(Bending Stiffness, Stretching Stiffness)
      * 1 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic Time Ratio)
 
-  10. *fishnum  (fishGroup）*: The number of the solid bodies in the specific type
+  10. *fishnum  (fishGroup)*: The number of the solid bodies in the specific type
 
   11. *numX,numY,numZ*: Number of arrangements of multiple bodies in the x, y, and z directions   !!!!!!!!!!!
 
@@ -261,7 +261,7 @@ $PBS_WDIR/$PBS_ENAME
 
   15. *isMotionGiven*: Degrees of freedom in six directions
 
-  16. *denR（iFish）* : Density ratio, 
+  16. *denR(iFish)* : Density ratio, 
       $$
       rho_b * h / rho_f * L
       $$
@@ -269,7 +269,7 @@ $PBS_WDIR/$PBS_ENAME
 
   17. *psR(iFish)*: Poisson ratio
 
-  18. *Freq（iFish)* : The flapping frequence for flexible bodies
+  18. *Freq(iFish)* : The flapping frequence for flexible bodies
 
   19. *firstXYZ*: The initial position of the first point of the bodies
 
@@ -300,8 +300,8 @@ $PBS_WDIR/$PBS_ENAME
 2. *DatFlow*     : Floder of flow field results
 3. *DatInfo*     : Floder of force and power *et. al.* results
 4. *DatTemp*     : Floder of continuation document
-5. *DatBodyIB*   ：Folder of body results for immersed boundary method when $Palpha \gt 0$
-6. *DatBodySpan* ：Folder of spanwise-extension body results
+5. *DatBodyIB*   : Folder of body results for immersed boundary method when $Palpha \gt 0$
+6. *DatBodySpan* : Folder of spanwise-extension body results
 7. *Check.dat*   : Parameter record file
 
 - **Files description**
