@@ -4,7 +4,7 @@ Parallel
 EndParallel
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
- 1.000D+2   1.000D+2                          read(buffer,*) timeSimTotal,timeContiDelta
+ 50.00D+0   1.000D+2                          read(buffer,*) timeSimTotal,timeContiDelta
  0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
  2.000D+0   2.000D+0   0.200D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
  5.000D+0   1.000D+0                          read(buffer,*) Re,denIn
@@ -25,9 +25,9 @@ FluidBlocks
  0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
  2          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
- 401        21         41                     read(buffer,*) xDim,yDim,zDim
- 0.025D+0  -5.000D+0   0.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
- 301   301   201   0   301   301              read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 161        121        41                     read(buffer,*) xDim,yDim,zDim
+ 0.025D+0  -2.000D+0   1.000D+0  0.000D+0     read(buffer,*) dh,xmin,ymin,zmin
+ 0     0     0     0   301   301              read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0.00   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
 ENDFluidBlocks
