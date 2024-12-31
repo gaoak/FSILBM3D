@@ -17,6 +17,7 @@ module FlowCondition
         integer :: fluidProbingNum,inWhichBlock,solidProbingNum
         integer, allocatable :: solidProbingNode(:)
         real(8), allocatable :: fluidProbingCoords(:,:)
+        real(8) :: AmplInitDist(1:3),waveInitDist
     end type FlowCondType
     type(FlowCondType) :: flow
 
@@ -102,6 +103,20 @@ module FlowCondition
         close(111)
     END SUBROUTINE
 
+    ! SUBROUTINE read_distb_params(filename)
+    !     implicit none
+    !     character(LEN=40),intent(in):: filename
+    !     character(LEN=256):: buffer
+    !     character(LEN=40):: keywordstr
+    !     ! read fluid disturb
+    !     open(unit=111, file=filename, status='old', action='read')
+    !     keywordstr = 'Disturb'
+    !     call found_keyword(111,keywordstr)
+    !     call readNextData(111, buffer)
+    !     read(buffer,*)    flow%waveInitDist,flow%AmplInitDist(1:3)
+    !     close(111)
+    ! END SUBROUTINE
+
     SUBROUTINE write_information_titles(nFish)
         implicit none
         integer:: i,iFish,nFish
@@ -121,7 +136,7 @@ module FlowCondition
             close(111)
             ! write average information titles
             open(111,file='./DatInfo/FishMeanInfo_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v" '
+            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write power title
             open(111,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt')
@@ -143,7 +158,7 @@ module FlowCondition
         do  i=1,flow%fluidProbingNum
             write(probeNum,'(I3.3)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt')
-            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w" '
+            write(111,*) 'variables= "t"  "u"  "v"  "w" '
             close(111)
         enddo
     END SUBROUTINE
@@ -173,7 +188,7 @@ module FlowCondition
             ! write file
             write(probeNum,'(I3.3)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt',position='append')
-            write(111,'(4E20.10)') time/flow%Tref,flow%fluidProbingCoords(i,1:3)/flow%Lref,velocityOut(1:3)/flow%Uref
+            write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
         END SUBROUTINE

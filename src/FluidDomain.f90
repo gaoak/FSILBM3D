@@ -383,20 +383,24 @@ module FluidDomain
         END SUBROUTINE initialise_flow
     END SUBROUTINE initialise_
 
-    !subroutine  initDisturb_(this)
+    ! subroutine  initDisturb_(this)
     !    implicit none
     !    class(LBMBlock), intent(inout) :: this
-    !    integer:: x, y,z
-    !    do  z = 1, this%zDim
-    !    do  y = 1, this%yDim
+    !    real(8):: xCoord,yCoord,zCoord
+    !    integer:: x, y, z
     !    do  x = 1, this%xDim
-    !         this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+AmplInitDist(1)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-    !         this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+AmplInitDist(2)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-    !         this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+AmplInitDist(3)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+    !        xCoord = this%xmin + this%dh * (x - 1);
+    !    do  y = 1, this%yDim
+    !        yCoord = this%ymin + this%dh * (y - 1);
+    !    do  z = 1, this%zDim
+    !        zCoord = this%zmin + this%dh * (z - 1);
+    !        this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+flow%AmplInitDist(1)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*xCoord)
+    !        this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+flow%AmplInitDist(2)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*yCoord)
+    !        this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+flow%AmplInitDist(3)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*zCoord)
     !    enddo
     !    enddo
     !    enddo
-    !END SUBROUTINE
+    ! END SUBROUTINE
 
     SUBROUTINE set_boundary_conditions_(this)
         implicit none
@@ -872,9 +876,9 @@ module FluidDomain
             real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
             integer:: z, y, x
             real(8):: temp, tmpz(1:zDim)
-        
+
             if(dz.eq.0 .and. dy.eq.0) return
-        
+
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp,tmpz)
             do  x = 1, xDim
                 if(dz.eq.1) then
@@ -1139,7 +1143,7 @@ module FluidDomain
        velocityOut(3) = velocityIn(3)
     END SUBROUTINE
 
-    ! calcualte distribution Function 
+    ! calcualte distribution Function
     SUBROUTINE calculate_distribution_funcion(density,velocity,distribution)
         implicit none
         real(8):: distribution(0:lbmDim)
@@ -1149,7 +1153,7 @@ module FluidDomain
         distribution(0:lbmDim)  = wt(0:lbmDim) * density * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
     END SUBROUTINE
 
-    ! set moving wall boundary distribution Function 
+    ! set moving wall boundary distribution Function
     SUBROUTINE evaluate_moving_wall(density,velocity,distributionIn,distributionOut)
         implicit none
         real(8):: distributionIn(0:lbmDim),distributionOut(0:lbmDim)

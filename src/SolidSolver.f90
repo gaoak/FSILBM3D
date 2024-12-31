@@ -4,7 +4,7 @@ module SolidSolver
     integer, parameter:: m_idat=12
     real(8):: m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf
     real(8):: m_dtolFEM,m_pi
-    integer:: m_ntolFEM,m_iForce2Body,m_iKB
+    integer:: m_ntolFEM,m_iKB
     real(8):: m_g(3)
     public :: BeamSolver,Set_SolidSolver_Params
     type :: BeamSolver
@@ -419,15 +419,9 @@ module SolidSolver
              if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
 
-        if    (m_iForce2Body==1)then   !Same force as flow
         open(fid,file='./DatInfo/ForceDirect_'//trim(fileName)//'.plt',position='append')
         write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
         close(fid)
-        elseif(m_iForce2Body==2)then   !stress force
-        open(fid,file='./DatInfo/ForceStress_'//trim(fileName)//'.plt',position='append')
-        write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
-        close(fid)
-        endif
 
         !==============================================================================================
         open(fid,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt',position='append')
