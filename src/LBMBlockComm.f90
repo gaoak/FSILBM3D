@@ -30,7 +30,9 @@ module LBMBlockComm
         type(CommPair)::pair
         nsons = blockTree(treenode)%nsons
         if(nsons .eq. 0) return
-        allocate(blockTree(treenode)%comm(nsons))
+        if(.not.allocated(blockTree(treenode)%comm(nsons))) then
+            allocate(blockTree(treenode)%comm(nsons))
+        endif
         do i=1,nsons
             pair%fatherId = treenode
             pair%sonId = blockTree(treenode)%sons(i)
@@ -231,13 +233,18 @@ module LBMBlockComm
         implicit none
         integer:: i, s, treenode, n_timeStep, iFish
         real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine2,time_end2
+        logical:: macroupdated
+        macroupdated = .false.
         call LBMblks(treenode)%update_volume_force()
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
-        call LBMblks(treenode)%calculate_macro_quantities()
         call LBMblks(treenode)%ResetVolumeForce()
         if (blockTree(treenode)%nsons .eq. 0) then
             do iFish = 1,m_nFish
                 if (treenode .eq. VBodies(iFish)%v_carrierFluidId) then
+                    if(.not.macroupdated) then
+                        call LBMblks(treenode)%calculate_macro_quantities()
+                        macroupdated = .true.
+                    endif
                     call IBM_FEM(treenode,time_IBM,time_FEM,LBMblks(treenode)%blktime)
                 endif
             enddo
@@ -412,15 +419,23 @@ module LBMBlockComm
         implicit none
         type(CommPair),intent(in):: pair
         integer:: xS,yS,zS,xF,yF,zF
+        real(8)::tmpf(0:lbmDim),coeff
+        coffe = (LBMblks(pair%sonId)%tau / LBMblks(pair%fatherId)%tau) / dble(m_gridDelta)
         ! x direction slices
         if(pair%sds(1).eq.1) then
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS,xF,yF,zF)
-            do  yS=1,LBMblks(pair%sonId)%yDim,m_gridDelta
-            do  zS=1,LBMblks(pair%sonId)%zDim,m_gridDelta
-                xS=                         1+m_gridDelta
-                call deliver_grid_distribution(pair%fatherId,pair%sonId,xS,yS,zS,xF,yF,zF)
-                call fIn_son_to_father(pair%fatherId,pair%sonId,xF,yF,zF)
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS,xF,yF,zF,tmpf)
+            xS=pair%si(1)
+            xF=pair%fi(1)
+            yF = pair%fi(3)
+            do  yS=pair%si(3),pair%si(4),m_gridDelta
+            zF = pair%fi(5)
+            do  zS=pair%si(5),pair%si(6),m_gridDelta
+                tmpf = LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim)
+                call fIn_son_to_father(tmpf, coeff) ! coeff 0.5 or 2?
+                LBMblks(pair%fatherId)%fIn(zF,yF,xF,0:lbmDim) = tmpf
+                zF = zF + 1
             enddo
+            yF = yF + 1
             enddo
             !$OMP END PARALLEL DO
         endif
@@ -596,6 +611,7 @@ module LBMBlockComm
 
     SUBROUTINE interpolation_grid_distribution(father,son,xS,yS,zS,n_timeStep,aDim,bDim,fIn_t1,fIn_t2,uuu_t1,xyz)
         ! interpolating distribution function from father block to son block
+        ! plane data, omp parallel inside, use average to replace interpolation
         implicit none
         integer:: father,son,n_timeStep,xS,yS,zS,xyz
         integer:: xF1,yF1,zF1,xF2,yF2,zF2
@@ -683,6 +699,20 @@ module LBMBlockComm
         if(n_timeStep==1)LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = 0.5d0*fIn_S2(0:lbmDim)+0.5d0*fIn_S1(0:lbmDim)
         if(n_timeStep==1)LBMblks(son)%uuu(zS,yS,xS,1:3     ) = uuu_S_(1:3     )
         ! LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = dble(n_timeStep - 0)/dble(m_gridDelta) * fIn_S2(0:lbmDim) + dble(m_gridDelta - n_timeStep)/dble(m_gridDelta) * fIn_S1(0:lbmDim)
+    end subroutine
+
+    subroutine fIn_GridTransform(fin,coeff)! Dupius-Chopard method
+        implicit none
+        real(8),intent(in)::coeff
+        real(8),intent(inout):: fin(0:lbmDim)
+        integer:: father,son,xS,yS,zS
+        real(8),intent(in):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),coffe
+        ! Guo 2008 P97 6.1.8
+        !calculate uuu here
+        uSqr           = sum(LBMblks(son)%uuu(zS,yS,xS,1:3)**2)
+        uxyz(0:lbmDim) = LBMblks(son)%uuu(zS,yS,xS,1) * ee(0:lbmDim,1) + LBMblks(son)%uuu(zS,yS,xS,2) * ee(0:lbmDim,2)+LBMblks(son)%uuu(zS,yS,xS,3) * ee(0:lbmDim,3)
+        fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(son)%den(zS,yS,xS) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
+        LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) - fEq(0:lbmDim))
     end subroutine
 
     subroutine fIn_father_to_son(father,son,xS,yS,zS)! Dupius-Chopard method
