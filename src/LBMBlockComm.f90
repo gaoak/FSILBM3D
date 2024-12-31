@@ -536,222 +536,158 @@ module LBMBlockComm
         LBMblks(father)%uuu(zF,yF,xF,1:3     ) = LBMblks(son)%uuu(zS,yS,xS,1:3     )
     end subroutine
 
-    SUBROUTINE interpolation_father_to_son(pair,n_timeStep)
+    SUBROUTINE interpolation_father_to_son(p,n_timeStep)
         implicit none
-        type(CommPair),intent(in):: pair
+        type(CommPair),intent(in):: p
         integer:: n_timeStep,xS,yS,zS,xF,yF,zF
-        real(8):: tmpf(0:lbmDim),coeff,VF(1:3),dh
-        coeff = (LBMblks(pair%sonId)%tau / LBMblks(pair%fatherId)%tau) / dble(m_gridDelta)
-        VF    = LBMblks(pair%sonId)%volumeForce(1:3)
-        dh    = LBMblks(pair%sonId)%dh
+        real(8):: coeff,VF(1:3),dh
+        real(8),allocatable::tmpf(:,:,:)
+        integer:: xDimS, xDimF, yDimS, yDimF, zDimS, zDimF
+        coeff = (LBMblks(p%sonId)%tau / LBMblks(p%fatherId)%tau) / dble(m_gridDelta)
+        VF    = LBMblks(p%sonId)%volumeForce(1:3)
+        dh    = LBMblks(p%sonId)%dh
+        xDimS = p%s(2) - p%s(1) + 1
+        xDimF = p%f(2) - p%f(1) + 1
+        yDimS = p%s(4) - p%s(3) + 1
+        yDimF = p%f(4) - p%f(3) + 1
+        zDimS = p%s(6) - p%s(5) + 1
+        zDimF = p%f(6) - p%f(5) + 1
         ! x direction
+        if(pair%sds(1).eq.1 .or. pair%sds(2).eq.-1) then
+            allocate(tmpf(zDimS,yDimS,0:lbmDim))
+        endif
         if(pair%sds(1).eq.1) then
-            xF = pair%f(1)
-            xS = pair%s(1)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS,yF,zF,tmpf)
-            do  yS = pair%s(3),pair%s(4),m_gridDelta
-                yF = (yS - pair%s(3))/2 + pair%f(3)
-                do  zS = pair%s(5),pair%s(6),m_gridDelta
-                    zF = (zS - pair%s(5))/2 + pair%f(5)
-                    call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                    LBMblks(pair%sonId)%fIn_Fx1t1,LBMblks(pair%sonId)%fIn_Fx1t2,n_timeStep,yF,zF,1)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf
-                    if (yS .lt. pair%s(4) .and. zS .lt. pair%s(6)) then
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fx1t1,LBMblks(pair%sonId)%fIn_Fx1t2,n_timeStep,yF,zF,2)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fx1t1,LBMblks(pair%sonId)%fIn_Fx1t2,n_timeStep,yF,zF,3)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS+1,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fx1t1,LBMblks(pair%sonId)%fIn_Fx1t2,n_timeStep,yF,zF,4)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS+1,xS,0:lbmDim) = tmpf
-                    endif
+            xS = p%s(1)
+            if(n_timeStep.eq.0) then
+                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx1t1,zDimS,yDimS,tmpf)
+            else
+                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx1t2,zDimS,yDimS,tmpf)
+            endif
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS)
+            do  yS = 1,yDimS
+                do  zS = 1,zDimS
+                    call fIn_GridTransform(tmpf(zS,yS,:), coeff, VF, dh)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,yS,:)
                 enddo
             enddo
             !$OMP END PARALLEL DO
         endif
         if(pair%sds(2).eq.-1) then
-            xF = pair%f(2)
-            xS = pair%s(2)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS,yF,zF,tmpf)
-            do  yS = pair%s(3),pair%s(4),m_gridDelta
-                yF = (yS - pair%s(3))/2 + pair%f(3)
-                do  zS = pair%s(5),pair%s(6),m_gridDelta
-                    zF = (zS - pair%s(5))/2 + pair%f(5)
-                    call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                    LBMblks(pair%sonId)%fIn_Fx2t1,LBMblks(pair%sonId)%fIn_Fx2t2,n_timeStep,yF,zF,1)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf
-                    if (yS .lt. pair%s(4) .and. zS .lt. pair%s(6)) then
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fx2t1,LBMblks(pair%sonId)%fIn_Fx2t2,n_timeStep,yF,zF,2)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fx2t1,LBMblks(pair%sonId)%fIn_Fx2t2,n_timeStep,yF,zF,3)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS+1,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%yDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fx2t1,LBMblks(pair%sonId)%fIn_Fx2t2,n_timeStep,yF,zF,4)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS+1,xS,0:lbmDim) = tmpf
-                    endif
+            xS = p%s(2)
+            if(n_timeStep.eq.0) then
+                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx2t1,zDimS,yDimS,tmpf)
+            else
+                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx2t2,zDimS,yDimS,tmpf)
+            endif
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS)
+            do  yS = 1,yDimS
+                do  zS = 1,zDimS
+                    call fIn_GridTransform(tmpf(zS,yS,:), coeff, VF, dh)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,yS,:)
                 enddo
             enddo
             !$OMP END PARALLEL DO
         endif
+        if(allocated(tmpf)) deallocate(tmpf)
         ! y direction
+        if(pair%sds(3).eq.1 .or. pair%sds(4).eq.-1) then
+            allocate(tmpf(zDimS,xDimS,0:lbmDim))
+        endif
         if(pair%sds(3).eq.1) then
-            yF = pair%f(3)
-            yS = pair%s(3)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,xF,zF,tmpf)
-            do  xS = pair%s(1),pair%s(2),m_gridDelta
-                xF = (xS - pair%s(1))/2 + pair%f(1)
-                do  zS = pair%s(5),pair%s(6),m_gridDelta
-                    zF = (zS - pair%s(5))/2 + pair%f(5)
-                    call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                    LBMblks(pair%sonId)%fIn_Fy1t1,LBMblks(pair%sonId)%fIn_Fy1t2,n_timeStep,xF,zF,1)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf
-                    if (yS .lt. pair%s(4) .and. zS .lt. pair%s(6)) then
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fy1t1,LBMblks(pair%sonId)%fIn_Fy1t2,n_timeStep,xF,zF,2)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fy1t1,LBMblks(pair%sonId)%fIn_Fy1t2,n_timeStep,xF,zF,3)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS,xS+1,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fy1t1,LBMblks(pair%sonId)%fIn_Fy1t2,n_timeStep,xF,zF,4)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS,xS+1,0:lbmDim) = tmpf
-                    endif
+            yS = p%s(3)
+            if(n_timeStep.eq.0) then
+                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy1t1,zDimS,xDimS,tmpf)
+            else
+                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy1t2,zDimS,xDimS,tmpf)
+            endif
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS)
+            do  xS = 1,xDimS
+                do  yS = 1,yDimS
+                    call fIn_GridTransform(tmpf(zS,xS,:), coeff, VF, dh)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,xS,:)
                 enddo
             enddo
             !$OMP END PARALLEL DO
         endif
         if(pair%sds(4).eq.-1) then
-            yF = pair%f(4)
-            yS = pair%s(4)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,xF,zF,tmpf)
-            do  xS = pair%s(1),pair%s(2),m_gridDelta
-                xF = (xS - pair%s(1))/2 + pair%f(1)
-                do  zS = pair%s(5),pair%s(6),m_gridDelta
-                    zF = (zS - pair%s(5))/2 + pair%f(5)
-                    call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                    LBMblks(pair%sonId)%fIn_Fy2t1,LBMblks(pair%sonId)%fIn_Fy2t2,n_timeStep,xF,zF,1)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf
-                    if (yS .lt. pair%s(4) .and. zS .lt. pair%s(6)) then
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fy2t1,LBMblks(pair%sonId)%fIn_Fy2t2,n_timeStep,xF,zF,2)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fy2t1,LBMblks(pair%sonId)%fIn_Fy2t2,n_timeStep,xF,zF,3)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS,xS+1,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%zDim, &
-                                        LBMblks(pair%sonId)%fIn_Fy2t1,LBMblks(pair%sonId)%fIn_Fy2t2,n_timeStep,xF,zF,4)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS+1,yS,xS+1,0:lbmDim) = tmpf
-                    endif
+            yS = p%s(4)
+            if(n_timeStep.eq.0) then
+                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy2t1,zDimS,xDimS,tmpf)
+            else
+                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy2t2,zDimS,xDimS,tmpf)
+            endif
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS)
+            do  xS = 1,xDimS
+                do  yS = 1,yDimS
+                    call fIn_GridTransform(tmpf(zS,xS,:), coeff, VF, dh)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,xS,:)
                 enddo
             enddo
             !$OMP END PARALLEL DO
         endif
+        if(allocated(tmpf)) deallocate(tmpf)
         ! z direction
+        if(pair%sds(5).eq.1 .or. pair%sds(6).eq.-1) then
+            allocate(tmpf(yDimS,xDimS,0:lbmDim))
+        endif
         if(pair%sds(5).eq.1) then
-            zF = pair%f(5)
-            zS = pair%s(5)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,xF,yF,tmpf)
-            do  xS = pair%s(1),pair%s(2),m_gridDelta
-                xF = (xS - pair%s(1))/2 + pair%f(1)
-                do  yS = pair%s(3),pair%s(4),m_gridDelta
-                    yF = (yS - pair%s(3))/2 + pair%f(3)
-                    call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                    LBMblks(pair%sonId)%fIn_Fz1t1,LBMblks(pair%sonId)%fIn_Fz1t2,n_timeStep,xF,yF,1)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf
-                    if (yS .lt. pair%s(4) .and. zS .lt. pair%s(6)) then
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                        LBMblks(pair%sonId)%fIn_Fz1t1,LBMblks(pair%sonId)%fIn_Fz1t2,n_timeStep,xF,yF,2)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS+1,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                        LBMblks(pair%sonId)%fIn_Fz1t1,LBMblks(pair%sonId)%fIn_Fz1t2,n_timeStep,xF,yF,3)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS,xS+1,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                        LBMblks(pair%sonId)%fIn_Fz1t1,LBMblks(pair%sonId)%fIn_Fz1t2,n_timeStep,xF,yF,4)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS+1,xS+1,0:lbmDim) = tmpf
-                    endif
+            zS = p%s(5)
+            if(n_timeStep.eq.0) then
+                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz1t1,yDimS,xDimS,tmpf)
+            else
+                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz1t2,yDimS,xDimS,tmpf)
+            endif
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS)
+            do  xS = 1,xDimS
+                do  yS = 1,yDimS
+                    call fIn_GridTransform(tmpf(yS,xS,:), coeff, VF, dh)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(yS,xS,:)
                 enddo
             enddo
             !$OMP END PARALLEL DO
         endif
         if(pair%sds(6).eq.-1) then
-            zF = pair%f(6)
-            zS = pair%s(6)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,xF,yF,tmpf)
-            do  xS = pair%s(1),pair%s(2),m_gridDelta
-                xF = (xS - pair%s(1))/2 + pair%f(1)
-                do  yS = pair%s(3),pair%s(4),m_gridDelta
-                    yF = (yS - pair%s(3))/2 + pair%f(3)
-                    call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                    LBMblks(pair%sonId)%fIn_Fz2t1,LBMblks(pair%sonId)%fIn_Fz2t2,n_timeStep,xF,yF,1)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf
-                    if (yS .lt. pair%s(4) .and. zS .lt. pair%s(6)) then
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                        LBMblks(pair%sonId)%fIn_Fz2t1,LBMblks(pair%sonId)%fIn_Fz2t2,n_timeStep,xF,yF,2)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS+1,xS,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                        LBMblks(pair%sonId)%fIn_Fz2t1,LBMblks(pair%sonId)%fIn_Fz2t2,n_timeStep,xF,yF,3)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS,xS+1,0:lbmDim)   = tmpf
-                        call interpolate(tmpf,LBMblks(pair%fatherId)%xDim, LBMblks(pair%fatherId)%yDim, &
-                                        LBMblks(pair%sonId)%fIn_Fz2t1,LBMblks(pair%sonId)%fIn_Fz2t2,n_timeStep,xF,yF,4)
-                        call fIn_GridTransform(tmpf, coeff, VF, dh)
-                        LBMblks(pair%sonId)%fIn(zS,yS+1,xS+1,0:lbmDim) = tmpf
-                    endif
+            zS = p%s(6)
+            if(n_timeStep.eq.0) then
+                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz2t1,yDimS,xDimS,tmpf)
+            else
+                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz2t2,yDimS,xDimS,tmpf)
+            endif
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS)
+            do  xS = 1,xDimS
+                do  yS = 1,yDimS
+                    call fIn_GridTransform(tmpf(yS,xS,:), coeff, VF, dh)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(yS,xS,:)
                 enddo
             enddo
             !$OMP END PARALLEL DO
         endif
+        if(allocated(tmpf)) deallocate(tmpf)
     end subroutine
 
-    subroutine interpolate(tmpf,aDim,bDim,fIn_t1,fIn_t2,n_timeStep,a,b,position)
+    subroutine interpolate(bF,aF,fF,bS,aS,fS)
         implicit none
-        integer:: aDim,bDim,n_timeStep,a,b,position
-        real(8):: tmpf(0:lbmDim),tmpf_t0(0:lbmDim),tmpf_t1(0:lbmDim),fIn_t1(bDim,aDim,0:lbmDim),fIn_t2(bDim,aDim,0:lbmDim)
-        if (position .eq. 1) then
-            tmpf_t0 = fIn_t1(b,a,0:lbmDim)
-            tmpf_t1 = fIn_t2(b,a,0:lbmDim)
-        endif
-        if (position .eq. 2) then
-            tmpf_t0 = 0.5d0*fIn_t1(b,a,0:lbmDim)+0.5d0*fIn_t1(b+1,a,0:lbmDim)
-            tmpf_t1 = 0.5d0*fIn_t2(b,a,0:lbmDim)+0.5d0*fIn_t2(b+1,a,0:lbmDim)
-        endif
-        if (position .eq. 3) then
-            tmpf_t0 = 0.5d0*fIn_t1(b,a,0:lbmDim)+0.5d0*fIn_t1(b,a+1,0:lbmDim)
-            tmpf_t1 = 0.5d0*fIn_t2(b,a,0:lbmDim)+0.5d0*fIn_t2(b,a+1,0:lbmDim)
-        endif
-        if (position .eq. 4) then
-            tmpf_t0 = 0.25d0*fIn_t1(b,a,0:lbmDim)+0.25d0*fIn_t1(b,a+1,0:lbmDim)+0.25d0*fIn_t1(b+1,a,0:lbmDim)+0.25d0*fIn_t1(b+1,a+1,0:lbmDim)
-            tmpf_t1 = 0.25d0*fIn_t2(b,a,0:lbmDim)+0.25d0*fIn_t2(b,a+1,0:lbmDim)+0.25d0*fIn_t2(b+1,a,0:lbmDim)+0.25d0*fIn_t2(b+1,a+1,0:lbmDim)
-        endif
-        ! time interpolation distribution function from father block to son block
-        if(n_timeStep==0) tmpf = tmpf_t0
-        if(n_timeStep==1) tmpf = 0.5d0*tmpf_t0+0.5d0*tmpf_t1
+        integer,intent(in):: aS,bS,aF,bF
+        real(8),intent(in):: fF(bF,aF,0:lbmDim)
+        real(8),intent(out):: fS(bS,aS,0:lbmDim) !fine grid values
+        integer:: a,b,a1,b1
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
+        do b=1,bS,2
+            b1 = b / 2 +1
+            do a=1,aS,2
+                a1 = a / 2 + 1
+                fS(b,a,:) = fF(b1,a1,:)
+                if(b.lt.bS) fS(b+1,i,:) = (fF(b1,a1,:) + fF(b1+1,a1,:))*0.5
+            enddo
+        enddo
+        !$OMP END PARALLEL DO
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b)
+        do b=1,bS
+            do a=2,aS,2
+                fS(b,a,:) = (fS(b,a-1,:) + fS(b,a+1,:))*0.5
+            enddo
+        enddo
+        !$OMP END PARALLEL DO
     end subroutine
     SUBROUTINE interpolation_grid_distribution(father,son,xS,yS,zS,n_timeStep,aDim,bDim,fIn_t1,fIn_t2,uuu_t1,xyz)
         ! interpolating distribution function from father block to son block
