@@ -8,6 +8,7 @@ module LBMBlockComm
         integer:: sonId
         integer:: sds(1:6) ! 0 no need communication; 1(min),-1(max) need communication
         integer:: s(1:6),f(1:6),si(1:6),fi(1:6) ! s son's boundary layer; si son's first inner layer
+        integer:: xDimS, xDimF, yDimS, yDimF, zDimS, zDimF
         integer:: islocal ! local (0) or mpi (1)
     end type CommPair
     type :: blockTreeNode
@@ -68,6 +69,12 @@ module LBMBlockComm
                 pair%f(6) = pair%f(5) + szD
                 pair%si(1:6) = pair%s(1:6) + pair%sds(1:6) * ratio
                 pair%fi(1:6) = pair%f(1:6) + pair%sds(1:6)
+                pair%xDimS = pair%s(2) - pair%s(1) + 1
+                pair%xDimF = pair%f(2) - pair%f(1) + 1
+                pair%yDimS = pair%s(4) - pair%s(3) + 1
+                pair%yDimF = pair%f(4) - pair%f(3) + 1
+                pair%zDimS = pair%s(6) - pair%s(5) + 1
+                pair%zDimF = pair%f(6) - pair%f(5) + 1
                 blockTree(treenode)%comm(i) = pair
             enddo
             call build_blocks_comunication(blockTree(treenode)%sons(i))
@@ -189,42 +196,48 @@ module LBMBlockComm
 
     recursive subroutine allocate_fIn_uuu(treenode)
         implicit none
+        type(CommPair):: pair
         integer,intent(in):: treenode
-        integer:: i,f,s
-        do i=1,blockTree(treenode)%nsons
-            f = blockTree(treenode)%comm(i)%fatherId
-            s = blockTree(treenode)%comm(i)%sonId
+        integer:: i,f,s,ns,xDimF,yDimF,zDimF
+        f  = treenode
+        ns = blockTree(f)%nsons
+        do i = 1,ns
+            s = blockTree(f)%sons(i)
+            pair  = blockTree(f)%comm(i)
+            xDimF = pair%xDimF
+            yDimF = pair%yDimF
+            zDimF = pair%zDimF
             if(LBMblks(s)%BndConds(1).eq.BCfluid) then
-                allocate(LBMblks(s)%fIn_Fx1t1(LBMblks(f)%zDim,LBMblks(f)%yDim,0:lbmDim))
-                allocate(LBMblks(s)%fIn_Fx1t2(LBMblks(f)%zDim,LBMblks(f)%yDim,0:lbmDim))
-                allocate(LBMblks(s)%uuu_Fx1t1(LBMblks(f)%zDim,LBMblks(f)%yDim,1:3     ))
+                allocate(LBMblks(s)%fIn_Fx1t1(zDimF,yDimF,0:lbmDim))
+                allocate(LBMblks(s)%fIn_Fx1t2(zDimF,yDimF,0:lbmDim))
+                allocate(LBMblks(s)%uuu_Fx1t1(zDimF,yDimF,1:3     ))
             endif
             if(LBMblks(s)%BndConds(2).eq.BCfluid) then
-                allocate(LBMblks(s)%fIn_Fx2t1(LBMblks(f)%zDim,LBMblks(f)%yDim,0:lbmDim))
-                allocate(LBMblks(s)%fIn_Fx2t2(LBMblks(f)%zDim,LBMblks(f)%yDim,0:lbmDim))
-                allocate(LBMblks(s)%uuu_Fx2t1(LBMblks(f)%zDim,LBMblks(f)%yDim,1:3     ))
+                allocate(LBMblks(s)%fIn_Fx2t1(zDimF,yDimF,0:lbmDim))
+                allocate(LBMblks(s)%fIn_Fx2t2(zDimF,yDimF,0:lbmDim))
+                allocate(LBMblks(s)%uuu_Fx2t1(zDimF,yDimF,1:3     ))
             endif
             if(LBMblks(s)%BndConds(3).eq.BCfluid) then
-                allocate(LBMblks(s)%fIn_Fy1t1(LBMblks(f)%zDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%fIn_Fy1t2(LBMblks(f)%zDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%uuu_Fy1t1(LBMblks(f)%zDim,LBMblks(f)%xDim,1:3     ))
+                allocate(LBMblks(s)%fIn_Fy1t1(zDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%fIn_Fy1t2(zDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%uuu_Fy1t1(zDimF,xDimF,1:3     ))
             endif
             if(LBMblks(s)%BndConds(4).eq.BCfluid) then
-                allocate(LBMblks(s)%fIn_Fy2t1(LBMblks(f)%zDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%fIn_Fy2t2(LBMblks(f)%zDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%uuu_Fy2t1(LBMblks(f)%zDim,LBMblks(f)%xDim,1:3     ))
+                allocate(LBMblks(s)%fIn_Fy2t1(zDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%fIn_Fy2t2(zDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%uuu_Fy2t1(zDimF,xDimF,1:3     ))
             endif
             if(LBMblks(s)%BndConds(5).eq.BCfluid) then
-                allocate(LBMblks(s)%fIn_Fz1t1(LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%fIn_Fz1t2(LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%uuu_Fz1t1(LBMblks(f)%yDim,LBMblks(f)%xDim,1:3     ))
+                allocate(LBMblks(s)%fIn_Fz1t1(yDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%fIn_Fz1t2(yDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%uuu_Fz1t1(yDimF,xDimF,1:3     ))
             endif
             if(LBMblks(s)%BndConds(6).eq.BCfluid) then
-                allocate(LBMblks(s)%fIn_Fz2t1(LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%fIn_Fz2t2(LBMblks(f)%yDim,LBMblks(f)%xDim,0:lbmDim))
-                allocate(LBMblks(s)%uuu_Fz2t1(LBMblks(f)%yDim,LBMblks(f)%xDim,1:3     ))
+                allocate(LBMblks(s)%fIn_Fz2t1(yDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%fIn_Fz2t2(yDimF,xDimF,0:lbmDim))
+                allocate(LBMblks(s)%uuu_Fz2t1(yDimF,xDimF,1:3     ))
             endif
-            call allocate_fIn_uuu(blockTree(treenode)%sons(i))
+            call allocate_fIn_uuu(blockTree(f)%sons(i))
         enddo
     endsubroutine
 
@@ -296,87 +309,110 @@ module LBMBlockComm
     endsubroutine
 
     subroutine extract_interpolate_layer(treenode,time)
-        integer:: treenode, time, f, s, i, ns
-        integer:: xF, yF, zF, x, y, z
-        f = treenode
+        implicit none
+        type(CommPair):: pair
+        integer:: treenode,time
+        integer:: xF,yF,zF,x,y,z
+        integer:: i,f,s,ns,xDimF,yDimF,zDimF
+        f  = treenode
         ns = blockTree(f)%nsons
-        if(ns .ne. 0) then
-            do i = 1,ns
-                s = blockTree(f)%sons(i)
-                if(LBMblks(s)%BndConds(1).eq.BCfluid) then
-                    xF = blockTree(f)%comm(i)%f(1)
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
-                    do y = 1,LBMblks(f)%yDim
-                    do z = 1,LBMblks(f)%zDim
-                        if (time .eq. 1) LBMblks(s)%fIn_Fx1t1(z,y,:) = LBMblks(f)%fIn(z,y,xF,:)
-                        if (time .eq. 2) LBMblks(s)%fIn_Fx1t2(z,y,:) = LBMblks(f)%fIn(z,y,xF,:)
-                        if (time .eq. 1) LBMblks(s)%uuu_Fx1t1(z,y,:) = LBMblks(f)%uuu(z,y,xF,:)
-                    enddo
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-                if(LBMblks(s)%BndConds(2).eq.BCfluid) then
-                    xF = blockTree(f)%comm(i)%f(2)
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z)
-                    do y = 1,LBMblks(f)%yDim
-                    do z = 1,LBMblks(f)%zDim
-                        if (time .eq. 1) LBMblks(s)%fIn_Fx2t1(z,y,:) = LBMblks(f)%fIn(z,y,xF,:)
-                        if (time .eq. 2) LBMblks(s)%fIn_Fx2t2(z,y,:) = LBMblks(f)%fIn(z,y,xF,:)
-                        if (time .eq. 1) LBMblks(s)%uuu_Fx2t1(z,y,:) = LBMblks(f)%uuu(z,y,xF,:)
-                    enddo
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-                if(LBMblks(s)%BndConds(3).eq.BCfluid) then
-                    yF = blockTree(f)%comm(i)%f(3)
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
-                    do x = 1,LBMblks(f)%xDim
-                    do z = 1,LBMblks(f)%zDim
-                        if (time .eq. 1) LBMblks(s)%fIn_Fy1t1(z,x,:) = LBMblks(f)%fIn(z,yF,x,:)
-                        if (time .eq. 2) LBMblks(s)%fIn_Fy1t2(z,x,:) = LBMblks(f)%fIn(z,yF,x,:)
-                        if (time .eq. 1) LBMblks(s)%uuu_Fy1t1(z,x,:) = LBMblks(f)%uuu(z,yF,x,:)
-                    enddo
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-                if(LBMblks(s)%BndConds(4).eq.BCfluid) then
-                    yF = blockTree(f)%comm(i)%f(4)
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z)
-                    do x = 1,LBMblks(f)%xDim
-                    do z = 1,LBMblks(f)%zDim
-                        if (time .eq. 1) LBMblks(s)%fIn_Fy2t1(z,x,:) = LBMblks(f)%fIn(z,yF,x,:)
-                        if (time .eq. 2) LBMblks(s)%fIn_Fy2t2(z,x,:) = LBMblks(f)%fIn(z,yF,x,:)
-                        if (time .eq. 1) LBMblks(s)%uuu_Fy2t1(z,x,:) = LBMblks(f)%uuu(z,yF,x,:)
-                    enddo
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-                if(LBMblks(s)%BndConds(5).eq.BCfluid) then
-                    zF = blockTree(f)%comm(i)%f(5)
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
-                    do x = 1,LBMblks(f)%xDim
-                    do y = 1,LBMblks(f)%yDim
-                        if (time .eq. 1) LBMblks(s)%fIn_Fz1t1(y,x,:) = LBMblks(f)%fIn(zF,y,x,:)
-                        if (time .eq. 2) LBMblks(s)%fIn_Fz1t2(y,x,:) = LBMblks(f)%fIn(zF,y,x,:)
-                        if (time .eq. 1) LBMblks(s)%uuu_Fz1t1(y,x,:) = LBMblks(f)%uuu(zF,y,x,:)
-                    enddo
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-                if(LBMblks(s)%BndConds(6).eq.BCfluid) then
-                    zF = blockTree(f)%comm(i)%f(6)
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y)
-                    do x = 1,LBMblks(f)%xDim
-                    do y = 1,LBMblks(f)%yDim
-                        if (time .eq. 1) LBMblks(s)%fIn_Fz2t1(y,x,:) = LBMblks(f)%fIn(zF,y,x,:)
-                        if (time .eq. 2) LBMblks(s)%fIn_Fz2t2(y,x,:) = LBMblks(f)%fIn(zF,y,x,:)
-                        if (time .eq. 1) LBMblks(s)%uuu_Fz2t1(y,x,:) = LBMblks(f)%uuu(zF,y,x,:)
-                    enddo
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-            enddo
-        endif
+        do i = 1,ns
+            s = blockTree(f)%sons(i)
+            pair  = blockTree(f)%comm(i)
+            xDimF = pair%xDimF
+            yDimF = pair%yDimF
+            zDimF = pair%zDimF
+            if(LBMblks(s)%BndConds(1).eq.BCfluid) then
+                xF = pair%f(1)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF)
+                do y = 1,yDimF
+                do z = 1,zDimF
+                    yF = y + yDimF
+                    zF = z + zDimF
+                    if (time .eq. 1) LBMblks(s)%fIn_Fx1t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx1t1(z,y,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fx1t2(z,y,:))*0.5d0
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx1t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%uuu_Fx1t1(z,y,:) =  LBMblks(f)%uuu(zF,yF,xF,:)
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if(LBMblks(s)%BndConds(2).eq.BCfluid) then
+                xF = pair%f(2)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF)
+                do y = 1,yDimF
+                do z = 1,zDimF
+                    yF = y + yDimF
+                    zF = z + zDimF
+                    if (time .eq. 1) LBMblks(s)%fIn_Fx2t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx2t1(z,y,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fx2t2(z,y,:))*0.5d0
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx2t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%uuu_Fx2t1(z,y,:) =  LBMblks(f)%uuu(zF,yF,xF,:)
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if(LBMblks(s)%BndConds(3).eq.BCfluid) then
+                yF = pair%f(3)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF)
+                do x = 1,xDimF
+                do z = 1,zDimF
+                    xF = x + xDimF
+                    zF = z + zDimF
+                    if (time .eq. 1) LBMblks(s)%fIn_Fy1t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy1t1(z,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fy1t2(z,x,:))*0.5d0
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy1t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%uuu_Fy1t1(z,x,:) =  LBMblks(f)%uuu(zF,yF,xF,:)
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if(LBMblks(s)%BndConds(4).eq.BCfluid) then
+                yF = pair%f(4)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF)
+                do x = 1,xDimF
+                do z = 1,zDimF
+                    xF = x + xDimF
+                    zF = z + zDimF
+                    if (time .eq. 1) LBMblks(s)%fIn_Fy2t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy2t1(z,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fy2t2(z,x,:))*0.5d0
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy2t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%uuu_Fy2t1(z,x,:) =  LBMblks(f)%uuu(zF,yF,xF,:)
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if(LBMblks(s)%BndConds(5).eq.BCfluid) then
+                zF = pair%f(5)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF)
+                do x = 1,xDimF
+                do y = 1,yDimF
+                    xF = x + xDimF
+                    yF = y + yDimF
+                    if (time .eq. 1) LBMblks(s)%fIn_Fz1t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz1t1(y,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fz1t2(y,x,:))*0.5d0
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz1t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%uuu_Fz1t1(y,x,:) =  LBMblks(f)%uuu(zF,yF,xF,:)
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if(LBMblks(s)%BndConds(6).eq.BCfluid) then
+                zF = pair%f(6)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF)
+                do x = 1,xDimF
+                do y = 1,yDimF
+                    xF = x + xDimF
+                    yF = y + yDimF
+                    if (time .eq. 1) LBMblks(s)%fIn_Fz2t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz2t1(y,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fz2t2(y,x,:))*0.5d0
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz2t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%uuu_Fz2t1(y,x,:) =  LBMblks(f)%uuu(zF,yF,xF,:)
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+        enddo
     endsubroutine
 
     ! verify the parameters of fluid blocks
@@ -537,30 +573,23 @@ module LBMBlockComm
         integer:: n_timeStep,xS,yS,zS
         real(8):: coeff,VF(1:3),dh
         real(8),allocatable::tmpf(:,:,:)
-        integer:: xDimS, xDimF, yDimS, yDimF, zDimS, zDimF
         coeff = (LBMblks(pair%sonId)%tau / LBMblks(pair%fatherId)%tau) / dble(m_gridDelta)
         VF    = LBMblks(pair%sonId)%volumeForce(1:3)
         dh    = LBMblks(pair%sonId)%dh
-        xDimS = pair%s(2) - pair%s(1) + 1
-        xDimF = pair%f(2) - pair%f(1) + 1
-        yDimS = pair%s(4) - pair%s(3) + 1
-        yDimF = pair%f(4) - pair%f(3) + 1
-        zDimS = pair%s(6) - pair%s(5) + 1
-        zDimF = pair%f(6) - pair%f(5) + 1
         ! x direction
         if(pair%sds(1).eq.1 .or. pair%sds(2).eq.-1) then
-            allocate(tmpf(zDimS,yDimS,0:lbmDim))
+            allocate(tmpf(pair%zDimS,pair%yDimS,0:lbmDim))
         endif
         if(pair%sds(1).eq.1) then
             xS = pair%s(1)
             if(n_timeStep.eq.0) then
-                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx1t1,zDimS,yDimS,tmpf)
+                call interpolate(pair%zDimF,pair%yDimF,LBMblks(pair%sonId)%fIn_Fx1t1,pair%zDimS,pair%yDimS,tmpf)
             else
-                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx1t2,zDimS,yDimS,tmpf)
+                call interpolate(pair%zDimF,pair%yDimF,LBMblks(pair%sonId)%fIn_Fx1t2,pair%zDimS,pair%yDimS,tmpf)
             endif
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS)
-            do  yS = 1,yDimS
-                do  zS = 1,zDimS
+            do  yS = 1,pair%yDimS
+                do  zS = 1,pair%zDimS
                     call fIn_GridTransform(tmpf(zS,yS,:), coeff, VF, dh)
                     LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,yS,:)
                 enddo
@@ -570,13 +599,13 @@ module LBMBlockComm
         if(pair%sds(2).eq.-1) then
             xS = pair%s(2)
             if(n_timeStep.eq.0) then
-                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx2t1,zDimS,yDimS,tmpf)
+                call interpolate(pair%zDimF,pair%yDimF,LBMblks(pair%sonId)%fIn_Fx2t1,pair%zDimS,pair%yDimS,tmpf)
             else
-                call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx2t2,zDimS,yDimS,tmpf)
+                call interpolate(pair%zDimF,pair%yDimF,LBMblks(pair%sonId)%fIn_Fx2t2,pair%zDimS,pair%yDimS,tmpf)
             endif
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS)
-            do  yS = 1,yDimS
-                do  zS = 1,zDimS
+            do  yS = 1,pair%yDimS
+                do  zS = 1,pair%zDimS
                     call fIn_GridTransform(tmpf(zS,yS,:), coeff, VF, dh)
                     LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,yS,:)
                 enddo
@@ -586,18 +615,18 @@ module LBMBlockComm
         if(allocated(tmpf)) deallocate(tmpf)
         ! y direction
         if(pair%sds(3).eq.1 .or. pair%sds(4).eq.-1) then
-            allocate(tmpf(zDimS,xDimS,0:lbmDim))
+            allocate(tmpf(pair%zDimS,pair%xDimS,0:lbmDim))
         endif
         if(pair%sds(3).eq.1) then
             yS = pair%s(3)
             if(n_timeStep.eq.0) then
-                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy1t1,zDimS,xDimS,tmpf)
+                call interpolate(pair%zDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fy1t1,pair%zDimS,pair%xDimS,tmpf)
             else
-                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy1t2,zDimS,xDimS,tmpf)
+                call interpolate(pair%zDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fy1t2,pair%zDimS,pair%xDimS,tmpf)
             endif
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS)
-            do  xS = 1,xDimS
-                do  yS = 1,yDimS
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS)
+            do  xS = 1,pair%xDimS
+                do  zS = 1,pair%zDimS
                     call fIn_GridTransform(tmpf(zS,xS,:), coeff, VF, dh)
                     LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,xS,:)
                 enddo
@@ -607,13 +636,13 @@ module LBMBlockComm
         if(pair%sds(4).eq.-1) then
             yS = pair%s(4)
             if(n_timeStep.eq.0) then
-                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy2t1,zDimS,xDimS,tmpf)
+                call interpolate(pair%zDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fy2t1,pair%zDimS,pair%xDimS,tmpf)
             else
-                call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy2t2,zDimS,xDimS,tmpf)
+                call interpolate(pair%zDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fy2t2,pair%zDimS,pair%xDimS,tmpf)
             endif
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS)
-            do  xS = 1,xDimS
-                do  yS = 1,yDimS
+            do  xS = 1,pair%xDimS
+                do  zS = 1,pair%zDimS
                     call fIn_GridTransform(tmpf(zS,xS,:), coeff, VF, dh)
                     LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(zS,xS,:)
                 enddo
@@ -623,18 +652,18 @@ module LBMBlockComm
         if(allocated(tmpf)) deallocate(tmpf)
         ! z direction
         if(pair%sds(5).eq.1 .or. pair%sds(6).eq.-1) then
-            allocate(tmpf(yDimS,xDimS,0:lbmDim))
+            allocate(tmpf(pair%yDimS,pair%xDimS,0:lbmDim))
         endif
         if(pair%sds(5).eq.1) then
             zS = pair%s(5)
             if(n_timeStep.eq.0) then
-                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz1t1,yDimS,xDimS,tmpf)
+                call interpolate(pair%yDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fz1t1,pair%yDimS,pair%xDimS,tmpf)
             else
-                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz1t2,yDimS,xDimS,tmpf)
+                call interpolate(pair%yDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fz1t2,pair%yDimS,pair%xDimS,tmpf)
             endif
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS)
-            do  xS = 1,xDimS
-                do  yS = 1,yDimS
+            do  xS = 1,pair%xDimS
+                do  yS = 1,pair%yDimS
                     call fIn_GridTransform(tmpf(yS,xS,:), coeff, VF, dh)
                     LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(yS,xS,:)
                 enddo
@@ -644,13 +673,13 @@ module LBMBlockComm
         if(pair%sds(6).eq.-1) then
             zS = pair%s(6)
             if(n_timeStep.eq.0) then
-                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz2t1,yDimS,xDimS,tmpf)
+                call interpolate(pair%yDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fz2t1,pair%yDimS,pair%xDimS,tmpf)
             else
-                call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz2t2,yDimS,xDimS,tmpf)
+                call interpolate(pair%yDimF,pair%xDimF,LBMblks(pair%sonId)%fIn_Fz2t2,pair%yDimS,pair%xDimS,tmpf)
             endif
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS)
-            do  xS = 1,xDimS
-                do  yS = 1,yDimS
+            do  xS = 1,pair%xDimS
+                do  yS = 1,pair%yDimS
                     call fIn_GridTransform(tmpf(yS,xS,:), coeff, VF, dh)
                     LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(yS,xS,:)
                 enddo
