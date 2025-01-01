@@ -233,18 +233,13 @@ module LBMBlockComm
         implicit none
         integer:: i, s, treenode, n_timeStep, iFish
         real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine2,time_end2
-        logical:: macroupdated
-        macroupdated = .false.
         call LBMblks(treenode)%update_volume_force()
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
+        call LBMblks(treenode)%calculate_macro_quantities()
         call LBMblks(treenode)%ResetVolumeForce()
         if (blockTree(treenode)%nsons .eq. 0) then
             do iFish = 1,m_nFish
                 if (treenode .eq. VBodies(iFish)%v_carrierFluidId) then
-                    if(.not.macroupdated) then
-                        call LBMblks(treenode)%calculate_macro_quantities()
-                        macroupdated = .true.
-                    endif
                     call IBM_FEM(treenode,time_IBM,time_FEM,LBMblks(treenode)%blktime)
                 endif
             enddo
@@ -536,28 +531,28 @@ module LBMBlockComm
         LBMblks(father)%uuu(zF,yF,xF,1:3     ) = LBMblks(son)%uuu(zS,yS,xS,1:3     )
     end subroutine
 
-    SUBROUTINE interpolation_father_to_son(p,n_timeStep)
+    SUBROUTINE interpolation_father_to_son(pair,n_timeStep)
         implicit none
-        type(CommPair),intent(in):: p
-        integer:: n_timeStep,xS,yS,zS,xF,yF,zF
+        type(CommPair),intent(in):: pair
+        integer:: n_timeStep,xS,yS,zS
         real(8):: coeff,VF(1:3),dh
         real(8),allocatable::tmpf(:,:,:)
         integer:: xDimS, xDimF, yDimS, yDimF, zDimS, zDimF
-        coeff = (LBMblks(p%sonId)%tau / LBMblks(p%fatherId)%tau) / dble(m_gridDelta)
-        VF    = LBMblks(p%sonId)%volumeForce(1:3)
-        dh    = LBMblks(p%sonId)%dh
-        xDimS = p%s(2) - p%s(1) + 1
-        xDimF = p%f(2) - p%f(1) + 1
-        yDimS = p%s(4) - p%s(3) + 1
-        yDimF = p%f(4) - p%f(3) + 1
-        zDimS = p%s(6) - p%s(5) + 1
-        zDimF = p%f(6) - p%f(5) + 1
+        coeff = (LBMblks(pair%sonId)%tau / LBMblks(pair%fatherId)%tau) / dble(m_gridDelta)
+        VF    = LBMblks(pair%sonId)%volumeForce(1:3)
+        dh    = LBMblks(pair%sonId)%dh
+        xDimS = pair%s(2) - pair%s(1) + 1
+        xDimF = pair%f(2) - pair%f(1) + 1
+        yDimS = pair%s(4) - pair%s(3) + 1
+        yDimF = pair%f(4) - pair%f(3) + 1
+        zDimS = pair%s(6) - pair%s(5) + 1
+        zDimF = pair%f(6) - pair%f(5) + 1
         ! x direction
         if(pair%sds(1).eq.1 .or. pair%sds(2).eq.-1) then
             allocate(tmpf(zDimS,yDimS,0:lbmDim))
         endif
         if(pair%sds(1).eq.1) then
-            xS = p%s(1)
+            xS = pair%s(1)
             if(n_timeStep.eq.0) then
                 call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx1t1,zDimS,yDimS,tmpf)
             else
@@ -573,7 +568,7 @@ module LBMBlockComm
             !$OMP END PARALLEL DO
         endif
         if(pair%sds(2).eq.-1) then
-            xS = p%s(2)
+            xS = pair%s(2)
             if(n_timeStep.eq.0) then
                 call interpolate(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx2t1,zDimS,yDimS,tmpf)
             else
@@ -594,7 +589,7 @@ module LBMBlockComm
             allocate(tmpf(zDimS,xDimS,0:lbmDim))
         endif
         if(pair%sds(3).eq.1) then
-            yS = p%s(3)
+            yS = pair%s(3)
             if(n_timeStep.eq.0) then
                 call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy1t1,zDimS,xDimS,tmpf)
             else
@@ -610,7 +605,7 @@ module LBMBlockComm
             !$OMP END PARALLEL DO
         endif
         if(pair%sds(4).eq.-1) then
-            yS = p%s(4)
+            yS = pair%s(4)
             if(n_timeStep.eq.0) then
                 call interpolate(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy2t1,zDimS,xDimS,tmpf)
             else
@@ -631,7 +626,7 @@ module LBMBlockComm
             allocate(tmpf(yDimS,xDimS,0:lbmDim))
         endif
         if(pair%sds(5).eq.1) then
-            zS = p%s(5)
+            zS = pair%s(5)
             if(n_timeStep.eq.0) then
                 call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz1t1,yDimS,xDimS,tmpf)
             else
@@ -647,7 +642,7 @@ module LBMBlockComm
             !$OMP END PARALLEL DO
         endif
         if(pair%sds(6).eq.-1) then
-            zS = p%s(6)
+            zS = pair%s(6)
             if(n_timeStep.eq.0) then
                 call interpolate(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz2t1,yDimS,xDimS,tmpf)
             else
@@ -677,7 +672,7 @@ module LBMBlockComm
             do a=1,aS,2
                 a1 = a / 2 + 1
                 fS(b,a,:) = fF(b1,a1,:)
-                if(b.lt.bS) fS(b+1,i,:) = (fF(b1,a1,:) + fF(b1+1,a1,:))*0.5
+                if(b.lt.bS) fS(b+1,a,:) = (fF(b1,a1,:) + fF(b1+1,a1,:))*0.5
             enddo
         enddo
         !$OMP END PARALLEL DO
