@@ -223,6 +223,12 @@ $PBS_WDIR/$PBS_ENAME
 
   18. *dtolLBM*: Error tolerance for the LBM method
 
+  19. *interpolateScheme*: Interpolate Scheme for multi-block communication.
+
+      - 1  : Linear interpolation.
+
+      - 2  : Third-(boundary) and fourth-order(inner) mix interpolation.
+  
 - **FluidBlocks**
 
   1. *nblock*: Number of fluid grid partitions
