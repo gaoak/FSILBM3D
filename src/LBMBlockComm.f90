@@ -305,7 +305,7 @@ module LBMBlockComm
         type(CommPair):: pair
         integer:: treenode,time
         integer:: xF,yF,zF,x,y,z
-        integer:: i,f,s,ns,xDimF,yDimF,zDimF
+        integer:: i,f,s,ns,xDimF,yDimF,zDimF,e
         f  = treenode
         ns = blockTree(f)%nsons
         do i = 1,ns
@@ -316,84 +316,96 @@ module LBMBlockComm
             zDimF = pair%zDimF
             if(LBMblks(s)%BndConds(1).eq.BCfluid) then
                 xF = pair%f(1)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF,e)
                 do y = 1,yDimF
                 do z = 1,zDimF
+                do e = 0,lbmDim
                     yF = y + pair%f(3) - 1
                     zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fx1t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fx1t1(z,y,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fx1t2(z,y,:))*0.5d0
-                    if (time .eq. 2) LBMblks(s)%fIn_Fx1t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%fIn_Fx1t1(z,y,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx1t2(z,y,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx1t1(z,y,e) = (LBMblks(s)%fIn_Fx1t1(z,y,e) + LBMblks(s)%fIn_Fx1t2(z,y,e))*0.5d0
+                enddo
                 enddo
                 enddo
                 !$OMP END PARALLEL DO
             endif
             if(LBMblks(s)%BndConds(2).eq.BCfluid) then
                 xF = pair%f(2)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF,e)
                 do y = 1,yDimF
                 do z = 1,zDimF
+                do e = 0,lbmDim
                     yF = y + pair%f(3) - 1
                     zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fx2t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fx2t1(z,y,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fx2t2(z,y,:))*0.5d0
-                    if (time .eq. 2) LBMblks(s)%fIn_Fx2t2(z,y,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%fIn_Fx2t1(z,y,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx2t2(z,y,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fx2t1(z,y,e) = (LBMblks(s)%fIn_Fx2t1(z,y,e) + LBMblks(s)%fIn_Fx2t2(z,y,e))*0.5d0
+                enddo
                 enddo
                 enddo
                 !$OMP END PARALLEL DO
             endif
             if(LBMblks(s)%BndConds(3).eq.BCfluid) then
                 yF = pair%f(3)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF,e)
                 do x = 1,xDimF
                 do z = 1,zDimF
+                do e = 0,lbmDim
                     xF = x + pair%f(1) - 1
                     zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fy1t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fy1t1(z,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fy1t2(z,x,:))*0.5d0
-                    if (time .eq. 2) LBMblks(s)%fIn_Fy1t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%fIn_Fy1t1(z,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy1t2(z,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy1t1(z,x,e) = (LBMblks(s)%fIn_Fy1t1(z,x,e) + LBMblks(s)%fIn_Fy1t2(z,x,e))*0.5d0
+                enddo
                 enddo
                 enddo
                 !$OMP END PARALLEL DO
             endif
             if(LBMblks(s)%BndConds(4).eq.BCfluid) then
                 yF = pair%f(4)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF,e)
                 do x = 1,xDimF
                 do z = 1,zDimF
+                do e = 0,lbmDim
                     xF = x + pair%f(1) - 1
                     zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fy2t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fy2t1(z,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fy2t2(z,x,:))*0.5d0
-                    if (time .eq. 2) LBMblks(s)%fIn_Fy2t2(z,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%fIn_Fy2t1(z,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy2t2(z,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fy2t1(z,x,e) = (LBMblks(s)%fIn_Fy2t1(z,x,e) + LBMblks(s)%fIn_Fy2t2(z,x,e))*0.5d0
+                enddo
                 enddo
                 enddo
                 !$OMP END PARALLEL DO
             endif
             if(LBMblks(s)%BndConds(5).eq.BCfluid) then
                 zF = pair%f(5)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF,e)
                 do x = 1,xDimF
                 do y = 1,yDimF
+                do e = 0,lbmDim
                     xF = x + pair%f(1) - 1
                     yF = y + pair%f(3) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fz1t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fz1t1(y,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fz1t2(y,x,:))*0.5d0
-                    if (time .eq. 2) LBMblks(s)%fIn_Fz1t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%fIn_Fz1t1(y,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz1t2(y,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz1t1(y,x,e) = (LBMblks(s)%fIn_Fz1t1(y,x,e) + LBMblks(s)%fIn_Fz1t2(y,x,e))*0.5d0
+                enddo
                 enddo
                 enddo
                 !$OMP END PARALLEL DO
             endif
             if(LBMblks(s)%BndConds(6).eq.BCfluid) then
                 zF = pair%f(6)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF,e)
                 do x = 1,xDimF
                 do y = 1,yDimF
+                do e = 0,lbmDim
                     xF = x + pair%f(1) - 1
                     yF = y + pair%f(3) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fz2t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fz2t1(y,x,:) = (LBMblks(f)%fIn(zF,yF,xF,:) + LBMblks(s)%fIn_Fz2t2(y,x,:))*0.5d0
-                    if (time .eq. 2) LBMblks(s)%fIn_Fz2t2(y,x,:) =  LBMblks(f)%fIn(zF,yF,xF,:)
+                    if (time .eq. 1) LBMblks(s)%fIn_Fz2t1(y,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz2t2(y,x,e) =  LBMblks(f)%fIn(zF,yF,xF,e)
+                    if (time .eq. 2) LBMblks(s)%fIn_Fz2t1(y,x,e) = (LBMblks(s)%fIn_Fz2t1(y,x,e) + LBMblks(s)%fIn_Fz2t2(y,x,e))*0.5d0
+                enddo
                 enddo
                 enddo
                 !$OMP END PARALLEL DO
@@ -690,24 +702,56 @@ module LBMBlockComm
         integer,intent(in):: aS,bS,aF,bF
         real(8),intent(in):: fF(bF,aF,0:lbmDim)
         real(8),intent(out):: fS(bS,aS,0:lbmDim) !fine grid values
-        integer:: a,b,a1,b1
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
-        do b=1,bS,2
-            b1 = b / 2 + 1
-            do a=1,aS,2
-                a1 = a / 2 + 1
-                fS(b,a,:) = fF(b1,a1,:)
-                if(b.lt.bS) fS(b+1,a,:) = (fF(b1,a1,:) + fF(b1+1,a1,:))*0.5d0
+        integer:: a,b,a1,b1,e
+        if (flow%interpolateScheme.eq.2) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1,e)
+            do b = 1,bS,2
+               b1= b / 2 + 1
+            do a = 1,aS,2
+               a1= a / 2 + 1
+            do e = 0,lbmDim
+                fS(b,a,e) = fF(b1,a1,e)
+                if(1.eq.b              ) fS(b+1,a,e) = fF(b1,a1,e)*(0.375d0)     + fF(b1+1,a1,e)*(0.75d0) + fF(b1+2,a1,e)*(-0.125d0)
+                if(1.lt.b.and.b.lt.bS-2) fS(b+1,a,e) = fF(b1-1,a1,e)*(-0.0625d0) + fF(b1,a1,e)*(0.5625d0) + fF(b1+1,a1,e)*(0.5625d0) + fF(b1+2,a1,e)*(-0.0625d0)
+                if(           b.eq.bS-2) fS(b+1,a,e) = fF(b1+1,a1,e)*(0.375d0)   + fF(b1,a1,e)*(0.75d0)   + fF(b1-1,a1,e)*(-0.125d0)
             enddo
-        enddo
-        !$OMP END PARALLEL DO
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b)
-        do b=1,bS
-            do a=2,aS,2
-                fS(b,a,:) = (fS(b,a-1,:) + fS(b,a+1,:))*0.5d0
             enddo
-        enddo
-        !$OMP END PARALLEL DO
+            enddo
+            !$OMP END PARALLEL DO
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,e)
+            do b = 1,bS
+            do a = 2,aS,2
+            do e = 0,lbmDim
+                if(2.eq.a              ) fS(b,a,e) = fS(b,a-1,e)*(0.375d0)   + fS(b,a+1,e)*(0.75d0)   + fS(b,a+3,e)*(-0.125d0)
+                if(2.lt.a.and.a.lt.aS-1) fS(b,a,e) = fS(b,a-3,e)*(-0.0625d0) + fS(b,a-1,e)*(0.5625d0) + fS(b,a+1,e)*(0.5625d0) + fS(b,a+3,e)*(-0.0625d0)
+                if(           a.eq.aS-1) fS(b,a,e) = fS(b,a+1,e)*(0.375d0)   + fS(b,a-1,e)*(0.75d0)   + fS(b,a-3,e)*(-0.125d0)
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+        else
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1,e)
+            do b = 1,bS,2
+               b1= b / 2 + 1
+            do a = 1,aS,2
+               a1= a / 2 + 1
+            do e = 0,lbmDim
+                fS(b,a,e) = fF(b1,a1,e)
+                if(b.lt.bS) fS(b+1,a,e) = (fF(b1,a1,e) + fF(b1+1,a1,e))*0.5d0
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,e)
+            do b = 1,bS
+            do a = 2,aS,2
+            do e = 0,lbmDim
+                fS(b,a,e) = (fS(b,a-1,e) + fS(b,a+1,e))*0.5d0
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+        endif
     end subroutine
 
     SUBROUTINE interpolation_grid_distribution(father,son,xS,yS,zS,n_timeStep,aDim,bDim,fIn_t1,fIn_t2,uuu_t1,xyz)
