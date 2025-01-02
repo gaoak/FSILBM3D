@@ -1174,16 +1174,25 @@ module FluidDomain
             cnt = cnt + 1
         else if(LBMblks(j)%xmin.le.LBMblks(i)%xmin .and. LBMblks(i)%xmax.le.LBMblks(j)%xmax) then
             cnt = cnt - 1
+        else if(LBMblks(i)%xmax.lt.LBMblks(j)%xmin .or. LBMblks(j)%xmax.lt.LBMblks(i)%xmin) then
+            CompareBlocks = 0
+            return
         endif
         if(LBMblks(i)%ymin.le.LBMblks(j)%ymin .and. LBMblks(j)%ymax.le.LBMblks(i)%ymax) then
             cnt = cnt + 1
         else if(LBMblks(j)%ymin.le.LBMblks(i)%ymin .and. LBMblks(i)%ymax.le.LBMblks(j)%ymax) then
             cnt = cnt - 1
+        else if(LBMblks(i)%ymax.lt.LBMblks(j)%ymin .or. LBMblks(j)%ymax.lt.LBMblks(i)%ymin) then
+            CompareBlocks = 0
+            return
         endif
         if(LBMblks(i)%zmin.le.LBMblks(j)%zmin .and. LBMblks(j)%zmax.le.LBMblks(i)%zmax) then
             cnt = cnt + 1
         else if(LBMblks(j)%zmin.le.LBMblks(i)%zmin .and. LBMblks(i)%zmax.le.LBMblks(j)%zmax) then
             cnt = cnt - 1
+        else if(LBMblks(i)%zmax.lt.LBMblks(j)%zmin .or. LBMblks(j)%zmax.lt.LBMblks(i)%zmin) then
+            CompareBlocks = 0
+            return
         endif
         if(cnt.eq.3) then
             CompareBlocks = 1
