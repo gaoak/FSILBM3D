@@ -356,7 +356,3 @@ $PBS_WDIR/$PBS_ENAME
 11. *Converg.plt* : The convergence of the simulation
 12. *MaMax.plt* : The max Mach number in flow field
 13. *Area.plt* : The surface area of the bodies
-
-## License
-
-Licese is owned by X-Y Lu research group. No distribution is allowed without a writing permission from Prof. Lu.
