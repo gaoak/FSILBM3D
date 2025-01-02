@@ -300,7 +300,7 @@ module LBMBlockComm
         time_FEM = time_FEM + (time_end2 - time_begine2)
     endsubroutine
 
-    subroutine extract_interpolate_layer(treenode,time)
+    subroutine extract_interpolate_layer(treenode,time) ! time interpolation : linear
         implicit none
         type(CommPair):: pair
         integer:: treenode,time
@@ -585,24 +585,6 @@ module LBMBlockComm
         endif
     end subroutine 
 
-    SUBROUTINE deliver_grid_distribution(father,son,xS,yS,zS,xF,yF,zF)
-        implicit none
-        integer:: father,son
-        integer:: xS,yS,zS,xF,yF,zF
-        real(8):: xCoordSon,yCoordSon,zCoordSon
-        ! calcualte the pubilc grid coordinates in son block
-        xCoordSon = LBMblks(son)%xmin + LBMblks(son)%dh*(xS - 1)
-        yCoordSon = LBMblks(son)%ymin + LBMblks(son)%dh*(yS - 1)
-        zCoordSon = LBMblks(son)%zmin + LBMblks(son)%dh*(zS - 1)
-        ! calcualte the pubilc grid number in father block
-        xF = NINT((xCoordSon - LBMblks(father)%xmin)/LBMblks(father)%dh + 1)
-        yF = NINT((yCoordSon - LBMblks(father)%ymin)/LBMblks(father)%dh + 1)
-        zF = NINT((zCoordSon - LBMblks(father)%zmin)/LBMblks(father)%dh + 1)
-        ! deliver distribution function from son block to father block
-        LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = LBMblks(son)%fIn(zS,yS,xS,0:lbmDim)
-        LBMblks(father)%uuu(zF,yF,xF,1:3     ) = LBMblks(son)%uuu(zS,yS,xS,1:3     )
-    end subroutine
-
     SUBROUTINE interpolation_father_to_son(pair,n_timeStep)
         implicit none
         type(CommPair),intent(in):: pair
@@ -732,7 +714,7 @@ module LBMBlockComm
         if(allocated(tmpf)) deallocate(tmpf)
     end subroutine
 
-    subroutine interpolate(bF,aF,fF,bS,aS,fS)
+    subroutine interpolate(bF,aF,fF,bS,aS,fS) ! space interpolation : 2 for 3rd- and 4th-order, other for linear
         use FlowCondition, only: flow
         implicit none
         integer,intent(in):: aS,bS,aF,bF
@@ -741,19 +723,18 @@ module LBMBlockComm
         integer:: a,b,a1,b1
         if (flow%interpolateScheme.eq.2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
-            do b = 1,bS,2
-            b1= b / 2 + 1
-            do a = 1,aS,2
-                a1= a / 2 + 1
+            do b  = 1,bS,2
+               b1 = b / 2 + 1
+            do a  = 1,aS,2
+               a1 = a / 2 + 1
                 fS(:,b,a) = fF(:,b1,a1)
                 if(1.eq.b) then
                     fS(:,b+1,a) = 0.375d0*fF(:,b1,a1) + 0.75d0*fF(:,b1+1,a1) - 0.125d0*fF(:,b1+2,a1)
                 else if(b.eq.bS-2) then
                     fS(:,b+1,a) = 0.375d0*fF(:,b1+1,a1) + 0.75d0*fF(:,b1,a1) - 0.125d0*fF(:,b1-1,a1)
-                else
+                else if(b.ne.bS) then
                     fS(:,b+1,a) = -0.0625d0*fF(:,b1-1,a1) + 0.5625d0*fF(:,b1,a1) + 0.5625d0*fF(:,b1+1,a1) - 0.0625d0*fF(:,b1+2,a1)
                 endif
-            enddo
             enddo
             enddo
             !$OMP END PARALLEL DO
@@ -769,17 +750,15 @@ module LBMBlockComm
                 endif
             enddo
             enddo
-            enddo
             !$OMP END PARALLEL DO
         else
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
-            do b = 1,bS,2
-            b1= b / 2 + 1
-            do a = 1,aS,2
-                a1= a / 2 + 1
+            do b  = 1,bS,2
+               b1 = b / 2 + 1
+            do a  = 1,aS,2
+               a1 = a / 2 + 1
                 fS(:,b,a) = fF(:,b1,a1)
                 if(b.lt.bS) fS(:,b+1,a) = (fF(:,b1,a1) + fF(:,b1+1,a1))*0.5d0
-            enddo
             enddo
             enddo
             !$OMP END PARALLEL DO
@@ -787,7 +766,6 @@ module LBMBlockComm
             do b = 1,bS
             do a = 2,aS,2
                 fS(:,b,a) = (fS(:,b,a-1) + fS(:,b,a+1))*0.5d0
-            enddo
             enddo
             enddo
             !$OMP END PARALLEL DO
@@ -817,29 +795,29 @@ module LBMBlockComm
         END SUBROUTINE
     end subroutine
 
-    subroutine fIn_father_to_son(father,son,xS,yS,zS)! Dupius-Chopard method
-        implicit none
-        integer:: father,son,xS,yS,zS
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),coffe
-        ! Guo 2008 P97 6.1.8
-        uSqr           = sum(LBMblks(son)%uuu(zS,yS,xS,1:3)**2)
-        uxyz(0:lbmDim) = LBMblks(son)%uuu(zS,yS,xS,1) * ee(0:lbmDim,1) + LBMblks(son)%uuu(zS,yS,xS,2) * ee(0:lbmDim,2)+LBMblks(son)%uuu(zS,yS,xS,3) * ee(0:lbmDim,3)
-        fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(son)%den(zS,yS,xS) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
-        coffe = (LBMblks(son)%tau / LBMblks(father)%tau) / dble(m_gridDelta)
-        LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) - fEq(0:lbmDim))
-    end subroutine
+    ! subroutine fIn_father_to_son(father,son,xS,yS,zS)! Dupius-Chopard method
+    !     implicit none
+    !     integer:: father,son,xS,yS,zS
+    !     real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),coffe
+    !     ! Guo 2008 P97 6.1.8
+    !     uSqr           = sum(LBMblks(son)%uuu(zS,yS,xS,1:3)**2)
+    !     uxyz(0:lbmDim) = LBMblks(son)%uuu(zS,yS,xS,1) * ee(0:lbmDim,1) + LBMblks(son)%uuu(zS,yS,xS,2) * ee(0:lbmDim,2)+LBMblks(son)%uuu(zS,yS,xS,3) * ee(0:lbmDim,3)
+    !     fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(son)%den(zS,yS,xS) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
+    !     coffe = (LBMblks(son)%tau / LBMblks(father)%tau) / dble(m_gridDelta)
+    !     LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) - fEq(0:lbmDim))
+    ! end subroutine
 
-    subroutine fIn_son_to_father(father,son,xF,yF,zF)! Dupius-Chopard method
-        implicit none
-        integer:: father,son,xF,yF,zF
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),coffe
-        ! Guo 2008 P97 6.1.8
-        uSqr           = sum(LBMblks(father)%uuu(zF,yF,xF,1:3)**2)
-        uxyz(0:lbmDim) = LBMblks(father)%uuu(zF,yF,xF,1) * ee(0:lbmDim,1) + LBMblks(father)%uuu(zF,yF,xF,2) * ee(0:lbmDim,2)+LBMblks(father)%uuu(zF,yF,xF,3) * ee(0:lbmDim,3)
-        fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(father)%den(zF,yF,xF) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
-        coffe = (LBMblks(father)%tau / LBMblks(son)%tau) * dble(m_gridDelta)
-        LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) - fEq(0:lbmDim))
-    end subroutine
+    ! subroutine fIn_son_to_father(father,son,xF,yF,zF)! Dupius-Chopard method
+    !     implicit none
+    !     integer:: father,son,xF,yF,zF
+    !     real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),coffe
+    !     ! Guo 2008 P97 6.1.8
+    !     uSqr           = sum(LBMblks(father)%uuu(zF,yF,xF,1:3)**2)
+    !     uxyz(0:lbmDim) = LBMblks(father)%uuu(zF,yF,xF,1) * ee(0:lbmDim,1) + LBMblks(father)%uuu(zF,yF,xF,2) * ee(0:lbmDim,2)+LBMblks(father)%uuu(zF,yF,xF,3) * ee(0:lbmDim,3)
+    !     fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(father)%den(zF,yF,xF) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
+    !     coffe = (LBMblks(father)%tau / LBMblks(son)%tau) * dble(m_gridDelta)
+    !     LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) - fEq(0:lbmDim))
+    ! end subroutine
 end module LBMBlockComm
 
 ! subroutine testmpiomp
