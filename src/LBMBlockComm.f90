@@ -426,7 +426,7 @@ module LBMBlockComm
                     (LBMblks(p%sonId)%zmax-LBMblks(p%fatherId)%zmin)/LBMblks(p%fatherId)%dh
             res = abs(res1 - dble(NINT(res1))) + abs(res2 - dble(NINT(res2)))
             if(flag .or. res .gt. 1d-8) then
-                write(*,*) 'grid points do not match between fluid blocks',p%fatherId,p%sonId,res1,res2
+                write(*,*) 'grid points do not match between fluid blocks',p%fatherId,p%sonId,res
                 stop
             endif
             call check_blocks_params(blocktree(treenode)%sons(i))
