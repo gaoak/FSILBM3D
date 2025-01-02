@@ -8,7 +8,7 @@ module FlowCondition
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
         real(8) :: Re,denIn,nu,Mu,dtolLBM
         integer :: TrefType,UrefType,ntolLBM
-        integer :: velocityKind
+        integer :: velocityKind,interpolateScheme
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
         real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
         real(8) :: Uref,Lref,Tref
@@ -60,6 +60,8 @@ module FlowCondition
         read(buffer,*)    flow%UrefType,flow%Uref
         call readNextData(111, buffer)
         read(buffer,*)    flow%ntolLBM,flow%dtolLBM
+        call readNextData(111, buffer)
+        read(buffer,*)    flow%interpolateScheme
         close(111)
         ! flow%denIn is not 1
         if(abs(flow%denIn-1.d0).gt.1e-6) then

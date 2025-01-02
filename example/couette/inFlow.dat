@@ -15,6 +15,7 @@ FlowCondition
  0          100.0D+0                          read(buffer,*) TrefType,Tref
  0          0.100D+0                          read(buffer,*) UrefType,Uref
  1          0.010D+0                          read(buffer,*) ntolLBM,dtolLBM
+ 2                                            read(buffer,*) interpolateScheme
 ENDFlowCondition
 FluidBlocks
  2                                            read(buffer,*) nblock (should be npairs + 1)
