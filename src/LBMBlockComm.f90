@@ -244,13 +244,11 @@ module LBMBlockComm
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
         call LBMblks(treenode)%calculate_macro_quantities()
         call LBMblks(treenode)%ResetVolumeForce()
-        if (blockTree(treenode)%nsons .eq. 0) then
-            do iFish = 1,m_nFish
-                if (treenode .eq. VBodies(iFish)%v_carrierFluidId) then
-                    call IBM_FEM(treenode,time_IBM,time_FEM,LBMblks(treenode)%blktime)
-                endif
-            enddo
-        endif
+        do iFish = 1,m_nFish
+            if (treenode .eq. VBodies(iFish)%v_carrierFluidId) then
+                call IBM_FEM(treenode,time_IBM,time_FEM,LBMblks(treenode)%blktime)
+            endif
+        enddo
         call LBMblks(treenode)%add_volume_force()
         ! extract interpolation layer for old time
         call extract_interpolate_layer(treenode,1)
