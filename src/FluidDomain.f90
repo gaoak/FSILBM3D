@@ -99,9 +99,11 @@ module FluidDomain
             write(*,'(A)') '========================================================='
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
+            open(unit=13,file=filename,form='unformatted',status='old')
             do iblock = 1,m_nblocks
-                call LBMblks(iblock)%read_continue(filename,step,time)
+                call LBMblks(iblock)%read_continue(filename,step,time,13)
             enddo
+            close(13)
         else
             write(*,'(A)') '========================================================='
             write(*,'(A)') '====================== New computing ===================='
@@ -144,9 +146,11 @@ module FluidDomain
         integer:: step
         real(8):: time
         integer:: iblock
+        open(unit=13,file=filename,form='unformatted',status='replace')
         do iblock = 1,m_nblocks
-            call LBMblks(iblock)%write_continue(filename,step,time)
+            call LBMblks(iblock)%write_continue(filename,step,time,13)
         enddo
+        close(13)
     END SUBROUTINE
 
     SUBROUTINE update_volume_force_blocks()
@@ -383,20 +387,24 @@ module FluidDomain
         END SUBROUTINE initialise_flow
     END SUBROUTINE initialise_
 
-    !subroutine  initDisturb_(this)
+    ! subroutine  initDisturb_(this)
     !    implicit none
     !    class(LBMBlock), intent(inout) :: this
-    !    integer:: x, y,z
-    !    do  z = 1, this%zDim
-    !    do  y = 1, this%yDim
+    !    real(8):: xCoord,yCoord,zCoord
+    !    integer:: x, y, z
     !    do  x = 1, this%xDim
-    !         this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+AmplInitDist(1)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-    !         this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+AmplInitDist(2)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
-    !         this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+AmplInitDist(3)*m_Uref*dsin(2.0*pi*waveInitDist*xGrid(x))
+    !        xCoord = this%xmin + this%dh * (x - 1);
+    !    do  y = 1, this%yDim
+    !        yCoord = this%ymin + this%dh * (y - 1);
+    !    do  z = 1, this%zDim
+    !        zCoord = this%zmin + this%dh * (z - 1);
+    !        this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+flow%AmplInitDist(1)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*xCoord)
+    !        this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+flow%AmplInitDist(2)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*yCoord)
+    !        this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+flow%AmplInitDist(3)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*zCoord)
     !    enddo
     !    enddo
     !    enddo
-    !END SUBROUTINE
+    ! END SUBROUTINE
 
     SUBROUTINE set_boundary_conditions_(this)
         implicit none
@@ -872,9 +880,9 @@ module FluidDomain
             real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
             integer:: z, y, x
             real(8):: temp, tmpz(1:zDim)
-        
+
             if(dz.eq.0 .and. dy.eq.0) return
-        
+
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp,tmpz)
             do  x = 1, xDim
                 if(dz.eq.1) then
@@ -1080,28 +1088,25 @@ module FluidDomain
         write(*,'(A,F18.12)')' FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine
 
-    SUBROUTINE write_continue_(this,filename,step,time)
+    SUBROUTINE write_continue_(this,filename,step,time,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         character(LEN=40),intent(in):: filename
-        integer,intent(in):: step
+        integer,intent(in):: step,fID
         real(8),intent(in):: time
-        open(unit=13,file=filename,form='unformatted',status='replace')
-        write(13) step,time
-        write(13) this%fIn
-        close(13)
+        write(fID) step,time
+        write(fID) this%fIn
     ENDSUBROUTINE write_continue_
 
-    SUBROUTINE read_continue_(this,filename,step,time)
+    SUBROUTINE read_continue_(this,filename,step,time,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         character(LEN=40),intent(in):: filename
+        integer,intent(in) :: fID
         integer,intent(out):: step
         real(8),intent(out):: time
-        open(unit=13,file=filename,form='unformatted',status='old')
-        read(13) step,time
-        read(13) this%fIn
-        close(13)
+        read(fID) step,time
+        read(fID) this%fIn
     ENDSUBROUTINE read_continue_
 
     SUBROUTINE evaluate_velocity(time,zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)
@@ -1139,7 +1144,7 @@ module FluidDomain
        velocityOut(3) = velocityIn(3)
     END SUBROUTINE
 
-    ! calcualte distribution Function 
+    ! calcualte distribution Function
     SUBROUTINE calculate_distribution_funcion(density,velocity,distribution)
         implicit none
         real(8):: distribution(0:lbmDim)
@@ -1149,7 +1154,7 @@ module FluidDomain
         distribution(0:lbmDim)  = wt(0:lbmDim) * density * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
     END SUBROUTINE
 
-    ! set moving wall boundary distribution Function 
+    ! set moving wall boundary distribution Function
     SUBROUTINE evaluate_moving_wall(density,velocity,distributionIn,distributionOut)
         implicit none
         real(8):: distributionIn(0:lbmDim),distributionOut(0:lbmDim)
@@ -1170,23 +1175,32 @@ module FluidDomain
             cnt = cnt + 1
         else if(LBMblks(j)%xmin.le.LBMblks(i)%xmin .and. LBMblks(i)%xmax.le.LBMblks(j)%xmax) then
             cnt = cnt - 1
+        else if(LBMblks(i)%xmax.lt.LBMblks(j)%xmin .or. LBMblks(j)%xmax.lt.LBMblks(i)%xmin) then
+            CompareBlocks = 0
+            return
         endif
         if(LBMblks(i)%ymin.le.LBMblks(j)%ymin .and. LBMblks(j)%ymax.le.LBMblks(i)%ymax) then
             cnt = cnt + 1
         else if(LBMblks(j)%ymin.le.LBMblks(i)%ymin .and. LBMblks(i)%ymax.le.LBMblks(j)%ymax) then
             cnt = cnt - 1
+        else if(LBMblks(i)%ymax.lt.LBMblks(j)%ymin .or. LBMblks(j)%ymax.lt.LBMblks(i)%ymin) then
+            CompareBlocks = 0
+            return
         endif
         if(LBMblks(i)%zmin.le.LBMblks(j)%zmin .and. LBMblks(j)%zmax.le.LBMblks(i)%zmax) then
             cnt = cnt + 1
         else if(LBMblks(j)%zmin.le.LBMblks(i)%zmin .and. LBMblks(i)%zmax.le.LBMblks(j)%zmax) then
             cnt = cnt - 1
+        else if(LBMblks(i)%zmax.lt.LBMblks(j)%zmin .or. LBMblks(j)%zmax.lt.LBMblks(i)%zmin) then
+            CompareBlocks = 0
+            return
         endif
         if(cnt.eq.3) then
             CompareBlocks = 1
         else if(cnt.eq.-3) then
             CompareBlocks = -1
         else
-            write(*,*) 'Error, block overlaps', i, j
+            write(*,*) 'Error, block overlaps', LBMblks(i)%ID, LBMblks(j)%ID
             write(*,*) LBMblks(i)%xmin, LBMblks(i)%xmax,LBMblks(i)%ymin, LBMblks(i)%ymax,LBMblks(i)%zmin, LBMblks(i)%zmax
             write(*,*) LBMblks(j)%xmin, LBMblks(j)%xmax,LBMblks(j)%ymin, LBMblks(j)%ymax,LBMblks(j)%zmin, LBMblks(j)%zmax
             stop
