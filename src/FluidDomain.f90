@@ -99,9 +99,11 @@ module FluidDomain
             write(*,'(A)') '========================================================='
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
+            open(unit=13,file=filename,form='unformatted',status='old')
             do iblock = 1,m_nblocks
-                call LBMblks(iblock)%read_continue(filename,step,time)
+                call LBMblks(iblock)%read_continue(filename,step,time,13)
             enddo
+            close(13)
         else
             write(*,'(A)') '========================================================='
             write(*,'(A)') '====================== New computing ===================='
@@ -144,9 +146,11 @@ module FluidDomain
         integer:: step
         real(8):: time
         integer:: iblock
+        open(unit=13,file=filename,form='unformatted',status='replace')
         do iblock = 1,m_nblocks
-            call LBMblks(iblock)%write_continue(filename,step,time)
+            call LBMblks(iblock)%write_continue(filename,step,time,13)
         enddo
+        close(13)
     END SUBROUTINE
 
     SUBROUTINE update_volume_force_blocks()
@@ -1084,28 +1088,25 @@ module FluidDomain
         write(*,'(A,F18.12)')' FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine
 
-    SUBROUTINE write_continue_(this,filename,step,time)
+    SUBROUTINE write_continue_(this,filename,step,time,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         character(LEN=40),intent(in):: filename
-        integer,intent(in):: step
+        integer,intent(in):: step,fID
         real(8),intent(in):: time
-        open(unit=13,file=filename,form='unformatted',status='replace')
-        write(13) step,time
-        write(13) this%fIn
-        close(13)
+        write(fID) step,time
+        write(fID) this%fIn
     ENDSUBROUTINE write_continue_
 
-    SUBROUTINE read_continue_(this,filename,step,time)
+    SUBROUTINE read_continue_(this,filename,step,time,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         character(LEN=40),intent(in):: filename
+        integer,intent(in) :: fID
         integer,intent(out):: step
         real(8),intent(out):: time
-        open(unit=13,file=filename,form='unformatted',status='old')
-        read(13) step,time
-        read(13) this%fIn
-        close(13)
+        read(fID) step,time
+        read(fID) this%fIn
     ENDSUBROUTINE read_continue_
 
     SUBROUTINE evaluate_velocity(time,zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)
