@@ -104,6 +104,8 @@ $PBS_WDIR/$PBS_ENAME
 
 ## Simulation control parameters
 
+(A line starting with # indicates a comment)
+
 - **Parallel**
 
   1. *npsize* : The core number used in the simulaion
@@ -132,7 +134,7 @@ $PBS_WDIR/$PBS_ENAME
 
   10. *Re*: Dimensionless Reynolds Number 
 
-  11. *denIn*: Fluid density （  Usually it's 1 )
+  11. *denIn*: Fluid density  (Usually it's 1 )  
 
   12. *uvwIn*: The incoming Velocity 
 
