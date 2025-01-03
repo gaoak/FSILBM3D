@@ -13,7 +13,7 @@ module SolidBody
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
     public :: VBodies,read_solid_files,allocate_solid_memory,Initialise_solid_bodies,Write_solid_v_bodies,FSInteraction_force, &
-              Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check,Write_solid_Data,Write_SampBodyNode, &
+              Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check, write_solid_Information, &
               calculate_reference_params,set_solidbody_parameters
     type :: VirtualBody
         type(BeamSolver):: rbm
@@ -446,24 +446,15 @@ module SolidBody
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   write solid data
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine Write_solid_Data(fid,time,timeOutInfo,Asfac)
+    subroutine write_solid_Information(time,timeOutInfo,Asfac,solidProbingNum,solidProbingNode)
         implicit none
-        integer,intent(in):: fid
+        integer,intent(in):: solidProbingNum,solidProbingNode(solidProbingNum)
         real(8),intent(in):: time,timeOutInfo,Asfac
-        integer:: iFish
+        integer:: iFish,fid = 111
         do iFish=1,m_nFish
             call VBodies(iFish)%rbm%write_solid_info(fid,iFish,time,timeOutInfo,m_Tref,m_Lref,m_Uref,m_Aref,m_Fref,m_Pref,m_Eref,Asfac)
+            call VBodies(iFish)%rbm%write_solid_probes(fid,iFish,time,solidProbingNum,solidProbingNode(1:solidProbingNum),m_Tref,m_Lref,m_Uref,m_Aref)
         enddo
-    end subroutine
-
-    subroutine Write_SampBodyNode(fid,time,numSampBody,SampBodyNode)
-        implicit none
-        integer,intent(in):: fid,numSampBody,SampBodyNode(numSampBody,m_nFish)
-        real(8),intent(in):: time
-        integer:: iFish
-        do iFish=1,m_nFish
-            call VBodies(iFish)%rbm%write_solid_SampBodyNode(fid,iFish,time,numSampBody,SampBodyNode(1:numSampBody,iFish),m_Tref,m_Lref,m_Uref,m_Aref)
-        enddo !nFish
     end subroutine
 
     subroutine FSInteraction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
