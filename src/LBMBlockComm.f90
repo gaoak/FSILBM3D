@@ -794,30 +794,6 @@ module LBMBlockComm
             uuu(3)  = (SUM(fIn(0:lbmDim)*ee(0:lbmDim,3))+0.5d0*volumeForce(3)*dh)/den
         END SUBROUTINE
     end subroutine
-
-    ! subroutine fIn_father_to_son(father,son,xS,yS,zS)! Dupius-Chopard method
-    !     implicit none
-    !     integer:: father,son,xS,yS,zS
-    !     real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),coffe
-    !     ! Guo 2008 P97 6.1.8
-    !     uSqr           = sum(LBMblks(son)%uuu(zS,yS,xS,1:3)**2)
-    !     uxyz(0:lbmDim) = LBMblks(son)%uuu(zS,yS,xS,1) * ee(0:lbmDim,1) + LBMblks(son)%uuu(zS,yS,xS,2) * ee(0:lbmDim,2)+LBMblks(son)%uuu(zS,yS,xS,3) * ee(0:lbmDim,3)
-    !     fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(son)%den(zS,yS,xS) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
-    !     coffe = (LBMblks(son)%tau / LBMblks(father)%tau) / dble(m_gridDelta)
-    !     LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(son)%fIn(zS,yS,xS,0:lbmDim) - fEq(0:lbmDim))
-    ! end subroutine
-
-    ! subroutine fIn_son_to_father(father,son,xF,yF,zF)! Dupius-Chopard method
-    !     implicit none
-    !     integer:: father,son,xF,yF,zF
-    !     real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),coffe
-    !     ! Guo 2008 P97 6.1.8
-    !     uSqr           = sum(LBMblks(father)%uuu(zF,yF,xF,1:3)**2)
-    !     uxyz(0:lbmDim) = LBMblks(father)%uuu(zF,yF,xF,1) * ee(0:lbmDim,1) + LBMblks(father)%uuu(zF,yF,xF,2) * ee(0:lbmDim,2)+LBMblks(father)%uuu(zF,yF,xF,3) * ee(0:lbmDim,3)
-    !     fEq(0:lbmDim)  = wt(0:lbmDim) * LBMblks(father)%den(zF,yF,xF) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) )
-    !     coffe = (LBMblks(father)%tau / LBMblks(son)%tau) * dble(m_gridDelta)
-    !     LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) = fEq(0:lbmDim) + coffe * (LBMblks(father)%fIn(zF,yF,xF,0:lbmDim) - fEq(0:lbmDim))
-    ! end subroutine
 end module LBMBlockComm
 
 ! subroutine testmpiomp
