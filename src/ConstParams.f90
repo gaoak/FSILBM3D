@@ -32,5 +32,6 @@ module ConstParams
     integer, parameter:: DOFDim = 6
 
     real(8), parameter:: Cs2 = 1.d0/3.0d0
-
+    real(8)::b_u(801),b_v(801)
 end module ConstParams
+
