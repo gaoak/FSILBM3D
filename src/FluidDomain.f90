@@ -858,10 +858,10 @@ module FluidDomain
     SUBROUTINE collision_smag_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega
         integer:: x,y,z
         dt3 = 3.d0*this%dh
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
@@ -874,8 +874,8 @@ module FluidDomain
                 +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
             if(this%iCollidModel==1)then
                 ! SRT collision
-                call smag(-fEq(0:lbmDim),this%dh,this%den(z,y,x),this%tau,this%omega)
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*fEq(0:lbmDim) + (1.d0-0.5d0*this%Omega)*Flb(0:lbmDim)
+                call smag(-fEq(0:lbmDim),this%dh,this%den(z,y,x),this%tau,omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
