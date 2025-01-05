@@ -842,23 +842,17 @@ module FluidDomain
         implicit none
         real(8),intent(in) :: fneq(0:lbmDim),dh,rho,tau_0
         real(8),intent(out):: omega
-        real(8):: Qij(1:SpaceDim,1:SpaceDim)
-        real(8):: Q_bar,tau_t
-        integer:: i,j,e
-            Q_bar = 0.0d0
-            Qij(1,1) = (fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14))**2
-            Qij(1,2) = (fneq(7)-fneq(8)-fneq(9)+fneq(10))**2
-            Qij(1,3) = (fneq(11)-fneq(12)-fneq(13)+fneq(14))**2
-            Qij(2,2) = (fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18))**2
-            Qij(2,3) = (fneq(15)-fneq(16)-fneq(17)+fneq(18))**2
-            Qij(3,3) = (fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18))**2
-            Qij(2,1) = Qij(1,2)
-            Qij(3,1) = Qij(1,3)
-            Qij(3,2) = Qij(2,3)
-            Q_bar = sum(Qij)
-            Q_bar = dsqrt(2.0d0*Q_bar)
-            tau_t = 0.5d0*(dsqrt(tau_0**2+16.0d0*Q_bar/(rho*3.0d0*pi*pi))-tau_0)
-            omega = 1.0d0 / (tau_0+tau_t)
+        real(8):: Q11,Q12,Q13,Q22,Q23,Q33
+        real(8):: Q,tau_t
+        Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+        Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+        Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+        Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+        Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+        Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+        Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
+        tau_t = dsqrt(tau_0*tau_0 + CsmagConst0*dsqrt(Q)/rho)
+        omega = 2.0d0 / (tau_0+tau_t)
     END SUBROUTINE
 
     SUBROUTINE collision_smag_(this)
@@ -871,7 +865,7 @@ module FluidDomain
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
-            uSqr           = sum(this%uuu(z,y,x,1:3)**2)
+            uSqr           = sum(this%uuu(z,y,x,1:3)*this%uuu(z,y,x,1:3))
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
@@ -899,7 +893,7 @@ module FluidDomain
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
-            uSqr           = sum(this%uuu(z,y,x,1:3)**2)
+            uSqr           = sum(this%uuu(z,y,x,1:3)*this%uuu(z,y,x,1:3))
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &

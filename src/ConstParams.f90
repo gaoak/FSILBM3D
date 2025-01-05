@@ -33,6 +33,7 @@ module ConstParams
 
     real(8), parameter:: Cs2 = 1.d0/3.0d0
     real(8), parameter:: Csmag = 0.16d0
+    real(8), parameter:: CsmagConst0 = 16.d0 * dsqrt(2.d0) / (3.d0 * Pi * Pi)
     integer, parameter::b_Dim = 161
     real(8)::b_u(b_Dim),b_v(b_Dim)
 end module ConstParams
