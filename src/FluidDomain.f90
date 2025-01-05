@@ -136,7 +136,7 @@ module FluidDomain
         real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblocks
-            call LBMblks(iblock)%initialise(time)
+            call LBMblks(iblock)%initialise(time,iblock)
         enddo
     END SUBROUTINE
 
@@ -278,10 +278,11 @@ module FluidDomain
         END SUBROUTINE OMPPrePartition
     END SUBROUTINE allocate_fluid_
 
-    SUBROUTINE initialise_(this,time)
+    SUBROUTINE initialise_(this,time,iblock)
         implicit none
         class(LBMBlock),intent(inout) :: this
         real(8),intent(in):: time
+        integer,intent(in):: iblock
         ! select the collision model
         call calculate_SRT_params()
         if(this%iCollidModel.eq.2) then
@@ -316,27 +317,27 @@ module FluidDomain
             real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)
             ! calculate MRTM transformation matrix
             DO  I=0,lbmDim
-                M_MRT(0,I)=1
-                M_MRT(1,I)=19*SUM(ee(I,1:3)**2)-30
-                M_MRT(2,I)=(21*SUM(ee(I,1:3)**2)**2-53*SUM(ee(I,1:3)**2)+24)/2.0
+                M_MRT(0,I)=1.0d0
+                M_MRT(1,I)=19.0d0*SUM(ee(I,1:3)**2)-30.0d0
+                M_MRT(2,I)=(21.0d0*SUM(ee(I,1:3)**2)**2-53.0d0*SUM(ee(I,1:3)**2)+24.0d0)/2.0d0
 
                 M_MRT(3,I)=ee(I,1)
                 M_MRT(5,I)=ee(I,2)
                 M_MRT(7,I)=ee(I,3)
 
-                M_MRT(4,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,1)
-                M_MRT(6,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,2)
-                M_MRT(8,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,3)
+                M_MRT(4,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,1)
+                M_MRT(6,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,2)
+                M_MRT(8,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,3)
 
-                M_MRT(9,I)=3*ee(I,1)**2-SUM(ee(I,1:3)**2)
+                M_MRT(9,I)=3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2)
+                M_MRT(10,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2))
+
                 M_MRT(11,I)=ee(I,2)**2-ee(I,3)**2
+                M_MRT(12,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(ee(I,2)**2-ee(I,3)**2)
 
                 M_MRT(13,I)=ee(I,1)*ee(I,2)
                 M_MRT(14,I)=ee(I,2)*ee(I,3)
                 M_MRT(15,I)=ee(I,3)*ee(I,1)
-
-                M_MRT(10,I)=(3*SUM(ee(I,1:3)**2)-5)*(3*ee(I,1)**2-SUM(ee(I,1:3)**2))
-                M_MRT(12,I)=(3*SUM(ee(I,1:3)**2)-5)*(ee(I,2)**2-ee(I,3)**2)
 
                 M_MRT(16,I)=(ee(I,2)**2-ee(I,3)**2)*ee(I,1)
                 M_MRT(17,I)=(ee(I,3)**2-ee(I,1)**2)*ee(I,2)
@@ -373,13 +374,15 @@ module FluidDomain
             integer:: x, y, z
             ! calculating initial flow velocity and the distribution function
             do  x = 1, this%xDim
-                xCoord = this%xmin + this%dh * (x - 1);
+                ! xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1, this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1, this%zDim
-                zCoord = this%zmin + this%dh * (z - 1);
+                ! zCoord = this%zmin + this%dh * (z - 1);
                 this%den(z,y,x) = flow%denIn
-                call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
+                this%uuu(z,y,x,1:SpaceDim) = [b_u(y),b_v(y),0.0d0]
+                this%uuu(z,y,x,2) = this%uuu(z,y,x,2) + 0.01d0*dsin(2.d0*pi*1.0d0*yCoord)
+                ! call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
             enddo
             enddo
@@ -416,10 +419,11 @@ module FluidDomain
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  y = 1,this%yDim
-                yCoord = this%ymin + this%dh * (y - 1);
+                ! yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
-                zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                ! zCoord = this%zmin + this%dh * (z - 1);
+                ! call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                velocity(1:3)=[b_u(y),b_v(y),0.0d0]
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim))
             enddo
             enddo
@@ -1240,3 +1244,4 @@ module FluidDomain
         enddo
     end subroutine
 end module FluidDomain
+
