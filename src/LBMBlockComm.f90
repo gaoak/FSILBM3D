@@ -235,10 +235,10 @@ module LBMBlockComm
         enddo
     endsubroutine
 
-    recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM)
+    recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM,step)
         use SolidBody, only: m_nFish,VBodies
         implicit none
-        integer:: i, s, treenode, n_timeStep, iFish
+        integer:: i, s, treenode, n_timeStep, iFish, step
         real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine2,time_end2
         call LBMblks(treenode)%update_volume_force()
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
@@ -254,7 +254,7 @@ module LBMBlockComm
         call extract_interpolate_layer(treenode,1)
         ! collision
         call get_now_time(time_begine2)
-        call collision_block(treenode)
+        call collision_block(treenode,step)
         call get_now_time(time_end2)
         time_collision = time_collision + (time_end2 - time_begine2)
         ! streaming
@@ -272,7 +272,7 @@ module LBMBlockComm
                 s = blockTree(treenode)%sons(i)
                 do n_timeStep=0,m_gridDelta-1! one divides intwo
                     LBMblks(s)%blktime = LBMblks(s)%blktime + dble(n_timeStep) * LBMblks(s)%dh
-                    call tree_collision_streaming_IBM_FEM(s,time_collision,time_streaming,time_IBM,time_FEM)
+                    call tree_collision_streaming_IBM_FEM(s,time_collision,time_streaming,time_IBM,time_FEM,step)
                     call interpolation_father_to_son(blockTree(treenode)%comm(i),n_timeStep)
                 enddo
                 call deliver_son_to_father(blockTree(treenode)%comm(i))

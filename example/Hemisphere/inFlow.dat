@@ -1,13 +1,13 @@
 Parallel
 # parameter for mpi
- 16                                           read(buffer,*) npsize
+ 64                                           read(buffer,*) npsize
 EndParallel
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
  50.00D+0   1.000D+2                          read(buffer,*) timeSimTotal,timeContiDelta
  0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
  2.000D+0   2.000D+0   0.200D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
- 4000.0D+0   1.000D+0                          read(buffer,*) Re,denIn
+ 2000.0D+0   1.000D+0                          read(buffer,*) Re,denIn
  0.100D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
  0.000D+0   0.000D+0   0.000D+0     0         read(buffer,*) shearRateIn(1:3)/velocityAmp,velocityFreq,velocityPhi,VelocityKind
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
@@ -15,17 +15,17 @@ FlowCondition
  0          100.0D+0                          read(buffer,*) TrefType,Tref
  0          0.100D+0                          read(buffer,*) UrefType,Uref
  1          0.010D+0                          read(buffer,*) ntolLBM,dtolLBM
- 1                                            read(buffer,*) interpolateScheme
+ 2                                            read(buffer,*) interpolateScheme
 ENDFlowCondition
 FluidBlocks
- 2                                            read(buffer,*) nblock (should be npairs + 1)
- 1          2          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
- 401        201        121                    read(buffer,*) xDim,yDim,zDim
- 0.050D+0  -3.000D+0   0.000D+0 -3.000D+0     read(buffer,*) dh,xmin,ymin,zmin
+ 1                                            read(buffer,*) nblock (should be npairs + 1)
+ 1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 801        241        241                    read(buffer,*) xDim,yDim,zDim
+ 0.0125D+0  -2.000D+0   0.000D+0 -1.500D+0     read(buffer,*) dh,xmin,ymin,zmin
  101   103   201   103   103   103            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
- 2          2          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 2          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
  321        81         161                    read(buffer,*) xDim,yDim,zDim
  0.025D+0  -2.000D+0   0.000D+0 -2.000D+0     read(buffer,*) dh,xmin,ymin,zmin
  0     0     201   0     0     0              read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
@@ -48,7 +48,7 @@ SolidBody
  1.000D+0   0.250D+0                          read(buffer,*) denR(iFish), psR(iFish)
  1.000D+3   1.000D+3                          read(buffer,*) [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
  0.010D+0   0.000D+0                          read(buffer,*) freq(iFish),St(iFish)
- 0.000D+0   0.025D+0   0.000D+0               read(buffer,*) firstXYZ(1:3)
+ 0.000D+0   0.0125D+0   0.000D+0               read(buffer,*) firstXYZ(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) deltaXYZ(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) XYZAmpl(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) XYZPhi(1:3,iFish)

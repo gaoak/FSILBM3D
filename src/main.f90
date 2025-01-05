@@ -14,7 +14,7 @@ PROGRAM main
     USE LBMBlockComm
     implicit none
     character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
-    integer:: step=0
+    integer:: step=0,i
     real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
     real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
@@ -40,6 +40,11 @@ PROGRAM main
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
     !==================================================================================================
     ! Initialization before simulation
+    open(111,file = 'Blasius.dat',status = 'old')
+    do i = 1,b_Dim
+        read(111,*)b_u(i),b_v(i)
+    enddo
+    close(111)
     call initialise_solid_bodies(0.d0, g)
     call FindCarrierFluidBlock()
     call initialise_fuild_blocks(time)
@@ -80,7 +85,7 @@ PROGRAM main
         time_streaming = 0.d0
         time_IBM       = 0.d0
         time_FEM       = 0.d0
-        call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
+        call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,step)
         call calculate_macro_quantities_blocks()
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming

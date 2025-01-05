@@ -34,6 +34,7 @@ module FluidDomain
         procedure :: read_continue => read_continue_
         procedure :: calculate_macro_quantities => calculate_macro_quantities_
         procedure :: collision => collision_
+        procedure :: collision_smag => collision_smag_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
         procedure :: update_volume_force => update_volume_force_
@@ -136,7 +137,7 @@ module FluidDomain
         real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblocks
-            call LBMblks(iblock)%initialise(time)
+            call LBMblks(iblock)%initialise(time,iblock)
         enddo
     END SUBROUTINE
 
@@ -175,10 +176,14 @@ module FluidDomain
         call LBMblks(nblock)%streaming()
     END SUBROUTINE
 
-    SUBROUTINE collision_block(nblock)
+    SUBROUTINE collision_block(nblock,step)
         implicit none
-        integer:: nblock
+        integer:: nblock,step
+        if (mod(step,1).eq.0) then
+            call LBMblks(nblock)%collision_smag()
+        else
         call LBMblks(nblock)%collision()
+        endif
     END SUBROUTINE
 
     SUBROUTINE set_boundary_conditions_block(nblock)
@@ -278,10 +283,11 @@ module FluidDomain
         END SUBROUTINE OMPPrePartition
     END SUBROUTINE allocate_fluid_
 
-    SUBROUTINE initialise_(this,time)
+    SUBROUTINE initialise_(this,time,iblock)
         implicit none
         class(LBMBlock),intent(inout) :: this
         real(8),intent(in):: time
+        integer,intent(in):: iblock
         ! select the collision model
         call calculate_SRT_params()
         if(this%iCollidModel.eq.2) then
@@ -316,27 +322,27 @@ module FluidDomain
             real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)
             ! calculate MRTM transformation matrix
             DO  I=0,lbmDim
-                M_MRT(0,I)=1
-                M_MRT(1,I)=19*SUM(ee(I,1:3)**2)-30
-                M_MRT(2,I)=(21*SUM(ee(I,1:3)**2)**2-53*SUM(ee(I,1:3)**2)+24)/2.0
+                M_MRT(0,I)=1.0d0
+                M_MRT(1,I)=19.0d0*SUM(ee(I,1:3)**2)-30.0d0
+                M_MRT(2,I)=(21.0d0*SUM(ee(I,1:3)**2)**2-53.0d0*SUM(ee(I,1:3)**2)+24.0d0)/2.0d0
 
                 M_MRT(3,I)=ee(I,1)
                 M_MRT(5,I)=ee(I,2)
                 M_MRT(7,I)=ee(I,3)
 
-                M_MRT(4,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,1)
-                M_MRT(6,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,2)
-                M_MRT(8,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,3)
+                M_MRT(4,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,1)
+                M_MRT(6,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,2)
+                M_MRT(8,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,3)
 
-                M_MRT(9,I)=3*ee(I,1)**2-SUM(ee(I,1:3)**2)
+                M_MRT(9,I)=3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2)
+                M_MRT(10,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2))
+
                 M_MRT(11,I)=ee(I,2)**2-ee(I,3)**2
+                M_MRT(12,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(ee(I,2)**2-ee(I,3)**2)
 
                 M_MRT(13,I)=ee(I,1)*ee(I,2)
                 M_MRT(14,I)=ee(I,2)*ee(I,3)
                 M_MRT(15,I)=ee(I,3)*ee(I,1)
-
-                M_MRT(10,I)=(3*SUM(ee(I,1:3)**2)-5)*(3*ee(I,1)**2-SUM(ee(I,1:3)**2))
-                M_MRT(12,I)=(3*SUM(ee(I,1:3)**2)-5)*(ee(I,2)**2-ee(I,3)**2)
 
                 M_MRT(16,I)=(ee(I,2)**2-ee(I,3)**2)*ee(I,1)
                 M_MRT(17,I)=(ee(I,3)**2-ee(I,1)**2)*ee(I,2)
@@ -373,13 +379,19 @@ module FluidDomain
             integer:: x, y, z
             ! calculating initial flow velocity and the distribution function
             do  x = 1, this%xDim
-                xCoord = this%xmin + this%dh * (x - 1);
+                ! xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1, this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1, this%zDim
-                zCoord = this%zmin + this%dh * (z - 1);
+                ! zCoord = this%zmin + this%dh * (z - 1);
                 this%den(z,y,x) = flow%denIn
-                call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
+                if (y.gt.b_Dim) then 
+                    this%uuu(z,y,x,1:SpaceDim) = [b_u(b_Dim),b_v(b_Dim),0.0d0]
+                else
+                    this%uuu(z,y,x,1:SpaceDim) = [b_u(y),b_v(y),0.0d0]
+                endif
+                this%uuu(z,y,x,2) = this%uuu(z,y,x,2) + 0.01d0*dsin(2.d0*pi*1.0d0*yCoord)
+                ! call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
             enddo
             enddo
@@ -416,10 +428,15 @@ module FluidDomain
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  y = 1,this%yDim
-                yCoord = this%ymin + this%dh * (y - 1);
+                ! yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
-                zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                ! zCoord = this%zmin + this%dh * (z - 1);
+                ! call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                if (y.gt.b_Dim) then 
+                    velocity(1:3)=[b_u(b_Dim),b_v(b_Dim),0.0d0]
+                else
+                    velocity(1:3)=[b_u(y),b_v(y),0.0d0]
+                endif
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim))
             enddo
             enddo
@@ -820,6 +837,57 @@ module FluidDomain
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE
+
+    SUBROUTINE smag(fneq,dh,rho,tau_0,omega)
+        implicit none
+        real(8),intent(in) :: fneq(0:lbmDim),dh,rho,tau_0
+        real(8),intent(out):: omega
+        real(8):: Qij(1:SpaceDim,1:SpaceDim)
+        real(8):: Q_bar,tau_t
+        integer:: i,j,e
+            Q_bar = 0.0d0
+            Qij(1,1) = (fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14))**2
+            Qij(1,2) = (fneq(7)-fneq(8)-fneq(9)+fneq(10))**2
+            Qij(1,3) = (fneq(11)-fneq(12)-fneq(13)+fneq(14))**2
+            Qij(2,2) = (fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18))**2
+            Qij(2,3) = (fneq(15)-fneq(16)-fneq(17)+fneq(18))**2
+            Qij(3,3) = (fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18))**2
+            Qij(2,1) = Qij(1,2)
+            Qij(3,1) = Qij(1,3)
+            Qij(3,2) = Qij(2,3)
+            Q_bar = sum(Qij)
+            Q_bar = dsqrt(2.0d0*Q_bar)
+            tau_t = 0.5d0*(dsqrt(tau_0**2+16.0d0*Q_bar/(rho*3.0d0*pi*pi))-tau_0)
+            omega = 1.0d0 / (tau_0+tau_t)
+    END SUBROUTINE
+
+    SUBROUTINE collision_smag_(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3
+        integer:: x,y,z
+        dt3 = 3.d0*this%dh
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb)
+        do    x = 1, this%xDim
+        do    y = 1, this%yDim
+        do    z = 1, this%zDim
+            uSqr           = sum(this%uuu(z,y,x,1:3)**2)
+            uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
+            Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
+                 (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
+                +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
+                +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
+            if(this%iCollidModel==1)then
+                ! SRT collision
+                call smag(-fEq(0:lbmDim),this%dh,this%den(z,y,x),this%tau,this%omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*fEq(0:lbmDim) + (1.d0-0.5d0*this%Omega)*Flb(0:lbmDim)
+            endif
+        enddo
+        enddo
+        enddo
+        !$OMP END PARALLEL DO
+    END SUBROUTINE collision_smag_
 
     SUBROUTINE collision_(this)
         implicit none
