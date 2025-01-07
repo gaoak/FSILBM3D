@@ -34,7 +34,6 @@ module FluidDomain
         procedure :: read_continue => read_continue_
         procedure :: calculate_macro_quantities => calculate_macro_quantities_
         procedure :: collision => collision_
-        procedure :: collision_smag => collision_smag_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
         procedure :: update_volume_force => update_volume_force_
@@ -176,14 +175,10 @@ module FluidDomain
         call LBMblks(nblock)%streaming()
     END SUBROUTINE
 
-    SUBROUTINE collision_block(nblock,step)
+    SUBROUTINE collision_block(nblock)
         implicit none
-        integer:: nblock,step
-        if (mod(step,1).eq.0) then
-            call LBMblks(nblock)%collision_smag()
-        else
+        integer:: nblock
         call LBMblks(nblock)%collision()
-        endif
     END SUBROUTINE
 
     SUBROUTINE set_boundary_conditions_block(nblock)
@@ -379,18 +374,18 @@ module FluidDomain
             integer:: x, y, z
             ! calculating initial flow velocity and the distribution function
             do  x = 1, this%xDim
-                ! xCoord = this%xmin + this%dh * (x - 1);
+                ! ! xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1, this%yDim
-                yCoord = this%ymin + this%dh * (y - 1);
+                ! yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1, this%zDim
-                ! zCoord = this%zmin + this%dh * (z - 1);
+                ! ! zCoord = this%zmin + this%dh * (z - 1);
                 this%den(z,y,x) = flow%denIn
                 if (y.gt.b_Dim) then 
                     this%uuu(z,y,x,1:SpaceDim) = [b_u(b_Dim),b_v(b_Dim),0.0d0]
                 else
                     this%uuu(z,y,x,1:SpaceDim) = [b_u(y),b_v(y),0.0d0]
                 endif
-                this%uuu(z,y,x,2) = this%uuu(z,y,x,2) + 0.01d0*dsin(2.d0*pi*1.0d0*yCoord)
+                ! this%uuu(z,y,x,2) = this%uuu(z,y,x,2) + 0.01d0*dsin(2.d0*pi*1.0d0*yCoord)
                 ! call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
             enddo
@@ -428,15 +423,15 @@ module FluidDomain
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  y = 1,this%yDim
-                ! yCoord = this%ymin + this%dh * (y - 1);
+                ! ! yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
-                ! zCoord = this%zmin + this%dh * (z - 1);
-                ! call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                ! ! zCoord = this%zmin + this%dh * (z - 1);
                 if (y.gt.b_Dim) then 
                     velocity(1:3)=[b_u(b_Dim),b_v(b_Dim),0.0d0]
                 else
                     velocity(1:3)=[b_u(y),b_v(y),0.0d0]
                 endif
+                ! call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim))
             enddo
             enddo
@@ -838,58 +833,15 @@ module FluidDomain
         !$OMP END PARALLEL DO
     END SUBROUTINE
 
-    SUBROUTINE smag(fneq,dh,rho,tau_0,omega)
-        implicit none
-        real(8),intent(in) :: fneq(0:lbmDim),dh,rho,tau_0
-        real(8),intent(out):: omega
-        real(8):: Q11,Q12,Q13,Q22,Q23,Q33
-        real(8):: Q,tau_t
-        Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
-        Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
-        Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
-        Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
-        Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
-        Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
-        Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
-        tau_t = dsqrt(tau_0*tau_0 + CsmagConst0*dsqrt(Q)/rho)
-        omega = 2.0d0 / (tau_0+tau_t)
-    END SUBROUTINE
-
-    SUBROUTINE collision_smag_(this)
-        implicit none
-        class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega
-        integer:: x,y,z
-        dt3 = 3.d0*this%dh
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
-        do    x = 1, this%xDim
-        do    y = 1, this%yDim
-        do    z = 1, this%zDim
-            uSqr           = sum(this%uuu(z,y,x,1:3)*this%uuu(z,y,x,1:3))
-            uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
-            Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
-                 (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
-                +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
-                +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
-            if(this%iCollidModel==1)then
-                ! SRT collision
-                call smag(-fEq(0:lbmDim),this%dh,this%den(z,y,x),this%tau,omega)
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
-            endif
-        enddo
-        enddo
-        enddo
-        !$OMP END PARALLEL DO
-    END SUBROUTINE collision_smag_
-
     SUBROUTINE collision_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,tau_0,dh,omega
         integer:: x,y,z
         dt3 = 3.d0*this%dh
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb)
+        tau_0 = this%tau
+        dh = this%dh
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
@@ -914,11 +866,31 @@ module FluidDomain
             elseif(this%iCollidModel==3)then
                 ! MRT collision
                 this%fIn(z,y,x,0:lbmDim)=this%fIn(z,y,x,0:lbmDim)+MATMUL( this%M_COLLID(0:lbmDim,0:lbmDim), fEq(0:lbmDim) ) + MATMUL( this%M_FORCE(0:lbmDim,0:lbmDim),Flb(0:lbmDim))
+            elseif(this%iCollidModel==11)then
+                ! SRT collision with LES
+                call smag(-fEq(0:lbmDim),this%den(z,y,x),omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
         enddo
         !$OMP END PARALLEL DO
+        contains
+        SUBROUTINE smag(fneq,rho,omega0)
+            implicit none
+            real(8):: fneq(0:lbmDim),rho,omega0,tau_t
+            real(8):: Q11,Q12,Q13,Q22,Q23,Q33
+            real(8):: Q
+            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
+            tau_t = dsqrt(tau_0*tau_0 + CsmagConst*dsqrt(Q)/rho)
+            omega0 = 2.0d0 / (tau_0+tau_t)
+        END SUBROUTINE
     END SUBROUTINE collision_
 
     !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
