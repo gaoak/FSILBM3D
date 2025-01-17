@@ -136,7 +136,7 @@ module FluidDomain
         real(8),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblocks
-            call LBMblks(iblock)%initialise(time,iblock)
+            call LBMblks(iblock)%initialise(time)
         enddo
     END SUBROUTINE
 
@@ -278,11 +278,10 @@ module FluidDomain
         END SUBROUTINE OMPPrePartition
     END SUBROUTINE allocate_fluid_
 
-    SUBROUTINE initialise_(this,time,iblock)
+    SUBROUTINE initialise_(this,time)
         implicit none
         class(LBMBlock),intent(inout) :: this
         real(8),intent(in):: time
-        integer,intent(in):: iblock
         ! select the collision model
         call calculate_SRT_params()
         if(this%iCollidModel.eq.2) then
@@ -836,7 +835,7 @@ module FluidDomain
     SUBROUTINE collision_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,tau_0,dh,omega
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,tau_0,dh,omega,f_1
         integer:: x,y,z
         dt3 = 3.d0*this%dh
         tau_0 = this%tau
@@ -870,12 +869,28 @@ module FluidDomain
                 ! SRT collision with LES
                 call smag(-fEq(0:lbmDim),this%den(z,y,x),omega)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==12)then
+                ! Regularised SRT collision
+                call RBGK(-fEq(0:lbmDim),f_1)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*f_1 + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
         enddo
         !$OMP END PARALLEL DO
         contains
+        SUBROUTINE RBGK(fneq,f_10)
+            implicit none
+            real(8):: fneq(0:lbmDim)
+            real(8):: Q11,Q12,Q13,Q22,Q23,Q33,f_10
+            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+            f_10= 4.5d0*(10.0d0-Cs2)*(Q11+Q22+Q33)
+        END SUBROUTINE
         SUBROUTINE smag(fneq,rho,omega0)
             implicit none
             real(8):: fneq(0:lbmDim),rho,omega0,tau_t
