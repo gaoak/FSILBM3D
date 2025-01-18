@@ -873,6 +873,10 @@ module FluidDomain
                 ! Regularised SRT collision
                 call RBGK(-fEq(0:lbmDim),f_1)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*f_1 + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==13)then
+                ! SRT collision in ELBM
+                call ELBM(fEq(0:lbmDim),this%fIn(z,y,x,0:lbmDim),omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
@@ -905,6 +909,23 @@ module FluidDomain
             Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
             tau_t = dsqrt(tau_0*tau_0 + CsmagConst*dsqrt(Q)/rho)
             omega0 = 2.0d0 / (tau_0+tau_t)
+        END SUBROUTINE
+        SUBROUTINE ELBM(fneq,fnin,omega0)
+            implicit none
+            real(8):: fneq(0:lbmDim),fnin(0:lbmDim),omega0
+            real(8):: x1(0:lbmDim),x2(0:lbmDim),x3(0:lbmDim)
+            real(8):: a,b,c,lpha,beta
+            x1(0:lbmDim) = fneq(0:lbmDim) / fnin(0:lbmDim)
+            x2(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim)
+            x3(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim) * x1(0:lbmDim) * (x1 < 0.0)
+
+            a = sum(fnin(0:lbmDim) * x2(0:lbmDim))
+            b = sum(fnin(0:lbmDim) * x3(0:lbmDim))
+            c = sum(fnin(0:lbmDim) * (2.0d0 * x2(0:lbmDim) / (2.0d0 + x1(0:lbmDim))))
+
+            alpha = (a - sqrt(a*a - 8.0d0*b*c)) / b / 2.0d0
+            beta = flow%timeFlowDelta / (2.0d0 * this%tau + flow%timeFlowDelta)
+            omega0 = alpha * beta
         END SUBROUTINE
     END SUBROUTINE collision_
 
