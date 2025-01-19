@@ -26,6 +26,7 @@ module FluidDomain
         real(8), allocatable :: uuu_Fx1t1(:,:,:),uuu_Fx2t1(:,:,:)
         real(8), allocatable :: uuu_Fy1t1(:,:,:),uuu_Fy2t1(:,:,:)
         real(8), allocatable :: uuu_Fz1t1(:,:,:),uuu_Fz2t1(:,:,:)
+        real(8), allocatable :: tau_all(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
         real(8) :: blktime
     contains
@@ -840,6 +841,12 @@ module FluidDomain
         dt3 = 3.d0*this%dh
         tau_0 = this%tau
         dh = this%dh
+        if(this%iCollidModel==14)then
+            if(.not.allocated(this%tau_all)) then
+                allocate(this%tau_all(this%zDim,this%yDim,this%xDim))
+                this%tau_all = this%tau
+            endif
+        endif
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
@@ -877,24 +884,16 @@ module FluidDomain
                 ! SRT collision in ELBM
                 call ELBM(fEq(0:lbmDim),this%fIn(z,y,x,0:lbmDim),omega)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==14)then
+                ! WALE SRT collision
+                call WALE(-fEq(0:lbmDim),this%den(z,y,x),x,y,z,omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
         enddo
         !$OMP END PARALLEL DO
         contains
-        SUBROUTINE RBGK(fneq,f_10)
-            implicit none
-            real(8):: fneq(0:lbmDim)
-            real(8):: Q11,Q12,Q13,Q22,Q23,Q33,f_10
-            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
-            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
-            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
-            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
-            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
-            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
-            f_10= 4.5d0*(10.0d0-Cs2)*(Q11+Q22+Q33)
-        END SUBROUTINE
         SUBROUTINE smag(fneq,rho,omega0)
             implicit none
             real(8):: fneq(0:lbmDim),rho,omega0,tau_t
@@ -910,11 +909,23 @@ module FluidDomain
             tau_t = dsqrt(tau_0*tau_0 + CsmagConst*dsqrt(Q)/rho)
             omega0 = 2.0d0 / (tau_0+tau_t)
         END SUBROUTINE
+        SUBROUTINE RBGK(fneq,f_10)
+            implicit none
+            real(8):: fneq(0:lbmDim)
+            real(8):: Q11,Q12,Q13,Q22,Q23,Q33,f_10
+            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+            f_10= 4.5d0*(10.0d0-Cs2)*(Q11+Q22+Q33)
+        END SUBROUTINE
         SUBROUTINE ELBM(fneq,fnin,omega0)
             implicit none
             real(8):: fneq(0:lbmDim),fnin(0:lbmDim),omega0
             real(8):: x1(0:lbmDim),x2(0:lbmDim),x3(0:lbmDim)
-            real(8):: a,b,c,lpha,beta
+            real(8):: a,b,c,alpha,beta
             x1(0:lbmDim) = fneq(0:lbmDim) / fnin(0:lbmDim)
             x2(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim)
             x3(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim) * x1(0:lbmDim) * (x1 < 0.0)
@@ -927,6 +938,101 @@ module FluidDomain
             beta = flow%timeFlowDelta / (2.0d0 * this%tau + flow%timeFlowDelta)
             omega0 = alpha * beta
         END SUBROUTINE
+        SUBROUTINE WALE(fneq,rho,x0,y0,z0,omega0)
+            implicit none
+            real(8):: fneq(0:lbmDim),rho,omega0,tau_t
+            real(8):: Q11,Q12,Q13,Q22,Q23,Q33
+            real(8):: S11,S12,S13,S22,S23,S33
+            real(8):: O12,O13,O23
+            real(8):: SO11,SO12,SO13,SO22,SO23,SO33
+            real(8):: Q,S,O,SO,operator,SdSd
+            real(8):: invdh,tau__
+            integer:: x0,y0,z0
+            invdh = this%dh
+            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
+
+            tau__ = this%tau_all(z0,y0,x0)
+            S11 = -1.5*invdh*Q11/(rho*tau__)
+            S22 = -1.5*invdh*Q22/(rho*tau__)
+            S33 = -1.5*invdh*Q33/(rho*tau__)
+            S12 = -1.5*invdh*Q12/(rho*tau__)
+            S13 = -1.5*invdh*Q13/(rho*tau__)
+            S23 = -1.5*invdh*Q23/(rho*tau__)
+            S = -1.5*invdh*Q/(rho*tau__)
+
+            if (x0.eq.this%xmin)then
+                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh))
+                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh))
+                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
+            elseif (x0.eq.this%xmax)then
+                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh))
+                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh))
+                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
+            elseif (z0.eq.this%zmin)then
+                O12 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
+                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh))
+            elseif (z0.eq.this%zmax)then
+                O12 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
+                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh))
+            elseif (z0.eq.this%zmin)then
+                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
+                O13 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+                O23 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
+            elseif (z0.eq.this%zmax)then
+                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
+                O13 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+                O23 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
+            else
+                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
+                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
+            endif
+            ! the boundary need unilateral interpolation
+            O = 2.d0*(O12*O12 + O13*O13 + O23*O23)
+            SO11 =-(0.0d0           + S11*S11*O12*O12 + S11*S11*O13*O13 + &
+                    0.0d0           + S12*S12*O12*O12 + S12*S12*O13*O13 + &
+                    0.0d0           + S13*S13*O12*O12 + S13*S13*O13*O13)
+            SO22 =-(S12*S12*O12*O12 + 0.0d0           + S12*S12*O23*O23 + &
+                    S22*S22*O12*O12 + 0.0d0           + S22*S22*O23*O23 + &
+                    S23*S23*O12*O12 + 0.0d0           + S23*S23*O23*O23)
+            SO33 =-(S13*S13*O13*O13 + S13*S13*O23*O23 + 0.0d0           + &
+                    S23*S23*O13*O13 + S23*S23*O23*O23 + 0.0d0           + &
+                    S33*S33*O13*O13 + S33*S33*O23*O23 + 0.0d0          )
+            SO12 =-(0.0d0           + 0.0d0           + S11*S12*O13*O23 + &
+                    0.0d0           + 0.0d0           + S12*S22*O13*O23 + &
+                    0.0d0           + 0.0d0           + S13*S23*O13*O23)
+            SO13 =-(0.0d0           + S11*S13*O12*O23 + 0.0d0           + &
+                    0.0d0           + S12*S23*O12*O23 + 0.0d0           + &
+                    0.0d0           + S13*S33*O12*O23 + 0.0d0          )
+            SO23 =-(S12*S13*O12*O13 + 0.0d0           + 0.0d0           + &
+                    S22*S23*O12*O13 + 0.0d0           + 0.0d0           + &
+                    S23*S33*O12*O13 + 0.0d0           + 0.0d0          )
+            SO = SO11*SO11 + SO22*SO22 + SO33*SO33 + 2.0d0*(SO12*SO12 + SO13*SO13 + SO23*SO23)
+            SdSd = (S*S+O*O)/6.0+2*S*O/3+2*SO
+            operator = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
+
+            tau__ = 3.0d0*(flow%nu+CWALEConst*operator*this%dh*this%dh)+0.5
+            this%tau_all(z0,y0,x0) = tau__
+            omega0 = 1.0d0 / (tau__)
+        END SUBROUTINE
+        FUNCTION center_diff(g1,g2,invdx)
+            implicit none
+            real(8):: center_diff,g1,g2,invdx
+            center_diff = (g1 - g2)*invdx
+        END FUNCTION
+        FUNCTION onesid_diff(g1,g2,g3,invdx)
+            implicit none
+            real(8):: onesid_diff,g1,g2,g3,invdx
+            onesid_diff = (-3.0d0*g1 + 4.0d0*g2 - g3)*invdx
+        END FUNCTION
     END SUBROUTINE collision_
 
     !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
