@@ -939,11 +939,12 @@ module FluidDomain
             omega0 = alpha * beta
         END SUBROUTINE
         SUBROUTINE WALE(fneq,rho,x0,y0,z0,omega0)
+            USE, INTRINSIC :: IEEE_ARITHMETIC
             implicit none
             real(8):: fneq(0:lbmDim),rho,omega0,tau_t
             real(8):: Q11,Q12,Q13,Q22,Q23,Q33
             real(8):: S11,S12,S13,S22,S23,S33
-            real(8):: O12,O13,O23
+            real(8):: O12,O13,O23,ox,oy,oz
             real(8):: SO11,SO12,SO13,SO22,SO23,SO33
             real(8):: Q,S,O,SO,operator,SdSd
             real(8):: invdh,tau__
@@ -965,38 +966,64 @@ module FluidDomain
             S13 = -1.5*invdh*Q13/(rho*tau__)
             S23 = -1.5*invdh*Q23/(rho*tau__)
             S = -1.5*invdh*Q/(rho*tau__)
+            if(S.lt.eps) S=0.0d0
 
-            if (x0.eq.this%xmin)then
-                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh))
-                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh))
-                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
-            elseif (x0.eq.this%xmax)then
-                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh))
-                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh))
-                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
-            elseif (z0.eq.this%zmin)then
-                O12 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
-                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
-                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh))
-            elseif (z0.eq.this%zmax)then
-                O12 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
-                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
-                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh))
-            elseif (z0.eq.this%zmin)then
-                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
-                O13 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
-                O23 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
-            elseif (z0.eq.this%zmax)then
-                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
-                O13 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
-                O23 = 0.5d0*(onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
+            ox=0.0d0
+            oy=0.0d0
+            oz=0.0d0
+            ! compute omega_x
+            if (y0.gt.1.and.y0.lt.this%yDim) then
+                ox = center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh)
+            elseif (y0.eq.1) then
+                ox = onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh)
             else
-                O12 = 0.5d0*(center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh))
-                O13 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)-center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
-                O23 = 0.5d0*(center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)-center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh))
+                ox = onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh)
             endif
+            if (z0.gt.1.and.z0.lt.this%zDim) then
+                ox = 0.5d0*(ox - center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh))
+            elseif (z0.eq.1) then
+                ox = 0.5d0*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh))
+            else
+                ox = 0.5d0*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh))
+            endif
+            ! compute omega_y
+            if (z0.gt.1.and.z0.lt.this%zDim) then
+                oy = center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)
+            elseif (z0.eq.1) then
+                oy = onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)
+            else
+                oy = onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
+            endif
+            if (x0.gt.1.and.x0.lt.this%xDim) then
+                oy = 0.5d0*(oy - center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+            elseif (x0.eq.1) then
+                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh))
+            else
+                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh))
+            endif
+            ! compute omega_y
+            if (x0.gt.1.and.x0.lt.this%xDim) then
+                oz = center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
+            elseif (x0.eq.1) then
+                oz = onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
+            else
+                oz = onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
+            endif
+            if (y0.gt.1.and.y0.lt.this%yDim) then
+                oz = 0.5d0*(oz - center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh))
+            elseif (y0.eq.1) then
+                oz = 0.5d0*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh))
+            else
+                oz = 0.5d0*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh))
+            endif
+            O12 = -0.5d0*oz
+            O13 =  0.5d0*oy
+            O23 = -0.5d0*ox
             ! the boundary need unilateral interpolation
-            O = 2.d0*(O12*O12 + O13*O13 + O23*O23)
+
+            O = 2.0d0*(O12*O12+O23*O23+O13*O13)
+            if(O.lt.eps) O=0.0d0
+
             SO11 =-(0.0d0           + S11*S11*O12*O12 + S11*S11*O13*O13 + &
                     0.0d0           + S12*S12*O12*O12 + S12*S12*O13*O13 + &
                     0.0d0           + S13*S13*O12*O12 + S13*S13*O13*O13)
@@ -1016,10 +1043,15 @@ module FluidDomain
                     S22*S23*O12*O13 + 0.0d0           + 0.0d0           + &
                     S23*S33*O12*O13 + 0.0d0           + 0.0d0          )
             SO = SO11*SO11 + SO22*SO22 + SO33*SO33 + 2.0d0*(SO12*SO12 + SO13*SO13 + SO23*SO23)
-            SdSd = (S*S+O*O)/6.0+2*S*O/3+2*SO
-            operator = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
+            if(SO.lt.eps) SO=0.0d0
 
-            tau__ = 3.0d0*(flow%nu+CWALEConst*operator*this%dh*this%dh)+0.5
+            SdSd = (S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2*SO
+            operator = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
+            if ((.not. IEEE_IS_FINITE(operator)).or.(operator.lt.0.0d0).or.(S.eq.0.0d0.and.SdSd.eq.0.0d0)) then
+                operator = 0.0d0
+            endif
+
+            tau__ = 3.0d0*(flow%nu+CWALEConst*operator*this%dh*this%dh)+0.5d0
             this%tau_all(z0,y0,x0) = tau__
             omega0 = 1.0d0 / (tau__)
         END SUBROUTINE
