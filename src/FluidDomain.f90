@@ -888,6 +888,10 @@ module FluidDomain
                 ! WALE SRT collision
                 call WALE(-fEq(0:lbmDim),this%den(z,y,x),x,y,z,omega)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==15)then
+                ! Vremann SRT collision
+                call vrem(x,y,z,omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
@@ -941,7 +945,7 @@ module FluidDomain
         SUBROUTINE WALE(fneq,rho,x0,y0,z0,omega0)
             USE, INTRINSIC :: IEEE_ARITHMETIC
             implicit none
-            real(8):: fneq(0:lbmDim),rho,omega0,tau_t
+            real(8):: fneq(0:lbmDim),rho,omega0
             real(8):: Q11,Q12,Q13,Q22,Q23,Q33
             real(8):: S11,S12,S13,S22,S23,S33
             real(8):: O12,O13,O23,ox,oy,oz
@@ -1065,6 +1069,69 @@ module FluidDomain
             real(8):: onesid_diff,g1,g2,g3,invdx
             onesid_diff = (-3.0d0*g1 + 4.0d0*g2 - g3)*invdx
         END FUNCTION
+        SUBROUTINE vrem(x0,y0,z0,omega0)
+            implicit none
+            real(8):: omega0
+            real(8):: a11,a12,a13,a21,a22,a23,a31,a32,a33
+            real(8):: b11,b12,b13,b21,b22,b23,b31,b32,b33
+            real(8):: aa,bb,operator
+            real(8):: invdh,tau__
+            integer:: x0,y0,z0
+            invdh = this%dh
+            if (x0.gt.1.and.x0.lt.this%xDim) then
+                a11 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0-1,1),invdh)
+                a21 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
+                a31 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh)
+            elseif (x0.eq.1) then
+                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0+2,1),invdh)
+                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
+                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh)
+            else
+                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0-1,1),this%uuu(z0,y0,x0-2,1),invdh)
+                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
+                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh)
+            endif
+            if (y0.gt.1.and.y0.lt.this%yDim) then
+                a12 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)
+                a22 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0-1,x0,2),invdh)
+                a32 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh)
+            elseif (y0.eq.1) then
+                a12 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh)
+                a22 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0+2,x0,2),invdh)
+                a32 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh)
+            else
+                a12 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh)
+                a22 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0-1,x0,2),this%uuu(z0,y0-2,x0,2),invdh)
+                a32 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh)
+            endif
+            if (z0.gt.1.and.z0.lt.this%zDim) then
+                a13 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)
+                a23 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)
+                a33 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,3),this%uuu(z0-1,y0,x0,3),invdh)
+            elseif (z0.eq.1) then
+                a13 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)
+                a23 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh)
+                a33 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0+1,y0,x0,3),this%uuu(z0+2,y0,x0,3),invdh)
+            else
+                a13 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
+                a23 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh)
+                a33 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0-1,y0,x0,3),this%uuu(z0-2,y0,x0,3),invdh)
+            endif
+            b11 = a11*a11
+            b12 = a12*a12
+            b13 = a13*a13
+            b21 = a21*a21
+            b22 = a22*a22
+            b23 = a23*a23
+            b31 = a31*a31
+            b32 = a32*a32
+            b33 = a33*a33
+            aa = b11+b12+b13+b21+b22+b23+b31+b32+b33
+            bb = b11*b22-b12*b12+b11*b33-b13*b13+b22*b33-b23*b23
+            operator = dsqrt(bb/aa)
+            tau__ = 3.0d0*(flow%nu+CvremConst*operator*this%dh*this%dh)+0.5d0
+            omega0 = 1.0d0 / (tau__)
+        END SUBROUTINE
     END SUBROUTINE collision_
 
     !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18
