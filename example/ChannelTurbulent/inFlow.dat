@@ -12,17 +12,17 @@ FlowCondition
  0.000D+0   0.000D+0   0.000D+0   0           read(buffer,*) shearRateIn(1:3),flow%velocityKind
  2.1348D-7   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceAmp,volumeForceFreq,volumeForcePhi
- 0          100.0D+0                          read(buffer,*) TrefType,Tref
+ 4         1000.0D+0                          read(buffer,*) TrefType,Tref
  0          0.010D+0                          read(buffer,*) UrefType,Uref
  10         0.010D+0                          read(buffer,*) ntolLBM,dtolLBM
  1                                            read(buffer,*) interpolateScheme
 ENDFlowCondition
 FluidBlocks
  1                                            read(buffer,*) nblock (should be npairs + 1)
- 1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
- 261        131        261                    read(buffer,*) xDim,yDim,zDim
- 1.000D+0  -130.000D+0  -130.000D+0 -130.00D+0     read(buffer,*) dh,xmin,ymin,zmin
- 301   301   200   302   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 1          14         0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 401        131        261                    read(buffer,*) xDim,yDim,zDim
+ 1.000D+0  0.000D+0  -130.000D+0 -130.00D+0     read(buffer,*) dh,xmin,ymin,zmin
+ 301   301   201   302   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
 ENDFluidBlocks
@@ -54,7 +54,7 @@ SolidBody
 ENDSolidBody
 ProbingFluid
  1          1                                 read(buffer,*) fluidProbingNum (0: no output)
- 0.600D+0   0.000D+0   0.500D+0               read(buffer,*) fluidProbingCoords(1,1:3)
+100.000D+0   -5.000D+0   0.000D+0               read(buffer,*) fluidProbingCoords(1,1:3)
 ProbingSolid
  1                                            read(buffer,*) solidProbingNum (0: no output)
  100                                          read(buffer,*) solidProbingNode(1)
