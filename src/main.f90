@@ -73,7 +73,7 @@ PROGRAM main
         step = step + 1
         LBMblks(:)%blktime = time
         write(*,'(A)') '========================================================='
-        write(*,'(A,I6,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
+        write(*,'(A,I8,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
         time_collision = 0.d0
@@ -107,7 +107,7 @@ PROGRAM main
         if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
             call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
                                               LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu)
-            call write_solid_information(time,m_nFish)
+            call write_solid_Information(time,flow%timeInfoDelta,flow%Asfac,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)
         write(*,*)'Time  for writing  step:', (time_end2 - time_begine2)
