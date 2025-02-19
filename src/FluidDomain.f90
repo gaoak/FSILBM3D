@@ -7,7 +7,7 @@ module FluidDomain
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
-             CompareBlocks,FindCarrierFluidBlock
+             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
@@ -20,6 +20,7 @@ module FluidDomain
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
+        real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
         real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
         real(8), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
@@ -43,6 +44,7 @@ module FluidDomain
         procedure :: write_continue => write_continue_
         procedure :: ComputeFieldStat => ComputeFieldStat_
         procedure :: ResetVolumeForce => ResetVolumeForce_
+        procedure :: halfwayBCset => halfwayBCset_
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
     integer,allocatable:: LBMblksIndex(:)
@@ -186,6 +188,12 @@ module FluidDomain
         implicit none
         integer:: nblock
         call LBMblks(nblock)%set_boundary_conditions()
+    END SUBROUTINE
+
+    SUBROUTINE halfwayBCset_block(nblock)
+        implicit none
+        integer:: nblock
+        call LBMblks(nblock)%halfwayBCset()
     END SUBROUTINE
 
     SUBROUTINE calculate_macro_quantities_blocks()
@@ -407,6 +415,62 @@ module FluidDomain
     !    enddo
     ! END SUBROUTINE
 
+
+    SUBROUTINE halfwayBCset_(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer:: x,y,z
+        if (this%BndConds(1) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwx1)) allocate(this%fIn_hwx1(0:lbmDim,this%zDim,this%yDim))
+            do y = 1,this%yDim
+            do z = 1,this%zDim
+                this%fIn_hwx1([1,7,9,11,13],z,y) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(2) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwx2)) allocate(this%fIn_hwx2(0:lbmDim,this%zDim,this%yDim))
+            do y = 1,this%yDim
+            do z = 1,this%zDim
+                this%fIn_hwx2([2,8,10,12,14],z,y) = this%fIn(z,y,this%xDim,oppo([2,8,10,12,14]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(3) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwy1)) allocate(this%fIn_hwy1(0:lbmDim,this%zDim,this%xDim))
+            do x = 1,this%xDim
+            do z = 1,this%zDim
+                this%fIn_hwy1([3,7,8,15,17],z,x) = this%fIn(z,1,x,oppo([3,7,8,15,17]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(4) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwy2)) allocate(this%fIn_hwy2(0:lbmDim,this%zDim,this%xDim))
+            do x = 1,this%xDim
+            do z = 1,this%zDim
+                this%fIn_hwy2([4,9,10,16,18],z,x) = this%fIn(z,this%yDim,x,oppo([4,9,10,16,18]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(5) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwz1)) allocate(this%fIn_hwz1(0:lbmDim,this%yDim,this%xDim))
+            do x = 1,this%xDim
+            do y = 1,this%yDim
+                this%fIn_hwz1([5,11,12,15,16],y,x) = this%fIn(1,y,x,oppo([5,11,12,15,16]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(6) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwz2)) allocate(this%fIn_hwz2(0:lbmDim,this%yDim,this%xDim))
+            do x = 1,this%xDim
+            do y = 1,this%yDim
+                this%fIn_hwz2([6,13,14,17,18],y,x) = this%fIn(this%zDim,y,x,oppo([6,13,14,17,18]))
+            enddo
+            enddo
+        endif
+
+    END SUBROUTINE
+
     SUBROUTINE set_boundary_conditions_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
@@ -448,6 +512,12 @@ module FluidDomain
             do  z = 1,this%zDim
                 fTmp([1,7,9,11,13]) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+            enddo
+            enddo
+        elseif(this%BndConds(1) .eq. BCstationary_Wall_halfway)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                this%fIn(z,y,1,[1,7,9,11,13]) = this%fIn_hwx1([1,7,9,11,13],z,y)
             enddo
             enddo
         elseif(this%BndConds(1) .eq. BCmoving_Wall)then
@@ -509,6 +579,12 @@ module FluidDomain
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
+        elseif(this%BndConds(2) .eq. BCstationary_Wall_halfway)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                this%fIn(z,y,this%xDim,[2,8,10,12,14]) = this%fIn_hwx2([2,8,10,12,14],z,y)
+            enddo
+            enddo
         elseif(this%BndConds(2) .eq. BCmoving_Wall)then
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -566,6 +642,12 @@ module FluidDomain
             do  z = 1,this%zDim
                 fTmp([3,7,8,15,17]) = this%fIn(z,1,x,oppo([3,7,8,15,17]))
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
+            enddo
+            enddo
+        elseif(this%BndConds(3) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  z = 1,this%zDim
+                this%fIn(z,1,x,[3,7,8,15,17]) = this%fIn_hwy1([3,7,8,15,17],z,x)
             enddo
             enddo
         elseif(this%BndConds(3) .eq. BCmoving_Wall)then
@@ -627,6 +709,12 @@ module FluidDomain
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
+        elseif(this%BndConds(4) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  z = 1,this%zDim
+                this%fIn(z,this%yDim,x,[4,9,10,16,18]) = this%fIn_hwy2([4,9,10,16,18],z,x)
+            enddo
+            enddo
         elseif(this%BndConds(4) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -686,6 +774,12 @@ module FluidDomain
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
+        elseif(this%BndConds(5) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  y = 1,this%yDim
+                this%fIn(1,y,x,[5,11,12,15,16]) = this%fIn_hwz1([5,11,12,15,16],y,x)
+            enddo
+            enddo
         elseif(this%BndConds(5) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -743,6 +837,12 @@ module FluidDomain
             do  y = 1,this%yDim
                 fTmp([6,13,14,17,18]) = this%fIn(this%zDim,y,x,oppo([6,13,14,17,18]))
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
+            enddo
+            enddo
+        elseif(this%BndConds(6) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  y = 1,this%yDim
+                this%fIn(this%zDim,y,x,[6,13,14,17,18]) = this%fIn_hwz2([6,13,14,17,18],y,x)
             enddo
             enddo
         elseif(this%BndConds(6) .eq. BCmoving_Wall)then

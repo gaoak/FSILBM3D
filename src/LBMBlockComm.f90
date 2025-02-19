@@ -257,6 +257,7 @@ module LBMBlockComm
         call collision_block(treenode)
         call get_now_time(time_end2)
         time_collision = time_collision + (time_end2 - time_begine2)
+        call halfwayBCset_block(treenode)
         ! streaming
         call get_now_time(time_begine2)
         call streaming_block(treenode)
