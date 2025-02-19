@@ -374,19 +374,13 @@ module FluidDomain
             integer:: x, y, z
             ! calculating initial flow velocity and the distribution function
             do  x = 1, this%xDim
-                ! ! xCoord = this%xmin + this%dh * (x - 1);
+                xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1, this%yDim
-                ! yCoord = this%ymin + this%dh * (y - 1);
+                yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1, this%zDim
-                ! ! zCoord = this%zmin + this%dh * (z - 1);
+                zCoord = this%zmin + this%dh * (z - 1);
                 this%den(z,y,x) = flow%denIn
-                if (y.gt.b_Dim) then 
-                    this%uuu(z,y,x,1:SpaceDim) = [b_u(b_Dim),b_v(b_Dim),0.0d0]
-                else
-                    this%uuu(z,y,x,1:SpaceDim) = [b_u(y),b_v(y),0.0d0]
-                endif
-                ! this%uuu(z,y,x,2) = this%uuu(z,y,x,2) + 0.01d0*dsin(2.d0*pi*1.0d0*yCoord)
-                ! call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
             enddo
             enddo
@@ -423,15 +417,10 @@ module FluidDomain
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
             do  y = 1,this%yDim
-                ! ! yCoord = this%ymin + this%dh * (y - 1);
+                yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1,this%zDim
-                ! ! zCoord = this%zmin + this%dh * (z - 1);
-                if (y.gt.b_Dim) then 
-                    velocity(1:3)=[b_u(b_Dim),b_v(b_Dim),0.0d0]
-                else
-                    velocity(1:3)=[b_u(y),b_v(y),0.0d0]
-                endif
-                ! call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim))
             enddo
             enddo

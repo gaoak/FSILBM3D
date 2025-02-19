@@ -38,6 +38,4 @@ module ConstParams
     real(8), parameter:: CWALE = 0.50d0
     real(8), parameter:: CWALEConst = CWALE*CWALE
     real(8), parameter:: CvremConst = 2.5d0*Csmag*Csmag
-    integer, parameter::b_Dim = 81
-    real(8)::b_u(b_Dim),b_v(b_Dim)
 end module ConstParams
