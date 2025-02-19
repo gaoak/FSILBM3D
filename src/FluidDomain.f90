@@ -7,7 +7,7 @@ module FluidDomain
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
-             CompareBlocks,FindCarrierFluidBlock
+             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,isoutput
@@ -20,12 +20,14 @@ module FluidDomain
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:)
         real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
+        real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
         real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
         real(8), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
         real(8), allocatable :: uuu_Fx1t1(:,:,:),uuu_Fx2t1(:,:,:)
         real(8), allocatable :: uuu_Fy1t1(:,:,:),uuu_Fy2t1(:,:,:)
         real(8), allocatable :: uuu_Fz1t1(:,:,:),uuu_Fz2t1(:,:,:)
+        real(8), allocatable :: tau_all(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
         real(8) :: blktime
     contains
@@ -42,6 +44,7 @@ module FluidDomain
         procedure :: write_continue => write_continue_
         procedure :: ComputeFieldStat => ComputeFieldStat_
         procedure :: ResetVolumeForce => ResetVolumeForce_
+        procedure :: halfwayBCset => halfwayBCset_
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
     integer,allocatable:: LBMblksIndex(:)
@@ -187,6 +190,12 @@ module FluidDomain
         call LBMblks(nblock)%set_boundary_conditions()
     END SUBROUTINE
 
+    SUBROUTINE halfwayBCset_block(nblock)
+        implicit none
+        integer:: nblock
+        call LBMblks(nblock)%halfwayBCset()
+    END SUBROUTINE
+
     SUBROUTINE calculate_macro_quantities_blocks()
         implicit none
         integer:: iblock
@@ -316,27 +325,27 @@ module FluidDomain
             real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)
             ! calculate MRTM transformation matrix
             DO  I=0,lbmDim
-                M_MRT(0,I)=1
-                M_MRT(1,I)=19*SUM(ee(I,1:3)**2)-30
-                M_MRT(2,I)=(21*SUM(ee(I,1:3)**2)**2-53*SUM(ee(I,1:3)**2)+24)/2.0
+                M_MRT(0,I)=1.0d0
+                M_MRT(1,I)=19.0d0*SUM(ee(I,1:3)**2)-30.0d0
+                M_MRT(2,I)=(21.0d0*SUM(ee(I,1:3)**2)**2-53.0d0*SUM(ee(I,1:3)**2)+24.0d0)/2.0d0
 
                 M_MRT(3,I)=ee(I,1)
                 M_MRT(5,I)=ee(I,2)
                 M_MRT(7,I)=ee(I,3)
 
-                M_MRT(4,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,1)
-                M_MRT(6,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,2)
-                M_MRT(8,I)=(5*SUM(ee(I,1:3)**2)-9)*ee(I,3)
+                M_MRT(4,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,1)
+                M_MRT(6,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,2)
+                M_MRT(8,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,3)
 
-                M_MRT(9,I)=3*ee(I,1)**2-SUM(ee(I,1:3)**2)
+                M_MRT(9,I)=3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2)
+                M_MRT(10,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2))
+
                 M_MRT(11,I)=ee(I,2)**2-ee(I,3)**2
+                M_MRT(12,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(ee(I,2)**2-ee(I,3)**2)
 
                 M_MRT(13,I)=ee(I,1)*ee(I,2)
                 M_MRT(14,I)=ee(I,2)*ee(I,3)
                 M_MRT(15,I)=ee(I,3)*ee(I,1)
-
-                M_MRT(10,I)=(3*SUM(ee(I,1:3)**2)-5)*(3*ee(I,1)**2-SUM(ee(I,1:3)**2))
-                M_MRT(12,I)=(3*SUM(ee(I,1:3)**2)-5)*(ee(I,2)**2-ee(I,3)**2)
 
                 M_MRT(16,I)=(ee(I,2)**2-ee(I,3)**2)*ee(I,1)
                 M_MRT(17,I)=(ee(I,3)**2-ee(I,1)**2)*ee(I,2)
@@ -406,6 +415,62 @@ module FluidDomain
     !    enddo
     ! END SUBROUTINE
 
+
+    SUBROUTINE halfwayBCset_(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer:: x,y,z
+        if (this%BndConds(1) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwx1)) allocate(this%fIn_hwx1(0:lbmDim,this%zDim,this%yDim))
+            do y = 1,this%yDim
+            do z = 1,this%zDim
+                this%fIn_hwx1([1,7,9,11,13],z,y) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(2) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwx2)) allocate(this%fIn_hwx2(0:lbmDim,this%zDim,this%yDim))
+            do y = 1,this%yDim
+            do z = 1,this%zDim
+                this%fIn_hwx2([2,8,10,12,14],z,y) = this%fIn(z,y,this%xDim,oppo([2,8,10,12,14]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(3) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwy1)) allocate(this%fIn_hwy1(0:lbmDim,this%zDim,this%xDim))
+            do x = 1,this%xDim
+            do z = 1,this%zDim
+                this%fIn_hwy1([3,7,8,15,17],z,x) = this%fIn(z,1,x,oppo([3,7,8,15,17]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(4) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwy2)) allocate(this%fIn_hwy2(0:lbmDim,this%zDim,this%xDim))
+            do x = 1,this%xDim
+            do z = 1,this%zDim
+                this%fIn_hwy2([4,9,10,16,18],z,x) = this%fIn(z,this%yDim,x,oppo([4,9,10,16,18]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(5) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwz1)) allocate(this%fIn_hwz1(0:lbmDim,this%yDim,this%xDim))
+            do x = 1,this%xDim
+            do y = 1,this%yDim
+                this%fIn_hwz1([5,11,12,15,16],y,x) = this%fIn(1,y,x,oppo([5,11,12,15,16]))
+            enddo
+            enddo
+        endif
+        if (this%BndConds(6) .eq. BCstationary_Wall_halfway) then
+            if (.not.allocated(this%fIn_hwz2)) allocate(this%fIn_hwz2(0:lbmDim,this%yDim,this%xDim))
+            do x = 1,this%xDim
+            do y = 1,this%yDim
+                this%fIn_hwz2([6,13,14,17,18],y,x) = this%fIn(this%zDim,y,x,oppo([6,13,14,17,18]))
+            enddo
+            enddo
+        endif
+
+    END SUBROUTINE
+
     SUBROUTINE set_boundary_conditions_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
@@ -447,6 +512,12 @@ module FluidDomain
             do  z = 1,this%zDim
                 fTmp([1,7,9,11,13]) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+            enddo
+            enddo
+        elseif(this%BndConds(1) .eq. BCstationary_Wall_halfway)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                this%fIn(z,y,1,[1,7,9,11,13]) = this%fIn_hwx1([1,7,9,11,13],z,y)
             enddo
             enddo
         elseif(this%BndConds(1) .eq. BCmoving_Wall)then
@@ -508,6 +579,12 @@ module FluidDomain
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
+        elseif(this%BndConds(2) .eq. BCstationary_Wall_halfway)then
+            do  y = 1,this%yDim
+            do  z = 1,this%zDim
+                this%fIn(z,y,this%xDim,[2,8,10,12,14]) = this%fIn_hwx2([2,8,10,12,14],z,y)
+            enddo
+            enddo
         elseif(this%BndConds(2) .eq. BCmoving_Wall)then
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -565,6 +642,12 @@ module FluidDomain
             do  z = 1,this%zDim
                 fTmp([3,7,8,15,17]) = this%fIn(z,1,x,oppo([3,7,8,15,17]))
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
+            enddo
+            enddo
+        elseif(this%BndConds(3) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  z = 1,this%zDim
+                this%fIn(z,1,x,[3,7,8,15,17]) = this%fIn_hwy1([3,7,8,15,17],z,x)
             enddo
             enddo
         elseif(this%BndConds(3) .eq. BCmoving_Wall)then
@@ -626,6 +709,12 @@ module FluidDomain
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
+        elseif(this%BndConds(4) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  z = 1,this%zDim
+                this%fIn(z,this%yDim,x,[4,9,10,16,18]) = this%fIn_hwy2([4,9,10,16,18],z,x)
+            enddo
+            enddo
         elseif(this%BndConds(4) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -685,6 +774,12 @@ module FluidDomain
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
+        elseif(this%BndConds(5) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  y = 1,this%yDim
+                this%fIn(1,y,x,[5,11,12,15,16]) = this%fIn_hwz1([5,11,12,15,16],y,x)
+            enddo
+            enddo
         elseif(this%BndConds(5) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -742,6 +837,12 @@ module FluidDomain
             do  y = 1,this%yDim
                 fTmp([6,13,14,17,18]) = this%fIn(this%zDim,y,x,oppo([6,13,14,17,18]))
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
+            enddo
+            enddo
+        elseif(this%BndConds(6) .eq. BCstationary_Wall_halfway)then
+            do  x = 1,this%xDim
+            do  y = 1,this%yDim
+                this%fIn(this%zDim,y,x,[6,13,14,17,18]) = this%fIn_hwz2([6,13,14,17,18],y,x)
             enddo
             enddo
         elseif(this%BndConds(6) .eq. BCmoving_Wall)then
@@ -824,14 +925,22 @@ module FluidDomain
     SUBROUTINE collision_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,tau_0,dh,omega,f_1
         integer:: x,y,z
         dt3 = 3.d0*this%dh
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb)
+        tau_0 = this%tau
+        dh = this%dh
+        if(this%iCollidModel==14)then
+            if(.not.allocated(this%tau_all)) then
+                allocate(this%tau_all(this%zDim,this%yDim,this%xDim))
+                this%tau_all = this%tau
+            endif
+        endif
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
-            uSqr           = sum(this%uuu(z,y,x,1:3)**2)
+            uSqr           = sum(this%uuu(z,y,x,1:3)*this%uuu(z,y,x,1:3))
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
             fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
@@ -852,11 +961,271 @@ module FluidDomain
             elseif(this%iCollidModel==3)then
                 ! MRT collision
                 this%fIn(z,y,x,0:lbmDim)=this%fIn(z,y,x,0:lbmDim)+MATMUL( this%M_COLLID(0:lbmDim,0:lbmDim), fEq(0:lbmDim) ) + MATMUL( this%M_FORCE(0:lbmDim,0:lbmDim),Flb(0:lbmDim))
+            elseif(this%iCollidModel==11)then
+                ! SRT collision with LES
+                call smag(-fEq(0:lbmDim),this%den(z,y,x),omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==12)then
+                ! Regularised SRT collision
+                call RBGK(-fEq(0:lbmDim),f_1)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*f_1 + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==13)then
+                ! SRT collision in ELBM
+                call ELBM(fEq(0:lbmDim),this%fIn(z,y,x,0:lbmDim),omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==14)then
+                ! WALE SRT collision
+                call WALE(-fEq(0:lbmDim),this%den(z,y,x),x,y,z,omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+            elseif(this%iCollidModel==15)then
+                ! Vremann SRT collision
+                call vrem(x,y,z,omega)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
         enddo
         !$OMP END PARALLEL DO
+        contains
+        SUBROUTINE smag(fneq,rho,omega0)
+            implicit none
+            real(8):: fneq(0:lbmDim),rho,omega0,tau_t
+            real(8):: Q11,Q12,Q13,Q22,Q23,Q33
+            real(8):: Q
+            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
+            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
+            tau_t = dsqrt(tau_0*tau_0 + CsmagConst*this%dh*dsqrt(Q)/rho)
+            omega0 = 2.0d0 / (tau_0+tau_t)
+        END SUBROUTINE
+        SUBROUTINE RBGK(fneq,f_10)
+            implicit none
+            real(8):: fneq(0:lbmDim)
+            real(8):: Q11,Q12,Q13,Q22,Q23,Q33,f_10
+            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
+            f_10= 4.5d0*(10.0d0-Cs2)*(Q11+Q22+Q33)
+        END SUBROUTINE
+        SUBROUTINE ELBM(fneq,fnin,omega0)
+            implicit none
+            real(8):: fneq(0:lbmDim),fnin(0:lbmDim),omega0
+            real(8):: x1(0:lbmDim),x2(0:lbmDim),x3(0:lbmDim)
+            real(8):: a,b,c,alpha,beta
+            x1(0:lbmDim) = fneq(0:lbmDim) / fnin(0:lbmDim)
+            x2(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim)
+            ! x3(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim) * x1(0:lbmDim) * (x1 < 0.0)
+
+            a = sum(fnin(0:lbmDim) * x2(0:lbmDim))
+            b = sum(fnin(0:lbmDim) * x3(0:lbmDim))
+            c = sum(fnin(0:lbmDim) * (2.0d0 * x2(0:lbmDim) / (2.0d0 + x1(0:lbmDim))))
+
+            alpha = (a - sqrt(a*a - 8.0d0*b*c)) / b / 2.0d0
+            beta = flow%timeFlowDelta / (2.0d0 * this%tau + flow%timeFlowDelta)
+            omega0 = alpha * beta
+        END SUBROUTINE
+        SUBROUTINE WALE(fneq,rho,x0,y0,z0,omega0)
+            USE, INTRINSIC :: IEEE_ARITHMETIC
+            implicit none
+            real(8):: fneq(0:lbmDim),rho,omega0
+            real(8):: Q11,Q12,Q13,Q22,Q23,Q33
+            real(8):: S11,S12,S13,S22,S23,S33
+            real(8):: O12,O13,O23,ox,oy,oz
+            real(8):: SO11,SO12,SO13,SO22,SO23,SO33
+            real(8):: Q,S,O,SO,operator,SdSd
+            real(8):: invdh,tau__
+            integer:: x0,y0,z0
+            invdh = this%dh
+            Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
+            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
+
+            tau__ = this%tau_all(z0,y0,x0)
+            S11 = -1.5d0*invdh*Q11/(rho*tau__)
+            S22 = -1.5d0*invdh*Q22/(rho*tau__)
+            S33 = -1.5d0*invdh*Q33/(rho*tau__)
+            S12 = -1.5d0*invdh*Q12/(rho*tau__)
+            S13 = -1.5d0*invdh*Q13/(rho*tau__)
+            S23 = -1.5d0*invdh*Q23/(rho*tau__)
+            S = S11*S11 + S22*S22 + S33*S33 + 2.d0*(S12*S12 + S13*S13 + S23*S23)
+            if(S.lt.eps) S=0.0d0
+
+            ox=0.0d0
+            oy=0.0d0
+            oz=0.0d0
+            ! compute omega_x
+            if (y0.gt.1.and.y0.lt.this%yDim) then
+                ox = center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh)
+            elseif (y0.eq.1) then
+                ox = onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh)
+            else
+                ox = onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh)
+            endif
+            if (z0.gt.1.and.z0.lt.this%zDim) then
+                ox = 0.5d0*(ox - center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh))
+            elseif (z0.eq.1) then
+                ox = 0.5d0*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh))
+            else
+                ox = 0.5d0*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh))
+            endif
+            ! compute omega_y
+            if (z0.gt.1.and.z0.lt.this%zDim) then
+                oy = center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)
+            elseif (z0.eq.1) then
+                oy = onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)
+            else
+                oy = onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
+            endif
+            if (x0.gt.1.and.x0.lt.this%xDim) then
+                oy = 0.5d0*(oy - center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+            elseif (x0.eq.1) then
+                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh))
+            else
+                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh))
+            endif
+            ! compute omega_y
+            if (x0.gt.1.and.x0.lt.this%xDim) then
+                oz = center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
+            elseif (x0.eq.1) then
+                oz = onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
+            else
+                oz = onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
+            endif
+            if (y0.gt.1.and.y0.lt.this%yDim) then
+                oz = 0.5d0*(oz - center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh))
+            elseif (y0.eq.1) then
+                oz = 0.5d0*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh))
+            else
+                oz = 0.5d0*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh))
+            endif
+            O12 = -0.5d0*oz
+            O13 =  0.5d0*oy
+            O23 = -0.5d0*ox
+            ! the boundary need unilateral interpolation
+
+            O = 2.0d0*(O12*O12+O23*O23+O13*O13)
+            if(O.lt.eps) O=0.0d0
+
+            SO11 =-(0.0d0           + S11*S11*O12*O12 + S11*S11*O13*O13 + &
+                    0.0d0           + S12*S12*O12*O12 + S12*S12*O13*O13 + &
+                    0.0d0           + S13*S13*O12*O12 + S13*S13*O13*O13)
+            SO22 =-(S12*S12*O12*O12 + 0.0d0           + S12*S12*O23*O23 + &
+                    S22*S22*O12*O12 + 0.0d0           + S22*S22*O23*O23 + &
+                    S23*S23*O12*O12 + 0.0d0           + S23*S23*O23*O23)
+            SO33 =-(S13*S13*O13*O13 + S13*S13*O23*O23 + 0.0d0           + &
+                    S23*S23*O13*O13 + S23*S23*O23*O23 + 0.0d0           + &
+                    S33*S33*O13*O13 + S33*S33*O23*O23 + 0.0d0          )
+            SO12 =-(0.0d0           + 0.0d0           + S11*S12*O13*O23 + &
+                    0.0d0           + 0.0d0           + S12*S22*O13*O23 + &
+                    0.0d0           + 0.0d0           + S13*S23*O13*O23)
+            SO13 = (0.0d0           + S11*S13*O12*O23 + 0.0d0           + &
+                    0.0d0           + S12*S23*O12*O23 + 0.0d0           + &
+                    0.0d0           + S13*S33*O12*O23 + 0.0d0          )
+            SO23 =-(S12*S13*O12*O13 + 0.0d0           + 0.0d0           + &
+                    S22*S23*O12*O13 + 0.0d0           + 0.0d0           + &
+                    S23*S33*O12*O13 + 0.0d0           + 0.0d0          )
+            SO = SO11 + SO22 + SO33 + 2.0d0*(SO12 + SO13 + SO23)
+            if(SO.lt.eps) SO=0.0d0
+
+            SdSd = (S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2.0d0*SO
+            operator = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
+            if ((.not. IEEE_IS_FINITE(operator)).or.(operator.lt.0.0d0).or.(S.eq.0.0d0.and.SdSd.eq.0.0d0)) then
+                operator = 0.0d0
+            endif
+
+            tau__ = 3.0d0*(flow%nu+CWALEConst*operator*this%dh*this%dh)+0.5d0
+            this%tau_all(z0,y0,x0) = tau__
+            omega0 = 1.0d0 / (tau__)
+        END SUBROUTINE
+        FUNCTION center_diff(g1,g2,invdx)
+            implicit none
+            real(8):: center_diff,g1,g2,invdx
+            center_diff = (g1 - g2)*invdx
+        END FUNCTION
+        FUNCTION onesid_diff(g1,g2,g3,invdx)
+            implicit none
+            real(8):: onesid_diff,g1,g2,g3,invdx
+            onesid_diff = (-3.0d0*g1 + 4.0d0*g2 - g3)*invdx
+        END FUNCTION
+        SUBROUTINE vrem(x0,y0,z0,omega0)
+            implicit none
+            real(8):: omega0
+            real(8):: a11,a12,a13,a21,a22,a23,a31,a32,a33
+            real(8):: b11,b12,b13,b21,b22,b23,b31,b32,b33
+            real(8):: aa,bb,operator
+            real(8):: invdh,tau__
+            integer:: x0,y0,z0
+            invdh = this%dh
+            if (x0.gt.1.and.x0.lt.this%xDim) then
+                a11 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0-1,1),invdh)
+                a21 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
+                a31 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh)
+            elseif (x0.eq.1) then
+                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0+2,1),invdh)
+                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
+                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh)
+            else
+                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0-1,1),this%uuu(z0,y0,x0-2,1),invdh)
+                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
+                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh)
+            endif
+            if (y0.gt.1.and.y0.lt.this%yDim) then
+                a12 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)
+                a22 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0-1,x0,2),invdh)
+                a32 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh)
+            elseif (y0.eq.1) then
+                a12 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh)
+                a22 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0+2,x0,2),invdh)
+                a32 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh)
+            else
+                a12 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh)
+                a22 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0-1,x0,2),this%uuu(z0,y0-2,x0,2),invdh)
+                a32 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh)
+            endif
+            if (z0.gt.1.and.z0.lt.this%zDim) then
+                a13 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)
+                a23 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)
+                a33 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,3),this%uuu(z0-1,y0,x0,3),invdh)
+            elseif (z0.eq.1) then
+                a13 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)
+                a23 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh)
+                a33 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0+1,y0,x0,3),this%uuu(z0+2,y0,x0,3),invdh)
+            else
+                a13 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
+                a23 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh)
+                a33 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0-1,y0,x0,3),this%uuu(z0-2,y0,x0,3),invdh)
+            endif
+            b11 = a11*a11
+            b12 = a12*a12
+            b13 = a13*a13
+            b21 = a21*a21
+            b22 = a22*a22
+            b23 = a23*a23
+            b31 = a31*a31
+            b32 = a32*a32
+            b33 = a33*a33
+            aa = b11+b12+b13+b21+b22+b23+b31+b32+b33
+            bb = (b11+b12+b13)*(b21+b22+b23)- &
+                 (a11*a21+a12*a22+a13*a23)*(a11*a21+a12*a22+a13*a23)+ &
+                 (b11+b12+b13)*(b31+b32+b33)- &
+                 (a11*a31+a12*a32+a13*a33)*(a11*a31+a12*a32+a13*a33)+ &
+                 (b21+b22+b23)*(b31+b32+b33)- &
+                 (a21*a31+a22*a32+a23*a33)*(a21*a31+a22*a32+a23*a33)
+            operator = dsqrt(bb/aa)
+            tau__ = 3.0d0*(flow%nu+CvremConst*operator*this%dh*this%dh)+0.5d0
+            omega0 = 1.0d0 / (tau__)
+        END SUBROUTINE
     END SUBROUTINE collision_
 
     !0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18

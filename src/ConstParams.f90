@@ -32,5 +32,10 @@ module ConstParams
     integer, parameter:: DOFDim = 6
 
     real(8), parameter:: Cs2 = 1.d0/3.0d0
-
+    real(8), parameter:: Csmag = 0.17d0
+    ! real(8), parameter:: CsmagConst = 16.d0 * dsqrt(2.d0) / (3.d0 * Pi * Pi)
+    real(8), parameter:: CsmagConst = 2.0d0 * Csmag * Csmag * dsqrt(2.d0) * 9.d0
+    real(8), parameter:: CWALE = 0.50d0
+    real(8), parameter:: CWALEConst = CWALE*CWALE
+    real(8), parameter:: CvremConst = 2.5d0*Csmag*Csmag
 end module ConstParams
