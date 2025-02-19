@@ -78,7 +78,7 @@ PROGRAM main
         step = step + 1
         LBMblks(:)%blktime = time
         write(*,'(A)') '========================================================='
-        write(*,'(A,I6,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
+        write(*,'(A,I8,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
         time_collision = 0.d0

@@ -905,12 +905,12 @@ module FluidDomain
             real(8):: Q
             Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
             Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
-            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
             Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
             Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
-            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
             Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
-            tau_t = dsqrt(tau_0*tau_0 + CsmagConst*dsqrt(Q)/rho)
+            tau_t = dsqrt(tau_0*tau_0 + CsmagConst*this%dh*dsqrt(Q)/rho)
             omega0 = 2.0d0 / (tau_0+tau_t)
         END SUBROUTINE
         SUBROUTINE RBGK(fneq,f_10)
@@ -919,10 +919,10 @@ module FluidDomain
             real(8):: Q11,Q12,Q13,Q22,Q23,Q33,f_10
             Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
             Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
-            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
             Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
             Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
-            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
             f_10= 4.5d0*(10.0d0-Cs2)*(Q11+Q22+Q33)
         END SUBROUTINE
         SUBROUTINE ELBM(fneq,fnin,omega0)
@@ -932,7 +932,7 @@ module FluidDomain
             real(8):: a,b,c,alpha,beta
             x1(0:lbmDim) = fneq(0:lbmDim) / fnin(0:lbmDim)
             x2(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim)
-            x3(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim) * x1(0:lbmDim) * (x1 < 0.0)
+            ! x3(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim) * x1(0:lbmDim) * (x1 < 0.0)
 
             a = sum(fnin(0:lbmDim) * x2(0:lbmDim))
             b = sum(fnin(0:lbmDim) * x3(0:lbmDim))
@@ -956,20 +956,20 @@ module FluidDomain
             invdh = this%dh
             Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
             Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
-            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)
+            Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
             Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
             Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
-            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)+fneq(17)+fneq(18)
+            Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
             Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
 
             tau__ = this%tau_all(z0,y0,x0)
-            S11 = -1.5*invdh*Q11/(rho*tau__)
-            S22 = -1.5*invdh*Q22/(rho*tau__)
-            S33 = -1.5*invdh*Q33/(rho*tau__)
-            S12 = -1.5*invdh*Q12/(rho*tau__)
-            S13 = -1.5*invdh*Q13/(rho*tau__)
-            S23 = -1.5*invdh*Q23/(rho*tau__)
-            S = -1.5*invdh*Q/(rho*tau__)
+            S11 = -1.5d0*invdh*Q11/(rho*tau__)
+            S22 = -1.5d0*invdh*Q22/(rho*tau__)
+            S33 = -1.5d0*invdh*Q33/(rho*tau__)
+            S12 = -1.5d0*invdh*Q12/(rho*tau__)
+            S13 = -1.5d0*invdh*Q13/(rho*tau__)
+            S23 = -1.5d0*invdh*Q23/(rho*tau__)
+            S = S11*S11 + S22*S22 + S33*S33 + 2.d0*(S12*S12 + S13*S13 + S23*S23)
             if(S.lt.eps) S=0.0d0
 
             ox=0.0d0
@@ -1040,16 +1040,16 @@ module FluidDomain
             SO12 =-(0.0d0           + 0.0d0           + S11*S12*O13*O23 + &
                     0.0d0           + 0.0d0           + S12*S22*O13*O23 + &
                     0.0d0           + 0.0d0           + S13*S23*O13*O23)
-            SO13 =-(0.0d0           + S11*S13*O12*O23 + 0.0d0           + &
+            SO13 = (0.0d0           + S11*S13*O12*O23 + 0.0d0           + &
                     0.0d0           + S12*S23*O12*O23 + 0.0d0           + &
                     0.0d0           + S13*S33*O12*O23 + 0.0d0          )
             SO23 =-(S12*S13*O12*O13 + 0.0d0           + 0.0d0           + &
                     S22*S23*O12*O13 + 0.0d0           + 0.0d0           + &
                     S23*S33*O12*O13 + 0.0d0           + 0.0d0          )
-            SO = SO11*SO11 + SO22*SO22 + SO33*SO33 + 2.0d0*(SO12*SO12 + SO13*SO13 + SO23*SO23)
+            SO = SO11 + SO22 + SO33 + 2.0d0*(SO12 + SO13 + SO23)
             if(SO.lt.eps) SO=0.0d0
 
-            SdSd = (S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2*SO
+            SdSd = (S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2.0d0*SO
             operator = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
             if ((.not. IEEE_IS_FINITE(operator)).or.(operator.lt.0.0d0).or.(S.eq.0.0d0.and.SdSd.eq.0.0d0)) then
                 operator = 0.0d0
@@ -1127,7 +1127,12 @@ module FluidDomain
             b32 = a32*a32
             b33 = a33*a33
             aa = b11+b12+b13+b21+b22+b23+b31+b32+b33
-            bb = b11*b22-b12*b12+b11*b33-b13*b13+b22*b33-b23*b23
+            bb = (b11+b12+b13)*(b21+b22+b23)- &
+                 (a11*a21+a12*a22+a13*a23)*(a11*a21+a12*a22+a13*a23)+ &
+                 (b11+b12+b13)*(b31+b32+b33)- &
+                 (a11*a31+a12*a32+a13*a33)*(a11*a31+a12*a32+a13*a33)+ &
+                 (b21+b22+b23)*(b31+b32+b33)- &
+                 (a21*a31+a22*a32+a23*a33)*(a21*a31+a22*a32+a23*a33)
             operator = dsqrt(bb/aa)
             tau__ = 3.0d0*(flow%nu+CvremConst*operator*this%dh*this%dh)+0.5d0
             omega0 = 1.0d0 / (tau__)
