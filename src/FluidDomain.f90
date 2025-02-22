@@ -423,7 +423,6 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer:: x,y,z
         if (this%BndConds(1) .eq. BCstationary_Wall_halfway) then
-            if (.not.allocated(this%fIn_hwx1)) allocate(this%fIn_hwx1(0:lbmDim,this%zDim,this%yDim))
             do y = 1,this%yDim
             do z = 1,this%zDim
                 this%fIn_hwx1([1,7,9,11,13],z,y) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
@@ -431,7 +430,6 @@ module FluidDomain
             enddo
         endif
         if (this%BndConds(2) .eq. BCstationary_Wall_halfway) then
-            if (.not.allocated(this%fIn_hwx2)) allocate(this%fIn_hwx2(0:lbmDim,this%zDim,this%yDim))
             do y = 1,this%yDim
             do z = 1,this%zDim
                 this%fIn_hwx2([2,8,10,12,14],z,y) = this%fIn(z,y,this%xDim,oppo([2,8,10,12,14]))
@@ -439,7 +437,6 @@ module FluidDomain
             enddo
         endif
         if (this%BndConds(3) .eq. BCstationary_Wall_halfway) then
-            if (.not.allocated(this%fIn_hwy1)) allocate(this%fIn_hwy1(0:lbmDim,this%zDim,this%xDim))
             do x = 1,this%xDim
             do z = 1,this%zDim
                 this%fIn_hwy1([3,7,8,15,17],z,x) = this%fIn(z,1,x,oppo([3,7,8,15,17]))
@@ -447,7 +444,6 @@ module FluidDomain
             enddo
         endif
         if (this%BndConds(4) .eq. BCstationary_Wall_halfway) then
-            if (.not.allocated(this%fIn_hwy2)) allocate(this%fIn_hwy2(0:lbmDim,this%zDim,this%xDim))
             do x = 1,this%xDim
             do z = 1,this%zDim
                 this%fIn_hwy2([4,9,10,16,18],z,x) = this%fIn(z,this%yDim,x,oppo([4,9,10,16,18]))
@@ -455,7 +451,6 @@ module FluidDomain
             enddo
         endif
         if (this%BndConds(5) .eq. BCstationary_Wall_halfway) then
-            if (.not.allocated(this%fIn_hwz1)) allocate(this%fIn_hwz1(0:lbmDim,this%yDim,this%xDim))
             do x = 1,this%xDim
             do y = 1,this%yDim
                 this%fIn_hwz1([5,11,12,15,16],y,x) = this%fIn(1,y,x,oppo([5,11,12,15,16]))
@@ -463,7 +458,6 @@ module FluidDomain
             enddo
         endif
         if (this%BndConds(6) .eq. BCstationary_Wall_halfway) then
-            if (.not.allocated(this%fIn_hwz2)) allocate(this%fIn_hwz2(0:lbmDim,this%yDim,this%xDim))
             do x = 1,this%xDim
             do y = 1,this%yDim
                 this%fIn_hwz2([6,13,14,17,18],y,x) = this%fIn(this%zDim,y,x,oppo([6,13,14,17,18]))
@@ -517,11 +511,15 @@ module FluidDomain
             enddo
             enddo
         elseif(this%BndConds(1) .eq. BCstationary_Wall_halfway)then
-            do  y = 1,this%yDim
-            do  z = 1,this%zDim
-                this%fIn(z,y,1,[1,7,9,11,13]) = this%fIn_hwx1([1,7,9,11,13],z,y)
-            enddo
-            enddo
+            if (.not.allocated(this%fIn_hwx1)) then
+                allocate(this%fIn_hwx1(0:lbmDim,this%zDim,this%yDim))
+            else
+                do  y = 1,this%yDim
+                do  z = 1,this%zDim
+                    this%fIn(z,y,1,[1,7,9,11,13]) = this%fIn_hwx1([1,7,9,11,13],z,y)
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(1) .eq. BCmoving_Wall)then
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -582,11 +580,15 @@ module FluidDomain
             enddo
             enddo
         elseif(this%BndConds(2) .eq. BCstationary_Wall_halfway)then
-            do  y = 1,this%yDim
-            do  z = 1,this%zDim
-                this%fIn(z,y,this%xDim,[2,8,10,12,14]) = this%fIn_hwx2([2,8,10,12,14],z,y)
-            enddo
-            enddo
+            if (.not.allocated(this%fIn_hwx2)) then
+                allocate(this%fIn_hwx2(0:lbmDim,this%zDim,this%yDim))
+            else
+                do  y = 1,this%yDim
+                do  z = 1,this%zDim
+                    this%fIn(z,y,this%xDim,[2,8,10,12,14]) = this%fIn_hwx2([2,8,10,12,14],z,y)
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(2) .eq. BCmoving_Wall)then
             do  y = 1,this%yDim
                 yCoord = this%ymin + this%dh * (y - 1);
@@ -647,11 +649,15 @@ module FluidDomain
             enddo
             enddo
         elseif(this%BndConds(3) .eq. BCstationary_Wall_halfway)then
-            do  x = 1,this%xDim
-            do  z = 1,this%zDim
-                this%fIn(z,1,x,[3,7,8,15,17]) = this%fIn_hwy1([3,7,8,15,17],z,x)
-            enddo
-            enddo
+            if (.not.allocated(this%fIn_hwy1)) then
+                allocate(this%fIn_hwy1(0:lbmDim,this%zDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                do  z = 1,this%zDim
+                    this%fIn(z,1,x,[3,7,8,15,17]) = this%fIn_hwy1([3,7,8,15,17],z,x)
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(3) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -712,11 +718,15 @@ module FluidDomain
             enddo
             enddo
         elseif(this%BndConds(4) .eq. BCstationary_Wall_halfway)then
-            do  x = 1,this%xDim
-            do  z = 1,this%zDim
-                this%fIn(z,this%yDim,x,[4,9,10,16,18]) = this%fIn_hwy2([4,9,10,16,18],z,x)
-            enddo
-            enddo
+            if (.not.allocated(this%fIn_hwy2)) then
+                allocate(this%fIn_hwy2(0:lbmDim,this%zDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                do  z = 1,this%zDim
+                    this%fIn(z,this%yDim,x,[4,9,10,16,18]) = this%fIn_hwy2([4,9,10,16,18],z,x)
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(4) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -777,11 +787,15 @@ module FluidDomain
             enddo
             enddo
         elseif(this%BndConds(5) .eq. BCstationary_Wall_halfway)then
-            do  x = 1,this%xDim
-            do  y = 1,this%yDim
-                this%fIn(1,y,x,[5,11,12,15,16]) = this%fIn_hwz1([5,11,12,15,16],y,x)
-            enddo
-            enddo
+            if (.not.allocated(this%fIn_hwz1)) then
+                allocate(this%fIn_hwz1(0:lbmDim,this%yDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                do  y = 1,this%yDim
+                    this%fIn(1,y,x,[5,11,12,15,16]) = this%fIn_hwz1([5,11,12,15,16],y,x)
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(5) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
@@ -842,11 +856,15 @@ module FluidDomain
             enddo
             enddo
         elseif(this%BndConds(6) .eq. BCstationary_Wall_halfway)then
-            do  x = 1,this%xDim
-            do  y = 1,this%yDim
-                this%fIn(this%zDim,y,x,[6,13,14,17,18]) = this%fIn_hwz2([6,13,14,17,18],y,x)
-            enddo
-            enddo
+            if (.not.allocated(this%fIn_hwz2)) then
+                allocate(this%fIn_hwz2(0:lbmDim,this%yDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                do  y = 1,this%yDim
+                    this%fIn(this%zDim,y,x,[6,13,14,17,18]) = this%fIn_hwz2([6,13,14,17,18],y,x)
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(6) .eq. BCmoving_Wall)then
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
