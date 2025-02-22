@@ -23,9 +23,9 @@ module FluidDomain
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
         real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
         real(8), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
-        real(8), allocatable :: uuu_Fx1t1(:,:,:),uuu_Fx2t1(:,:,:)
-        real(8), allocatable :: uuu_Fy1t1(:,:,:),uuu_Fy2t1(:,:,:)
-        real(8), allocatable :: uuu_Fz1t1(:,:,:),uuu_Fz2t1(:,:,:)
+        real(8), allocatable :: tau_Fx1t1(:,:),tau_Fx1t2(:,:),tau_Fx2t1(:,:),tau_Fx2t2(:,:)
+        real(8), allocatable :: tau_Fy1t1(:,:),tau_Fy1t2(:,:),tau_Fy2t1(:,:),tau_Fy2t2(:,:)
+        real(8), allocatable :: tau_Fz1t1(:,:),tau_Fz1t2(:,:),tau_Fz2t1(:,:),tau_Fz2t2(:,:)
         real(8), allocatable :: tau_all(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
         real(8) :: blktime
@@ -300,6 +300,8 @@ module FluidDomain
             implicit none
             this%tau = flow%nu/(this%dh*Cs2)+0.5d0
             this%Omega =  1.0d0 / this%tau
+            allocate(this%tau_all(this%zDim,this%yDim,this%xDim))
+            this%tau_all = this%tau
         END SUBROUTINE calculate_SRT_params
 
         SUBROUTINE calculate_TRT_params(lambda)
@@ -825,17 +827,9 @@ module FluidDomain
     SUBROUTINE collision_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,tau_0,dh,omega,f_1
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega,f_1
         integer:: x,y,z
         dt3 = 3.d0*this%dh
-        tau_0 = this%tau
-        dh = this%dh
-        if(this%iCollidModel==14)then
-            if(.not.allocated(this%tau_all)) then
-                allocate(this%tau_all(this%zDim,this%yDim,this%xDim))
-                this%tau_all = this%tau
-            endif
-        endif
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
@@ -863,7 +857,7 @@ module FluidDomain
                 this%fIn(z,y,x,0:lbmDim)=this%fIn(z,y,x,0:lbmDim)+MATMUL( this%M_COLLID(0:lbmDim,0:lbmDim), fEq(0:lbmDim) ) + MATMUL( this%M_FORCE(0:lbmDim,0:lbmDim),Flb(0:lbmDim))
             elseif(this%iCollidModel==11)then
                 ! SRT collision with LES
-                call smag(-fEq(0:lbmDim),this%den(z,y,x),omega)
+                call smag(-fEq(0:lbmDim),this%den(z,y,x),x,y,z,omega)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
             elseif(this%iCollidModel==12)then
                 ! Regularised SRT collision
@@ -887,11 +881,12 @@ module FluidDomain
         enddo
         !$OMP END PARALLEL DO
         contains
-        SUBROUTINE smag(fneq,rho,omega0)
+        SUBROUTINE smag(fneq,rho,x0,y0,z0,omega0)
             implicit none
             real(8):: fneq(0:lbmDim),rho,omega0,tau_t
             real(8):: Q11,Q12,Q13,Q22,Q23,Q33
             real(8):: Q
+            integer:: x0,y0,z0
             Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
             Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
             Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
@@ -899,8 +894,9 @@ module FluidDomain
             Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
             Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
             Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
-            tau_t = dsqrt(tau_0*tau_0 + CsmagConst*this%dh*dsqrt(Q)/rho)
-            omega0 = 2.0d0 / (tau_0+tau_t)
+            tau_t = dsqrt(this%tau*this%tau + CsmagConst*dsqrt(Q)/rho)
+            this%tau_all(z0,y0,x0) = 0.5d0 * (this%tau+tau_t)
+            omega0 = 2.0d0 / (this%tau+tau_t)
         END SUBROUTINE
         SUBROUTINE RBGK(fneq,f_10)
             implicit none
@@ -1044,7 +1040,7 @@ module FluidDomain
                 operator = 0.0d0
             endif
 
-            tau__ = 3.0d0*(flow%nu+CWALEConst*operator*this%dh*this%dh)+0.5d0
+            tau__ = (flow%nu+CWALEConst*operator*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
             this%tau_all(z0,y0,x0) = tau__
             omega0 = 1.0d0 / (tau__)
         END SUBROUTINE
@@ -1123,7 +1119,8 @@ module FluidDomain
                  (b21+b22+b23)*(b31+b32+b33)- &
                  (a21*a31+a22*a32+a23*a33)*(a21*a31+a22*a32+a23*a33)
             operator = dsqrt(bb/aa)
-            tau__ = 3.0d0*(flow%nu+CvremConst*operator*this%dh*this%dh)+0.5d0
+            tau__ = (flow%nu+CvremConst*operator*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
+            this%tau_all(z0,y0,x0) = tau__
             omega0 = 1.0d0 / (tau__)
         END SUBROUTINE
     END SUBROUTINE collision_
