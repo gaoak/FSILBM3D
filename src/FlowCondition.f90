@@ -2,7 +2,7 @@ module FlowCondition
     implicit none
     private
     public :: FlowCondType,flow
-    public :: read_flow_conditions,read_probe_params,write_information_titles,write_fluid_information,write_solid_information
+    public :: read_flow_conditions,read_probe_params,write_information_titles,write_fluid_information
     type :: FlowCondType
         integer :: isConCmpt,numsubstep,npsize
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
@@ -130,29 +130,49 @@ module FlowCondition
             write(fishNum,'(I3)') iFish
             fishNum = adjustr(fishNum)
             do  i=1,nameLen
-                 if(fishNum(i:i)==' ') fishNum(i:i)='0'
+                    if(fishNum(i:i)==' ') fishNum(i:i)='0'
             enddo
             ! write forces title
             open(111,file='./DatInfo/FishForce_'//trim(fishNum)//'.plt')
             write(111,*) 'variables= "t"  "Fx"  "Fy"  "Fz"'
             close(111)
-            ! write average information titles
-            open(111,file='./DatInfo/FishMeanInfo_'//trim(fishNum)//'.plt')
+            ! write begin information titles
+            open(111,file='./DatInfo/FishNodeBegin_'//trim(fishNum)//'.plt')
             write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
+            ! write end information titles
+            open(111,file='./DatInfo/FishNodeEnd_'//trim(fishNum)//'.plt')
+            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            close(111)
+            ! write center information titles
+            open(111,file='./DatInfo/FishNodeCenter_'//trim(fishNum)//'.plt')
+            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            close(111)
+            ! write mean information titles
+            open(111,file='./DatInfo/FishNodeMean_'//trim(fishNum)//'.plt')
+            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            close(111)
+            ! write angular information titles
+            open(111,file='./DatInfo/FishAngular_'//trim(fishNum)//'.plt')
+            write(111,*) 'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
+            close(111) 
             ! write power title
             open(111,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt')
             write(111,*) 'variables= "t" "Ptot" "Paero" "Piner" "Pax" "Pay" "Paz" "Pix" "Piy" "Piz"'
             close(111)
+            ! write area title
+            ! open(111,file='./DatInfo/FishArea_'//trim(fishNum)//'.plt')
+            ! write(111,*) 'variables= "t"  "Area"'
+            ! close(111)
             ! write energy title
             open(111,file='./DatInfo/FishEnergy_'//trim(fishNum)//'.plt')
             write(111,*) 'variables= "t","Es","Eb","Ep","Ek","Ew","Et"'
             close(111)
-            ! probing informations
+            ! write solid probing title
             do  i=1,flow%solidProbingNum
                 write(probeNum,'(I3.3)') i
                 open(111,file='./DatInfo/FishProbes_'//trim(fishNum)//'_'//trim(probeNum)//'.plt')
-                write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w" '
+                write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
                 close(111)
             enddo
         enddo
@@ -163,6 +183,14 @@ module FlowCondition
             write(111,*) 'variables= "t"  "u"  "v"  "w" '
             close(111)
         enddo
+        ! ! write max vel of fluid title
+        ! open(111,file='./DatInfo/MaMax.plt')
+        ! write(111,*)'variables= "t"  "MaMax"  '
+        ! close(111)
+        ! ! write convergence title
+        ! open(111,file='./DatInfo/Converg.plt')
+        ! write(111,*)'variables= "t"  "Convergence"  '
+        ! close(111)
     END SUBROUTINE
 
     SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocityIn)
@@ -193,75 +221,6 @@ module FlowCondition
             write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
-        END SUBROUTINE
-
-        SUBROUTINE write_solid_information(time,nFish)
-            implicit none
-            integer:: i,iFish,nFish
-            real(8):: time
-            integer,parameter::nameLen=3
-            character (LEN=nameLen):: fishNum,probeNum
-        
-            do iFish=1,nFish
-                ! get fish numbers
-                write(fishNum,'(I3)') iFish
-                fishNum = adjustr(fishNum)
-                do  i=1,nameLen
-                        if(fishNum(i:i)==' ') fishNum(i:i)='0'
-                enddo
-                ! write forces
-                open(111,file='./DatInfo/FishForce_'//trim(fishNum)//'.plt',position='append')
-                write(111,*) 'test'
-                !write(111,'(4E20.10)') time/flow%Tref,sum(extful(1:nND(iFish),1:3,iFish),1)/Fref
-                close(111)
-                ! write average information
-                open(111,file='./DatInfo/FishMeanInfo_'//trim(fishNum)//'.plt',position='append')
-                write(111,*) 'test'
-                !write(111,'(10E20.10)')time/flow%Tref,sum(xyzful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Lref, &
-                !                                      sum(velful(1:nND(iFish),1:3,iFish)*mssful(1:nND(iFish),1:3,iFish),1)/sum(mssful(1:nND(iFish),1:3,iFish),1)/Uref
-                close(111)
-                ! write power
-                open(111,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt',position='append')
-                !Pax=sum(extful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
-                !Pay=sum(extful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
-                !Paz=sum(extful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
-                !Pix=-sum(mssful(1:nND(iFish),1,iFish)*accful(1:nND(iFish),1,iFish)*velful(1:nND(iFish),1,iFish))/Pref
-                !Piy=-sum(mssful(1:nND(iFish),2,iFish)*accful(1:nND(iFish),2,iFish)*velful(1:nND(iFish),2,iFish))/Pref
-                !Piz=-sum(mssful(1:nND(iFish),3,iFish)*accful(1:nND(iFish),3,iFish)*velful(1:nND(iFish),3,iFish))/Pref
-                !Paero=Pax+Pay+Paz
-                !Piner=Pix+Piy+Piz
-                !Ptot=Paero+Piner
-                !write(111,'(10E20.10)')time/flow%Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
-                write(111,*) 'test'
-                close(111)
-                ! write energy title
-                open(111,file='./DatInfo/FishEnergy_'//trim(fishNum)//'.plt', position='append')
-                !call strain_energy_D(strainEnergy(1:nEL(iFish),1:2,iFish),xyzful0(1:nND(iFish),1,iFish),xyzful0(1:nND(iFish),2,iFish),xyzful0(1:nND(iFish),3,iFish), &
-                !                        xyzful(1:nND(iFish),1,iFish), xyzful(1:nND(iFish),2,iFish), xyzful(1:nND(iFish),3,iFish),ele(1:nEL(iFish),1:5,iFish), prop(1:nMT(iFish),1:10,iFish), &
-                !                        triad_n1(1:3,1:3,1:nEL(iFish),iFish),triad_n2(1:3,1:3,1:nEL(iFish),iFish), &
-                !                        triad_ee(1:3,1:3,1:nEL(iFish),iFish), &
-                !                        nND(iFish),nEL(iFish),nMT(iFish))
-                !EEE(1)=sum(strainEnergy(1:nEL(iFish),1,iFish))
-                !EEE(2)=sum(strainEnergy(1:nEL(iFish),2,iFish))
-                !Es=EEE(1)/Eref
-                !Eb=EEE(2)/Eref
-                !Ep=Es+Eb
-                !Ew=Ew+Paero*timeOutInfo
-                !Ek=0.5*sum(mssful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish)*velful(1:nND(iFish),1:6,iFish))/Eref
-                !Et=Ek+Ep
-                !write(111,'(7E20.10)')time/flow%Tref,Es,Eb,Ep,Ek,Ew,Et
-                write(111,*) 'test'
-                close(111)
-                
-                ! probing informations
-                do  i=1,flow%solidProbingNum
-                    write(probeNum,'(I3.3)') i
-                    open(111,file='./DatInfo/FishProbes_'//trim(fishNum)//'_'//trim(probeNum)//'.plt',position='append')
-                !    write(111,'(5E20.10)') time/flow%Tref,  Pressure/(0.5*denIn*Uref**2), velocity(1:3)/Uref
-                    write(111,*) 'test'
-                    close(111)
-                enddo
-            enddo   
         END SUBROUTINE
 
 end module FlowCondition

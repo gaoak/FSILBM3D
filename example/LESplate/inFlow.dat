@@ -1,0 +1,61 @@
+Parallel
+# parameter for mpi
+ 64                                           read(buffer,*) npsize
+EndParallel
+FlowCondition
+ 1          1                                 read(buffer,*) isConCmpt,numsubstep
+ 50.0D+0   100.0D+0                          read(buffer,*) timeSimTotal,timeContiDelta
+ 0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
+ 1.000D+0   1.000D+0   1.000D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
+ 2740.0D+0   1.000D+0                          read(buffer,*) Re,denIn
+ 0.100D+0   0.000D+0   0.000D+0               read(buffer,*) uvwIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0   0           read(buffer,*) shearRateIn(1:3),flow%velocityKind
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceIn(1:3)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) volumeForceAmp,volumeForceFreq,volumeForcePhi
+ 0          100.0D+0                          read(buffer,*) TrefType,Tref
+ 0          0.010D+0                          read(buffer,*) UrefType,Uref
+ 10         0.010D+0                          read(buffer,*) ntolLBM,dtolLBM
+ 1                                            read(buffer,*) interpolateScheme
+ENDFlowCondition
+FluidBlocks
+ 1                                            read(buffer,*) nblock (should be npairs + 1)
+ 1          11         0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 801        241        321                    read(buffer,*) xDim,yDim,zDim
+ 1.000D+0  -160.000D+0  -80.000D+0 -160.00D+0     read(buffer,*) dh,xmin,ymin,zmin
+ 101   103   201   103   103   103            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
+=====================
+ENDFluidBlocks
+SolidBody
+# general parameters for solid solver
+ 1.000D+0   0.000D+0                          read(buffer,*) IBPenaltyalpha,alphaf
+ 0.500D+0   1.000D+0                          read(buffer,*) NewmarkGamma,NewmarkBeta
+ 0.000D+0   0.000D+0                          read(buffer,*) dampK,dampM
+ 1.000D-6   100			                      read(buffer,*) dtolFEM,ntolFEM
+ 1          1          1                      read(buffer,*) nFish,nfishGroup,isKB
+# parameters for each body
+ 1          1          1          1           read(buffer,*) fishNum(fishGroup),FluidBlockID,numX,numY,numZ
+ plate.dat                                    read(buffer,*) FEmeshName(iFish)
+ 1          1                                 read(buffer,*) iBodyModel(iFish),iBodyType(iFish)
+ 1          1          1                      read(buffer,*) isMotionGiven(1:3,iFish)
+ 1          1          1                      read(buffer,*) isMotionGiven(4:6,iFish)
+ 1.000D+0   0.250D+0                          read(buffer,*) denR(iFish), psR(iFish)
+ 1.000D+3   1.000D+3                          read(buffer,*) [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
+ 0.010D+0   0.000D+0                          read(buffer,*) freq(iFish),St(iFish)
+ 0.000D+0   0.000D+0  -40.00D+0               read(buffer,*) firstXYZ(1:3)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) deltaXYZ(1:3)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) XYZAmpl(1:3,iFish)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) XYZPhi(1:3,iFish)
+ # angle in degree
+ 0.000D+0   0.000D+0   -15.d0               read(buffer,*) AoAo(1:3,iFish)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) AoAAmpl(1:3,iFish)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) AoAPhi(1:3,iFish)
+ ===
+ENDSolidBody
+ProbingFluid
+ 1          1                                 read(buffer,*) fluidProbingNum (0: no output)
+ 0.600D+0   0.000D+0   0.500D+0               read(buffer,*) fluidProbingCoords(1,1:3)
+ProbingSolid
+ 1                                            read(buffer,*) solidProbingNum (0: no output)
+ 100                                          read(buffer,*) solidProbingNode(1)
+ENDProbing
