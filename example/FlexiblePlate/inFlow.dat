@@ -4,7 +4,7 @@ Parallel
 EndParallel
 FlowCondition
  1          1                                 read(buffer,*) isConCmpt,numsubstep
- 1.000D+0   1.000D+0                          read(buffer,*) timeSimTotal,timeContiDelta
+ 100.0D+0   100.0D+0                          read(buffer,*) timeSimTotal,timeContiDelta
  0.000D+0   100.0D+0                          read(buffer,*) timeWriteBegin,timeWriteEnd
  0.250D+0   0.250D+0   0.010D+0               read(buffer,*) timeWriteFlow,timeWriteBody,timeWriteInfo
  100.0D+0   1.000D+0                          read(buffer,*) Re,denIn
@@ -19,13 +19,13 @@ FlowCondition
 ENDFlowCondition
 FluidBlocks
  2                                            read(buffer,*) nblock (should be npairs + 1)
- 1          2          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 1          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
  501        101        101                    read(buffer,*) xDim,yDim,zDim
  0.040D+0   0.000D+0  -2.000D+0  -2.000D+0    read(buffer,*) dh,xmin,ymin,zmin
- 101   103   301   301   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
+ 101   101   301   301   301   301            read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
  0.25   0   0   0   0   0   0   0   0   0     read(buffer,*) params(1:10)
 =====================
- 2          2          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
+ 2          1          0          1           read(buffer,*) ID,iCollideModel,offsetOutput,isoutput
  801        101        101                    read(buffer,*) xDim,yDim,zDim
  0.020D+0   2.000D+0  -1.000D+0  -1.000D+0    read(buffer,*) dh,xmin,ymin,zmin
  0   0   0   0   0   0                        read(buffer,*) boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)
@@ -38,9 +38,9 @@ SolidBody
  0.500D+0   1.000D+0                          read(buffer,*) NewmarkGamma,NewmarkBeta
  0.000D+0   0.000D+0                          read(buffer,*) dampK,dampM
  1.000D-6   100			                      read(buffer,*) dtolFEM,ntolFEM
- 2          1          1                      read(buffer,*) nFish,nfishGroup,isKB
+ 1          1          1                      read(buffer,*) nFish,nfishGroup,isKB
 # parameters for each body
- 2          2          2          1           read(buffer,*) fishNum(fishGroup),FluidBlockID,numX,numY
+ 1          2          1          1           read(buffer,*) fishNum(fishGroup),FluidBlockID,numX,numY
  plate.dat                                    read(buffer,*) FEmeshName(iFish)
  2          1                                 read(buffer,*) iBodyModel(iFish),iBodyType(iFish)
  0          1          1                      read(buffer,*) isMotionGiven(1:3,iFish)
@@ -48,8 +48,8 @@ SolidBody
  1.000D+0   0.250D+0                          read(buffer,*) denR(iFish), psR(iFish)
  1.000D+1   1.000D+3                          read(buffer,*) [KB(iFish), KS(iFish)]/[ERatio(iFish),tcR(iFish)]
  0.010D+0   0.000D+0                          read(buffer,*) freq(iFish),St(iFish)
- 14.00D+0   0.000D+0  -0.500D+0               read(buffer,*) firstXYZ(1:3)
- 2.000D+0   0.000D+0   0.000D+0               read(buffer,*) deltaXYZ(1:3)
+ 16.00D+0   0.000D+0  -0.500D+0               read(buffer,*) firstXYZ(1:3)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) deltaXYZ(1:3)
  0.000D+0   0.100D+0   0.000D+0               read(buffer,*) XYZAmpl(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) XYZPhi(1:3,iFish)
  # angle in degree
