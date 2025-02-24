@@ -199,19 +199,19 @@ $PBS_WDIR/$PBS_ENAME
 
       - 4  : Velocity amplitude of Concussion velocity
 
-      - 10 : Flapping frequency velocity 
+      - 5  : Flapping frequency velocity 
 
       $$
         L f
       $$
 
-      - 11 : Maximum plunging velocity 
+      - 6  : Maximum plunging velocity 
 
       $$
         2\pi f a
       $$
 
-      - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF 
+      - 7  : Twice maximum plunging velocity used by Park et al. (2017) PoF 
 
       $$
         2\pi f a * 2
