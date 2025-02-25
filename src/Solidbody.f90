@@ -338,6 +338,7 @@ module SolidBody
             write(*,*) 'not implemented body type', this%v_type
             stop
         endif
+        call this%PlateUpdatePosVelArea()
     end subroutine Initialise_
 
     subroutine Calculate_Solid_params(uMax,Lthck)
