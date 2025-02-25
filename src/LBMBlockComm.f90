@@ -247,6 +247,19 @@ module LBMBlockComm
         enddo
     endsubroutine
 
+    recursive subroutine tree_set_boundary_conditions_block(treenode)
+        implicit none
+        integer:: i, s, treenode
+        call set_boundary_conditions_block(treenode)
+        ! tree cycle
+        if(blockTree(treenode)%nsons.gt.0) then
+            do i=1,blockTree(treenode)%nsons
+                s = blockTree(treenode)%sons(i)
+                call tree_set_boundary_conditions_block(s)
+            enddo
+        endif
+    endsubroutine tree_set_boundary_conditions_block
+
     recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM)
         use SolidBody, only: m_nFish,VBodies
         implicit none
@@ -269,6 +282,7 @@ module LBMBlockComm
         call collision_block(treenode)
         call get_now_time(time_end2)
         time_collision = time_collision + (time_end2 - time_begine2)
+        call halfwayBCset_block(treenode)
         ! streaming
         call get_now_time(time_begine2)
         call streaming_block(treenode)

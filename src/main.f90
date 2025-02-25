@@ -54,7 +54,7 @@ PROGRAM main
     !==================================================================================================
     ! Update the volume forces and calculate the macro quantities
     call update_volume_force_blocks()
-    call set_boundary_conditions_block(blockTreeRoot)
+    call tree_set_boundary_conditions_block(blockTreeRoot)
     call calculate_macro_quantities_blocks()
     !==================================================================================================
     ! Write the initial fluid and solid data
