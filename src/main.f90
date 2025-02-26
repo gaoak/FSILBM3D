@@ -14,11 +14,10 @@ PROGRAM main
     USE LBMBlockComm
     implicit none
     character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
-    integer:: isubstep=0,step=0
-    integer:: n_pairs,n_gridDelta
+    integer:: step=0
     real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
-    real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2,time_IBM_FEM
+    real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
@@ -26,11 +25,10 @@ PROGRAM main
     call read_solid_files(parameterFile)
     call read_fuild_blocks(parameterFile)
     call read_probe_params(parameterFile)
-    call read_blocks_comunication(parameterFile)
+    call bluid_block_tree()
     !==================================================================================================
     ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)
-    call bluid_block_tree()
     !==================================================================================================
     ! Allocate the memory for simulation
     call allocate_solid_memory(flow%Asfac,flow%Lchod,flow%Lspan,flow%AR)
@@ -40,22 +38,23 @@ PROGRAM main
     call calculate_reference_params(flow)
     call set_solidbody_parameters(flow%denIn,flow%uvwIn,LBMblks(blockTreeRoot)%BndConds,&
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
-    call write_parameter_check_file(checkFile)
     !==================================================================================================
     ! Initialization before simulation
     call initialise_solid_bodies(0.d0, g)
-    call initialise_fuild_blocks(flow)
+    call FindCarrierFluidBlock()
+    call initialise_fuild_blocks(time)
     !==================================================================================================
-    ! Check blocks number and calculate the tau of each block
-    call check_blocks_params(m_nblock)
+    ! Check blocks number and check the tau of each block
+    call check_blocks_params(blockTreeRoot)
+    call write_parameter_check_file(checkFile)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)
     call write_information_titles(m_nFish)
     !==================================================================================================
     ! Update the volume forces and calculate the macro quantities
-    call update_volume_force_blocks(time)
-    call set_boundary_conditions_block(blockTreeRoot)
+    call update_volume_force_blocks()
+    call tree_set_boundary_conditions_block(blockTreeRoot)
     call calculate_macro_quantities_blocks()
     !==================================================================================================
     ! Write the initial fluid and solid data
@@ -66,28 +65,28 @@ PROGRAM main
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================='
     !==================================================================================================
-    dt_fluid = flow%dt                       !time step of the fluid 
+    dt_fluid = LBMblks(blockTreeRoot)%dh                       !time step of the fluid 
     write(*,*) 'Time loop beginning'
     do while(time/flow%Tref < flow%timeSimTotal)
         call get_now_time(time_begine1)
         time = time + dt_fluid
         step = step + 1
+        LBMblks(:)%blktime = time
         write(*,'(A)') '========================================================='
-        write(*,'(A,I6,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
+        write(*,'(A,I8,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
         time_collision = 0.d0
         time_streaming = 0.d0
         time_IBM       = 0.d0
         time_FEM       = 0.d0
-        time_IBM_FEM = time
-        call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM,time_IBM_FEM)
+        call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
         call calculate_macro_quantities_blocks()
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming
-        write(*,*)'Time   for   IBM   step:', time_IBM
+        write(*,*)'Time for       IBM step:', time_IBM
         write(*,'(A)')' --------------------- solid solver ---------------------'
-        write(*,*)'Time   for  solid  step:', time_FEM
+        write(*,*)'Time for     solid step:', time_FEM
         write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
@@ -108,13 +107,13 @@ PROGRAM main
         if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
             call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
                                               LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu)
-            call write_solid_information(time,m_nFish)
+            call write_solid_Information(time,flow%timeInfoDelta,flow%Asfac,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)
-        write(*,*)'Time  for writing  step:', (time_end2 - time_begine2)
+        write(*,*)'Time for   writing step:', (time_end2 - time_begine2)
         write(*,'(A)')' ----------------------- one step -----------------------'
         call get_now_time(time_end1)
-        write(*,*)'Time   for   one   step:', (time_end1 - time_begine1)
+        write(*,*)'Time for       one step:', (time_end1 - time_begine1)
     enddo
     ! write validation informations
     write(*,'(A)') '========================================================='

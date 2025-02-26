@@ -25,12 +25,17 @@ module ConstParams
     !   MODULE BoundCondParams
     integer, parameter:: BCEq_DirecletU = 101,BCnEq_DirecletU = 102,BCorder1_Extrapolate = 103,BCorder2_Extrapolate = 104
                         !given balance function,unbalanced extrapolation,1st order extrapolate,2nd order extrapolate
-    integer, parameter:: BCstationary_Wall = 201, BCmoving_Wall = 202
+    integer, parameter:: BCstationary_Wall = 201, BCmoving_Wall = 202, BCstationary_Wall_halfway = 203
     integer, parameter:: BCPeriodic = 301,BCSymmetric = 302,BCfluid = 0
 
     real(8), parameter:: Pi = 3.141592653589793d0,eps = 1.0d-5
     integer, parameter:: DOFDim = 6
 
     real(8), parameter:: Cs2 = 1.d0/3.0d0
-
+    real(8), parameter:: Csmag = 0.17d0
+    ! real(8), parameter:: CsmagConst = 16.d0 * dsqrt(2.d0) / (3.d0 * Pi * Pi)
+    real(8), parameter:: CsmagConst = 2.0d0 * Csmag * Csmag * dsqrt(2.d0) * 9.d0
+    real(8), parameter:: CWALE = 0.50d0
+    real(8), parameter:: CWALEConst = CWALE*CWALE
+    real(8), parameter:: CvremConst = 2.5d0*Csmag*Csmag
 end module ConstParams

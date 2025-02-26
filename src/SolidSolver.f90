@@ -4,12 +4,12 @@ module SolidSolver
     integer, parameter:: m_idat=12
     real(8):: m_dampK,m_dampM,m_NewmarkGamma,m_NewmarkBeta,m_alphaf
     real(8):: m_dtolFEM,m_pi
-    integer:: m_ntolFEM,m_iForce2Body,m_iKB
+    integer:: m_ntolFEM,m_iKB
     real(8):: m_g(3)
     public :: BeamSolver,Set_SolidSolver_Params
     type :: BeamSolver
         character (LEN=40):: FEmeshName
-        integer:: iBodyModel,iBodyType
+        integer:: iBodyModel
         real(8), allocatable :: r_Lspan(:)
         real(8), allocatable :: r_Rspan(:)
         integer, allocatable :: r_Nspan(:)
@@ -41,16 +41,16 @@ module SolidSolver
         procedure :: write_solid_params => write_solid_params_
         procedure :: write_solid_materials => write_solid_materials_
         procedure :: write_solid_info => write_solid_info_
-        procedure :: write_solid_SampBodyNode => write_solid_SampBodyNode_
+        procedure :: write_solid_probes => write_solid_probes_
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,iBodyType_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
+    Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
                             Freq_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
         character (LEN=40),intent(in):: FEmeshName_
-        integer,intent(in):: iBodyModel_,iBodyType_,isMotionGiven_(6)
+        integer,intent(in):: iBodyModel_,isMotionGiven_(6)
         real(8),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
         real(8),intent(in):: Freq_
         real(8),intent(in):: XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
@@ -58,7 +58,6 @@ module SolidSolver
         
         this%FEmeshName = FEmeshName_
         this%iBodyModel = iBodyModel_
-        this%iBodyType = iBodyType_
         this%isMotionGiven(1:6)=isMotionGiven_(1:6)
         this%denR= denR_
         this%psR = psR_
@@ -426,49 +425,41 @@ module SolidSolver
     real(8):: EEE(2),strainEnergy(this%nEL,2)
     real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
     real(8):: Et,Ek,Ep,Es,Eb,Ew
-    integer,parameter::nameLen=4
-    character (LEN=nameLen):: fileName
-        write(fileName,'(I4)') iFish
-        fileName = adjustr(fileName)
+    integer,parameter::nameLen=3
+    character (LEN=nameLen):: fishNum
+        ! get fish numbers
+        write(fishNum,'(I3)') iFish
+        fishNum = adjustr(fishNum)
         do  i=1,nameLen
-             if(fileName(i:i)==' ')fileName(i:i)='0'
+                if(fishNum(i:i)==' ') fishNum(i:i)='0'
         enddo
-
-        if    (m_iForce2Body==1)then   !Same force as flow
-        open(fid,file='./DatInfo/ForceDirect_'//trim(fileName)//'.plt',position='append')
-        write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        ! write forces
+        open(fid,file='./DatInfo/FishForce_'//trim(fishNum)//'.plt',position='append')
+        write(fid,'(10E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
         close(fid)
-        elseif(m_iForce2Body==2)then   !stress force
-        open(fid,file='./DatInfo/ForceStress_'//trim(fileName)//'.plt',position='append')
-        write(fid,'(4E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
-        close(fid)
-        endif
-
-        !==============================================================================================
-        open(fid,file='./DatInfo/SampBodyNodeBegin_'//trim(fileName)//'.plt',position='append')
+        ! write begin information
+        open(fid,file='./DatInfo/FishNodeBegin_'//trim(fishNum)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,this%xyzful(1,1:3)/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
         close(fid)
-        !===============================================================================
-        open(fid,file='./DatInfo/SampBodyNodeEnd_'//trim(fileName)//'.plt',position='append')
+        ! write end information titles
+        open(fid,file='./DatInfo/FishNodeEnd_'//trim(fishNum)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,this%xyzful(this%nND,1:3)/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
         close(fid)
-
-        open(111,file='./DatInfo/SampBodyNodeCenter_'//trim(fileName)//'.plt',position='append')
-        write(111,'(10E20.10)')time/Tref,this%xyzful((this%nND+1)/2,1:3)/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
-        close(111)
-
-        open(fid,file='./DatInfo/SampBodyMean_'//trim(fileName)//'.plt',position='append')
+        ! write center information titles
+        open(fid,file='./DatInfo/FishNodeCenter_'//trim(fishNum)//'.plt',position='append')
+        write(fid,'(10E20.10)')time/Tref,this%xyzful((this%nND+1)/2,1:3)/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
+        close(fid)
+        ! write mean information titles
+        open(fid,file='./DatInfo/FishNodeMean_'//trim(fishNum)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Lref, &
                                          sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
                                          sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
         close(fid)
-
-        open(fid,file='./DatInfo/SampBodyAngular_'//trim(fileName)//'.plt',position='append')
-        write(fid,'(5E20.10)')time/Tref,datan((this%xyzful(this%nND,2)-this%xyzful(1,2))/(this%xyzful(this%nND,1)-this%xyzful(1,1))),    &
+        ! write angular information titles
+        open(fid,file='./DatInfo/FishAngular_'//trim(fishNum)//'.plt',position='append')
+        write(fid,'(10E20.10)')time/Tref,datan((this%xyzful(this%nND,2)-this%xyzful(1,2))/(this%xyzful(this%nND,1)-this%xyzful(1,1))),    &
                                         this%xyzful(this%nND,2)/Lref-this%xyzful(1,2)/Lref,this%xyzful(1,2)/Lref,this%xyzful(this%nND,2)/Lref
         close(fid)
-
-        !==============================================================================================
 
         Pax=sum(this%extful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
         Pay=sum(this%extful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
@@ -479,14 +470,16 @@ module SolidSolver
         Piz=-sum(this%mssful(1:this%nND,3)*this%accful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
         Piner=Pix+Piy+Piz
         Ptot=Paero+Piner
-        open(fid,file='./DatInfo/Power_'//trim(fileName)//'.plt',position='append')
+        ! write power title
+        open(fid,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt',position='append')
         write(fid,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
         close(fid)
 
-        call cptArea(this%areaElem(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1:6))
-        open(fid,file='./DatInfo/Area_'//trim(fileName)//'.plt',position='append')
-        write(fid,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
-        close(fid)
+        ! write area title
+        ! call cptArea(this%areaElem(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1:6))
+        ! open(fid,file='./DatInfo/FishArea_'//trim(fishNum)//'.plt',position='append')
+        ! write(fid,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
+        ! close(fid)
 
         call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
                                 this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nEL,1:10), &
@@ -501,12 +494,35 @@ module SolidSolver
         Ew=Ew+Paero*timeOutInfo
         Ek=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
         Et=Ek+Ep
-
-        open(fid,file='./DatInfo/Energy_'//trim(fileName)//'.plt', position='append')
-        write(fid,'(7E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
+        ! write energy title
+        open(fid,file='./DatInfo/FishEnergy_'//trim(fishNum)//'.plt', position='append')
+        write(fid,'(10E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
         close(fid)
 
     ENDSUBROUTINE
+
+    subroutine write_solid_probes_(this,fid,iFish,time,solidProbingNum,solidProbingNode,Tref,Lref,Uref,Aref)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        integer,intent(in):: fid,iFish,solidProbingNum,solidProbingNode(solidProbingNum)
+        real(8),intent(in):: time,Tref,Lref,Uref,Aref
+        integer:: i
+        integer,parameter::nameLen=3
+        character (LEN=nameLen):: fishNum,probeNum
+        write(fishNum,'(I3)') iFish
+        fishNum = adjustr(fishNum)
+        do  i=1,nameLen
+             if(fishNum(i:i)==' ') fishNum(i:i)='0'
+        enddo
+        do  i=1,solidProbingNum
+            write(probeNum,'(I3.3)') i
+            open(fid,file='./DatInfo/FishProbes_'//trim(fishNum)//'_'//trim(probeNum)//'.plt',position='append')
+            write(fid,'(10E20.10)')time/Tref, this%xyzful(solidProbingNode(i),1:3)/Lref, &
+                                              this%velful(solidProbingNode(i),1:3)/Uref, &
+                                              this%accful(solidProbingNode(i),1:3)/Aref
+            close(fid)
+        enddo
+    end subroutine
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    compute strain energy
@@ -634,29 +650,6 @@ module SolidSolver
         endif
     enddo
     ENDSUBROUTINE strain_energy_D
-
-    subroutine write_solid_SampBodyNode_(this,fid,iFish,time,numSampBody,SampBodyNode,Tref,Lref,Uref,Aref)
-        implicit none
-        class(BeamSolver), intent(inout) :: this
-        integer,intent(in):: fid,iFish,numSampBody,SampBodyNode(numSampBody)
-        real(8),intent(in):: time,Tref,Lref,Uref,Aref
-        integer:: i
-        integer,parameter::nameLen=4
-        character (LEN=nameLen):: fileName,Nodename
-        write(fileName,'(I4)') iFish
-        fileName = adjustr(fileName)
-        do  i=1,nameLen
-             if(fileName(i:i)==' ')fileName(i:i)='0'
-        enddo
-        do  i=1,numSampBody
-            write(Nodename,'(I4.4)') SampBodyNode(i)
-            open(fid,file='./DatInfo/SampBodyNode_'//trim(fileName)//'_'//trim(Nodename)//'.plt',position='append')
-            write(fid,'(10E20.10)')time/Tref, this%xyzful(SampBodyNode(i),1:3)/Lref, &
-                                              this%velful(SampBodyNode(i),1:3)/Uref, &
-                                              this%accful(SampBodyNode(i),1:3)/Aref
-            close(fid)
-        enddo
-    end subroutine
 
     SUBROUTINE structure_(this,iFish,time,isubstep,deltat,subdeltat)
         implicit none
