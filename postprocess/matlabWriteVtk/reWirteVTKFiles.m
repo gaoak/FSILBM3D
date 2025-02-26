@@ -1,6 +1,6 @@
 clear;clc;close all
 %% File serises
-nfile = 61;
+nfile = 81;
 sTime = 00000;
 dTime = 10000;
 readPath  = 'G:\TandemPlates\Demos\FlexiblePlate\DatFlow\';
@@ -18,6 +18,4 @@ for n = 1:nfile
     % Write tecplot file
     writeParaviewVTK(mesh2,writeName2)
     writeParaviewVTK(mesh1,writeName1)
-    fprintf('Writing ready : %s\n', writeName2)
-    fprintf('Writing ready : %s\n', writeName1)
 end

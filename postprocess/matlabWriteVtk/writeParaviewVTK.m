@@ -26,5 +26,6 @@ velocity = [mesh.u(:), mesh.v(:), mesh.w(:)]';
 fwrite(fid, velocity(:), 'float32', 'ieee-be');
 
 % Close the file
+fprintf('Writing ready : %s\n', writeFile)
 fclose all;
 end
