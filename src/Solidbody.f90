@@ -338,7 +338,6 @@ module SolidBody
             write(*,*) 'not implemented body type', this%v_type
             stop
         endif
-        call this%PlateUpdatePosVelArea()
     end subroutine Initialise_
 
     subroutine Calculate_Solid_params(uMax,Lthck)
@@ -903,6 +902,7 @@ module SolidBody
         enddo
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+        call this%PlateUpdatePosVelArea()
     end subroutine PlateBuild_
 
     subroutine SurfaceBuild_(this)
