@@ -705,8 +705,10 @@ module SolidBody
                 if (ix_(k_)<1) then
                     if(boundaryConditions_(1).eq.BCPeriodic) then
                         ix_(k_) = ix_(k_) + xDim_
-                    else if((boundaryConditions_(1).eq.BCSymmetric .or. boundaryConditions_(1).eq.BCstationary_Wall .or. boundaryConditions_(1).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.0) then
+                    else if((boundaryConditions_(1).eq.BCSymmetric .or. boundaryConditions_(1).eq.BCstationary_Wall) .and. ix_(k_).eq.0) then
                         ix_(k_) = 2
+                    else if((boundaryConditions_(1).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.0) then
+                        ix_(k_) = 1
                     else
                         write(*,*) 'index out of xmin bound', ix_(k_)
                         stop
@@ -714,8 +716,10 @@ module SolidBody
                 else if(ix_(k_)>xDim_) then
                     if(boundaryConditions_(2).eq.BCPeriodic) then
                         ix_(k_) = ix_(k_) - xDim_
-                    else if((boundaryConditions_(2).eq.BCSymmetric .or. boundaryConditions_(2).eq.BCstationary_Wall .or. boundaryConditions_(2).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.xDim_+1) then
+                    else if((boundaryConditions_(2).eq.BCSymmetric .or. boundaryConditions_(2).eq.BCstationary_Wall) .and. ix_(k_).eq.xDim_+1) then
                         ix_(k_) = xDim_ - 1
+                    else if((boundaryConditions_(2).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.xDim_+1) then
+                        ix_(k_) = xDim_
                     else
                         write(*,*) 'index out of xmax bound', ix_(k_)
                         stop
