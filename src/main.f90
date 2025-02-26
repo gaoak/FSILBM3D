@@ -84,9 +84,9 @@ PROGRAM main
         call calculate_macro_quantities_blocks()
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming
-        write(*,*)'Time   for   IBM   step:', time_IBM
+        write(*,*)'Time for       IBM step:', time_IBM
         write(*,'(A)')' --------------------- solid solver ---------------------'
-        write(*,*)'Time   for  solid  step:', time_FEM
+        write(*,*)'Time for     solid step:', time_FEM
         write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
@@ -110,10 +110,10 @@ PROGRAM main
             call write_solid_Information(time,flow%timeInfoDelta,flow%Asfac,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)
-        write(*,*)'Time  for writing  step:', (time_end2 - time_begine2)
+        write(*,*)'Time for   writing step:', (time_end2 - time_begine2)
         write(*,'(A)')' ----------------------- one step -----------------------'
         call get_now_time(time_end1)
-        write(*,*)'Time   for   one   step:', (time_end1 - time_begine1)
+        write(*,*)'Time for       one step:', (time_end1 - time_begine1)
     enddo
     ! write validation informations
     write(*,'(A)') '========================================================='

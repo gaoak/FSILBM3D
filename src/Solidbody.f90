@@ -707,6 +707,8 @@ module SolidBody
                         ix_(k_) = ix_(k_) + xDim_
                     else if((boundaryConditions_(1).eq.BCSymmetric .or. boundaryConditions_(1).eq.BCstationary_Wall) .and. ix_(k_).eq.0) then
                         ix_(k_) = 2
+                    else if((boundaryConditions_(1).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.0) then
+                        ix_(k_) = 1
                     else
                         write(*,*) 'index out of xmin bound', ix_(k_)
                         stop
@@ -716,6 +718,8 @@ module SolidBody
                         ix_(k_) = ix_(k_) - xDim_
                     else if((boundaryConditions_(2).eq.BCSymmetric .or. boundaryConditions_(2).eq.BCstationary_Wall) .and. ix_(k_).eq.xDim_+1) then
                         ix_(k_) = xDim_ - 1
+                    else if((boundaryConditions_(2).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.xDim_+1) then
+                        ix_(k_) = xDim_
                     else
                         write(*,*) 'index out of xmax bound', ix_(k_)
                         stop
@@ -902,6 +906,7 @@ module SolidBody
         enddo
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+        call this%PlateUpdatePosVelArea()
     end subroutine PlateBuild_
 
     subroutine SurfaceBuild_(this)

@@ -199,19 +199,19 @@ $PBS_WDIR/$PBS_ENAME
 
       - 4  : Velocity amplitude of Concussion velocity
 
-      - 10 : Flapping frequency velocity 
+      - 5  : Flapping frequency velocity 
 
       $$
         L f
       $$
 
-      - 11 : Maximum plunging velocity 
+      - 6  : Maximum plunging velocity 
 
       $$
         2\pi f a
       $$
 
-      - 12 : Twice maximum plunging velocity used by Park et al. (2017) PoF 
+      - 7  : Twice maximum plunging velocity used by Park et al. (2017) PoF 
 
       $$
         2\pi f a * 2
@@ -247,8 +247,9 @@ $PBS_WDIR/$PBS_ENAME
      + 102: Dirichlet boundary condition (The value of velocity at the boundary is not a fixed constant, but a non-uniform distribution of function values)
      + 103: First order extrapolation boundary conditions
      + 104: Second-order extrapolation boundary conditions
-     + 201: Fixed wall
+     + 201: Fixed wall(full way bounce back)
      + 202: Moving wall, only for the top and bottom boundaries $(ymin, ymax)$
+     + 203: Fixed wall(half way bounce back, good choice for turbulent in LES compute)
      + 301: Periodic Boundary
      + 302: Symmetric boundary
   10. *params*: Pending Parameters
