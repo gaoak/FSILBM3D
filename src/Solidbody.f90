@@ -338,7 +338,6 @@ module SolidBody
             write(*,*) 'not implemented body type', this%v_type
             stop
         endif
-        call this%PlateUpdatePosVelArea()
     end subroutine Initialise_
 
     subroutine Calculate_Solid_params(uMax,Lthck)
@@ -429,19 +428,24 @@ module SolidBody
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write solid parameters for checking, tecplot ASCII format
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine Write_solid_Check(fid)
+    subroutine Write_solid_Check(filename)
         implicit none
-        integer,intent(in):: fid
+        character(len=40):: filename
+        character(len=4):: IDstr
         integer:: iFish
+        open(111,file=filename,position='append')
         do iFish=1,m_nFish
-            write(fid,'(A      )')'===================================='
-            write(fid,'(A,I20.10)')'Fish number is',iFish
-            write(fid,'(A      )')'===================================='
-            call VBodies(iFish)%rbm%write_solid_params(fid)
+            write(IDstr,'(I4.4)')iFish
+            write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
+            call VBodies(iFish)%rbm%write_solid_params(111)
         enddo
         do iFish=1,m_nFish
-            call VBodies(iFish)%rbm%write_solid_materials(fid,iFish)
+            write(IDstr,'(I4.4)')iFish
+            write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
+            call VBodies(iFish)%rbm%write_solid_materials(111)
         enddo
+        write(111,'(A      )')'===================================================================='
+        close(111)
     end subroutine
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -903,6 +907,7 @@ module SolidBody
         enddo
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+        call this%PlateUpdatePosVelArea()
     end subroutine PlateBuild_
 
     subroutine SurfaceBuild_(this)
