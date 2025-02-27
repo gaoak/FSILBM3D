@@ -428,24 +428,19 @@ module SolidBody
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write solid parameters for checking, tecplot ASCII format
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine Write_solid_Check(filename)
+    subroutine Write_solid_Check(fid)
         implicit none
-        character(len=40):: filename
-        character(len=4):: IDstr
+        integer,intent(in):: fid
         integer:: iFish
-        open(111,file=filename,position='append')
         do iFish=1,m_nFish
-            write(IDstr,'(I4.4)')iFish
-            write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
-            call VBodies(iFish)%rbm%write_solid_params(111)
+            write(fid,'(A      )')'===================================='
+            write(fid,'(A,I20.10)')'Fish number is',iFish
+            write(fid,'(A      )')'===================================='
+            call VBodies(iFish)%rbm%write_solid_params(fid)
         enddo
         do iFish=1,m_nFish
-            write(IDstr,'(I4.4)')iFish
-            write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
-            call VBodies(iFish)%rbm%write_solid_materials(111)
+            call VBodies(iFish)%rbm%write_solid_materials(fid,iFish)
         enddo
-        write(111,'(A      )')'===================================================================='
-        close(111)
     end subroutine
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
