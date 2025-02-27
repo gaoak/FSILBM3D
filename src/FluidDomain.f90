@@ -1584,10 +1584,10 @@ module FluidDomain
         else if(cnt.eq.-3) then
             CompareBlocks = -1
         else
-            write(*,*) 'Error, block overlaps', LBMblks(i)%ID, LBMblks(j)%ID
+            write(*,*) 'Warning, blocks partial overlaps', LBMblks(i)%ID, LBMblks(j)%ID
             write(*,*) LBMblks(i)%xmin, LBMblks(i)%xmax,LBMblks(i)%ymin, LBMblks(i)%ymax,LBMblks(i)%zmin, LBMblks(i)%zmax
             write(*,*) LBMblks(j)%xmin, LBMblks(j)%xmax,LBMblks(j)%ymin, LBMblks(j)%ymax,LBMblks(j)%zmin, LBMblks(j)%zmax
-            stop
+            !stop
         endif
     end function CompareBlocks
 
