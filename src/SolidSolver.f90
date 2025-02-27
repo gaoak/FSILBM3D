@@ -396,14 +396,12 @@ module SolidSolver
         write(fid,'(3(A,1x,I8,2x))')'nMT=',this%nMT,'nBD=',this%nBD,'nSTF=',this%nSTF
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_materials_(this,fid,iFish)
+    SUBROUTINE write_solid_materials_(this,fid)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
-    integer,intent(in) :: fid,iFish
+    integer,intent(in) :: fid
     integer:: iMT
         do iMT=1,this%nMT
-        write(fid,'(A      )')'===================================='
-        write(fid,'(A,I5.5 )')'Fish number is',iFish
         write(fid,'(A,I5.5 )')'MT:',iMT
         write(fid,'(A,E20.10 )')'E    =',this%prop(iMT,1)
         write(fid,'(A,E20.10 )')'G    =',this%prop(iMT,2)
