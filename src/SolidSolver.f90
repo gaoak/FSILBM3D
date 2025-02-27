@@ -385,7 +385,7 @@ module SolidSolver
         !write(fid,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
         !write(fid,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
         !write(fid,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
-        !write(fid,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
+        write(fid,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
         !write(fid,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
         !write(fid,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
         !write(fid,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
