@@ -47,6 +47,7 @@ PROGRAM main
     ! Check blocks number and check the tau of each block
     call check_blocks_params(blockTreeRoot)
     call write_parameter_check_file(checkFile)
+    call Write_solid_Check(checkFile)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(continueFile,step,time,flow%isConCmpt)

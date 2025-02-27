@@ -254,7 +254,6 @@
         write(111,'(A,F20.10)')'Eref =', flow%Eref
         write(111,'(A,F20.10)')'Fref =', flow%Fref
         call write_parameter_blocks(blockTreeRoot)
-        write(111,'(A      )')'===================================================================='
         close(111)
 
         contains
@@ -264,7 +263,7 @@
             integer:: treenode,i,s
             character(len=4):: IDstr
             write(IDstr,'(I4.4)')LBMblks(treenode)%ID
-            write(111,'(A,A,A  )')'========================== BlockID = ',IDstr,' =========================='
+            write(111,'(A,A,A  )')'============================ BlockID = ',IDstr,' ============================='
             write(111,'(A,F20.10)')'Tau  =', LBMblks(treenode)%tau
             write(111,'(A,F20.10)')'Omega=', LBMblks(treenode)%Omega
             do i=1,blockTree(treenode)%nsons
