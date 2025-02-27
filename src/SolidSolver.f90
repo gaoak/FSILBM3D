@@ -382,27 +382,29 @@ module SolidSolver
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
     integer,intent(in) :: fid
-        write(fid,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
-        write(fid,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
-        write(fid,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
-        write(fid,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
-        write(fid,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',this%AoAo(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',this%AoAAmpl(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
-        write(fid,'(3(A,1x,I8,2x))')'nND=',this%nND,'nEL=',this%nEL,'nEQ=',this%nEQ
-        write(fid,'(3(A,1x,I8,2x))')'nMT=',this%nMT,'nBD=',this%nBD,'nSTF=',this%nSTF
+        !write(fid,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
+        !write(fid,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
+        !write(fid,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
+        !write(fid,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
+        !write(fid,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',this%AoAo(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',this%AoAAmpl(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
+        write(fid,'(3(A,1x,I8,2x))')'nND =',this%nND,'nEL =',this%nEL,'nEQ  =',this%nEQ
+        write(fid,'(3(A,1x,I8,2x))')'nMT =',this%nMT,'nBD =',this%nBD,'nSTF =',this%nSTF
     ENDSUBROUTINE
 
     SUBROUTINE write_solid_materials_(this,fid)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
+    character(len=4):: IDstr
     integer,intent(in) :: fid
     integer:: iMT
         do iMT=1,this%nMT
-        write(fid,'(A,I5.5 )')'MT:',iMT
+        write(IDstr,'(I4.4)')iMT
+        write(111,'(A,A,A  )')'------------------------------- iMT = ',IDstr,' ------------------------------'
         write(fid,'(A,E20.10 )')'E    =',this%prop(iMT,1)
         write(fid,'(A,E20.10 )')'G    =',this%prop(iMT,2)
         write(fid,'(A,E20.10 )')'h    =',this%prop(iMT,3)

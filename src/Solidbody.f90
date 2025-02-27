@@ -438,10 +438,6 @@ module SolidBody
             write(IDstr,'(I4.4)')iFish
             write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
             call VBodies(iFish)%rbm%write_solid_params(111)
-        enddo
-        do iFish=1,m_nFish
-            write(IDstr,'(I4.4)')iFish
-            write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
             call VBodies(iFish)%rbm%write_solid_materials(111)
         enddo
         write(111,'(A      )')'===================================================================='
