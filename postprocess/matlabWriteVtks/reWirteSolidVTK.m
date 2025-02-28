@@ -1,4 +1,4 @@
-run globPalarameters.m
+run globalParameters.m
 %% File serises
 readPath  = [casePath '\DatBodySpan\'];
 writePath = [casePath '\DatBodySpan\'];
