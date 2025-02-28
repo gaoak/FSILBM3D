@@ -2,7 +2,7 @@ function [solid] = readAscallSolid(filePath,extraVelocity,time)
 % Read paramters
 solid.data = importdata(filePath).data;
 length = floor((size(solid.data,1)/2));
-% Calculate coordiantes
+% Calculate coordinates
 solid.x = solid.data(1:2:length,1);
 solid.y = solid.data(1:2:length,2);
 solid.z = [solid.data(1,3); solid.data(2,3)];

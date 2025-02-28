@@ -13,6 +13,8 @@ for n = 1:nfile
     % Update mesh data in coarse mesh
     mesh1 = finerToCoarse(mesh2,mesh1);
     % Write mesh data in vtks
-    writeFluidVTK(mesh2,writeName2)
+    % writeFluidVTK(mesh2,writeName2)
     writeFluidVTK(mesh1,writeName1)
 end
+% write whole block contains the calculation domain at all times
+writeWholeVTK(mesh1,exVel,time,writePath)
