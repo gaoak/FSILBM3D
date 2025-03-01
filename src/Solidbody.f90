@@ -439,6 +439,9 @@ module SolidBody
         do iFish=1,m_nFish
             write(IDstr,'(I4.4)')iFish
             write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
+            write(IDstr,'(I4.4)')VBodies(iFish)%v_carrierFluidId
+            write(111,'(A,A    )') 'inWhichBlock : ', IDstr
+            write(111,'(A,A    )')'---------------------------------------------------------------------------'
             call VBodies(iFish)%rbm%write_solid_params(111)
             call VBodies(iFish)%rbm%write_solid_materials(111)
         enddo
