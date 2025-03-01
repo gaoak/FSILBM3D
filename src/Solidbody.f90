@@ -352,13 +352,15 @@ module SolidBody
         Lthck = maxval(nLthck)
     end subroutine Calculate_Solid_params
 
-    SUBROUTINE Solver(time,isubstep,deltat,subdeltat)
+    SUBROUTINE Solver(bodies,time,isubstep,deltat,subdeltat)
         implicit none
+        integer,intent(in):: bodies(0:m_nFish)
         integer,intent(in):: isubstep
         real(8),intent(in):: time,deltat,subdeltat
-        integer:: iFish
+        integer:: iFish, i
         !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish)
-        do iFish=1,m_nFish
+        do i = 1,bodies(0)
+            iFish = bodies(i)
             call VBodies(iFish)%rbm%structure(iFish,time,isubstep,deltat,subdeltat)
         enddo !do iFish=1,nFish
         !$OMP END PARALLEL DO
@@ -458,17 +460,19 @@ module SolidBody
         enddo
     end subroutine
 
-    subroutine FSInteraction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+    subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
         implicit none
+        integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
-        integer :: iFish
-        do iFish = 1,m_nFish
+        integer :: i,iFish
+        do i = 1,bodies(0)
+            iFish = bodies(i)
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
-        call calculate_interaction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+        call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
     end subroutine
 
     subroutine PlateUpdatePosVelArea_(this)
@@ -730,34 +734,37 @@ module SolidBody
         END SUBROUTINE trimedindex
     end subroutine UpdateElmtInterp_
 
-    SUBROUTINE calculate_interaction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+    SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
+        integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         !================================
-        integer:: iFish
+        integer:: iFish, i
         integer:: iterLBM
         real(8):: dmaxLBM,dsum
         real(8)::tol,ntol
         ! update virtual body shape and velocity
-        do iFish = 1, m_nFish
+        do i = 1, bodies(0)
+            iFish = bodies(i)
             if (VBodies(iFish)%v_move .eq. 1 .or. VBodies(iFish)%rbm%iBodyModel .eq. 2 .or. VBodies(iFish)%count_Interp .eq. 0 ) then
                 call VBodies(iFish)%UpdateElmtInterp(dh,xmin,ymin,zmin,xDim,yDim,zDim)
                 VBodies(iFish)%count_Interp = 1
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
-        if (m_nFish .gt. 0) then
+        if (bodies(0) .gt. 0) then
             ! calculate interaction force using immersed-boundary method
             iterLBM=0
             dmaxLBM=1d10
             do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
                 dmaxLBM = 0.d0
                 dsum=0.0d0
-                do iFish=1,m_nFish
+                do i = 1, bodies(0)
+                    iFish = bodies(i)
                     call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
                     dmaxLBM = dmaxLBM + tol
                     dsum = dsum + ntol
@@ -767,11 +774,13 @@ module SolidBody
             enddo
         endif
         ! update body load and fluid force
-        do iFish=1,m_nFish
+        do i = 1, bodies(0)
+            iFish = bodies(i)
             VBodies(iFish)%rbm%extful = 0.0d0
             ! to do, consider gravity
         enddo
-        do iFish=1,m_nFish
+        do i = 1, bodies(0)
+            iFish = bodies(i)
             call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force)
         enddo
     END SUBROUTINE

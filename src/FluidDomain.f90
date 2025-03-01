@@ -30,6 +30,7 @@ module FluidDomain
         real(8), allocatable :: tau_all(:,:,:)
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
         real(8) :: blktime
+        integer, allocatable :: carriedBodies(:) ! 0 is the number of carried bodies
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_
@@ -1618,9 +1619,21 @@ module FluidDomain
     subroutine FindCarrierFluidBlock()
         use SolidBody, only: m_nFish,VBodies
         implicit none
-        integer:: i
-        do i=1,m_nFish
-            call find_carrier_fluidblock(VBodies(i)%v_Exyz(1:3,1), VBodies(i)%v_carrierFluidId)
+        integer:: iFish, iBlock
+        do iFish=1,m_nFish
+            call find_carrier_fluidblock(VBodies(iFish)%v_Exyz(1:3,1), VBodies(iFish)%v_carrierFluidId)
+        enddo
+        do iBlock=1,m_nblocks
+            if(.not.allocated(LBMblks(iBlock)%carriedBodies)) then
+                allocate(LBMblks(iBlock)%carriedBodies(0:m_nFish))
+            endif
+            LBMblks(iBlock)%carriedBodies = 0
+            do iFish = 1,m_nFish
+                if (iBlock .eq. VBodies(iFish)%v_carrierFluidId) then
+                    LBMblks(iBlock)%carriedBodies(0) = LBMblks(iBlock)%carriedBodies(0) + 1
+                    LBMblks(iBlock)%carriedBodies(LBMblks(iBlock)%carriedBodies(0)) = iFish
+                endif
+            enddo
         enddo
     end subroutine
 end module FluidDomain
