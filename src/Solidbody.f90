@@ -265,8 +265,9 @@ module SolidBody
         integer :: iFish,maxN
         write(*,'(A)') '========================================================='
         do iFish = 1,m_nFish
-            if (dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3))-0.d0) .gt. 1e-5 .or. &
-                dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3))-0.d0) .gt. 1e-5) then
+            if (dabs(maxval(VBodies(iFish)%rbm%initXYZVel(1:3))-0.d0) .gt. 1e-5 .or. &
+                dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3))-0.d0)    .gt. 1e-5 .or. &
+                dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3))-0.d0)    .gt. 1e-5) then
                 VBodies(iFish)%v_move = 1
             endif
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
@@ -594,7 +595,7 @@ module SolidBody
             this%v_Evel(1:3,i)=[this%rbm%WWW3(2)*this%v_Exyz(3,i)-this%rbm%WWW3(3)*this%v_Exyz(2,i),    &
                                 this%rbm%WWW3(3)*this%v_Exyz(1,i)-this%rbm%WWW3(1)*this%v_Exyz(3,i),    &
                                 this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)    ]&
-                                + this%rbm%UVW(1:3)
+                                + this%rbm%UVW(1:3) + this%rbm%initXYZVel(1:3)
         enddo
     end subroutine SurfaceUpdatePosVel_
 
