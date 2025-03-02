@@ -245,11 +245,11 @@ module SolidSolver
         k1 = this%ele(i,3)
         nt = this%ele(i,4)
         len = 0.5d0 * (this%r_Rspan(i1) + this%r_Rspan(j1) + this%r_Lspan(i1) + this%r_Lspan(j1))
-        this%prop(i,1) = this%EmR*len*denIn*Uref**2
+        this%prop(i,1) = (this%EmR*len)*denIn*Uref**2
         this%prop(i,2) = this%prop(i,1)/2.0d0/(1.0+this%psR)
-        nLthck= this%tcR*len*Lref
-        this%prop(i,3) = this%tcR*len*Lref
-        this%prop(i,4) = this%denR*len*Lref*denIn/this%prop(i,3)
+        nLthck = (this%tcR*len)*Lref
+        this%prop(i,3) = (this%tcR*len)*Lref
+        this%prop(i,4) = (this%denR*len)*Lref*denIn/this%prop(i,3)
         if    (nt==2)then   !frame
         this%prop(i,7) = this%prop(i,3)**3/12.0d0
         this%prop(i,8) = this%prop(i,3)**3/12.0d0
@@ -258,8 +258,8 @@ module SolidSolver
         else
         endif
         enddo
-        this%KB=this%prop(this%nEL,1)*this%prop(this%nEL,6)/(denIn*Uref**2*Lref**3)/len ! to be check
-        this%KS=this%prop(this%nEL,1)*this%prop(this%nEL,3)/(denIn*Uref**2*Lref)/len**2
+        this%KB=this%prop(this%nEL,1)*this%prop(this%nEL,6)/(denIn*Uref**2*Lref**3)
+        this%KS=this%prop(this%nEL,1)*this%prop(this%nEL,3)/(denIn*Uref**2*Lref)
     endif
 
     if(m_iKB==1)then
@@ -269,23 +269,23 @@ module SolidSolver
         k1 = this%ele(i,3)
         nt = this%ele(i,4)
         len = 0.5d0 * (this%r_Rspan(i1) + this%r_Rspan(j1) + this%r_Lspan(i1) + this%r_Lspan(j1))
-        this%prop(i,3) = dsqrt(this%KB*len/this%KS*len*12.0d0)*Lref
-        this%prop(i,4) = this%denR*len*Lref*denIn/this%prop(i,3)
+        this%prop(i,3) = dsqrt((this%KB*len)/(this%KS*len)*12.0d0)*Lref
+        this%prop(i,4) = (this%denR*len)*Lref*denIn/this%prop(i,3)
         if    (nt==2)then   !frame
-        this%prop(i,1) = this%KS*len*denIn*Uref**2*Lref/this%prop(i,3)
+        this%prop(i,1) = (this%KS*len)*denIn*Uref**2*Lref/this%prop(i,3)
         this%prop(i,2) = this%prop(i,1)/2.0d0/(1.0d0+this%psR)
         this%prop(i,7) = this%prop(i,3)**3/12.0d0
         this%prop(i,8) = this%prop(i,3)**3/12.0d0
         elseif(nt==3)then   !plate
-        this%prop(i,1) = this%KS*len*denIn*Uref**2*Lref/this%prop(i,3)
+        this%prop(i,1) = (this%KS*len)*denIn*Uref**2*Lref/this%prop(i,3)
         this%prop(i,2) = this%prop(i,1)/2.0d0/(1.0d0+this%psR)
         this%prop(i,6) = this%prop(i,3)**3/12.0d0
         else
         endif
         enddo
-        this%EmR = this%prop(this%nEL,1)/(denIn*Uref**2)/len
-        this%tcR = this%prop(this%nEL,3)/Lref/len
-        nLthck=this%prop(this%nEL,3)/len
+        this%EmR = this%prop(this%nEL,1)/(denIn*Uref**2)
+        this%tcR = this%prop(this%nEL,3)/Lref
+        nLthck=this%prop(this%nEL,3)
     endif
 
     END SUBROUTINE calculate_angle_material_
