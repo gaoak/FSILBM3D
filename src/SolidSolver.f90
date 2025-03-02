@@ -16,7 +16,7 @@ module SolidSolver
         real(8), allocatable :: r_dirc(:,:)
         real(8):: Freq,denR,KB,KS,EmR,psR,tcR,St
         real(8):: elmax,elmin
-        real(8):: XYZ(3),XYZo(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
+        real(8):: XYZ(3),XYZo(3),initXYZVel(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
         real(8):: AoA(3),AoAo(3),AoAAmpl(3),AoAPhi(3),AoAd(3),WWW1(3),WWW2(3),WWW3(3)
         real(8):: TTT00(3,3),TTT0(3,3),TTTnxt(3,3)
         integer:: nND,nEL,nEQ,nMT,nBD,nSTF
@@ -46,14 +46,14 @@ module SolidSolver
     end type BeamSolver
   contains
     Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
-                            Freq_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
+                            Freq_,initXYZVel_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
         character (LEN=40),intent(in):: FEmeshName_
         integer,intent(in):: iBodyModel_,isMotionGiven_(6)
         real(8),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
         real(8),intent(in):: Freq_
-        real(8),intent(in):: XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
+        real(8),intent(in):: initXYZVel_(3),XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
         real(8),intent(in):: AoAo_(3),AoAAmpl_(3),AoAPhi_(3)
         
         this%FEmeshName = FEmeshName_
@@ -67,12 +67,13 @@ module SolidSolver
         this%KS  = KS_
         this%Freq=Freq_
         this%St  =St_
-        this%XYZo(1:3) = XYZo_(1:3)
-        this%XYZAmpl(1:3)=XYZAmpl_(1:3)
-        this%XYZPhi(1:3) =XYZPhi_(1:3)
-        this%AoAo(1:3)   =AoAo_(1:3)
-        this%AoAAmpl(1:3)=AoAAmpl_(1:3)
-        this%AoAPhi(1:3) =AoAPhi_(1:3)
+        this%XYZo(1:3)     = XYZo_(1:3)
+        this%initXYZVel(1:3) = initXYZVel_(1:3)
+        this%XYZAmpl(1:3)  = XYZAmpl_(1:3)
+        this%XYZPhi(1:3)   = XYZPhi_(1:3)
+        this%AoAo(1:3)     = AoAo_(1:3)
+        this%AoAAmpl(1:3)  = AoAAmpl_(1:3)
+        this%AoAPhi(1:3)   = AoAPhi_(1:3)
     ENDSUBROUTINE SetSolver_
     Subroutine Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,iKB)
         implicit none
@@ -111,7 +112,7 @@ module SolidSolver
         allocate( this%ele(this%nEL,5),this%xyzful00(this%nND,6),this%xyzful0(this%nND,6),this%mssful(this%nND,6),this%lodful(this%nND,6), &
                   this%extful(this%nND,6),this%repful(this%nND,1:6),this%extful1(this%nND,6),this%extful2(this%nND,6),this%nloc(this%nND*6),this%nprof(this%nND*6), &
                   this%nprof2(this%nND*6),this%jBC(this%nND,6))
-        allocate( this%grav(this%nND,6),this%vBC(this%nND,6),this%mss(this%nND*6),this%prop(this%nMT,10),this%areaElem00(this%nEL),this%areaElem(this%nEL))
+        allocate( this%grav(this%nND,6),this%vBC(this%nND,6),this%mss(this%nND*6),this%prop(this%nEL,10),this%areaElem00(this%nEL),this%areaElem(this%nEL))
 
         allocate( this%xyzful(this%nND,6),this%xyzfulnxt(this%nND,6),this%dspful(this%nND,6),this%velful(this%nND,6),this%accful(this%nND,6))
         allocate( this%triad_nn(3,3,this%nND),this%triad_ee(3,3,this%nEL),this%triad_e0(3,3,this%nEL) )
@@ -126,7 +127,7 @@ module SolidSolver
     !   ===============================================================================================
         call read_structural_datafile(this%r_Lspan(1:this%nND),this%r_Rspan(1:this%nND),this%r_Nspan(1:this%nEL),this%r_dirc(1:this%nND,1:3), &
                                       this%jBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5),this%nloc(1:this%nND*6),this%nprof(1:this%nND*6), &
-                                      this%nprof2(1:this%nND*6),this%xyzful00(1:this%nND,1:6),this%prop(1:this%nMT,1:10),this%nND, &
+                                      this%nprof2(1:this%nND*6),this%xyzful00(1:this%nND,1:6),this%prop(1:this%nEL,1:10),this%nND, &
                                       this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,m_idat)
         close(m_idat)
 
@@ -190,7 +191,7 @@ module SolidSolver
             this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
                                   this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
                                   this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
-                                  + this%UVW(1:3)
+                                  + this%UVW(1:3) + this%initXYZVel(1:3)
             this%velful(iND,4:6)=this%WWW3(1:3)
         enddo
 
@@ -199,7 +200,7 @@ module SolidSolver
 
         if(this%ele(1,4).eq.2)then
             CALL formmass_D(this%ele(1:this%nEL,1:5),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
-                            this%prop(1:this%nMT,1:10),this%mss(1:this%nND*6),this%nND,this%nEL,this%nEQ,this%nMT,m_alphaf)
+                            this%prop(1:this%nEL,1:10),this%mss(1:this%nND*6),this%nND,this%nEL,this%nEQ,m_alphaf)
 
             do iND = 1, this%nND
                 this%mssful(iND,1:6)= this%mss((iND-1)*6+1:(iND-1)*6+6)
@@ -224,7 +225,8 @@ module SolidSolver
     real(8),intent(in):: Lref, Uref, denIn, uuuIn(3)
     real(8),intent(inout):: uMax
     real(8),intent(out):: nLthck
-    integer:: nt
+    integer:: i,i1,j1,k1,nt
+    real(8):: len
 
     this%St = Lref * this%Freq / Uref
     ! angle to radian
@@ -236,41 +238,54 @@ module SolidSolver
             2.0*m_pi*MAXVAL(dabs(this%AoAAmpl(1:3))*[maxval(dabs(this%xyzful00(:,2))), &
             maxval(dabs(this%xyzful00(:,1))),maxval(dabs(this%xyzful00(:,3)))])*this%Freq])
     !calculate material parameters
-    nt=this%ele(1,4)
     if(m_iKB==0)then
-        this%prop(1:this%nMT,1) = this%EmR*denIn*Uref**2
-        this%prop(1:this%nMT,2) = this%prop(1:this%nMT,1)/2.0d0/(1.0+this%psR)
-        nLthck= this%tcR*Lref
-        this%prop(1:this%nMT,3) = this%tcR*Lref
-        this%prop(1:this%nMT,4) = this%denR*Lref*denIn/this%prop(1:this%nMT,3)
+        do i = 1, this%nEL
+        i1 = this%ele(i,1)
+        j1 = this%ele(i,2)
+        k1 = this%ele(i,3)
+        nt = this%ele(i,4)
+        len = 0.5d0 * (this%r_Rspan(i1) + this%r_Rspan(j1) + this%r_Lspan(i1) + this%r_Lspan(j1))
+        this%prop(i,1) = (this%EmR*len)*denIn*Uref**2
+        this%prop(i,2) = this%prop(i,1)/2.0d0/(1.0+this%psR)
+        nLthck = (this%tcR*len)*Lref
+        this%prop(i,3) = (this%tcR*len)*Lref
+        this%prop(i,4) = (this%denR*len)*Lref*denIn/this%prop(i,3)
         if    (nt==2)then   !frame
-        this%prop(1:this%nMT,7) = this%prop(1:this%nMT,3)**3/12.0d0
-        this%prop(1:this%nMT,8) = this%prop(1:this%nMT,3)**3/12.0d0
+        this%prop(i,7) = this%prop(i,3)**3/12.0d0
+        this%prop(i,8) = this%prop(i,3)**3/12.0d0
         elseif(nt==3)then   !plate
-        this%prop(1:this%nMT,6) = this%prop(1:this%nMT,3)**3/12.0d0
+        this%prop(i,6) = this%prop(i,3)**3/12.0d0 ! to be check
         else
         endif
-        this%KB=this%prop(this%nMT,1)*this%prop(this%nMT,6)/(denIn*Uref**2*Lref**3)
-        this%KS=this%prop(this%nMT,1)*this%prop(this%nMT,3)/(denIn*Uref**2*Lref)
+        enddo
+        this%KB=this%prop(this%nEL,1)*this%prop(this%nEL,6)/(denIn*Uref**2*Lref**3)
+        this%KS=this%prop(this%nEL,1)*this%prop(this%nEL,3)/(denIn*Uref**2*Lref)
     endif
 
     if(m_iKB==1)then
-        this%prop(1:this%nMT,3) = dsqrt(this%KB/this%KS*12.0d0)*Lref
-        this%prop(1:this%nMT,4) = this%denR*Lref*denIn/this%prop(1:this%nMT,3)
+        do i = 1, this%nEL
+        i1 = this%ele(i,1)
+        j1 = this%ele(i,2)
+        k1 = this%ele(i,3)
+        nt = this%ele(i,4)
+        len = 0.5d0 * (this%r_Rspan(i1) + this%r_Rspan(j1) + this%r_Lspan(i1) + this%r_Lspan(j1))
+        this%prop(i,3) = dsqrt((this%KB*len)/(this%KS*len)*12.0d0)*Lref
+        this%prop(i,4) = (this%denR*len)*Lref*denIn/this%prop(i,3)
         if    (nt==2)then   !frame
-        this%prop(1:this%nMT,1) = this%KS*denIn*Uref**2*Lref/this%prop(1:this%nMT,3)
-        this%prop(1:this%nMT,2) = this%prop(1:this%nMT,1)/2.0d0/(1.0d0+this%psR)
-        this%prop(1:this%nMT,7) = this%prop(1:this%nMT,3)**3/12.0d0
-        this%prop(1:this%nMT,8) = this%prop(1:this%nMT,3)**3/12.0d0
+        this%prop(i,1) = (this%KS*len)*denIn*Uref**2*Lref/this%prop(i,3)
+        this%prop(i,2) = this%prop(i,1)/2.0d0/(1.0d0+this%psR)
+        this%prop(i,7) = this%prop(i,3)**3/12.0d0
+        this%prop(i,8) = this%prop(i,3)**3/12.0d0
         elseif(nt==3)then   !plate
-        this%prop(1:this%nMT,1) = this%KS*denIn*Uref**2*Lref/this%prop(1:this%nMT,3)
-        this%prop(1:this%nMT,2) = this%prop(1:this%nMT,1)/2.0d0/(1.0d0+this%psR)
-        this%prop(1:this%nMT,6) = this%prop(1:this%nMT,3)**3/12.0d0
+        this%prop(i,1) = (this%KS*len)*denIn*Uref**2*Lref/this%prop(i,3)
+        this%prop(i,2) = this%prop(i,1)/2.0d0/(1.0d0+this%psR)
+        this%prop(i,6) = this%prop(i,3)**3/12.0d0
         else
         endif
-        this%EmR = this%prop(this%nMT,1)/(denIn*Uref**2)
-        this%tcR = this%prop(this%nMT,3)/Lref
-        nLthck=this%prop(this%nMT,3)
+        enddo
+        this%EmR = this%prop(this%nEL,1)/(denIn*Uref**2)
+        this%tcR = this%prop(this%nEL,3)/Lref
+        nLthck=this%prop(this%nEL,3)
     endif
 
     END SUBROUTINE calculate_angle_material_
@@ -368,29 +383,29 @@ module SolidSolver
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
     integer,intent(in) :: fid
-        write(fid,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
-        write(fid,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
-        write(fid,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
+        !write(fid,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
+        !write(fid,'(A,2F20.10)')'denR,psR    =',this%denR,this%psR
+        !write(fid,'(A,2F20.10)')'KB,  KS     =',this%KB,this%KS
         write(fid,'(A,2F20.10)')'EmR, tcR    =',this%EmR,this%tcR
-        write(fid,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',this%AoAo(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',this%AoAAmpl(1:3)
-        write(fid,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
-        write(fid,'(3(A,1x,I8,2x))')'nND=',this%nND,'nEL=',this%nEL,'nEQ=',this%nEQ
-        write(fid,'(3(A,1x,I8,2x))')'nMT=',this%nMT,'nBD=',this%nBD,'nSTF=',this%nSTF
+        !write(fid,'(A,1x,3F20.10,2x)')'XYZo(1:3)   =',this%XYZo(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'XYZAmpl(1:3)=',this%XYZAmpl(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'XYZPhi(1:3) =',this%XYZPhi(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'AoAo(1:3)   =',this%AoAo(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'AoAAmpl(1:3)=',this%AoAAmpl(1:3)
+        !write(fid,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
+        write(fid,'(3(A,1x,I8,2x))')'nND =',this%nND,'nEL =',this%nEL,'nEQ  =',this%nEQ
+        write(fid,'(3(A,1x,I8,2x))')'nMT =',this%nMT,'nBD =',this%nBD,'nSTF =',this%nSTF
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_materials_(this,fid,iFish)
+    SUBROUTINE write_solid_materials_(this,fid)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
-    integer,intent(in) :: fid,iFish
+    character(len=4):: IDstr
+    integer,intent(in) :: fid
     integer:: iMT
         do iMT=1,this%nMT
-        write(fid,'(A      )')'===================================='
-        write(fid,'(A,I5.5 )')'Fish number is',iFish
-        write(fid,'(A,I5.5 )')'MT:',iMT
+        write(IDstr,'(I4.4)')iMT
+        write(111,'(A,A,A  )')'------------------------------- iMT = ',IDstr,' ------------------------------'
         write(fid,'(A,E20.10 )')'E    =',this%prop(iMT,1)
         write(fid,'(A,E20.10 )')'G    =',this%prop(iMT,2)
         write(fid,'(A,E20.10 )')'h    =',this%prop(iMT,3)
@@ -468,10 +483,10 @@ module SolidSolver
         ! close(fid)
 
         call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
-                                this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nMT,1:10), &
+                                this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nEL,1:10), &
                                 this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
                                 this%triad_ee(1:3,1:3,1:this%nEL), &
-                                this%nND,this%nEL,this%nMT)
+                                this%nND,this%nEL)
         EEE(1)=sum(strainEnergy(1:this%nEL,1))
         EEE(2)=sum(strainEnergy(1:this%nEL,2))
         Es=EEE(1)/Eref
@@ -515,15 +530,15 @@ module SolidSolver
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE strain_energy_D(  strainEnergy, xord0,yord0,zord0,xord,yord,zord, &
                                  ele,prop,triad_n1,triad_n2,triad_ee, &
-                                 nND,nEL,nMT &
+                                 nND,nEL &
                                )
     implicit none
-    integer:: nMT,nEL,nND
+    integer:: nEL,nND
     integer:: ele(nEL,5)
     real(8):: xord0(nND), yord0(nND), zord0(nND), strainEnergy(nEL,2)
     real(8):: xord(nND), yord(nND), zord(nND)
 !
-    real(8):: prop(nMT,10)
+    real(8):: prop(nEL,10)
 
     real(8):: ekb12(12,12),ekb12Strech(12,12),ekb12BendTor(12,12)
 !
@@ -537,7 +552,7 @@ module SolidSolver
     real(8):: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
 
     real(8):: e0,g0,a0,b0,r0,zix0,ziy0,ziz0,xl
-    integer:: i,j,n,i1,j1,k1,mat,nELt
+    integer:: i,j,n,i1,j1,k1,nELt
 
 !   For each element, calculate the nodal forces
     do    n=1,nEL
@@ -546,17 +561,16 @@ module SolidSolver
         j1  = ele(n,2)
         k1  = ele(n,3)
         nELt= ele(n,4)
-        mat = ele(n,5)
         if    ( nELt == 2) then
 !           frame
-            e0  =prop(mat,1)
-            g0  =prop(mat,2)
-            a0  =prop(mat,3)
-            r0  =prop(mat,4)
-            b0  =prop(mat,5)
-            zix0=prop(mat,6)
-            ziy0=prop(mat,7)
-            ziz0=prop(mat,8)
+            e0  =prop(n,1)
+            g0  =prop(n,2)
+            a0  =prop(n,3)
+            r0  =prop(n,4)
+            b0  =prop(n,5)
+            zix0=prop(n,6)
+            ziy0=prop(n,7)
+            ziz0=prop(n,8)
 
             dx0 = xord0(j1) - xord0(i1)
             dy0 = yord0(j1) - yord0(i1)
@@ -698,13 +712,13 @@ module SolidSolver
                 !-----------------------------------------
                 CALL structure_solver(this%jBC(1:this%nND,1:6),this%vBC(1:this%nND,1:6),this%ele(1:this%nEL,1:5), &
                                       this%nloc(1:this%nND*6),this%nprof(1:this%nND*6),this%nprof2(1:this%nND*6), &
-                                      this%prop(1:this%nMT,1:10),this%mss(1:this%nND*6), &
+                                      this%prop(1:this%nEL,1:10),this%mss(1:this%nND*6), &
                                       this%xyzful0(1:this%nND,1:6),this%xyzful(1:this%nND,1:6),this%dspful(1:this%nND,1:6), &
                                       this%velful(1:this%nND,1:6),this%accful(1:this%nND,1:6),this%lodful(1:this%nND,1:6),  &
                                       subdeltat,m_dampK,m_dampM,  &
                                       this%triad_nn(1:3,1:3,1:this%nND),this%triad_ee(1:3,1:3,1:this%nEL), &
                                       this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
-                                      this%nND,this%nEL,this%nEQ,this%nMT,this%nBD,this%nSTF,m_NewmarkGamma,m_NewmarkBeta,m_dtolFEM,m_ntolFEM,    &
+                                      this%nND,this%nEL,this%nEQ,this%nBD,this%nSTF,m_NewmarkGamma,m_NewmarkBeta,m_dtolFEM,m_ntolFEM,    &
                                       iFish,this%FishInfo)
             else
                 stop 'no define body model'
@@ -729,12 +743,12 @@ module SolidSolver
 !    workspace variables:
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE structure_solver(jBC,vBC,ele,nloc,nprof,nprof2,prop,mss,xyzful0,xyzful,dspful,velful,accful,lodExteful,deltat,dampK,dampM,     &
-                      triad_nn,triad_ee,triad_n1,triad_n2,nND,nEL,nEQ,nMT,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
+                      triad_nn,triad_ee,triad_n1,triad_n2,nND,nEL,nEQ,nBD,maxstiff,Newmarkdelta,Newmarkalpha, &
                       dtol,iterMax,iFish,FishInfo)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,iFish
+    integer:: nND,nEL,nEQ,nBD,maxstiff,iFish
     integer:: jBC(nND,6),ele(nEL,5),nloc(nEQ),nprof(nEQ),nprof2(nEQ)
-    real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(nMT,10)
+    real(8):: vBC(nND,6),xyzful0(nND,6),xyzful(nND,6),prop(10)
     real(8):: mss(nEQ),dspful(nND,6),velful(nND,6),accful(nND,6),lodExteful(nND,6),deltat
     real(8):: dampK,dampM
 
@@ -790,7 +804,7 @@ module SolidSolver
 !        forces from body stresses
         call body_stress_D( lodInte,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
                             ele,prop,triad_n1,triad_n2,triad_ee,    &
-                            nND,nEL,nEQ,nMT,geoFRM &
+                            nND,nEL,nEQ,geoFRM &
                           )
 
         do    i= 1, nEQ
@@ -813,10 +827,10 @@ module SolidSolver
 !       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !       -------------------------------------------------------------------
         call formstif_s(stfElas,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
-                        prop,nloc,nND,nEL,nEQ,nMT,maxstiff)
+                        prop,nloc,nND,nEL,nEQ,maxstiff)
 
         call formgeom_s(stfGeom,ele,xyzful0(1:nND,1),xyzful0(1:nND,2),xyzful0(1:nND,3),xyzful(1:nND,1),xyzful(1:nND,2),xyzful(1:nND,3), &
-                        prop,nloc,nND,nEL,nEQ,nMT,maxstiff,geoFRM)
+                        prop,nloc,nND,nEL,nEQ,maxstiff,geoFRM)
 !
         do  i= 1, nEQ
             iloc=nloc(i)
@@ -918,7 +932,7 @@ module SolidSolver
     implicit none
     integer:: nND,nEL,nEQ,nMT,nBD,maxstiff,idat
     integer:: ele(nEL,5),jBC(nND,6),nloc(nND*6),nprof(nND*6),nprof2(nND*6),r_Nspan(nEL)
-    real(8):: xyzful00(nND,6),prop(nMT,10),r_Lspan(nND),r_Rspan(nND),r_dirc(nND,3)
+    real(8):: xyzful00(nND,6),prop(nEL,10),tmpprop(nMT,10),r_Lspan(nND),r_Rspan(nND),r_dirc(nND,3)
 !   ---------------------------------------------------------------------------
     integer:: i,j,nbc,node,nmp,ibandh,iend,ibandv,ji1
     character (LEN=50):: endin
@@ -954,7 +968,14 @@ module SolidSolver
     ! property data will be overwritten if isKB = 0 or 1
     read(idat,*) nMT
     do    i= 1, nMT
-        read(idat,*) nmp,prop(nmp,1:8)
+        read(idat,*) nmp,tmpprop(nmp,1:8)
+    enddo
+    do  i= 1, nEL
+        do j= 1, nMT
+            if (ele(i,5) .eq. j) then
+                prop(i,1:8) = tmpprop(j,1:8)
+            endif
+        enddo
     enddo
     read(idat,'(1a50)') endin
 !   -----------------------------------------------------------------------------------------------
@@ -1402,15 +1423,15 @@ module SolidSolver
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     SUBROUTINE body_stress_D(    gforce,xord0,yord0,zord0,xord,yord,zord, &
                                 ele,prop,triad_n1,triad_n2,triad_ee, &
-                                nND,nEL,nEQ,nMT,geoFRM &
+                                nND,nEL,nEQ,geoFRM &
                             )
     implicit none
-    integer:: nMT,nEL,nND,nEQ
+    integer:: nEL,nND,nEQ
     integer:: ele(nEL,5)
     real(8):: xord0(nND), yord0(nND), zord0(nND)
     real(8):: xord(nND), yord(nND), zord(nND)
 !
-    real(8):: prop(nMT,10),geoFRM(nEL)
+    real(8):: prop(nEL,10),geoFRM(nEL)
 
     real(8):: force(18),forceb(18)
     real(8):: gforce(nEQ)
@@ -1428,7 +1449,7 @@ module SolidSolver
     real(8):: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
 
     real(8):: e0,g0,a0,b0,r0,zix0,ziy0,ziz0,xl,fxx
-    integer:: i,j,k,n,i1,j1,k1,mat,nELt
+    integer:: i,j,k,n,i1,j1,k1,nELt
 
 !    pi=4.0*datan(1.0d0)
 
@@ -1445,17 +1466,16 @@ module SolidSolver
         j1  = ele(n,2)
         k1  = ele(n,3)
         nELt= ele(n,4)
-        mat = ele(n,5)
         if    ( nELt == 2) then
 !           frame
-            e0  =prop(mat,1)
-            g0  =prop(mat,2)
-            a0  =prop(mat,3)
-            r0  =prop(mat,4)
-            b0  =prop(mat,5)
-            zix0=prop(mat,6)
-            ziy0=prop(mat,7)
-            ziz0=prop(mat,8)
+            e0  =prop(n,1)
+            g0  =prop(n,2)
+            a0  =prop(n,3)
+            r0  =prop(n,4)
+            b0  =prop(n,5)
+            zix0=prop(n,6)
+            ziy0=prop(n,7)
+            ziz0=prop(n,8)
 
             dx0 = xord0(j1) - xord0(i1)
             dy0 = yord0(j1) - yord0(i1)
@@ -1556,17 +1576,17 @@ module SolidSolver
 !   FORM MASS matrix: only lumped
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,nMT,alphaf)
+    subroutine formmass_D(ele,xord,yord,zord,prop,mss,nND,nEL,nEQ,alphaf)
     implicit none
-    integer:: nND,nEL,nEQ,nMT
+    integer:: nND,nEL,nEQ
     integer:: ele(nEL,5)
-    real(8):: prop(nMT,10)
+    real(8):: prop(nEL,10)
 !
     real(8):: xord(nND), yord(nND), zord(nND)
     real(8):: mss(nEQ), em(18,18)
     real(8):: em12(12,12)
 
-    integer:: i,i1,j1,k1,mat,nELt
+    integer:: i,i1,j1,k1,nELt
     real(8):: a0,r0,b0,zix0,ziy0,ziz0,dx,dy,dz,xl,xll,xmm,xnn
 
     !ת���������Ӵ�С
@@ -1582,14 +1602,13 @@ module SolidSolver
         j1  = ele(i,2)
         k1  = ele(i,3)
         nELt= ele(i,4) ! element type, 2 line segment
-        mat = ele(i,5)
         if (nELt == 2) then
-            a0=prop(mat,3)
-            r0=prop(mat,4)
-            b0=prop(mat,5)
-            zix0=prop(mat,6)
-            ziy0=prop(mat,7)
-            ziz0=prop(mat,8)
+            a0=prop(i,3)
+            r0=prop(i,4)
+            b0=prop(i,5)
+            zix0=prop(i,6)
+            ziy0=prop(i,7)
+            ziz0=prop(i,8)
             dx= xord(j1) - xord(i1)
             dy= yord(j1) - yord(i1)
             dz= zord(j1) - zord(i1)
@@ -1614,17 +1633,17 @@ module SolidSolver
 !   FORM STIFfness matrix  [K]
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine formstif_s(stf,ele,xord0,yord0,zord0,xord,yord,zord,prop,nloc,nND,nEL,nEQ,nMT,maxstiff)
+    subroutine formstif_s(stf,ele,xord0,yord0,zord0,xord,yord,zord,prop,nloc,nND,nEL,nEQ,maxstiff)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,maxstiff
+    integer:: nND,nEL,nEQ,maxstiff
     integer:: ele(nEL,5), nloc(nEQ)
-    real(8):: prop(nMT,10)
+    real(8):: prop(nEL,10)
     real(8):: xord0(nND), yord0(nND),zord0(nND)
     real(8):: xord(nND), yord(nND),zord(nND)
     real(8):: stf(maxstiff)
     real(8):: ek(18,18), ek12(12,12)
 
-    integer:: j,k,n,i1,j1,k1,mat,nELt
+    integer:: j,k,n,i1,j1,k1,nELt
     real(8):: e0,g0,a0,r0,b0,zix0,ziy0,ziz0,dx,dy,dz,xl0,xl,xll,xmm,xnn,xl9
 
 !   initialize [K]  to zero
@@ -1636,19 +1655,18 @@ module SolidSolver
         j1  = ele(n,2)
         k1  = ele(n,3)
         nELt= ele(n,4)
-        mat = ele(n,5)
 !
         if    (nELt == 2) then
 !           frame
 !           material props not change
-            e0=prop(mat,1)    !1 E modulus
-            g0=prop(mat,2)    !2 G shear modulus
-            a0=prop(mat,3)    !3 A cross section area
-            r0=prop(mat,4)    !4 rho density
-            b0=prop(mat,5)    !5 self-rotation angle in degree
-            zix0=prop(mat,6)  !6 J torsion rigidity of the cross section
-            ziy0=prop(mat,7)  !7 Iy bending rigidity in z direction
-            ziz0=prop(mat,8)  !8 Iz bending rigidity in z direction
+            e0=prop(n,1)    !1 E modulus
+            g0=prop(n,2)    !2 G shear modulus
+            a0=prop(n,3)    !3 A cross section area
+            r0=prop(n,4)    !4 rho density
+            b0=prop(n,5)    !5 self-rotation angle in degree
+            zix0=prop(n,6)  !6 J torsion rigidity of the cross section
+            ziy0=prop(n,7)  !7 Iy bending rigidity in z direction
+            ziz0=prop(n,8)  !8 Iz bending rigidity in z direction
             dx= xord0(j1) - xord0(i1)
             dy= yord0(j1) - yord0(i1)
             dz= zord0(j1) - zord0(i1)
@@ -1693,11 +1711,11 @@ module SolidSolver
 !   FORM GEOMetric stiffness matrices  [KGx],[KGy],[KGxy]
 !
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine formgeom_s(geo,ele,xord0,yord0,zord0,xord,yord,zord,prop,nloc,nND,nEL,nEQ,nMT,maxstiff,geoFRM)
+    subroutine formgeom_s(geo,ele,xord0,yord0,zord0,xord,yord,zord,prop,nloc,nND,nEL,nEQ,maxstiff,geoFRM)
     implicit none
-    integer:: nND,nEL,nEQ,nMT,maxstiff
+    integer:: nND,nEL,nEQ,maxstiff
     integer:: ele(nEL,5), nloc(nEQ)
-    real(8):: prop(nMT,10),geoFRM(nEL)
+    real(8):: prop(nEL,10),geoFRM(nEL)
     real(8):: eg12(12,12),eg(18,18)
 !
     real(8):: xord0(nND), yord0(nND),zord0(nND)
@@ -1705,7 +1723,7 @@ module SolidSolver
 
     real(8):: geo(maxstiff)
 
-    integer:: n,i1,j1,k1,mat,nELt
+    integer:: n,i1,j1,k1,nELt
     real(8):: e0,g0,a0,b0,dx,dy,dz,xl0,xl,xll,xmm,xnn,sxx,s,xl9
 
 !   initialize [G] to zero
@@ -1719,14 +1737,13 @@ module SolidSolver
         j1  = ele(n,2)
         k1  = ele(n,3)
         nELt= ele(n,4)
-        mat = ele(n,5)
 !
         if (nELt == 2) then
 !           constit relation not change
-            e0=prop(mat,1)
-            g0=prop(mat,2)
-            a0=prop(mat,3)
-            b0=prop(mat,5)
+            e0=prop(n,1)
+            g0=prop(n,2)
+            a0=prop(n,3)
+            b0=prop(n,5)
             dx= xord0(j1) - xord0(i1)
             dy= yord0(j1) - yord0(i1)
             dz= zord0(j1) - zord0(i1)

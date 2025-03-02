@@ -1,4 +1,4 @@
-function [] = writeParaviewVTK(mesh,writeFile)
+function [] = writeFluidVTK(mesh,writeFile)
 % file path
 fid = fopen(writeFile, 'wb');
 

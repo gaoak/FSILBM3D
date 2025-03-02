@@ -269,11 +269,7 @@ module LBMBlockComm
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
         call LBMblks(treenode)%calculate_macro_quantities()
         call LBMblks(treenode)%ResetVolumeForce()
-        do iFish = 1,m_nFish
-            if (treenode .eq. VBodies(iFish)%v_carrierFluidId) then
-                call IBM_FEM(treenode,time_IBM,time_FEM,LBMblks(treenode)%blktime)
-            endif
-        enddo
+        call IBM_FEM(treenode,time_IBM,time_FEM,LBMblks(treenode)%blktime)
         call LBMblks(treenode)%add_volume_force()
         ! extract interpolation layer for old time
         call extract_interpolate_layer(treenode,1)
@@ -314,13 +310,13 @@ module LBMBlockComm
         integer:: carrierFluidId,isubstep=0
         dt_solid = LBMblks(carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
         call get_now_time(time_begine2)
-        call FSInteraction_force(LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%xmin,LBMblks(carrierFluidId)%ymin,LBMblks(carrierFluidId)%zmin, &
+        call FSInteraction_force(LBMblks(carrierFluidId)%carriedBodies,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%xmin,LBMblks(carrierFluidId)%ymin,LBMblks(carrierFluidId)%zmin, &
                                 LBMblks(carrierFluidId)%xDim,LBMblks(carrierFluidId)%yDim,LBMblks(carrierFluidId)%zDim,LBMblks(carrierFluidId)%uuu,LBMblks(carrierFluidId)%force)
         call get_now_time(time_end2)
         time_IBM = time_IBM + (time_end2 - time_begine2)
         call get_now_time(time_begine2)
         do isubstep=1,flow%numsubstep
-            call Solver(time,isubstep,LBMblks(carrierFluidId)%dh,dt_solid)
+            call Solver(LBMblks(carrierFluidId)%carriedBodies,time,isubstep,LBMblks(carrierFluidId)%dh,dt_solid)
         enddo !do isubstep=1,numsubstep
         call get_now_time(time_end2)
         time_FEM = time_FEM + (time_end2 - time_begine2)

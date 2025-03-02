@@ -1,4 +1,4 @@
-function [readName,writeName] = generateFilePath(readPath,writePath,nTime,id)
+function [readName,writeName] = generateFluidPath(readPath,writePath,nTime,id)
 % Convert input numbers to strings
 numStr = num2str(nTime);
 
@@ -13,6 +13,6 @@ else
     % If the length is sufficient, return directly
     newStr = numStr;
 end
-readName = [readPath 'Flow' newStr '_b00' num2str(id)];
+readName  = [readPath 'Flow' newStr '_b00' num2str(id)];
 writeName = [writePath 'b00' num2str(id) 'Flow' newStr '.vtk' ];
 end

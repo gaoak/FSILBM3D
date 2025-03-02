@@ -73,13 +73,13 @@ module SolidBody
         integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
         real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
         real(8):: t_freq,firstXYZ(1:3),deltaXYZ(1:3)
-        real(8):: t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
+        real(8):: t_initXYZVel(3),t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
         integer:: order1=0,order2=0,order3=0,lineX,lineY,lineZ
         character(LEN=40),allocatable:: FEmeshName(:)
         integer,allocatable:: fishNum(:)
         integer,allocatable:: iBodyModel(:),iBodyType(:),isMotionGiven(:,:)
         real(8),allocatable:: denR(:),psR(:),EmR(:),tcR(:),KB(:),KS(:)
-        real(8),allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
+        real(8),allocatable:: initXYZVel(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
         real(8),allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
         ! read body parameters from inflow file
         open(unit=111, file=filename, status='old', action='read')
@@ -103,7 +103,7 @@ module SolidBody
         call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
         allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish), &
                 denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish), &
-                XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish), &
+                initXYZVel(3,m_nFish),XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish), &
                 AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
         ! read fish parameters for each type
         fishNum(1)=1
@@ -132,6 +132,8 @@ module SolidBody
             read(buffer,*)    firstXYZ(1:3)
             call readNextData(111, buffer)
             read(buffer,*)    deltaXYZ(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_initXYZVel(1:3)
             call readNextData(111, buffer)
             read(buffer,*)    t_XYZAmpl(1:3)
             call readNextData(111, buffer)
@@ -162,6 +164,7 @@ module SolidBody
                 endif
                 freq(iFish) = t_freq
                 St(iFish) = t_St
+                initXYZVel(1:3,iFish)= t_initXYZVel(1:3)
                 XYZAmpl(1:3,iFish) = t_XYZAmpl(1:3)
                 XYZPhi(1:3,iFish)  = t_XYZPhi(1:3)
                 AoAo(1:3,iFish)    = t_AoAo(1:3)
@@ -188,7 +191,7 @@ module SolidBody
             call VBodies(iFish)%rbm%SetSolver(FEmeshName(iFish),&
                 iBodyModel(iFish),isMotionGiven(1:6,iFish), &
                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
-                freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
+                freq(iFish),initXYZVel(1:3,iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
                 AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
         enddo
     end subroutine read_solid_files
@@ -352,13 +355,15 @@ module SolidBody
         Lthck = maxval(nLthck)
     end subroutine Calculate_Solid_params
 
-    SUBROUTINE Solver(time,isubstep,deltat,subdeltat)
+    SUBROUTINE Solver(bodies,time,isubstep,deltat,subdeltat)
         implicit none
+        integer,intent(in):: bodies(0:m_nFish)
         integer,intent(in):: isubstep
         real(8),intent(in):: time,deltat,subdeltat
-        integer:: iFish
+        integer:: iFish, i
         !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iFish)
-        do iFish=1,m_nFish
+        do i = 1,bodies(0)
+            iFish = bodies(i)
             call VBodies(iFish)%rbm%structure(iFish,time,isubstep,deltat,subdeltat)
         enddo !do iFish=1,nFish
         !$OMP END PARALLEL DO
@@ -428,19 +433,23 @@ module SolidBody
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write solid parameters for checking, tecplot ASCII format
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine Write_solid_Check(fid)
+    subroutine Write_solid_Check(filename)
         implicit none
-        integer,intent(in):: fid
+        character(len=40):: filename
+        character(len=4):: IDstr
         integer:: iFish
+        open(111,file=filename,position='append')
         do iFish=1,m_nFish
-            write(fid,'(A      )')'===================================='
-            write(fid,'(A,I20.10)')'Fish number is',iFish
-            write(fid,'(A      )')'===================================='
-            call VBodies(iFish)%rbm%write_solid_params(fid)
+            write(IDstr,'(I4.4)')iFish
+            write(111,'(A,A,A  )')'============================= nFish = ',IDstr,' =============================='
+            write(IDstr,'(I4.4)')VBodies(iFish)%v_carrierFluidId
+            write(111,'(A,A    )') 'inWhichBlock : ', IDstr
+            write(111,'(A,A    )')'---------------------------------------------------------------------------'
+            call VBodies(iFish)%rbm%write_solid_params(111)
+            call VBodies(iFish)%rbm%write_solid_materials(111)
         enddo
-        do iFish=1,m_nFish
-            call VBodies(iFish)%rbm%write_solid_materials(fid,iFish)
-        enddo
+        write(111,'(A      )')'===================================================================='
+        close(111)
     end subroutine
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -457,17 +466,19 @@ module SolidBody
         enddo
     end subroutine
 
-    subroutine FSInteraction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+    subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
         implicit none
+        integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
-        integer :: iFish
-        do iFish = 1,m_nFish
+        integer :: i,iFish
+        do i = 1,bodies(0)
+            iFish = bodies(i)
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
-        call calculate_interaction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+        call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
     end subroutine
 
     subroutine PlateUpdatePosVelArea_(this)
@@ -729,34 +740,37 @@ module SolidBody
         END SUBROUTINE trimedindex
     end subroutine UpdateElmtInterp_
 
-    SUBROUTINE calculate_interaction_force(dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+    SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
+        integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         !================================
-        integer:: iFish
+        integer:: iFish, i
         integer:: iterLBM
         real(8):: dmaxLBM,dsum
         real(8)::tol,ntol
         ! update virtual body shape and velocity
-        do iFish = 1, m_nFish
+        do i = 1, bodies(0)
+            iFish = bodies(i)
             if (VBodies(iFish)%v_move .eq. 1 .or. VBodies(iFish)%rbm%iBodyModel .eq. 2 .or. VBodies(iFish)%count_Interp .eq. 0 ) then
                 call VBodies(iFish)%UpdateElmtInterp(dh,xmin,ymin,zmin,xDim,yDim,zDim)
                 VBodies(iFish)%count_Interp = 1
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
-        if (m_nFish .gt. 0) then
+        if (bodies(0) .gt. 0) then
             ! calculate interaction force using immersed-boundary method
             iterLBM=0
             dmaxLBM=1d10
             do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
                 dmaxLBM = 0.d0
                 dsum=0.0d0
-                do iFish=1,m_nFish
+                do i = 1, bodies(0)
+                    iFish = bodies(i)
                     call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
                     dmaxLBM = dmaxLBM + tol
                     dsum = dsum + ntol
@@ -766,11 +780,13 @@ module SolidBody
             enddo
         endif
         ! update body load and fluid force
-        do iFish=1,m_nFish
+        do i = 1, bodies(0)
+            iFish = bodies(i)
             VBodies(iFish)%rbm%extful = 0.0d0
             ! to do, consider gravity
         enddo
-        do iFish=1,m_nFish
+        do i = 1, bodies(0)
+            iFish = bodies(i)
             call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force)
         enddo
     END SUBROUTINE
