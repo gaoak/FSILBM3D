@@ -16,7 +16,7 @@ module SolidSolver
         real(8), allocatable :: r_dirc(:,:)
         real(8):: Freq,denR,KB,KS,EmR,psR,tcR,St
         real(8):: elmax,elmin
-        real(8):: XYZ(3),XYZo(3),firstVel(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
+        real(8):: XYZ(3),XYZo(3),initXYZVel(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
         real(8):: AoA(3),AoAo(3),AoAAmpl(3),AoAPhi(3),AoAd(3),WWW1(3),WWW2(3),WWW3(3)
         real(8):: TTT00(3,3),TTT0(3,3),TTTnxt(3,3)
         integer:: nND,nEL,nEQ,nMT,nBD,nSTF
@@ -46,14 +46,14 @@ module SolidSolver
     end type BeamSolver
   contains
     Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
-                            Freq_,firstVel_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
+                            Freq_,initXYZVel_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
         character (LEN=40),intent(in):: FEmeshName_
         integer,intent(in):: iBodyModel_,isMotionGiven_(6)
         real(8),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
         real(8),intent(in):: Freq_
-        real(8),intent(in):: firstVel_(3),XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
+        real(8),intent(in):: initXYZVel_(3),XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
         real(8),intent(in):: AoAo_(3),AoAAmpl_(3),AoAPhi_(3)
         
         this%FEmeshName = FEmeshName_
@@ -68,7 +68,7 @@ module SolidSolver
         this%Freq=Freq_
         this%St  =St_
         this%XYZo(1:3)     = XYZo_(1:3)
-        this%firstVel(1:3) = firstVel_(1:3)
+        this%initXYZVel(1:3) = initXYZVel_(1:3)
         this%XYZAmpl(1:3)  = XYZAmpl_(1:3)
         this%XYZPhi(1:3)   = XYZPhi_(1:3)
         this%AoAo(1:3)     = AoAo_(1:3)
@@ -191,7 +191,7 @@ module SolidSolver
             this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
                                   this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
                                   this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
-                                  + this%UVW(1:3) + this%firstVel(1:3)
+                                  + this%UVW(1:3) + this%initXYZVel(1:3)
             this%velful(iND,4:6)=this%WWW3(1:3)
         enddo
 

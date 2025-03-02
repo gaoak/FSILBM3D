@@ -51,7 +51,7 @@ SolidBody
  0.005D+0   0.000D+0                          read(buffer,*) freq(iFish),St(iFish)
  26.00D+0   0.000D+0  -0.500D+0               read(buffer,*) firstXYZ(1:3,iFish)
  9.000D+0   0.000D+0   0.000D+0               read(buffer,*) deltaXYZ(1:3,iFish)
- 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) firstVel(1:3,iFish)
+ 0.000D+0   0.000D+0   0.000D+0               read(buffer,*) initXYZVel(1:3,iFish)
  0.000D+0   0.500D+0   0.000D+0               read(buffer,*) XYZAmpl(1:3,iFish)
  0.000D+0   0.000D+0   0.000D+0               read(buffer,*) XYZPhi(1:3,iFish)
  # angle in degree
