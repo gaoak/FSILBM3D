@@ -73,13 +73,13 @@ module SolidBody
         integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
         real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
         real(8):: t_freq,firstXYZ(1:3),deltaXYZ(1:3)
-        real(8):: t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
+        real(8):: t_firstVel(3),t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
         integer:: order1=0,order2=0,order3=0,lineX,lineY,lineZ
         character(LEN=40),allocatable:: FEmeshName(:)
         integer,allocatable:: fishNum(:)
         integer,allocatable:: iBodyModel(:),iBodyType(:),isMotionGiven(:,:)
         real(8),allocatable:: denR(:),psR(:),EmR(:),tcR(:),KB(:),KS(:)
-        real(8),allocatable:: XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
+        real(8),allocatable:: firstVel(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
         real(8),allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
         ! read body parameters from inflow file
         open(unit=111, file=filename, status='old', action='read')
@@ -103,7 +103,7 @@ module SolidBody
         call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
         allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish), &
                 denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish), &
-                XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish), &
+                firstVel(3,m_nFish),XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish), &
                 AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
         ! read fish parameters for each type
         fishNum(1)=1
@@ -132,6 +132,8 @@ module SolidBody
             read(buffer,*)    firstXYZ(1:3)
             call readNextData(111, buffer)
             read(buffer,*)    deltaXYZ(1:3)
+            call readNextData(111, buffer)
+            read(buffer,*)    t_firstVel(1:3)
             call readNextData(111, buffer)
             read(buffer,*)    t_XYZAmpl(1:3)
             call readNextData(111, buffer)
@@ -162,6 +164,7 @@ module SolidBody
                 endif
                 freq(iFish) = t_freq
                 St(iFish) = t_St
+                firstVel(1:3,iFish)= t_firstVel(1:3)
                 XYZAmpl(1:3,iFish) = t_XYZAmpl(1:3)
                 XYZPhi(1:3,iFish)  = t_XYZPhi(1:3)
                 AoAo(1:3,iFish)    = t_AoAo(1:3)
@@ -188,7 +191,7 @@ module SolidBody
             call VBodies(iFish)%rbm%SetSolver(FEmeshName(iFish),&
                 iBodyModel(iFish),isMotionGiven(1:6,iFish), &
                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
-                freq(iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
+                freq(iFish),firstVel(1:3,iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
                 AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
         enddo
     end subroutine read_solid_files
