@@ -424,7 +424,7 @@ module SolidSolver
     real(8),intent(in) :: time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref,Asfac
     integer:: i,iFish
     real(8):: EEE(2),strainEnergy(this%nEL,2)
-    real(8):: Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+    real(8):: Ptot,Pax,Pay,Paz
     real(8):: Et,Ek,Ep,Es,Eb,Ew
     integer,parameter::nameLen=3
     character (LEN=nameLen):: fishNum
@@ -465,15 +465,10 @@ module SolidSolver
         Pax=sum(this%extful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
         Pay=sum(this%extful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
         Paz=sum(this%extful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
-        Paero=Pax+Pay+Paz
-        !Pix=-sum(this%mssful(1:this%nND,1)*this%accful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
-        !Piy=-sum(this%mssful(1:this%nND,2)*this%accful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
-        !Piz=-sum(this%mssful(1:this%nND,3)*this%accful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
-        !Piner=Pix+Piy+Piz
-        !Ptot=Paero+Piner
+        Ptot=Pax+Pay+Paz
         ! write power title
         open(fid,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,Paero,Pax,Pay,Paz
+        write(fid,'(10E20.10)')time/Tref,Ptot,Pax,Pay,Paz
         close(fid)
 
         ! write area title
@@ -492,7 +487,7 @@ module SolidSolver
         Es=EEE(1)/Eref
         Eb=EEE(2)/Eref
         Ep=Es+Eb
-        Ew=Ew+Paero*timeOutInfo
+        Ew=Ew+Ptot*timeOutInfo
         Ek=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
         Et=Ek+Ep
         ! write energy title
