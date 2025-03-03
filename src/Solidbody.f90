@@ -28,7 +28,7 @@ module SolidBody
         ! 1 plate given by line mesh
         ! 2 rod given by line mesh
         integer :: v_move = 0 ! 0 stationary 1 moving
-        integer :: count_Area = 0, count_Interp = 0
+        integer :: count_Interp = 0
         real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z), required for type 3
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
         real(8), allocatable :: v_Ea(:) ! element area
@@ -265,8 +265,9 @@ module SolidBody
         integer :: iFish,maxN
         write(*,'(A)') '========================================================='
         do iFish = 1,m_nFish
-            if (dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3))-0.d0) .gt. 1e-5 .or. &
-                dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3))-0.d0) .gt. 1e-5) then
+            if (dabs(maxval(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1e-5 .or. &
+                dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3)))    .gt. 1e-5 .or. &
+                dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3)))    .gt. 1e-5) then
                 VBodies(iFish)%v_move = 1
             endif
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
@@ -535,13 +536,11 @@ module SolidBody
             A = Surfacetmpxyz(1:3,i1)
             B = Surfacetmpxyz(1:3,i2)
             C = Surfacetmpxyz(1:3,i3)
-            call cpt_incenter(this%v_Exyz(1:3,i))
+            call cpt_incenter(this%v_Exyz0(1:3,i))
             call cpt_area(tmparea)
             this%v_Ea(i) = tmparea*IBPenaltyBeta
         enddo
-        allocate(this%v_Exyz0(3,this%v_nelmts))
-        this%v_Exyz0 = this%v_Exyz
-        this%v_Evel(:,:) = 0.d0
+        call this%SurfaceUpdatePosVel()
         contains
         subroutine cpt_incenter(Exyz)
             implicit none
@@ -594,19 +593,17 @@ module SolidBody
             this%v_Evel(1:3,i)=[this%rbm%WWW3(2)*this%v_Exyz(3,i)-this%rbm%WWW3(3)*this%v_Exyz(2,i),    &
                                 this%rbm%WWW3(3)*this%v_Exyz(1,i)-this%rbm%WWW3(1)*this%v_Exyz(3,i),    &
                                 this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)    ]&
-                                + this%rbm%UVW(1:3)
+                                + this%rbm%UVW(1:3) + this%rbm%initXYZVel(1:3)
         enddo
     end subroutine SurfaceUpdatePosVel_
 
     subroutine UpdatePosVelArea_(this)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. this%count_Area .eq. 0)) then
+        if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
             call this%PlateUpdatePosVelArea()
-            this%count_Area = 1
-        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. this%count_Area .eq. 0)) then
+        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
             call this%SurfaceUpdatePosVel()
-            this%count_Area = 1
         else
         endif
     end subroutine UpdatePosVelArea_
@@ -933,6 +930,7 @@ module SolidBody
         integer,allocatable :: Surfacetmpele(:,:)
         call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         this%v_nelmts = Surfacetmpnelmts
+        allocate(this%v_Exyz0(3,this%v_nelmts))
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
         call this%SurfaceBuildPosVelArea(Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
@@ -1001,7 +999,7 @@ module SolidBody
         i = index(FEmeshName, '.')
         FEmeshName = FEmeshName(:i) // 'dat'
         open(unit=fileiD, file = trim(adjustl(FEmeshName)))! write *.dat file
-            write(fileiD,*) "Frame3D"
+            write(fileiD,*) "Frame3D(This is a .dat file converted from .msh file)"
         close(fileiD)
         open(unit=fileiD, file = trim(adjustl(FEmeshName)),position='append')! write *.dat file
             write(fileiD,*) "     3     1     1"
@@ -1011,13 +1009,13 @@ module SolidBody
                 write(fileiD,*) i,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i),"   0.0   0.0   0. 0. 1."
             enddo
             write(fileiD,*) "END"
-            write(fileiD,*) "     1"
+            write(fileiD,*) "     1     I     J     K  TYPE   MAT   LEN"
             write(fileiD,*) "     1     1     2     3     3     1     0"
             write(fileiD,*) "END"
-            write(fileiD,*) "     1"
+            write(fileiD,*) "     1  XTRA  YTRA  ZTRA  XROT  YROT  ZROT"
             write(fileiD,*) "     1     1     0     0     0     0     0"
             write(fileiD,*) "END"
-            write(fileiD,*) "     1"
+            write(fileiD,*) "     1   E           G           A           RHO         GAMMA       IP          IA          IB"
             write(fileiD,*) "     1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00"
             write(fileiD,*) "END"
         close(fileiD)

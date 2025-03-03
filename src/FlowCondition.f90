@@ -158,7 +158,7 @@ module FlowCondition
             close(111) 
             ! write power title
             open(111,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t" "Ptot" "Paero" "Piner" "Pax" "Pay" "Paz" "Pix" "Piy" "Piz"'
+            write(111,*) 'variables= "t" "Ptot" "Px" "Py" "Pz"'
             close(111)
             ! write area title
             ! open(111,file='./DatInfo/FishArea_'//trim(fishNum)//'.plt')
