@@ -289,11 +289,7 @@ $PBS_WDIR/$PBS_ENAME
 
   14. *isMotionGiven* : Degrees of freedom in six directions
 
-  15. *denR(iFish)* : Density ratio, 
-      $$
-      rho_b * h / rho_f * L
-      $$
-      L is plate thickness
+  15. *denR(iFish)* : Density ratio $(rho_b * h / rho_f * L)$, where $L$ is the virtual plate thickness
 
   16. *psR(iFish)* : Poisson ratio
 
