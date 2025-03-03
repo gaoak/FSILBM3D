@@ -146,14 +146,13 @@ $PBS_WDIR/$PBS_ENAME
 
   11. *denIn*: Fluid density  (Usually it's 1 )  
 
-  12. *uvwIn*: The given incoming Velocity 
-
-      $U_\infty, V_\infty, W_\infty$
+  12. *uvwIn*: The given incoming Velocity $(U_\infty, V_\infty, W_\infty)$
 
       (determined by the velocity control parameters **velocityKind**)
 
   13. *shearRateIn*, *velocityKind* : the velocity control parameters
    * 0 : if *velocityKind* equals 0 , *shearRateIn* are the shear rate for incoming flow
+
      $U_\infty = U_{in} + 0 * shearRate(1) + y * shearRate(2) + z * shearRate(3)$
 
      $V_\infty = V_{in} + x * shearRate(1) + 0 * shearRate(2) + z * shearRate(3)$
@@ -161,11 +160,11 @@ $PBS_WDIR/$PBS_ENAME
      $W_\infty = W_{in} + x * shearRate(1) + y * shearRate(2) + 0 * shearRate(3)$
    * 1 : if *velocityKind* equals 2 , *shearRateIn* are the oscillatory parameter for incoming flow
 
-      $U_\infty = U_{in} + shearRate(1) * cos(2*pi*shearRate(2)*time + shearRate(3)/180*pi)$
+     $U_\infty = U_{in} + shearRate(1) * \cos(2*\pi*shearRate(2)*t + shearRate(3)/180*\pi)$
 
-      $V_\infty = V_{in}$
+     $V_\infty = V_{in}$
 
-      $W_\infty = W_{in}$
+     $W_\infty = W_{in}$
   14. *VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi* : Parameters for Volume Force
 
       According to the NS equation : 
@@ -183,7 +182,7 @@ $PBS_WDIR/$PBS_ENAME
 
       * 0  : Caculated by referece length and reference velocity 
 
-        $(Tref = Lref / Uref)$
+        $Tref = Lref / Uref$
 
       * 1  : Caculated by the maximum frequency of the bodies 
 
@@ -193,36 +192,20 @@ $PBS_WDIR/$PBS_ENAME
 
   16. *UrefType*:  Determining the definition of reference velocity
 
-      * 0  : X-incoming flow velocity
+      * 0  : X-incoming flow velocity : $U_\infty$
 
-        $U_\infty$
+      * 1  : Y-incoming flow velocity : $V_\infty$
 
-      * 1  : Y-incoming flow velocity 
+      * 2  : Z-incoming flow velocity : $W_\infty$
 
-        $V_\infty$
+      * 3  : Incoming flow velocity magnitude : $\sqrt{U_\infty^2 + V_\infty^2}$
 
-      * 2  : Z-incoming flow velocity 
+      * 4  : The velocity amplitude only for **velocityKind**  2 : $|shearRateIn(1)|$
+      * 5  : Flapping frequency velocity : $L f$
 
-        $W_\infty$
+      - 6  : Maximum plunging velocity : $2\pi f a$
 
-      * 3  : Incoming flow velocity magnitude
-
-        $\sqrt{U_\infty^2 + V_\infty^2}$
-
-      * 4  : The velocity amplitude only for **velocityKind**  2
-
-        $|shearRateIn(1)|$
-      * 5  : Flapping frequency velocity 
-
-        $L f$
-
-      - 6  : Maximum plunging velocity 
-
-        $2\pi f a$
-
-      - 7  : Twice maximum plunging velocity used by Park et al. (2017) PoF 
-
-        $2\pi f a * 2$
+      - 7  : Twice maximum plunging velocity used by Park et al. (2017) PoF : $2\pi f a * 2$
 
       - *else* : The input value Uref in parameter file inflow.dat
 
