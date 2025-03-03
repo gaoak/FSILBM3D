@@ -28,7 +28,7 @@ make
 
 The executable file is **FSILBM3D**
 
-The default compiler is intel fortran. To use a GNU gfortran compiler **gcc**, you need to change the first line in the Makefile
+The default compiler is **intel fortran**. To use a GNU gfortran compiler **gcc**, you need to change the first line in the Makefile
 
 ```
 CMP = intel# intel,gcc
@@ -44,43 +44,53 @@ CMP = gcc# intel,gcc
 
 ### prepare work direcotry and input files
 
-Copy fluid mesh (FluidMesh.dat in examples), body mesh (Plate.dat in examples) files to the work directory.
+Copy input parameter file (**inFlow.dat** in examples), body mesh file (**plate.dat** in examples) and create or clean directories bash script (**cleanfiles.sh** in examples) to the work directory.
 
-Create data folders in the work directory by running bash script (cleanfiles.sh)
+Create data folders in the work directory by running bash script (**cleanfiles.sh**)
 
 ```
-for folder in DatTemp DatBodyIB DatBodySpan DatInfo DatOthe DatBody DatFlow
+for folder in DatBodySpan DatInfo DatBody DatFlow 
 do
-  echo $folder 
   if [[ -d $folder ]]; then
-    rm $folder/*
+    rm -r $folder
+    mkdir $folder
+    echo Clear $folder
   else
     mkdir $folder
+    echo Create $folder
+  fi
+done
+
+for file in check.dat continue.dat log.* *.txt
+do
+  if [[ -e $file ]]; then
+    rm $file
+    echo Delete $file
   fi
 done
 ```
 
-### On local linux machine
+### Running on local linux machine
 
 Run the solve using bash script
 
 ```
-nohup /home/gaoak/LBM/FSILBM3D/FSILBM3D &>log
+nohup /your/local/path/FSILBM3D/FSILBM3D &>log
 ```
 
-### On compute node
+### Runing on the compute node
 
-submit the PBS script (2 threads for example)
+Submit the PBS script (2 threads for example)
 
 ```
 #!/bin/sh 
-#PBS -N LBM2D
+#PBS -N LBM3D-Test
 #PBS -e stderr.txt 
 #PBS -o stdout.txt
 #PBS -l nodes=1:ppn=2
 #PBS -l walltime=1:59:00
 #PBS -q CPU_Small
-PBS_WDIR=`pwd`/code/FSILBM3D
+PBS_WDIR=`pwd`/FSILBM3D/FSILBM3D
 PBS_ENAME=FSILBM3D
 #########################################
 echo Working directory is $PBS_O_WORKDIR
@@ -99,10 +109,10 @@ $PBS_WDIR/$PBS_ENAME
 ## Input file description
 
 - **inFlow.dat**     Simulation control parameters
-- **Body.dat**      Body mesh
+- **plate.dat**      Body mesh file
 - **cleanfiles.sh**  Bash script to create/clean output directories
 
-## Simulation control parameters
+## Simulation parameters description
 
 (A line starting with # indicates a comment)
 
@@ -114,51 +124,73 @@ $PBS_WDIR/$PBS_ENAME
 
   1. *isConCmpt* : Determining new simulation or continue simulaion
      + 0 : Calculate from the beginning
-     + 1: Calculate from last output
+     + 1: Calculate from last time output
 
   2. *numsubstep*: Number of sub-steps for solid time-stepping solution
 
   3. *timeSimTotal*: Dimensionless total simulation time (time/Tref <= timeSimTotl)
 
-  4. *timeContiDelta*: Dimensionless time interval for restart file output (for continue simulation)
+  4. *timeContiDelta*: Dimensionless time interval for writing continue (continue.dat) which used for continue simulation
 
-  5. *timeWriteBegin*: Dimensionless time to start flow field and body output
+  5. *timeWriteBegin*: Dimensionless time to start fluid mesh (in DatFlow) and body mesh (in DatBody) writing 
 
-  6. *timeWriteEnd*: Dimensionless time to end flow field and body output (output only in timeOutBegin<= time/Tref <= timeOutEnd)
+  6. *timeWriteEnd*: Dimensionless time to end fluid mesh (in DatFlow) and body mesh (in DatBody) writing (timeOutBegin should less than timeOutEnd)
 
-  7. *timeWriteFlow*: Dimensionless time interval for flow field output
+  7. *timeWriteFlow*: Dimensionless time interval for fluid mesh (in DatFlow) writing
 
-  8. *timeWriteBody*  : Dimensionless time interval for body output
+  8. *timeWriteBody*  : Dimensionless time interval for body mesh (in DatBody) writing
 
-  9. *timeWriteInfo*  : Dimensionless time interval for DatInfo output (force, velocity *et. al.*)
+  9. *timeWriteInfo*  : Dimensionless time interval for post procesing information (such as force, velocity *et. al.* in DatInfo)
 
   10. *Re*: Dimensionless Reynolds Number 
 
   11. *denIn*: Fluid density  (Usually it's 1 )  
 
-  12. *uvwIn*: The incoming Velocity 
+  12. *uvwIn*: The given incoming Velocity 
 
   $$
       U_\infty, V_\infty, W_\infty
   $$
 
-       (determined by the boundary kind)
+       (determined by the velocity control parameters **velocityKind**)
 
-  13. *shearRateIn*: Parameters for uniform shear flow 
-
+  13. *shearRateIn*, *velocityKind* : the velocity control parameters
+   * 0 : if *velocityKind* equals 0 , *shearRateIn* are the shear rate for incoming flow
+     $$
+      U_\infty = U_{in} + 0 * shearRate(1) + y * shearRate(2) + z * shearRate(3)
+     $$
+     $$
+      V_\infty = V_{in} + x * shearRate(1) + 0 * shearRate(2) + z * shearRate(3)
+     $$
+     $$
+      W_\infty = W_{in} + x * shearRate(1) + y * shearRate(2) + 0 * shearRate(3)
+     $$
+   * 1 : if *velocityKind* equals 2 , *shearRateIn* are the oscillatory parameter for incoming flow
+     $$
+      U_\infty = U_{in} + shearRate(1) * cos(2*pi*shearRate(2)*time + shearRate(3)/180*pi)
+     $$
+     $$
+      V_\infty = V_{in}
+     $$
+     $$
+      W_\infty = W_{in}
+     $$
   14. *VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi* : Parameters for Volume Force
 
        According to the NS equation : 
-
-  $$
+      $$
       rho * Du/Dt = rho * f_x - dp/dx
-  $$
-
       $$
-
-    $[VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi), VolumeForceIn(2), VolumeForceIn(3)]$
+        the volume force is calculated as following:
       $$
-
+        volumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi)
+      $$
+      $$
+        volumeForce(2) = VolumeForceIn(2)
+      $$
+      $$
+        volumeForce(3) = VolumeForceIn(3)
+      $$
   15. *TrefType*: Determining the definition of reference time
 
       * 0  : Caculated by referece length and reference velocity 
@@ -175,31 +207,38 @@ $PBS_WDIR/$PBS_ENAME
 
       * *else*  : The input value Tref in parameter file inflow.dat
 
-  16. *UrefType(VelocityKind)*:  Determining the definition of reference velocity
+  16. *UrefType*:  Determining the definition of reference velocity
 
-      - 0  : X-incoming flow velocity
+      * 0  : X-incoming flow velocity
 
       $$
         U_\infty
       $$
 
-      - 1  : Y-incoming flow velocity 
+      * 1  : Y-incoming flow velocity 
 
       $$
         V_\infty
       $$
 
-      - 2  : Incoming flow velocity magnitude
+      * 2  : Z-incoming flow velocity 
+
+      $$
+        W_\infty
+      $$
+
+      * 3  : Incoming flow velocity magnitude
 
       $$
         \sqrt{U_\infty^2 + V_\infty^2}
       $$
 
-      - 3  : Maximum moving wall velocity
+      * 4  : The velocity amplitude only for **velocityKind**  2
 
-      - 4  : Velocity amplitude of Concussion velocity
-
-      - 5  : Flapping frequency velocity 
+      $$
+        |shearRateIn(1)|
+      $$
+      * 5  : Flapping frequency velocity 
 
       $$
         L f
@@ -234,14 +273,20 @@ $PBS_WDIR/$PBS_ENAME
   1. *nblock*: Number of fluid grid partitions
   2. *ID*: The ID of  fluid grid
   3. *iCollideModel*:  Determines the LBM model used in simualtion  
-     + 1 : *LBGK* : Single Relaxation Time
-     + 2 : *MRT-LBGK*: Multiple Relaxation Time Lattice Boltzmann Method
+     + 1 : *SRT* : Single Relaxation Time
+     + 2 : *TRT* : Double Relaxation Time
+     + 3 : *MRT* : Multiple Relaxation Time
+     + 11 : *SMAG-SRT*: Single Relaxation Time With Smagorinsky Model
+     + 12 : *Regular-SRT*: Regularised Single Relaxation Time
+     + 13 : *ELBM-SRT*: Single Relaxation Time In ELBM 
+     + 14 : *WALE-SRT*: WALE Single Relaxation Time
+     + 15 : *Vremann-SRT*: Vremann Single Relaxation Time
   4. *offsetOutput*: The computation domain moves with first body if this equals 1
   5. *isoutput*: Outputting the relative flow grid and body, i.e. in the moving frame of reference, if this equals 1
   6. *xDim,yDim,zDim*: Number of nodes in the x, y, and z directions of the fluid block
   7. *dh*: For uniform grid dh=dx=dy=dz
-  8. *xmin,ymin,zmin*: Starting position of fluid block
-  9. *boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)*: Boundary conditions on six boundaries
+  8. *xmin,ymin,zmin*: Starting position of the fluid block
+  9. *boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)*: Boundary conditions parameters on six directions
      + 0:  Fluid boundary conditions
      + 101: Dirichlet boundary condition (velocity equal to a specified value)
      + 102: Dirichlet boundary condition (The value of velocity at the boundary is not a fixed constant, but a non-uniform distribution of function values)
@@ -256,39 +301,39 @@ $PBS_WDIR/$PBS_ENAME
 
 - **SolidBody**
 
-  1. *IBPenaltyalpha*: Velocity correction parameter of the penalty function in the IBM method
+  1. *IBPenaltyalpha* : Velocity correction parameter of the penalty function in the IBM method
 
-  2. *alphaf*: Parameter for correcting torsion in the mass matrix
+  2. *alphaf* : Parameter for correcting torsion in the mass matrix
 
   3. *NewmarkGamma, NewmarkBeta*: Parameters of the Newmark method
 
-  4. *dampK, dampM*: Stiffness damping K, mass damping M
+  4. *dampK, dampM* : Stiffness damping K, mass damping M
 
-  5. *dtolFEM, ntolFEM*: Maximum number of iterations and error tolerance for the FEM method
+  5. *dtolFEM, ntolFEM* : Maximum number of iterations and error tolerance for the FEM method
 
   6. *nFish* : Total number of the solid bodies
 
-  7. *nfishGroup*: Numbers of the solid bodies type
+  7. *nfishGroup* : Numbers of the solid bodies type
 
-  8. *isKB*:  Determining the kind of parameters of the flexible bodies 
+  8. *isKB* :  Determining the kind of parameters of the flexible bodies 
 
      * 0 : *KB, KS*(Bending Stiffness, Stretching Stiffness)
      * 1 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic Time Ratio)
 
-  9. *fishnum  (fishGroup)*: The number of the solid bodies in the specific type
+  9. *fishnum  (fishGroup)* : The number of the solid bodies in the specific type
 
-  10. *numX,numY,numZ*: Number of arrangements of multiple bodies in the x, y, and z directions  
+  10. *numX,numY,numZ* : Number of arrangements of multiple bodies in the x, y, and z directions  
 
-  11. *FEmeshName(iFish)*: The name of the body mesh file  in the specific type
+  11. *FEmeshName(iFish)* : The name of the body mesh file  in the specific type
 
-  12. *iBodyModel(iFish)*: Choose for the body models
+  12. *iBodyModel(iFish)* : Choose for the body models
 
       + 1: rigid body
       + 2: flexible body
 
-  13. *iBodyType(iFish)*: Type of virtual object
+  13. *iBodyType(iFish)* : Type of virtual object
 
-  14. *isMotionGiven*: Degrees of freedom in six directions
+  14. *isMotionGiven* : Degrees of freedom in six directions
 
   15. *denR(iFish)* : Density ratio, 
       $$
@@ -296,21 +341,23 @@ $PBS_WDIR/$PBS_ENAME
       $$
       L is plate thickness
 
-  16. *psR(iFish)*: Poisson ratio
+  16. *psR(iFish)* : Poisson ratio
 
   17. *Freq(iFish)* : The flapping frequence for flexible bodies
 
-  18. *firstXYZ*: The initial position of the first point of the bodies
+  18. *firstXYZ* : The initial position of the first point of the bodies
 
-  19. *deltaXYZ*: If there are more than one bodies in a type, *deltaXYZ* determines the interval between front and rear solids
+  19. *deltaXYZ* : If there are more than one bodies in a type, *deltaXYZ* determines the interval between front and rear solids
 
-  20. *XYZAmpl, XYZPhi* : Parameters for body flapping
+  19. *initXYZVel* : The given initial translatory velocity for the solids
+
+  21. *XYZAmpl, XYZPhi* : Parameters for body flapping
 
        - $$
          XYZ = XYZAmpl * dcos(2.0 * pi * Freq * time + XYZPhi)
          $$
 
-  21. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
+  22. *AoAo, AoAAmpl, AoAPhi* : Parameters for body rotation
 
        - $$
          Theta = AoAo + AoAAmpl * dcos(2.0 * pi * Freq * time + AoAPhi)
@@ -328,32 +375,35 @@ $PBS_WDIR/$PBS_ENAME
 
 ## Output file description
 
-- **Output files**
+- **Output files and directories**
 
-1. *DatBody*     : Folder of body results
-2. *DatFlow*     : Floder of flow field results
-3. *DatInfo*     : Floder of force and power *et. al.* results
-4. *DatTemp*     : Floder of continuation document
-5. *DatBodyIB*   : Folder of body results for immersed boundary method when $Palpha \gt 0$
-6. *DatBodySpan* : Folder of spanwise-extension body results
-7. *Check.dat*   : Parameter record file
+1. *DatBody*      : Folder of body results
+2. *DatBodySpan*  : Folder of spanwise-extension body results
+3. *DatFlow*      : Floder of flow field results
+4. *DatInfo*      : Floder of force and power *et. al.* results
+5. *Check.dat*    : Parameters record file for checking
+6. *continue.dat* : Results record file for continue calculating
 
-- **Files description**
+- **Files in DatInfo description**
 
-1. *SampBodyAngular.plt* 
-   - *Hy*: *y* Coordinate of the first point $(y1)$
-   - *Ty*: *y* Coordinate of the last point $(y2)$
-   - *Ty-TH* : Height difference between the first and last points $(y2 - y1)$
+1. *FishAngular.plt* 
    - *AoA* :  The deflection angle of the body $(y2-y1)/(x2-x1)$;
-2. *SampBodyMean.plt* : The average information $(x, y, u, v, ax, ay)$ of the bodies 
-3. *SampBodyBegin.plt* : The same information of the first point of the bodies 
-4. *SampBodyEnd.plt* : The same information of the last point of the bodies 
-5. *SampFlowPint.plt* : The information of the detected points in the flow field
-6. *SampBodyNode.plt* : The information of the detected points in the bodies
-7. *MaxValBody.plt* : The max velocity in all bodies points
-8. *ForceDirect.plt* :The forces exerted on the bodies
-9. *Energy.plt* : The energy of the bodies
-10. *Power.plt* : The input power of the bodies
-11. *Converg.plt* : The convergence of the simulation
-12. *MaMax.plt* : The max Mach number in flow field
-13. *Area.plt* : The surface area of the bodies
+   - *Ty-TH* : Height difference between the first and last points $(y2 - y1)$
+   - *Hy* : *y* Coordinate of the first point $(y1)$
+   - *Ty* : *y* Coordinate of the last point $(y2)$
+2. *FishPower.plt* : The power information of the bodies
+   - *Ptot*  : *Px* + *Py* + *Pz*
+   - *Px*,*Py*,*Pz* : Output power calculated by ($force * velcity$)
+3. *FishEnergy.plt* : The energy of the bodies
+   - *E_s* : Streching strain energy
+   - *E_b* : Bending strain energy
+   - *E_p* : Total strain energy calculated by (*E_s* + *E_b*)
+   - *E_w* : Kinetic energy
+   - *E_t* : total energy calculated by (*E_p* + *E_w*)
+   - *E_k* : Output energy calculated by ($E_k = E_k + t * ptot$)
+4. *FishForce.plt* :The forces exerted on the bodies
+5. *FishNodeBegin.plt* : The information of the first point of the bodies 
+6. *FishNodeCenter.plt* : The information of the center point of the bodies 
+7. *FishNoEnd.plt* : The information of the last point of the bodies 
+8. *FishNodeMean.plt* : The average information of the all points of the bodies 
+
