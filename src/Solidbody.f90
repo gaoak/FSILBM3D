@@ -1099,24 +1099,32 @@ module SolidBody
         enddo
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
         !==========================================================================
-        call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
-        do  i=1,Surfacetmpnpts
-            Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
-        enddo
-        write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
-        do i = 1,Surfacetmpnpts
-            tmpxyz = Surfacetmpxyz(1:3,i)
-            write(idfile, *) tmpxyz/m_Lref
-        enddo
-        do  i=1,Surfacetmpnelmts
-            i1 = Surfacetmpele(1,i)
-            i2 = Surfacetmpele(2,i)
-            i3 = Surfacetmpele(3,i)
-            write(idfile, *) i1, i2, i3
-        enddo
-        deallocate(Surfacetmpxyz,Surfacetmpele)
+        if (time .lt. 1e-5) then
+            call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
+            do  i=1,Surfacetmpnpts
+                Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
+            enddo
+            write(idfile, '(A)') 'variables = "x" "y" "z"'
+            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
+            do i = 1,Surfacetmpnpts
+                tmpxyz = Surfacetmpxyz(1:3,i)
+                write(idfile, *) tmpxyz/m_Lref
+            enddo
+            do  i=1,Surfacetmpnelmts
+                i1 = Surfacetmpele(1,i)
+                i2 = Surfacetmpele(2,i)
+                i3 = Surfacetmpele(3,i)
+                write(idfile, *) i1, i2, i3
+            enddo
+            deallocate(Surfacetmpxyz,Surfacetmpele)
+        else
+            write(idfile, '(A)') 'variables = "X" "Y" "Z" "TTTnxt(RotMat)"'
+            write(idfile, '(10E20.10)') this%rbm%XYZ(1),this%rbm%XYZ(2),this%rbm%XYZ(3)
+            write(idfile, '(10E20.10)') this%rbm%TTTnxt(1,1),this%rbm%TTTnxt(1,2),this%rbm%TTTnxt(1,3)
+            write(idfile, '(10E20.10)') this%rbm%TTTnxt(2,1),this%rbm%TTTnxt(2,2),this%rbm%TTTnxt(2,3)
+            write(idfile, '(10E20.10)') this%rbm%TTTnxt(3,1),this%rbm%TTTnxt(3,2),this%rbm%TTTnxt(3,3)
+        endif
         close(idfile)
     end subroutine SurfaceWrite_body_
 
