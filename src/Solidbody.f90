@@ -595,7 +595,7 @@ module SolidBody
             this%v_Evel(1:3,i)=[this%rbm%WWW3(2)*this%v_Exyz(3,i)-this%rbm%WWW3(3)*this%v_Exyz(2,i),    &
                                 this%rbm%WWW3(3)*this%v_Exyz(1,i)-this%rbm%WWW3(1)*this%v_Exyz(3,i),    &
                                 this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)    ]&
-                                + this%rbm%UVW(1:3) + this%rbm%initXYZVel(1:3)
+                                + this%rbm%UVW(1:3)
         enddo
     end subroutine SurfaceUpdatePosVel_
 
