@@ -466,14 +466,14 @@ module SolidSolver
         Pay=sum(this%extful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
         Paz=sum(this%extful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
         Paero=Pax+Pay+Paz
-        Pix=-sum(this%mssful(1:this%nND,1)*this%accful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
-        Piy=-sum(this%mssful(1:this%nND,2)*this%accful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
-        Piz=-sum(this%mssful(1:this%nND,3)*this%accful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
-        Piner=Pix+Piy+Piz
-        Ptot=Paero+Piner
+        !Pix=-sum(this%mssful(1:this%nND,1)*this%accful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
+        !Piy=-sum(this%mssful(1:this%nND,2)*this%accful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
+        !Piz=-sum(this%mssful(1:this%nND,3)*this%accful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
+        !Piner=Pix+Piy+Piz
+        !Ptot=Paero+Piner
         ! write power title
         open(fid,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,Ptot,Paero,Piner,Pax,Pay,Paz,Pix,Piy,Piz
+        write(fid,'(10E20.10)')time/Tref,Paero,Pax,Pay,Paz
         close(fid)
 
         ! write area title
