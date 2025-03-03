@@ -28,7 +28,7 @@ module SolidBody
         ! 1 plate given by line mesh
         ! 2 rod given by line mesh
         integer :: v_move = 0 ! 0 stationary 1 moving
-        integer :: count_Area = 0, count_Interp = 0
+        integer :: count_Interp = 0
         real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z), required for type 3
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
         real(8), allocatable :: v_Ea(:) ! element area
@@ -601,12 +601,10 @@ module SolidBody
     subroutine UpdatePosVelArea_(this)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
-        if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. this%count_Area .eq. 0)) then
+        if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
             call this%PlateUpdatePosVelArea()
-            this%count_Area = 1
-        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2 .or. this%count_Area .eq. 0)) then
+        elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
             call this%SurfaceUpdatePosVel()
-            this%count_Area = 1
         else
         endif
     end subroutine UpdatePosVelArea_
