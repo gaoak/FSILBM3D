@@ -528,7 +528,6 @@ module SolidBody
         integer :: Surfacetmpele(3,Surfacetmpnelmts)
         integer :: i,i1,i2,i3
         real(8) :: A(3),B(3),C(3),tmparea,IBPenaltyBeta
-        allocate(this%v_Exyz0(3,this%v_nelmts))
         IBPenaltyBeta = - m_IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,Surfacetmpnelmts
             i1 = Surfacetmpele(1,i)
@@ -931,6 +930,7 @@ module SolidBody
         integer,allocatable :: Surfacetmpele(:,:)
         call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         this%v_nelmts = Surfacetmpnelmts
+        allocate(this%v_Exyz0(3,this%v_nelmts))
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
         allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
         call this%SurfaceBuildPosVelArea(Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
