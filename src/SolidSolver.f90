@@ -688,7 +688,7 @@ module SolidSolver
                     this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
                                            this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
                                            this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
-                                           + this%UVW(1:3)
+                                           + this%UVW(1:3) + this%initXYZVel(1:3)
                     this%velful(iND,4:6)=this%WWW3(1:3)
                 enddo
                 !-------------------------------------------------------
