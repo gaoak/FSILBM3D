@@ -1099,8 +1099,8 @@ module SolidBody
         enddo
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
         !==========================================================================
-        open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
+        open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         do  i=1,Surfacetmpnpts
             Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
         enddo
