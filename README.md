@@ -299,7 +299,7 @@ $PBS_WDIR/$PBS_ENAME
 
   19. *deltaXYZ* : If there are more than one bodies in a type, *deltaXYZ* determines the interval between front and rear solids
 
-  19. *initXYZVel* : The given initial translatory velocity for the solids
+  19. *initXYZVel* : The given initial translatory velocity for the flexible body and the given translational velocity for the rigid body.
 
   21. *XYZAmpl, XYZPhi* : Parameters for body flapping
 
