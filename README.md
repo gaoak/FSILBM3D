@@ -158,13 +158,15 @@ $PBS_WDIR/$PBS_ENAME
      $V_\infty = V_{in} + x * shearRate(1) + 0 * shearRate(2) + z * shearRate(3)$
 
      $W_\infty = W_{in} + x * shearRate(1) + y * shearRate(2) + 0 * shearRate(3)$
+
    * 1 : if *velocityKind* equals 2 , *shearRateIn* are the oscillatory parameter for incoming flow
 
-     $U_\infty = U_{in} + shearRate(1) * \cos(2*\pi*shearRate(2)*t + shearRate(3)/180*\pi)$
+     $U_\infty = U_{in} + shearRate(1) * cos(2 * pi * shearRate(2) * time + shearRate(3) * pi / 180)$
 
      $V_\infty = V_{in}$
 
      $W_\infty = W_{in}$
+
   14. *VolumeForceIn,VolumeForceAmp,VolumeForceFreq,VolumeForcePhi* : Parameters for Volume Force
 
       According to the NS equation : 
@@ -173,11 +175,12 @@ $PBS_WDIR/$PBS_ENAME
 
       The volume force is calculated as following:
 
-      $volumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * dsin(2 * pi * VolumeForceFreq * time + VolumeForcePhi)$
+      $volumeForce(1) = VolumeForceIn(1) + VolumeForceAmp * sin(2 * pi * VolumeForceFreq * time + VolumeForcePhi)$
 
       $volumeForce(2) = VolumeForceIn(2)$
 
       $volumeForce(3) = VolumeForceIn(3)$
+
   15. *TrefType*: Determining the definition of reference time
 
       * 0  : Caculated by referece length and reference velocity 
