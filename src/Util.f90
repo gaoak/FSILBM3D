@@ -275,7 +275,7 @@
                 write(111,'(A,A    )', advance='no') '    ', IDstr
             enddo
             write(111,'(A      )') ''
-            write(111,'(A      )', advance='no') 'sonBlock :'
+            write(111,'(A      )', advance='no') 'sonBlocks :'
             do j=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%comm(j)%sonId
                 write(IDstr,'(I4.4)')s
