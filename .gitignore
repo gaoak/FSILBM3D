@@ -4,6 +4,7 @@
 *.plt
 *.00000
 .*.swp
+*.asv
 combineforcheck
 combineforcheck.f90
 Check.dat
