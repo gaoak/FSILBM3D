@@ -53,6 +53,15 @@ module LBMBlockComm
                 sxD = LBMblks(sId)%xDim
                 syD = LBMblks(sId)%yDim
                 szD = LBMblks(sId)%zDim
+                if (LBMblks(sId)%BndConds(1).eq.BCPeriodic.and.LBMblks(sId)%BndConds(2).eq.BCPeriodic) then
+                    sxD = sxD - 1
+                endif
+                if (LBMblks(sId)%BndConds(3).eq.BCPeriodic.and.LBMblks(sId)%BndConds(4).eq.BCPeriodic) then
+                    syD = syD - 1
+                endif
+                if (LBMblks(sId)%BndConds(5).eq.BCPeriodic.and.LBMblks(sId)%BndConds(6).eq.BCPeriodic) then
+                    szD = szD - 1
+                endif
                 pair%s([1,3,5]) = 1
                 pair%s(2) = sxD
                 pair%s(4) = syD
@@ -75,6 +84,15 @@ module LBMBlockComm
                 pair%yDimF = pair%f(4) - pair%f(3) + 1
                 pair%zDimS = pair%s(6) - pair%s(5) + 1
                 pair%zDimF = pair%f(6) - pair%f(5) + 1
+                if (LBMblks(sId)%BndConds(1).eq.BCPeriodic.and.LBMblks(sId)%BndConds(2).eq.BCPeriodic) then
+                    pair%xDimS = pair%xDimS + 1
+                endif
+                if (LBMblks(sId)%BndConds(3).eq.BCPeriodic.and.LBMblks(sId)%BndConds(4).eq.BCPeriodic) then
+                    pair%yDimS = pair%yDimS + 1
+                endif
+                if (LBMblks(sId)%BndConds(5).eq.BCPeriodic.and.LBMblks(sId)%BndConds(6).eq.BCPeriodic) then
+                    pair%zDimS = pair%zDimS + 1
+                endif
                 blockTree(treenode)%comm(i) = pair
             enddo
             call build_blocks_comunication(blockTree(treenode)%sons(i))
@@ -493,17 +511,32 @@ module LBMBlockComm
     recursive SUBROUTINE check_blocks_params(treenode)
         implicit none
         integer,intent(in):: treenode
-        integer:: i,nblock
+        integer:: i,nblock,r(3)
         type(CommPair)::p
         logical:: flag
         real(8)::res1,res2,res
         flag = .false. ! default flase
         do i=1,blocktree(treenode)%nsons
             p = blocktree(treenode)%comm(i)
+            if (LBMblks(p%sonId)%BndConds(1).eq.BCPeriodic.and.LBMblks(p%sonId)%BndConds(2).eq.BCPeriodic) then
+                r(1) = 0
+            else
+                r(1) = 1
+            endif
+            if (LBMblks(p%sonId)%BndConds(3).eq.BCPeriodic.and.LBMblks(p%sonId)%BndConds(4).eq.BCPeriodic) then
+                r(2) = 0
+            else
+                r(2) = 1
+            endif
+            if (LBMblks(p%sonId)%BndConds(5).eq.BCPeriodic.and.LBMblks(p%sonId)%BndConds(6).eq.BCPeriodic) then
+                r(3) = 0
+            else
+                r(3) = 1
+            endif
             flag =  abs(LBMblks(p%fatherId)%dh - LBMblks(p%sonId)%dh*m_gridDelta).gt.1d-8 .or. &
-                    mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. 1 .or. &
-                    mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. 1 .or. &
-                    mod(LBMblks(p%sonId)%zDim,m_gridDelta) .ne. 1
+                    mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. r(1) .or. &
+                    mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. r(2) .or. &
+                    mod(LBMblks(p%sonId)%zDim,m_gridDelta) .ne. r(3)
             res1 = (LBMblks(p%sonId)%xmin-LBMblks(p%fatherId)%xmin)/LBMblks(p%fatherId)%dh + &
                     (LBMblks(p%sonId)%ymin-LBMblks(p%fatherId)%ymin)/LBMblks(p%fatherId)%dh + &
                     (LBMblks(p%sonId)%zmin-LBMblks(p%fatherId)%zmin)/LBMblks(p%fatherId)%dh
@@ -789,7 +822,16 @@ module LBMBlockComm
         integer,intent(in):: aS,bS,aF,bF
         real(8),intent(in):: fF(0:lbmDim,bF,aF)
         real(8),intent(out):: fS(0:lbmDim,bS,aS) !fine grid values
-        integer:: a,b,a1,b1
+        integer:: a,b,a1,b1,r(2)
+        r = 0
+        if (mod(bS,2).eq.0) then
+            bS = bS - 1
+            r(2) = 1
+        endif
+        if (mod(aS,2).eq.0) then
+            aS = aS - 1
+            r(1) = 1
+        endif
         if (flow%interpolateScheme.eq.2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
             do b  = 1,bS,2
@@ -820,6 +862,21 @@ module LBMBlockComm
             enddo
             enddo
             !$OMP END PARALLEL DO
+            if (r(2).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a)
+                do a = 1,aS
+                    fS(:,bS+1,a) = -0.0625d0*fS(:,bS-1,a) + 0.5625d0*fS(:,bS,a) + 0.5625d0*fS(:,1,a) - 0.0625d0*fS(:,2,a)
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if (r(1).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
+                do b = 1,bS
+                    fS(:,b,aS+1) = -0.0625d0*fS(:,b,aS-1) + 0.5625d0*fS(:,b,aS) + 0.5625d0*fS(:,b,1) - 0.0625d0*fS(:,b,2)
+                enddo
+                !$OMP END PARALLEL DO
+                if (r(2).eq.1) fS(:,bS+1,aS+1) = -0.0625d0*fS(:,bS+1,aS-1) + 0.5625d0*fS(:,bS+1,aS) + 0.5625d0*fS(:,bS+1,1) - 0.0625d0*fS(:,bS+1,2)
+            endif
         else
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
             do b  = 1,bS,2
@@ -838,6 +895,21 @@ module LBMBlockComm
             enddo
             enddo
             !$OMP END PARALLEL DO
+            if (r(2).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a)
+                do a = 1,aS
+                    fS(:,bS+1,a) = (fS(:,bS,a) + fS(:,1,a))*0.5d0
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if (r(1).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
+                do b = 1,bS
+                    fS(:,b,aS+1) = (fS(:,b,aS) + fS(:,b,1))*0.5d0
+                enddo
+                !$OMP END PARALLEL DO
+                if (r(2).eq.1) fS(:,bS+1,aS+1) = (fS(:,bS+1,aS) + fS(:,bS+1,1))*0.5d0
+            endif
         endif
     end subroutine
 
@@ -846,7 +918,16 @@ module LBMBlockComm
         integer,intent(in):: aS,bS,aF,bF
         real(8),intent(in):: fF(bF,aF)
         real(8),intent(out):: fS(bS,aS) !fine grid values
-        integer:: a,b,a1,b1
+        integer:: a,b,a1,b1,r(2)
+        r = 0
+        if (mod(bS,2).eq.0) then
+            bS = bS - 1
+            r(2) = 1
+        endif
+        if (mod(aS,2).eq.0) then
+            aS = aS - 1
+            r(1) = 1
+        endif
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
         do b  = 1,bS,2
             b1 = b / 2 + 1
@@ -864,6 +945,21 @@ module LBMBlockComm
         enddo
         enddo
         !$OMP END PARALLEL DO
+        if (r(2).eq.1) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a)
+            do a = 1,aS
+                fS(bS+1,a) = (fS(bS,a) + fS(1,a))*0.5d0
+            enddo
+            !$OMP END PARALLEL DO
+        endif
+        if (r(1).eq.1) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
+            do b = 1,bS
+                fS(b,aS+1) = (fS(:,b,aS) + fS(b,1))*0.5d0
+            enddo
+            !$OMP END PARALLEL DO
+            if (r(2).eq.1) fS(bS+1,aS+1) = (fS(bS+1,aS) + fS(bS+1,1))*0.5d0
+        endif
     end subroutine
 
     subroutine fIn_GridTransform(fIn,coeff,volumeForce,dh)! Dupius-Chopard method
