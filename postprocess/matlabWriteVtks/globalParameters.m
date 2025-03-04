@@ -21,7 +21,7 @@ nBlock = floor(str2double(fluidLine{1})); % the number of fluid blocks
 nSolid = floor(str2double(solidLine{1})); % the number of solids
 meshContain = cell(nBlock); % the contian relationship of the fluid blocks, the space means no son block
 for i = 1:nBlock
-    blockLine = readKeyLines([casePath '\check.dat'],'sonBlock',i);
+    blockLine = readKeyLines([casePath '\check.dat'],'sonBlocks',i);
     if length(blockLine) == 2
         meshContain{i} = [ ];
     else
