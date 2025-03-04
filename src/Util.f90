@@ -265,16 +265,22 @@
             write(IDstr,'(I4.4)')LBMblks(treenode)%ID
             write(111,'(A,A,A  )')'============================ BlockID = ',IDstr,' ============================='
             write(111,'(A,F20.10)')'Tau  =', LBMblks(treenode)%tau
-            write(111,'(A,F20.10)')'Omega=', LBMblks(treenode)%Omega
+            write(111,'(A,F20.10)')'Omega =', LBMblks(treenode)%Omega
             write(111,'(A,A    )')'---------------------------------------------------------------------------'
             write(IDstr,'(I4.4)')LBMblks(treenode)%carriedBodies(0)
             write(111,'(A,A    )') 'carryBodies : ', IDstr
+            write(111,'(A      )', advance='no') 'bodyIDs :'
             do i=1,LBMblks(treenode)%carriedBodies(0)
                 write(IDstr,'(I4.4)')LBMblks(treenode)%carriedBodies(i)
-                write(111,'(A,A    )') 'bodyNum : ', IDstr
+                write(111,'(A,A    )', advance='no') '    ', IDstr
             enddo
+            write(111,'(A      )') ''
+            write(111,'(A      )', advance='no') 'sonBlock :'
             do j=1,blockTree(treenode)%nsons
                 s = blockTree(treenode)%comm(j)%sonId
+                write(IDstr,'(I4.4)')s
+                write(111,'(A,A    )', advance='no') '    ', IDstr
+                write(111,'(A      )') ''
                 call write_parameter_blocks(s)
             enddo
             end subroutine
