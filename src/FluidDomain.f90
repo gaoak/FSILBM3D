@@ -86,6 +86,15 @@ module FluidDomain
             LBMblks(iblock)%xmax = LBMblks(iblock)%xmin + LBMblks(iblock)%dh*(LBMblks(iblock)%xDim-1)
             LBMblks(iblock)%ymax = LBMblks(iblock)%ymin + LBMblks(iblock)%dh*(LBMblks(iblock)%yDim-1)
             LBMblks(iblock)%zmax = LBMblks(iblock)%zmin + LBMblks(iblock)%dh*(LBMblks(iblock)%zDim-1)
+            if (LBMblks(iblock)%BndConds(1).eq.BCPeriodic.and.LBMblks(iblock)%BndConds(2).eq.BCPeriodic) then
+                LBMblks(iblock)%xmax = LBMblks(iblock)%xmax + LBMblks(iblock)%dh
+            endif
+            if (LBMblks(iblock)%BndConds(3).eq.BCPeriodic.and.LBMblks(iblock)%BndConds(4).eq.BCPeriodic) then
+                LBMblks(iblock)%xmax = LBMblks(iblock)%ymax + LBMblks(iblock)%dh
+            endif
+            if (LBMblks(iblock)%BndConds(5).eq.BCPeriodic.and.LBMblks(iblock)%BndConds(6).eq.BCPeriodic) then
+                LBMblks(iblock)%xmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh
+            endif
         enddo
         close(111)
     END SUBROUTINE
