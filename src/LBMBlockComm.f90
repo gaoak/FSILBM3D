@@ -955,7 +955,7 @@ module LBMBlockComm
         if (r(1).eq.1) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
             do b = 1,bS
-                fS(b,aS+1) = (fS(:,b,aS) + fS(b,1))*0.5d0
+                fS(b,aS+1) = (fS(b,aS) + fS(b,1))*0.5d0
             enddo
             !$OMP END PARALLEL DO
             if (r(2).eq.1) fS(bS+1,aS+1) = (fS(bS+1,aS) + fS(bS+1,1))*0.5d0
