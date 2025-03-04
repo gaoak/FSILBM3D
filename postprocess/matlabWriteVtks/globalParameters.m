@@ -23,7 +23,7 @@ meshContain = cell(nBlock); % the contian relationship of the fluid blocks, the 
 for i = 1:nBlock
     blockLine = readKeyLines([casePath '\check.dat'],'sonBlocks',i);
     if length(blockLine) == 2
-        meshContain{i} = [ ];
+        meshContain{i} = [];
     else
         for j = 1:length(blockLine)-2
         meshContain{i} = [meshContain{i} str2double(blockLine{2+j})];

@@ -29,4 +29,5 @@ array.x = mesh.xmin : mesh.dh : mesh.xmax;
 array.y = mesh.ymin : mesh.dh : mesh.ymax;
 array.z = mesh.zmin : mesh.dh : mesh.zmax;
 [mesh.x, mesh.y, mesh.z] = ndgrid(array.x, array.y, array.z);
+fclose(filePath);
 end

@@ -15,4 +15,5 @@ solid.zr = solid.data(2:2:solid.length,3) - extraVelocity(1) * time;
 solid.nx = size(solid.x,1);
 solid.ny = 1;
 solid.nz = 2;
+fclose(filePath);
 end
