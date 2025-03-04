@@ -2,7 +2,7 @@ function [] = writeWholeVTK(mesh,exVel,time,writePath)
 if norm(exVel) ~= 0
     % Update whole block parameters
     exMesh = mesh;
-    exDisplacemnt = time * exVel * 1e-5;
+    exDisplacemnt = time * exVel;
     exMesh.u = zeros(size(exMesh.u));
     exMesh.v = zeros(size(exMesh.v));
     exMesh.w = zeros(size(exMesh.w));

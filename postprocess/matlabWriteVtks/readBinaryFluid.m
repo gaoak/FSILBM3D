@@ -1,14 +1,17 @@
 function [mesh] = readBinaryFluid(filePath,extraVelocity,time)
 % Open file
 fileID = fopen(filePath,'r');
+if fileID == -1
+    error('Can not found fluid mesh files! : %s',filePath);
+end
 % Read paramters
 mesh.nx = fread(fileID, 1, 'int32');
 mesh.ny = fread(fileID, 1, 'int32');
 mesh.nz = fread(fileID, 1, 'int32');
 mesh.id = fread(fileID, 1, 'int32');
-mesh.xmin = fread(fileID, 1, 'double') - extraVelocity(1) * time * 1e-5;
-mesh.ymin = fread(fileID, 1, 'double') - extraVelocity(2) * time * 1e-5;
-mesh.zmin = fread(fileID, 1, 'double') - extraVelocity(3) * time * 1e-5;
+mesh.xmin = fread(fileID, 1, 'double') - extraVelocity(1) * time;
+mesh.ymin = fread(fileID, 1, 'double') - extraVelocity(2) * time;
+mesh.zmin = fread(fileID, 1, 'double') - extraVelocity(3) * time;
 mesh.dh = fread(fileID, 1, 'double');
 % Calculate max coordinates
 mesh.xmax = mesh.xmin + (mesh.nx - 1) * mesh.dh;

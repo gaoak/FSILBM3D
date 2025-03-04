@@ -19,7 +19,7 @@ eTime  = str2double(TimeLine{2}); % ending time for writing
 dTime  = str2double(deltaLine{1}); % writing intervl
 nBlock = floor(str2double(fluidLine{1})); % the number of fluid blocks
 nSolid = floor(str2double(solidLine{1})); % the number of solids
-meshContain = cell(nBlock); % the contian relationship of the fluid blocks, the space means no son block
+meshContain = 
 for i = 1:nBlock
     blockLine = readKeyLines([casePath '\check.dat'],'sonBlock',i);
     if length(blockLine) == 2
@@ -30,6 +30,8 @@ for i = 1:nBlock
         end
     end
 end
+
 %% Calculate key parameters
 nfile  = (eTime - sTime) / dTime + 1;
 exVel  = UVW / Uref;
+meshContain = {[2] [ ]};  % the contian relationship of the fluid blocks, the space means no son block
