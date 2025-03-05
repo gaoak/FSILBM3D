@@ -78,21 +78,12 @@ module LBMBlockComm
                 pair%f(6) = pair%f(5) + szD
                 pair%si(1:6) = pair%s(1:6) + pair%sds(1:6) * ratio
                 pair%fi(1:6) = pair%f(1:6) + pair%sds(1:6)
-                pair%xDimS = pair%s(2) - pair%s(1) + 1
+                pair%xDimS = LBMblks(sId)%xDim
                 pair%xDimF = pair%f(2) - pair%f(1) + 1
-                pair%yDimS = pair%s(4) - pair%s(3) + 1
+                pair%yDimS = LBMblks(sId)%yDim
                 pair%yDimF = pair%f(4) - pair%f(3) + 1
-                pair%zDimS = pair%s(6) - pair%s(5) + 1
+                pair%zDimS = LBMblks(sId)%zDim
                 pair%zDimF = pair%f(6) - pair%f(5) + 1
-                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
-                    pair%xDimS = pair%xDimS + 1
-                endif
-                if (LBMblks(sId)%periodic_bc(2) .eq. 1 ) then
-                    pair%yDimS = pair%yDimS + 1
-                endif
-                if (LBMblks(sId)%periodic_bc(3) .eq. 1 ) then
-                    pair%zDimS = pair%zDimS + 1
-                endif
                 blockTree(treenode)%comm(i) = pair
             enddo
             call build_blocks_comunication(blockTree(treenode)%sons(i))
