@@ -518,20 +518,15 @@ module LBMBlockComm
         flag = .false. ! default flase
         do i=1,blocktree(treenode)%nsons
             p = blocktree(treenode)%comm(i)
+            r = 1
             if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
                 r(1) = 0
-            else
-                r(1) = 1
             endif
             if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
                 r(2) = 0
-            else
-                r(2) = 1
             endif
             if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
                 r(3) = 0
-            else
-                r(3) = 1
             endif
             flag =  abs(LBMblks(p%fatherId)%dh - LBMblks(p%sonId)%dh*m_gridDelta).gt.1d-8 .or. &
                     mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. r(1) .or. &
