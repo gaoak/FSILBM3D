@@ -1,8 +1,8 @@
-function [] = writeWholeVTK(mesh,exVel,time,writePath)
-if norm(exVel) ~= 0
+function [] = writeWholeVTK(mesh,inflowVelocity,time,Lref,Tref,writePath)
+if norm(inflowVelocity) ~= 0
     % Update whole block parameters
     exMesh = mesh;
-    exDisplacemnt = time * exVel;
+    exDisplacemnt = time * Tref * inflowVelocity / Lref;
     exMesh.u = zeros(size(exMesh.u));
     exMesh.v = zeros(size(exMesh.v));
     exMesh.w = zeros(size(exMesh.w));
@@ -15,7 +15,7 @@ if norm(exVel) ~= 0
     exMesh.y = (exMesh.y - exMesh.ymax) * enlarge.y + exMesh.ymax + exDisplacemnt(2);
     exMesh.z = (exMesh.z - exMesh.zmax) * enlarge.z + exMesh.zmax + exDisplacemnt(3);
     % Write whole block
-    fprintf("Writing whole block for moving mesh ==============================\n")
+    fprintf("Writing whole block for moving mesh\n")
     writeFluidVTK(exMesh,[writePath 'b000Flow0000000000.vtk'])
 end
 end

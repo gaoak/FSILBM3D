@@ -26,4 +26,5 @@ keyLine = strrep(keyLine, 'D', 'E');
 keyLine = strtrim(keyLine);
 % Split strings by spaces
 keyLine = strsplit(keyLine, ' ');
+fclose all;
 end

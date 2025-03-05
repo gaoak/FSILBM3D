@@ -1,4 +1,4 @@
-run globalParameters.m
+run getParameters.m
 %% File serises
 readPath  = [casePath '\DatBodySpan\'];
 writePath = [casePath '\DatBodySpan\'];
@@ -8,7 +8,7 @@ for n = 1:nfile
         % Generate reading and writing file paths
         [readName, writeName] = generateSolidPath(readPath,writePath,time,i);
         % Read mesh data
-        solid = readAscallSolid(readName,exVel,time);
+        solid = readAscallSolid(readName,time,UVW,Lref,Tref);
         % Write mesh data in vtks
         writeSolidVTK(solid,writeName)
     end
