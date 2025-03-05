@@ -849,17 +849,17 @@ module LBMBlockComm
             if (r(2).eq.1) then
                 !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a)
                 do a = 1,aStmp
-                    fS(:,bStmp+1,a) = (-1.0d0*fS(:,bStmp-1,a) + 4.0d0*fS(:,bStmp,a) + 4.0d0*fS(:,1,a) - 1.0d0*fS(:,2,a))/6.0d0
+                    fS(:,bStmp+1,a) = -0.0625d0*fS(:,bStmp-2,a) + 0.5625d0*fS(:,bStmp,a) + 0.5625d0*fS(:,1,a) - 0.0625d0*fS(:,3,a)
                 enddo
                 !$OMP END PARALLEL DO
             endif
             if (r(1).eq.1) then
                 !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
                 do b = 1,bStmp
-                    fS(:,b,aStmp+1) = (-1.0d0*fS(:,b,aStmp-1) + 4.0d0*fS(:,b,aStmp) + 4.0d0*fS(:,b,1) - 1.0d0*fS(:,b,2))/6.0d0
+                    fS(:,b,aStmp+1) = 0.0625d0*fS(:,b,aStmp-2) + 0.5625d0*fS(:,b,aStmp) + 0.5625d0*fS(:,b,1) - 0.0625d0*fS(:,b,3)
                 enddo
                 !$OMP END PARALLEL DO
-                if (r(2).eq.1) fS(:,bStmp+1,aStmp+1) = (-1.0d0*fS(:,bStmp+1,aStmp-1) + 4.0d0*fS(:,bStmp+1,aStmp) + 4.0d0*fS(:,bStmp+1,1) - 1.0d0*fS(:,bStmp+1,2))/6.0d0
+                if (r(2).eq.1) fS(:,bStmp+1,aStmp+1) = -0.0625d0*fS(:,bStmp+1,aStmp-2) + 0.5625d0*fS(:,bStmp+1,aStmp) + 0.5625d0*fS(:,bStmp+1,1) - 0.0625d0*fS(:,bStmp+1,3)
             endif
         else
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
