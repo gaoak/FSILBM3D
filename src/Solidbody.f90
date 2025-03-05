@@ -206,7 +206,12 @@ module SolidBody
         real(8):: nUref(1:m_nFish)
         ! reference length
         if(flow%LrefType==0) then
-            flow%Lref  = flow%Lchod
+            if(m_nFish.eq.0) then
+                flow%Lref = 1.d0
+                write(*,*) 'LrefType and nFish is 0, Lref is adjusted to 1'
+            else
+                flow%Lref = flow%Lchod
+            endif
         else
             write(*,*) 'use input reference length'
         endif
