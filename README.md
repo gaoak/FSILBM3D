@@ -249,7 +249,7 @@ $PBS_WDIR/$PBS_ENAME
      + 201: Fixed wall(full way bounce back)
      + 202: Moving wall, only for the top and bottom boundaries $(ymin, ymax)$
      + 203: Fixed wall(half way bounce back, good choice for turbulent in LES compute)
-     + 301: Periodic Boundary
+     + 301: Periodic Boundary(For the son block, the xDim/yDim/zDim should have have one more layer than the father block)
      + 302: Symmetric boundary
   10. *params*: Pending Parameters
 
