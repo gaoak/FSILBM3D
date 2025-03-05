@@ -91,10 +91,10 @@ module FluidDomain
             if (LBMblks(iblock)%periodic_bc(1) .eq. 1) then
                 LBMblks(iblock)%xmax = LBMblks(iblock)%xmax + LBMblks(iblock)%dh
             endif
-            if (LBMblks(iblock)%periodic_bc(1) .eq. 1) then
+            if (LBMblks(iblock)%periodic_bc(2) .eq. 1) then
                 LBMblks(iblock)%xmax = LBMblks(iblock)%ymax + LBMblks(iblock)%dh
             endif
-            if (LBMblks(iblock)%periodic_bc(1) .eq. 1) then
+            if (LBMblks(iblock)%periodic_bc(3) .eq. 1) then
                 LBMblks(iblock)%xmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh
             endif
         enddo

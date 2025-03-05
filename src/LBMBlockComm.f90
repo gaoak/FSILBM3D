@@ -56,10 +56,10 @@ module LBMBlockComm
                 if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
                     sxD = sxD - 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
+                if (LBMblks(sId)%periodic_bc(2) .eq. 1) then
                     syD = syD - 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
+                if (LBMblks(sId)%periodic_bc(3) .eq. 1) then
                     szD = szD - 1
                 endif
                 pair%s([1,3,5]) = 1
@@ -87,10 +87,10 @@ module LBMBlockComm
                 if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
                     pair%xDimS = pair%xDimS + 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1) .eq.1 ) then
+                if (LBMblks(sId)%periodic_bc(2) .eq.1 ) then
                     pair%yDimS = pair%yDimS + 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1) .eq.1 ) then
+                if (LBMblks(sId)%periodic_bc(3) .eq.1 ) then
                     pair%zDimS = pair%zDimS + 1
                 endif
                 blockTree(treenode)%comm(i) = pair
@@ -511,7 +511,7 @@ module LBMBlockComm
     recursive SUBROUTINE check_blocks_params(treenode)
         implicit none
         integer,intent(in):: treenode
-        integer:: i,nblock,r(3)
+        integer:: i,nblock,r(3),bc_pair
         type(CommPair)::p
         logical:: flag
         real(8)::res1,res2,res
@@ -519,15 +519,11 @@ module LBMBlockComm
         do i=1,blocktree(treenode)%nsons
             p = blocktree(treenode)%comm(i)
             r = 1
-            if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
-                r(1) = 0
-            endif
-            if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
-                r(2) = 0
-            endif
-            if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
-                r(3) = 0
-            endif
+            do bc_pair = 1,3
+                if (LBMblks(p%sonId)%periodic_bc(bc_pair) .eq. 1) then
+                    r(bc_pair) = 0
+                endif
+            enddo
             flag =  abs(LBMblks(p%fatherId)%dh - LBMblks(p%sonId)%dh*m_gridDelta).gt.1d-8 .or. &
                     mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. r(1) .or. &
                     mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. r(2) .or. &
