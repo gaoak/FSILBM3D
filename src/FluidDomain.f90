@@ -825,7 +825,7 @@ module FluidDomain
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
-                zCoord = this%zmin + this%dh * (y - 1);
+                yCoord = this%ymin + this%dh * (y - 1);
                 call evaluate_velocity(this%blktime,this%zmax,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(this%zDim,y,x,0:lbmDim))
             enddo
@@ -835,7 +835,7 @@ module FluidDomain
             do  x = 1,this%xDim
                 xCoord = this%xmin + this%dh * (x - 1);
             do  y = 1,this%yDim
-                zCoord = this%zmin + this%dh * (y - 1);
+                yCoord = this%ymin + this%dh * (y - 1);
                 call evaluate_velocity(this%blktime,this%zmax,yCoord,xCoord,flow%uvwIn,velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 ! equilibriun part
                 call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),fEq(0:lbmDim))
