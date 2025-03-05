@@ -1,6 +1,6 @@
 function [readName,writeName] = generateFluidPath(readPath,writePath,nTime,id)
 % Convert input numbers to strings
-numStr = num2str(nTime);
+numStr = num2str(nTime * 1e5);
 
 % Calculate the number of zeros that need to be filled in the first place
 zeroNumbers = 10 - length(numStr);

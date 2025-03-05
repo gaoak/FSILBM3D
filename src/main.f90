@@ -95,7 +95,7 @@ PROGRAM main
             call write_continue_blocks(continueFile,step,time)
         endif
         ! write fluid and soild data
-        if((flow%timeWriteBegin .le. time/flow%Tref) .and. (time/flow%Tref .le. flow%timeWriteEnd)) then
+        if((time/flow%Tref - flow%timeWriteBegin) >= -0.5*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5*dt_fluid/flow%Tref) then
             if(DABS(time/flow%Tref-flow%timeBodyDelta*NINT(time/flow%Tref/flow%timeBodyDelta)) <= 0.5*dt_fluid/flow%Tref)then
                 call write_solid_field(time)
                 call Write_solid_v_bodies(time)

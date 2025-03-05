@@ -1,16 +1,19 @@
-function [solid] = readAscallSolid(filePath,extraVelocity,time)
+function [solid] = readAscallSolid(filePath,time,initialVelocity,Lref,Tref)
+if ~isfile(filePath)
+    error('Can not found solid mesh files! : %s',filePath);
+end
 % Read paramters
 solid.data = importdata(filePath).data;
-length = floor((size(solid.data,1)/2));
+solid.length = floor((size(solid.data,1)/2)) + 1;
 % Calculate coordinates
-solid.x = solid.data(1:2:length,1);
-solid.y = solid.data(1:2:length,2);
-solid.z = [solid.data(1,3); solid.data(2,3)];
-solid.x = solid.x - extraVelocity(1) * time * 1e-5;
-solid.y = solid.y - extraVelocity(2) * time * 1e-5;
-solid.z = solid.z - extraVelocity(3) * time * 1e-5;
+solid.x  = solid.data(1:2:solid.length,1) - initialVelocity(1) / Lref * time * Tref;  % dimensionless
+solid.yl = solid.data(1:2:solid.length,2) - initialVelocity(2) / Lref * time * Tref;
+solid.yr = solid.data(2:2:solid.length,2) - initialVelocity(2) / Lref * time * Tref;
+solid.zl = solid.data(1:2:solid.length,3) - initialVelocity(3) / Lref * time * Tref;
+solid.zr = solid.data(2:2:solid.length,3) - initialVelocity(3) / Lref * time * Tref;
 % Get index numbers
 solid.nx = size(solid.x,1);
 solid.ny = 1;
-solid.nz = size(solid.z,1);
+solid.nz = 2;
+fclose all;
 end
