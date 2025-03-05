@@ -807,7 +807,7 @@ module LBMBlockComm
         if(allocated(tmptau)) deallocate(tmptau)
     end subroutine
 
-    subroutine interpolate_fIn(bF,aF,fF,bS,aS,fS) ! space interpolation : 2 for 3rd- and 4th-order, other for linear
+    subroutine interpolate_fIn(bF,aF,fF,bS,aS,fS) ! space interpolation : 2 for 3rd- and 4th-order, other for linear(lagrange interpolate)
         use FlowCondition, only: flow
         implicit none
         integer,intent(in):: aS,bS,aF,bF
