@@ -53,13 +53,13 @@ module LBMBlockComm
                 sxD = LBMblks(sId)%xDim
                 syD = LBMblks(sId)%yDim
                 szD = LBMblks(sId)%zDim
-                if (LBMblks(sId)%periodic_bc(1).eq.1) then
+                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
                     sxD = sxD - 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1).eq.1) then
+                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
                     syD = syD - 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1).eq.1) then
+                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
                     szD = szD - 1
                 endif
                 pair%s([1,3,5]) = 1
@@ -84,13 +84,13 @@ module LBMBlockComm
                 pair%yDimF = pair%f(4) - pair%f(3) + 1
                 pair%zDimS = pair%s(6) - pair%s(5) + 1
                 pair%zDimF = pair%f(6) - pair%f(5) + 1
-                if (LBMblks(sId)%periodic_bc(1).eq.1) then
+                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
                     pair%xDimS = pair%xDimS + 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1).eq.1) then
+                if (LBMblks(sId)%periodic_bc(1) .eq.1 ) then
                     pair%yDimS = pair%yDimS + 1
                 endif
-                if (LBMblks(sId)%periodic_bc(1).eq.1) then
+                if (LBMblks(sId)%periodic_bc(1) .eq.1 ) then
                     pair%zDimS = pair%zDimS + 1
                 endif
                 blockTree(treenode)%comm(i) = pair
@@ -518,17 +518,17 @@ module LBMBlockComm
         flag = .false. ! default flase
         do i=1,blocktree(treenode)%nsons
             p = blocktree(treenode)%comm(i)
-            if (LBMblks(p%sonId)%periodic_bc(1).eq.1) then
+            if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
                 r(1) = 0
             else
                 r(1) = 1
             endif
-            if (LBMblks(p%sonId)%periodic_bc(1).eq.1) then
+            if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
                 r(2) = 0
             else
                 r(2) = 1
             endif
-            if (LBMblks(p%sonId)%periodic_bc(1).eq.1) then
+            if (LBMblks(p%sonId)%periodic_bc(1) .eq. 1) then
                 r(3) = 0
             else
                 r(3) = 1

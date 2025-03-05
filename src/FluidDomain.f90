@@ -83,22 +83,38 @@ module FluidDomain
                 write(*,*) "Grid number exceeds 32767, please try to reduced the grid size."
                 stop
             endif
+            call LBMblks(iblock)%check_periodic_boundary()
             ! calculate the maximum coordinates
             LBMblks(iblock)%xmax = LBMblks(iblock)%xmin + LBMblks(iblock)%dh*(LBMblks(iblock)%xDim-1)
             LBMblks(iblock)%ymax = LBMblks(iblock)%ymin + LBMblks(iblock)%dh*(LBMblks(iblock)%yDim-1)
             LBMblks(iblock)%zmax = LBMblks(iblock)%zmin + LBMblks(iblock)%dh*(LBMblks(iblock)%zDim-1)
-            if (LBMblks(iblock)%BndConds(1).eq.BCPeriodic.and.LBMblks(iblock)%BndConds(2).eq.BCPeriodic) then
+            if (LBMblks(iblock)%periodic_bc(1) .eq. 1) then
                 LBMblks(iblock)%xmax = LBMblks(iblock)%xmax + LBMblks(iblock)%dh
             endif
-            if (LBMblks(iblock)%BndConds(3).eq.BCPeriodic.and.LBMblks(iblock)%BndConds(4).eq.BCPeriodic) then
+            if (LBMblks(iblock)%periodic_bc(1) .eq. 1) then
                 LBMblks(iblock)%xmax = LBMblks(iblock)%ymax + LBMblks(iblock)%dh
             endif
-            if (LBMblks(iblock)%BndConds(5).eq.BCPeriodic.and.LBMblks(iblock)%BndConds(6).eq.BCPeriodic) then
+            if (LBMblks(iblock)%periodic_bc(1) .eq. 1) then
                 LBMblks(iblock)%xmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh
             endif
         enddo
         close(111)
     END SUBROUTINE
+
+    subroutine check_periodic_boundary_(this)
+        implicit none
+        class(LBMBlock), intent(in) :: this
+        integer :: i
+        this%periodic_bc(i) = 0
+        do i = 1,3
+            if ((this%BndConds(2*i-1) .eq. this%BndConds(2*i)) .and. (this%BndConds(2*i-1) .eq. BCPeriodic .or. this%BndConds(2*i) .eq. BCPeriodic)) then
+                this%periodic_bc(i) = 1
+            else
+                write(*,*) 'Stop! Periodic boundaries must apper in pairs: ', this%BndConds(2*i-1), this%BndConds(2*i)
+                stop
+            endif
+        enddo
+    end subroutine
 
     ! Check whether the calculation is continued
     SUBROUTINE check_is_continue(filename,step,time,isContinue)
@@ -478,28 +494,12 @@ module FluidDomain
 
     END SUBROUTINE
 
-    subroutine check_periodic_boundary_(this)
-        implicit none
-        class(LBMBlock), intent(in) :: this
-        integer :: i
-        this%periodic_bc(i) = 0
-        do i = 1,3
-            if ((this%BndConds(2*i-1) .eq. this%BndConds(2*i)) .and. (this%BndConds(2*i-1) .eq. BCPeriodic .or. this%BndConds(2*i) .eq. BCPeriodic)) then
-                this%periodic_bc(i) = 1
-            else
-                write(*,*) 'Stop! Periodic boundaries must apper in pairs: ', this%BndConds(2*i-1), this%BndConds(2*i)
-                stop
-            endif
-        enddo
-    end subroutine
-
     SUBROUTINE set_boundary_conditions_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x, y, z
         real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
         real(8):: fEq(0:lbmDim),fEqi(0:lbmDim),fTmp(0:lbmDim)
-        call this%check_periodic_boundary()
         ! set the x direction (inlet) --------------------------------------------------------------------
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
