@@ -87,10 +87,10 @@ module LBMBlockComm
                 if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
                     pair%xDimS = pair%xDimS + 1
                 endif
-                if (LBMblks(sId)%periodic_bc(2) .eq.1 ) then
+                if (LBMblks(sId)%periodic_bc(2) .eq. 1 ) then
                     pair%yDimS = pair%yDimS + 1
                 endif
-                if (LBMblks(sId)%periodic_bc(3) .eq.1 ) then
+                if (LBMblks(sId)%periodic_bc(3) .eq. 1 ) then
                     pair%zDimS = pair%zDimS + 1
                 endif
                 blockTree(treenode)%comm(i) = pair
