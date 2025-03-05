@@ -53,6 +53,15 @@ module LBMBlockComm
                 sxD = LBMblks(sId)%xDim
                 syD = LBMblks(sId)%yDim
                 szD = LBMblks(sId)%zDim
+                if (LBMblks(sId)%periodic_bc(1) .eq. 1) then
+                    sxD = sxD - 1
+                endif
+                if (LBMblks(sId)%periodic_bc(2) .eq. 1) then
+                    syD = syD - 1
+                endif
+                if (LBMblks(sId)%periodic_bc(3) .eq. 1) then
+                    szD = szD - 1
+                endif
                 pair%s([1,3,5]) = 1
                 pair%s(2) = sxD
                 pair%s(4) = syD
@@ -69,11 +78,11 @@ module LBMBlockComm
                 pair%f(6) = pair%f(5) + szD
                 pair%si(1:6) = pair%s(1:6) + pair%sds(1:6) * ratio
                 pair%fi(1:6) = pair%f(1:6) + pair%sds(1:6)
-                pair%xDimS = pair%s(2) - pair%s(1) + 1
+                pair%xDimS = LBMblks(sId)%xDim
                 pair%xDimF = pair%f(2) - pair%f(1) + 1
-                pair%yDimS = pair%s(4) - pair%s(3) + 1
+                pair%yDimS = LBMblks(sId)%yDim
                 pair%yDimF = pair%f(4) - pair%f(3) + 1
-                pair%zDimS = pair%s(6) - pair%s(5) + 1
+                pair%zDimS = LBMblks(sId)%zDim
                 pair%zDimF = pair%f(6) - pair%f(5) + 1
                 blockTree(treenode)%comm(i) = pair
             enddo
@@ -191,10 +200,10 @@ module LBMBlockComm
         call array_to_tree(iblocks,nb,blockTreeRoot)
         call build_blocks_comunication(blockTreeRoot)
         ! allocate father slices in sons node
-        call allocate_fIn_uuu(blockTreeRoot)
+        call allocate_fIn_tau(blockTreeRoot)
     endsubroutine bluid_block_tree
 
-    recursive subroutine allocate_fIn_uuu(treenode)
+    recursive subroutine allocate_fIn_tau(treenode)
         implicit none
         type(CommPair):: pair
         integer,intent(in):: treenode
@@ -243,7 +252,7 @@ module LBMBlockComm
                 allocate(LBMblks(s)%tau_Fz2t1(yDimF,xDimF))
                 allocate(LBMblks(s)%tau_Fz2t2(yDimF,xDimF))
             endif
-            call allocate_fIn_uuu(blockTree(f)%sons(i))
+            call allocate_fIn_tau(blockTree(f)%sons(i))
         enddo
     endsubroutine
 
@@ -493,17 +502,23 @@ module LBMBlockComm
     recursive SUBROUTINE check_blocks_params(treenode)
         implicit none
         integer,intent(in):: treenode
-        integer:: i,nblock
+        integer:: i,nblock,r(3),bc_pair
         type(CommPair)::p
         logical:: flag
         real(8)::res1,res2,res
         flag = .false. ! default flase
         do i=1,blocktree(treenode)%nsons
             p = blocktree(treenode)%comm(i)
+            r = 1
+            do bc_pair = 1,3
+                if (LBMblks(p%sonId)%periodic_bc(bc_pair) .eq. 1) then
+                    r(bc_pair) = 0
+                endif
+            enddo
             flag =  abs(LBMblks(p%fatherId)%dh - LBMblks(p%sonId)%dh*m_gridDelta).gt.1d-8 .or. &
-                    mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. 1 .or. &
-                    mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. 1 .or. &
-                    mod(LBMblks(p%sonId)%zDim,m_gridDelta) .ne. 1
+                    mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. r(1) .or. &
+                    mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. r(2) .or. &
+                    mod(LBMblks(p%sonId)%zDim,m_gridDelta) .ne. r(3)
             res1 = (LBMblks(p%sonId)%xmin-LBMblks(p%fatherId)%xmin)/LBMblks(p%fatherId)%dh + &
                     (LBMblks(p%sonId)%ymin-LBMblks(p%fatherId)%ymin)/LBMblks(p%fatherId)%dh + &
                     (LBMblks(p%sonId)%zmin-LBMblks(p%fatherId)%zmin)/LBMblks(p%fatherId)%dh
@@ -783,36 +798,47 @@ module LBMBlockComm
         if(allocated(tmptau)) deallocate(tmptau)
     end subroutine
 
-    subroutine interpolate_fIn(bF,aF,fF,bS,aS,fS) ! space interpolation : 2 for 3rd- and 4th-order, other for linear
+    subroutine interpolate_fIn(bF,aF,fF,bS,aS,fS) ! space interpolation : 2 for 3rd- and 4th-order, other for linear(lagrange interpolate)
         use FlowCondition, only: flow
         implicit none
         integer,intent(in):: aS,bS,aF,bF
         real(8),intent(in):: fF(0:lbmDim,bF,aF)
         real(8),intent(out):: fS(0:lbmDim,bS,aS) !fine grid values
-        integer:: a,b,a1,b1
+        integer:: a,b,a1,b1,r(2),aStmp,bStmp
+        r = 0
+        bStmp = bS
+        aStmp = aS
+        if (mod(bS,2).eq.0) then
+            bStmp = bS - 1
+            r(2) = 1
+        endif
+        if (mod(aS,2).eq.0) then
+            aStmp = aS - 1
+            r(1) = 1
+        endif
         if (flow%interpolateScheme.eq.2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
-            do b  = 1,bS,2
+            do b  = 1,bStmp,2
                b1 = b / 2 + 1
-            do a  = 1,aS,2
+            do a  = 1,aStmp,2
                a1 = a / 2 + 1
                 fS(:,b,a) = fF(:,b1,a1)
                 if(1.eq.b) then
                     fS(:,b+1,a) = 0.375d0*fF(:,b1,a1) + 0.75d0*fF(:,b1+1,a1) - 0.125d0*fF(:,b1+2,a1)
-                else if(b.eq.bS-2) then
+                else if(b.eq.bStmp-2) then
                     fS(:,b+1,a) = 0.375d0*fF(:,b1+1,a1) + 0.75d0*fF(:,b1,a1) - 0.125d0*fF(:,b1-1,a1)
-                else if(b.ne.bS) then
+                else if(b.ne.bStmp) then
                     fS(:,b+1,a) = -0.0625d0*fF(:,b1-1,a1) + 0.5625d0*fF(:,b1,a1) + 0.5625d0*fF(:,b1+1,a1) - 0.0625d0*fF(:,b1+2,a1)
                 endif
             enddo
             enddo
             !$OMP END PARALLEL DO
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b)
-            do b = 1,bS
-            do a = 2,aS,2
+            do b = 1,bStmp
+            do a = 2,aStmp,2
                 if(2.eq.a) then
                     fS(:,b,a) = 0.375d0*fS(:,b,a-1) + 0.75d0*fS(:,b,a+1) - 0.125d0*fS(:,b,a+3)
-                else if(a.eq.aS-1) then
+                else if(a.eq.aStmp-1) then
                     fS(:,b,a) = 0.375d0*fS(:,b,a+1) + 0.75d0*fS(:,b,a-1) - 0.125d0*fS(:,b,a-3)
                 else
                     fS(:,b,a) = -0.0625d0*fS(:,b,a-3) + 0.5625d0*fS(:,b,a-1) + 0.5625d0*fS(:,b,a+1) - 0.0625d0*fS(:,b,a+3)
@@ -820,24 +846,54 @@ module LBMBlockComm
             enddo
             enddo
             !$OMP END PARALLEL DO
+            if (r(2).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a)
+                do a = 1,aStmp
+                    fS(:,bStmp+1,a) = -0.0625d0*fS(:,bStmp-2,a) + 0.5625d0*fS(:,bStmp,a) + 0.5625d0*fS(:,1,a) - 0.0625d0*fS(:,3,a)
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if (r(1).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
+                do b = 1,bStmp
+                    fS(:,b,aStmp+1) = -0.0625d0*fS(:,b,aStmp-2) + 0.5625d0*fS(:,b,aStmp) + 0.5625d0*fS(:,b,1) - 0.0625d0*fS(:,b,3)
+                enddo
+                !$OMP END PARALLEL DO
+                if (r(2).eq.1) fS(:,bStmp+1,aStmp+1) = -0.0625d0*fS(:,bStmp+1,aStmp-2) + 0.5625d0*fS(:,bStmp+1,aStmp) + 0.5625d0*fS(:,bStmp+1,1) - 0.0625d0*fS(:,bStmp+1,3)
+            endif
         else
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
-            do b  = 1,bS,2
+            do b  = 1,bStmp,2
                b1 = b / 2 + 1
-            do a  = 1,aS,2
+            do a  = 1,aStmp,2
                a1 = a / 2 + 1
                 fS(:,b,a) = fF(:,b1,a1)
-                if(b.lt.bS) fS(:,b+1,a) = (fF(:,b1,a1) + fF(:,b1+1,a1))*0.5d0
+                if(b.lt.bStmp) fS(:,b+1,a) = (fF(:,b1,a1) + fF(:,b1+1,a1))*0.5d0
             enddo
             enddo
             !$OMP END PARALLEL DO
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b)
-            do b = 1,bS
-            do a = 2,aS,2
+            do b = 1,bStmp
+            do a = 2,aStmp,2
                 fS(:,b,a) = (fS(:,b,a-1) + fS(:,b,a+1))*0.5d0
             enddo
             enddo
             !$OMP END PARALLEL DO
+            if (r(2).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a)
+                do a = 1,aStmp
+                    fS(:,bStmp+1,a) = (fS(:,bStmp,a) + fS(:,1,a))*0.5d0
+                enddo
+                !$OMP END PARALLEL DO
+            endif
+            if (r(1).eq.1) then
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
+                do b = 1,bStmp
+                    fS(:,b,aStmp+1) = (fS(:,b,aStmp) + fS(:,b,1))*0.5d0
+                enddo
+                !$OMP END PARALLEL DO
+                if (r(2).eq.1) fS(:,bStmp+1,aStmp+1) = (fS(:,bStmp+1,aStmp) + fS(:,bStmp+1,1))*0.5d0
+            endif
         endif
     end subroutine
 
@@ -846,24 +902,50 @@ module LBMBlockComm
         integer,intent(in):: aS,bS,aF,bF
         real(8),intent(in):: fF(bF,aF)
         real(8),intent(out):: fS(bS,aS) !fine grid values
-        integer:: a,b,a1,b1
+        integer:: a,b,a1,b1,r(2),aStmp,bStmp
+        r = 0
+        bStmp = bS
+        aStmp = aS
+        if (mod(bS,2).eq.0) then
+            bStmp = bS - 1
+            r(2) = 1
+        endif
+        if (mod(aS,2).eq.0) then
+            aStmp = aS - 1
+            r(1) = 1
+        endif
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,a1,b1)
-        do b  = 1,bS,2
+        do b  = 1,bStmp,2
             b1 = b / 2 + 1
-        do a  = 1,aS,2
+        do a  = 1,aStmp,2
             a1 = a / 2 + 1
             fS(b,a) = fF(b1,a1)
-            if(b.lt.bS) fS(b+1,a) = (fF(b1,a1) + fF(b1+1,a1))*0.5d0
+            if(b.lt.bStmp) fS(b+1,a) = (fF(b1,a1) + fF(b1+1,a1))*0.5d0
         enddo
         enddo
         !$OMP END PARALLEL DO
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b)
-        do b = 1,bS
-        do a = 2,aS,2
+        do b = 1,bStmp
+        do a = 2,aStmp,2
             fS(b,a) = (fS(b,a-1) + fS(b,a+1))*0.5d0
         enddo
         enddo
         !$OMP END PARALLEL DO
+        if (r(2).eq.1) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a)
+            do a = 1,aStmp
+                fS(bStmp+1,a) = (fS(bStmp,a) + fS(1,a))*0.5d0
+            enddo
+            !$OMP END PARALLEL DO
+        endif
+        if (r(1).eq.1) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(b)
+            do b = 1,bStmp
+                fS(b,aStmp+1) = (fS(b,aStmp) + fS(b,1))*0.5d0
+            enddo
+            !$OMP END PARALLEL DO
+            if (r(2).eq.1) fS(bStmp+1,aStmp+1) = (fS(bStmp+1,aStmp) + fS(bStmp+1,1))*0.5d0
+        endif
     end subroutine
 
     subroutine fIn_GridTransform(fIn,coeff,volumeForce,dh)! Dupius-Chopard method
