@@ -1583,28 +1583,47 @@ module FluidDomain
         ! partial overlaped, output error
         implicit none
         integer:: i, j, CompareBlocks, cnt
+        logical:: d(6)
         cnt = 0
-        if(LBMblks(i)%xmin.le.LBMblks(j)%xmin .and. LBMblks(j)%xmax.le.LBMblks(i)%xmax) then
+        d(1) = LBMblks(i)%xmin.lt.LBMblks(j)%xmin.or.abs(LBMblks(i)%xmin-LBMblks(j)%xmin).lt.MachineTolerace
+        d(2) = LBMblks(j)%xmax.lt.LBMblks(i)%xmax.or.abs(LBMblks(j)%xmax-LBMblks(i)%xmax).lt.MachineTolerace
+        d(3) = LBMblks(j)%xmin.lt.LBMblks(i)%xmin.or.abs(LBMblks(j)%xmin-LBMblks(i)%xmin).lt.MachineTolerace
+        d(4) = LBMblks(i)%xmax.lt.LBMblks(j)%xmax.or.abs(LBMblks(i)%xmax-LBMblks(j)%xmax).lt.MachineTolerace
+        d(5) = LBMblks(i)%xmax.lt.LBMblks(j)%xmin
+        d(6) = LBMblks(j)%xmax.lt.LBMblks(i)%xmin
+        if(d(1) .and. d(2)) then
             cnt = cnt + 1
-        else if(LBMblks(j)%xmin.le.LBMblks(i)%xmin .and. LBMblks(i)%xmax.le.LBMblks(j)%xmax) then
+        else if(d(3) .and. d(4)) then
             cnt = cnt - 1
-        else if(LBMblks(i)%xmax.lt.LBMblks(j)%xmin .or. LBMblks(j)%xmax.lt.LBMblks(i)%xmin) then
+        else if(d(5) .and. d(6)) then
             CompareBlocks = 0
             return
         endif
-        if(LBMblks(i)%ymin.le.LBMblks(j)%ymin .and. LBMblks(j)%ymax.le.LBMblks(i)%ymax) then
+        d(1) = LBMblks(i)%ymin.lt.LBMblks(j)%ymin.or.abs(LBMblks(i)%ymin-LBMblks(j)%ymin).lt.MachineTolerace
+        d(2) = LBMblks(j)%ymax.lt.LBMblks(i)%ymax.or.abs(LBMblks(j)%ymax-LBMblks(i)%ymax).lt.MachineTolerace
+        d(3) = LBMblks(j)%ymin.lt.LBMblks(i)%ymin.or.abs(LBMblks(j)%ymin-LBMblks(i)%ymin).lt.MachineTolerace
+        d(4) = LBMblks(i)%ymax.lt.LBMblks(j)%ymax.or.abs(LBMblks(i)%ymax-LBMblks(j)%ymax).lt.MachineTolerace
+        d(5) = LBMblks(i)%ymax.lt.LBMblks(j)%ymin
+        d(6) = LBMblks(j)%ymax.lt.LBMblks(i)%ymin
+        if(d(1) .and. d(2)) then
             cnt = cnt + 1
-        else if(LBMblks(j)%ymin.le.LBMblks(i)%ymin .and. LBMblks(i)%ymax.le.LBMblks(j)%ymax) then
+        else if(d(3) .and. d(4)) then
             cnt = cnt - 1
-        else if(LBMblks(i)%ymax.lt.LBMblks(j)%ymin .or. LBMblks(j)%ymax.lt.LBMblks(i)%ymin) then
+        else if(d(5) .and. d(6)) then
             CompareBlocks = 0
             return
         endif
-        if(LBMblks(i)%zmin.le.LBMblks(j)%zmin .and. LBMblks(j)%zmax.le.LBMblks(i)%zmax) then
+        d(1) = LBMblks(i)%zmin.lt.LBMblks(j)%zmin.or.abs(LBMblks(i)%zmin-LBMblks(j)%zmin).lt.MachineTolerace
+        d(2) = LBMblks(j)%zmax.lt.LBMblks(i)%zmax.or.abs(LBMblks(j)%zmax-LBMblks(i)%zmax).lt.MachineTolerace
+        d(3) = LBMblks(j)%zmin.lt.LBMblks(i)%zmin.or.abs(LBMblks(j)%zmin-LBMblks(i)%zmin).lt.MachineTolerace
+        d(4) = LBMblks(i)%zmax.lt.LBMblks(j)%zmax.or.abs(LBMblks(i)%zmax-LBMblks(j)%zmax).lt.MachineTolerace
+        d(5) = LBMblks(i)%zmax.lt.LBMblks(j)%zmin
+        d(6) = LBMblks(j)%zmax.lt.LBMblks(i)%zmin
+        if(d(1) .and. d(2)) then
             cnt = cnt + 1
-        else if(LBMblks(j)%zmin.le.LBMblks(i)%zmin .and. LBMblks(i)%zmax.le.LBMblks(j)%zmax) then
+        else if(d(3) .and. d(4)) then
             cnt = cnt - 1
-        else if(LBMblks(i)%zmax.lt.LBMblks(j)%zmin .or. LBMblks(j)%zmax.lt.LBMblks(i)%zmin) then
+        else if(d(5) .and. d(6)) then
             CompareBlocks = 0
             return
         endif

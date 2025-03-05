@@ -28,7 +28,7 @@ module ConstParams
     integer, parameter:: BCstationary_Wall = 201, BCmoving_Wall = 202, BCstationary_Wall_halfway = 203
     integer, parameter:: BCPeriodic = 301,BCSymmetric = 302,BCfluid = 0
 
-    real(8), parameter:: Pi = 3.141592653589793d0,eps = 1.0d-5
+    real(8), parameter:: Pi = 3.141592653589793d0,eps = 1.0d-5,MachineTolerace = 1.0d-12
     integer, parameter:: DOFDim = 6
 
     real(8), parameter:: Cs2 = 1.d0/3.0d0
