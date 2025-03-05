@@ -13,7 +13,7 @@ module FluidDomain
         integer :: ID,iCollidModel,offsetOutput,isoutput
         integer :: xDim,yDim,zDim
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
-        integer :: BndConds(1:6)
+        integer :: BndConds(1:6),periodic_bc(3)
         real(8) :: params(1:10),tau,Omega,Omega2 ! single time, two time relaxation
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
@@ -39,6 +39,7 @@ module FluidDomain
         procedure :: collision => collision_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
+        procedure :: check_periodic_boundary => check_periodic_boundary_
         procedure :: update_volume_force => update_volume_force_
         procedure :: add_volume_force => add_volume_force_
         procedure :: write_flow => write_flow_
@@ -477,12 +478,28 @@ module FluidDomain
 
     END SUBROUTINE
 
+    subroutine check_periodic_boundary_(this)
+        implicit none
+        class(LBMBlock), intent(in) :: this
+        integer :: i
+        this%periodic_bc(i) = 0
+        do i = 1,3
+            if ((this%BndConds(2*i-1) .eq. this%BndConds(2*i)) .and. (this%BndConds(2*i-1) .eq. BCPeriodic .or. this%BndConds(2*i) .eq. BCPeriodic)) then
+                this%periodic_bc(i) = 1
+            else
+                write(*,*) 'Stop! Periodic boundaries must apper in pairs: ', this%BndConds(2*i-1), this%BndConds(2*i)
+                stop
+            endif
+        enddo
+    end subroutine
+
     SUBROUTINE set_boundary_conditions_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x, y, z
         real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
         real(8):: fEq(0:lbmDim),fEqi(0:lbmDim),fTmp(0:lbmDim)
+        call this%check_periodic_boundary()
         ! set the x direction (inlet) --------------------------------------------------------------------
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
