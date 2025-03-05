@@ -103,7 +103,7 @@ module FluidDomain
 
     subroutine check_periodic_boundary_(this)
         implicit none
-        class(LBMBlock), intent(in) :: this
+        class(LBMBlock), intent(inout) :: this
         integer :: i
         this%periodic_bc(i) = 0
         do i = 1,3
