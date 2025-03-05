@@ -105,13 +105,15 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer :: i
-        this%periodic_bc(i) = 0
+        this%periodic_bc = 0
         do i = 1,3
-            if ((this%BndConds(2*i-1) .eq. this%BndConds(2*i)) .and. (this%BndConds(2*i-1) .eq. BCPeriodic .or. this%BndConds(2*i) .eq. BCPeriodic)) then
-                this%periodic_bc(i) = 1
-            else
-                write(*,*) 'Stop! Periodic boundaries must apper in pairs: ', this%BndConds(2*i-1), this%BndConds(2*i)
-                stop
+            if (this%BndConds(2*i-1) .eq. BCPeriodic .or. this%BndConds(2*i) .eq. BCPeriodic) then
+                if (this%BndConds(2*i-1) .eq. this%BndConds(2*i)) then
+                    this%periodic_bc(i) = 1
+                else
+                    write(*,*) 'Stop! Periodic boundaries must apper in pairs: ', this%BndConds(2*i-1), this%BndConds(2*i)
+                    stop
+                endif
             endif
         enddo
     end subroutine
