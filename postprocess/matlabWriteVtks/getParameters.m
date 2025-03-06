@@ -1,7 +1,7 @@
 clear;clc;close all;format long
 %% Case path
 isOnlyWriteRootBlock = true;
-casePath  = 'G:\TandemPlates\Validation\Comparison\Case3DL064T06400-double';
+casePath  = 'G:\TandemPlates\Examples\OneMeshBlocks-1';
 %% Read key lines
 UrefLine  = readKeyLines([casePath '\check.dat' ],'Uref'          ,1);
 TrefLine  = readKeyLines([casePath '\check.dat' ],'Tref'          ,1);
