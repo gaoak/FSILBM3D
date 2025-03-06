@@ -234,8 +234,14 @@ $PBS_WDIR/$PBS_ENAME
   1. *nblock*: Number of fluid grid partitions
   2. *ID*: The ID of  fluid grid
   3. *iCollideModel*:  Determines the LBM model used in simualtion  
-     + 1 : *LBGK* : Single Relaxation Time
-     + 2 : *MRT-LBGK*: Multiple Relaxation Time Lattice Boltzmann Method
+     + 1 : *SRT* : Single Relaxation Time
+     + 2 : *TRT* : Double Relaxation Time (only for single fluid block)
+     + 3 : *MRT* : Multiple Relaxation Time (only for single fluid block)
+     + 11 : *SMAG-SRT*: Single Relaxation Time With Smagorinsky Model
+     + 12 : *Regular-SRT*: Regularised Single Relaxation Time
+     + 13 : *ELBM-SRT*: Single Relaxation Time In ELBM 
+     + 14 : *WALE-SRT*: WALE Single Relaxation Time
+     + 15 : *Vremann-SRT*: Vremann Single Relaxation Time
   4. *offsetOutput*: The computation domain moves with first body if this equals 1
   5. *isoutput*: Outputting the relative flow grid and body, i.e. in the moving frame of reference, if this equals 1
   6. *xDim,yDim,zDim*: Number of nodes in the x, y, and z directions of the fluid block
