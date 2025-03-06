@@ -1082,7 +1082,7 @@ module FluidDomain
             real(8):: S11,S12,S13,S22,S23,S33
             real(8):: O12,O13,O23,ox,oy,oz
             real(8):: SO11,SO12,SO13,SO22,SO23,SO33
-            real(8):: Q,S,O,SO,operator,SdSd
+            real(8):: Q,S,O,SO,OP,SdSd
             real(8):: invdh,tau__
             integer:: x0,y0,z0
             invdh = this%dh
@@ -1102,7 +1102,6 @@ module FluidDomain
             S13 = -1.5d0*invdh*Q13/(rho*tau__)
             S23 = -1.5d0*invdh*Q23/(rho*tau__)
             S = S11*S11 + S22*S22 + S33*S33 + 2.d0*(S12*S12 + S13*S13 + S23*S23)
-            if(S.lt.eps) S=0.0d0
 
             ox=0.0d0
             oy=0.0d0
@@ -1158,7 +1157,6 @@ module FluidDomain
             ! the boundary need unilateral interpolation
 
             O = 2.0d0*(O12*O12+O23*O23+O13*O13)
-            if(O.lt.eps) O=0.0d0
 
             SO11 =-(0.0d0           + S11*S11*O12*O12 + S11*S11*O13*O13 + &
                     0.0d0           + S12*S12*O12*O12 + S12*S12*O13*O13 + &
@@ -1179,15 +1177,14 @@ module FluidDomain
                     S22*S23*O12*O13 + 0.0d0           + 0.0d0           + &
                     S23*S33*O12*O13 + 0.0d0           + 0.0d0          )
             SO = SO11 + SO22 + SO33 + 2.0d0*(SO12 + SO13 + SO23)
-            if(SO.lt.eps) SO=0.0d0
 
             SdSd = (S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2.0d0*SO
-            operator = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
-            if ((.not. IEEE_IS_FINITE(operator)).or.(operator.lt.0.0d0).or.(S.eq.0.0d0.and.SdSd.eq.0.0d0)) then
-                operator = 0.0d0
+            OP = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
+            if ((.not. IEEE_IS_FINITE(OP)).or.(OP.lt.0.0d0)) then
+                OP = 0.0d0
             endif
 
-            tau__ = (flow%nu+CWALEConst*operator*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
+            tau__ = (flow%nu+CWALEConst*OP*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
             this%tau_all(z0,y0,x0) = tau__
             omega0 = 1.0d0 / (tau__)
         END SUBROUTINE
@@ -1202,11 +1199,12 @@ module FluidDomain
             onesid_diff = (-3.0d0*g1 + 4.0d0*g2 - g3)*invdx
         END FUNCTION
         SUBROUTINE vrem(x0,y0,z0,omega0)
+            USE, INTRINSIC :: IEEE_ARITHMETIC
             implicit none
             real(8):: omega0
             real(8):: a11,a12,a13,a21,a22,a23,a31,a32,a33
             real(8):: b11,b12,b13,b21,b22,b23,b31,b32,b33
-            real(8):: aa,bb,operator
+            real(8):: aa,bb,OP
             real(8):: invdh,tau__
             integer:: x0,y0,z0
             invdh = this%dh
@@ -1265,8 +1263,11 @@ module FluidDomain
                  (a11*a31+a12*a32+a13*a33)*(a11*a31+a12*a32+a13*a33)+ &
                  (b21+b22+b23)*(b31+b32+b33)- &
                  (a21*a31+a22*a32+a23*a33)*(a21*a31+a22*a32+a23*a33)
-            operator = dsqrt(bb/aa)
-            tau__ = (flow%nu+CvremConst*operator*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
+            OP = dsqrt(bb/aa)
+            if (.not. IEEE_IS_FINITE(OP)) then
+                OP = 0.0d0
+            endif
+            tau__ = (flow%nu+CvremConst*OP*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
             this%tau_all(z0,y0,x0) = tau__
             omega0 = 1.0d0 / (tau__)
         END SUBROUTINE
