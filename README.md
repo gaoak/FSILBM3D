@@ -124,7 +124,7 @@ $PBS_WDIR/$PBS_ENAME
 
   1. *isConCmpt* : Determining new simulation or continue simulaion
      + 0 : Calculate from the beginning
-     + 1: Calculate from last time output
+     + 1 : Calculate from last time output
 
   2. *numsubstep*: Number of sub-steps for solid time-stepping solution
 
@@ -132,7 +132,7 @@ $PBS_WDIR/$PBS_ENAME
 
   4. *timeContiDelta*: Dimensionless time interval for writing continue (continue.dat) which used for continue simulation
 
-  5. *timeWriteBegin*: Dimensionless time to start fluid mesh (in DatFlow) and body mesh (in DatBody) writing 
+  5. *timeWriteBegin*: Dimensionless time to start fluid mesh (in DatFlow) and body mesh (in DatBody) writing, also is the start time for fluid averaging
 
   6. *timeWriteEnd*: Dimensionless time to end fluid mesh (in DatFlow) and body mesh (in DatBody) writing (timeOutBegin should less than timeOutEnd)
 
@@ -228,8 +228,8 @@ $PBS_WDIR/$PBS_ENAME
   2. *ID*: The ID of  fluid grid
   3. *iCollideModel*:  Determines the LBM model used in simualtion  
      + 1 : *SRT* : Single Relaxation Time
-     + 2 : *TRT* : Double Relaxation Time
-     + 3 : *MRT* : Multiple Relaxation Time
+     + 2 : *TRT* : Double Relaxation Time (only for single fluid block)
+     + 3 : *MRT* : Multiple Relaxation Time (only for single fluid block)
      + 11 : *SMAG-SRT*: Single Relaxation Time With Smagorinsky Model
      + 12 : *Regular-SRT*: Regularised Single Relaxation Time
      + 13 : *ELBM-SRT*: Single Relaxation Time In ELBM 
