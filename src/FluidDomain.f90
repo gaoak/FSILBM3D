@@ -1507,7 +1507,7 @@ module FluidDomain
             WRITE(idfile) xmin,ymin,zmin,this%dh
             write(idfile) this%oututmp,this%outvtmp,this%outwtmp
             close(idfile)
-            open(idfile,file='./DatFlow/AverageFlow_b'//blockName,form='unformatted',access='stream')
+            open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
             WRITE(idfile) nxe,nye,nze,this%ID
             WRITE(idfile) xmin,ymin,zmin,this%dh
             write(idfile) this%oututmp_ave,this%outvtmp_ave,this%outwtmp_ave
