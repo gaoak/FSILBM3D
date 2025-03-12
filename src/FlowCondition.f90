@@ -178,6 +178,10 @@ module FlowCondition
                 close(111)
             enddo
         enddo
+        ! write fluid flux title
+        open(111,file='./DatInfo/FluidFlux.plt')
+        write(111,*) 'variables= "t","inlet","middle","outlet"'
+        close(111)
         ! write fluid probing title
         do  i=1,flow%fluidProbingNum
             write(probeNum,'(I3.3)') i
@@ -195,11 +199,12 @@ module FlowCondition
         ! close(111)
     END SUBROUTINE
 
-    SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocityIn)
+    SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocityIn,density)
         implicit none
         integer:: i,j,xDim,yDim,zDim
         real(8):: time,dh,xmin,ymin,zmin,xmax,ymax,zmax
-        real(8):: velocityIn(zDim,yDim,xDim,1:3),velocityOut(1:3)
+        real(8):: velocityIn(zDim,yDim,xDim,1:3),velocityOut(1:3),density(zDim,yDim,xDim)
+        real(8):: fluxIn=0.d0,fluxMiddle=0.d0,fluxOut=0.d0
         integer,parameter::nameLen=3
         character (LEN=nameLen):: probeNum
         ! write fluid probing information
@@ -223,6 +228,17 @@ module FlowCondition
             write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
+        ! write fluid flux
+        do j=1,yDim
+        do i=1,xDim
+            fluxIn = fluxIn + velocityIn(1,j,i,1) * density(1,j,i)
+            fluxMiddle = fluxMiddle + velocityIn(int(zDim/2),j,i,1) * density(int(zDim/2),j,i)
+            fluxOut = fluxOut + velocityIn(zDim,j,i,1) * density(zDim,j,i)
+        enddo
+        enddo
+        open(111,file='./DatInfo/FluidFlux.plt',position='append')
+        write(111,'(4E20.10)') time/flow%Tref,fluxIn/flow%Uref/flow%denIn,fluxMiddle/flow%Uref/flow%denIn,fluxOut/flow%Uref/flow%denIn
+        close(111)
         END SUBROUTINE
 
 end module FlowCondition
