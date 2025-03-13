@@ -4,7 +4,7 @@ module FluidDomain
     implicit none
     private
     public:: LBMblks,LBMblksIndex,m_nblocks
-    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_average_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
+    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_turbulent_statistic_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
              CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block
@@ -19,7 +19,7 @@ module FluidDomain
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:)
-        real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:),OUTutmp_ave(:,:,:),OUTvtmp_ave(:,:,:),OUTwtmp_ave(:,:,:)
+        real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:),OUTtmp_ave(:,:,:,:)
         real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
         real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
@@ -36,7 +36,7 @@ module FluidDomain
         procedure :: Initialise => Initialise_
         procedure :: read_continue => read_continue_
         procedure :: calculate_macro_quantities => calculate_macro_quantities_
-        procedure :: calculate_average_quantities => calculate_average_quantities_
+        procedure :: calculate_turbulent_statistic => calculate_turbulent_statistic_
         procedure :: collision => collision_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
@@ -234,11 +234,11 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE calculate_average_quantities_blocks(step,step_s)
+    SUBROUTINE calculate_turbulent_statistic_blocks(step,step_s)
         implicit none
         integer:: iblock,step,step_s
         do iblock = 1,m_nblocks
-            call LBMblks(iblock)%calculate_average_quantities(step,step_s)
+            call LBMblks(iblock)%calculate_turbulent_statistic(step,step_s)
         enddo
     END SUBROUTINE
 
@@ -286,7 +286,7 @@ module FluidDomain
         allocate(this%uuu(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%force(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%den(this%zDim,this%yDim,this%xDim))
-        allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:3))
+        allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:9))
         ! allocate output workspace
         xmin = 1 + this%offsetOutput
         ymin = 1 + this%offsetOutput
@@ -297,9 +297,7 @@ module FluidDomain
         allocate(this%oututmp(zmin:zmax,ymin:ymax,xmin:xmax))
         allocate(this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax))
         allocate(this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax))
-        allocate(this%oututmp_ave(zmin:zmax,ymin:ymax,xmin:xmax))
-        allocate(this%outvtmp_ave(zmin:zmax,ymin:ymax,xmin:xmax))
-        allocate(this%outwtmp_ave(zmin:zmax,ymin:ymax,xmin:xmax))
+        allocate(this%outtmp_ave(zmin:zmax,ymin:ymax,xmin:xmax,1:9))
         ! allocate mesh partition
         allocate(this%OMPpartition(1:m_npsize),this%OMPparindex(1:m_npsize+1),this%OMPeid(1:m_npsize))
         allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:m_npsize))
@@ -434,9 +432,7 @@ module FluidDomain
                 this%den(z,y,x) = flow%denIn
                 call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
-                this%uuu_ave(z,y,x,1) = 0.0D0
-                this%uuu_ave(z,y,x,2) = 0.0D0
-                this%uuu_ave(z,y,x,3) = 0.0D0
+                this%uuu_ave(z,y,x,:) = 0.0D0
             enddo
             enddo
             enddo
@@ -953,7 +949,7 @@ module FluidDomain
         !$OMP END PARALLEL DO
     END SUBROUTINE
 
-    SUBROUTINE calculate_average_quantities_(this,step,step_s)
+    SUBROUTINE calculate_turbulent_statistic_(this,step,step_s)
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z,step,step_s
@@ -967,6 +963,12 @@ module FluidDomain
                 this%uuu_ave(z,y,x,1) = (this%uuu_ave(z,y,x,1) * real(step - step_s) + this%uuu(z,y,x,1)) * invStep
                 this%uuu_ave(z,y,x,2) = (this%uuu_ave(z,y,x,2) * real(step - step_s) + this%uuu(z,y,x,2)) * invStep
                 this%uuu_ave(z,y,x,3) = (this%uuu_ave(z,y,x,3) * real(step - step_s) + this%uuu(z,y,x,3)) * invStep
+                this%uuu_ave(z,y,x,4) = (this%uuu_ave(z,y,x,4) * real(step - step_s) + this%uuu(z,y,x,1)*this%uuu(z,y,x,1)) * invStep
+                this%uuu_ave(z,y,x,5) = (this%uuu_ave(z,y,x,5) * real(step - step_s) + this%uuu(z,y,x,2)*this%uuu(z,y,x,2)) * invStep
+                this%uuu_ave(z,y,x,6) = (this%uuu_ave(z,y,x,6) * real(step - step_s) + this%uuu(z,y,x,3)*this%uuu(z,y,x,3)) * invStep
+                this%uuu_ave(z,y,x,7) = (this%uuu_ave(z,y,x,7) * real(step - step_s) + this%uuu(z,y,x,1)*this%uuu(z,y,x,2)) * invStep
+                this%uuu_ave(z,y,x,8) = (this%uuu_ave(z,y,x,8) * real(step - step_s) + this%uuu(z,y,x,1)*this%uuu(z,y,x,3)) * invStep
+                this%uuu_ave(z,y,x,9) = (this%uuu_ave(z,y,x,9) * real(step - step_s) + this%uuu(z,y,x,2)*this%uuu(z,y,x,3)) * invStep
             enddo
             enddo
             enddo
@@ -1438,7 +1440,7 @@ module FluidDomain
         integer,parameter::nameLen=10,blockLen=3,idfile=100
         character (LEN=nameLen):: fileName
         character (LEN=blockLen):: blockName
-        real(8):: invUref
+        real(8):: invUref,invUrefs
         if(this%isoutput.lt.1) return
         nxs = 1 + this%offsetOutput
         nys = 1 + this%offsetOutput
@@ -1450,13 +1452,16 @@ module FluidDomain
         ymin = this%ymin + this%offsetOutput * this%dh
         zmin = this%zmin + this%offsetOutput * this%dh
         invUref = 1.d0/flow%Uref
+        invUrefs = 1.d0/flow%Uref/flow%Uref
 
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do x=nxs, nxe
             do y=nys, nye
                 do z=nzs, nze
                     this%oututmp(z,y,x) = this%uuu(z,y,x,1)*invUref
-                    this%oututmp_ave(z,y,x) = this%uuu_ave(z,y,x,1)*invUref
+                    this%outtmp_ave(z,y,x,1) = this%uuu_ave(z,y,x,1)*invUref  !<u>
+                    this%outtmp_ave(z,y,x,2) = this%uuu_ave(z,y,x,2)*invUref  !<v>
+                    this%outtmp_ave(z,y,x,3) = this%uuu_ave(z,y,x,3)*invUref  !<w>
                 enddo
             enddo
         enddo
@@ -1466,7 +1471,9 @@ module FluidDomain
             do y=nys, nye
                 do z=nzs, nze
                     this%outvtmp(z,y,x) = this%uuu(z,y,x,2)*invUref
-                    this%outvtmp_ave(z,y,x) = this%uuu_ave(z,y,x,2)*invUref
+                    this%outtmp_ave(z,y,x,4) = this%uuu_ave(z,y,x,4)*invUrefs  !<uu>
+                    this%outtmp_ave(z,y,x,5) = this%uuu_ave(z,y,x,5)*invUrefs  !<vv>
+                    this%outtmp_ave(z,y,x,6) = this%uuu_ave(z,y,x,6)*invUrefs  !<ww>
                 enddo
             enddo
         enddo
@@ -1476,7 +1483,9 @@ module FluidDomain
             do y=nys, nye
                 do z=nzs, nze
                     this%outwtmp(z,y,x) = this%uuu(z,y,x,3)*invUref
-                    this%outwtmp_ave(z,y,x) = this%uuu_ave(z,y,x,3)*invUref
+                    this%outtmp_ave(z,y,x,7) = this%uuu_ave(z,y,x,7)*invUrefs  !<uv>
+                    this%outtmp_ave(z,y,x,8) = this%uuu_ave(z,y,x,8)*invUrefs  !<uw>
+                    this%outtmp_ave(z,y,x,9) = this%uuu_ave(z,y,x,9)*invUrefs  !<vw>
                 enddo
             enddo
         enddo
@@ -1510,7 +1519,9 @@ module FluidDomain
             open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
             WRITE(idfile) nxe,nye,nze,this%ID
             WRITE(idfile) xmin,ymin,zmin,this%dh
-            write(idfile) this%oututmp_ave,this%outvtmp_ave,this%outwtmp_ave
+            write(idfile) this%outtmp_ave(:,:,:,1),this%outtmp_ave(:,:,:,2),this%outtmp_ave(:,:,:,3)
+            write(idfile) this%outtmp_ave(:,:,:,4),this%outtmp_ave(:,:,:,5),this%outtmp_ave(:,:,:,6)
+            write(idfile) this%outtmp_ave(:,:,:,7),this%outtmp_ave(:,:,:,8),this%outtmp_ave(:,:,:,9)
             close(idfile)
             call myexit(0)
         endif

@@ -87,7 +87,7 @@ PROGRAM main
         time_FEM       = 0.d0
         call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
         call calculate_macro_quantities_blocks()
-        call calculate_average_quantities_blocks(step,step_ave)
+        call calculate_turbulent_statistic_blocks(step,step_ave)
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming
         write(*,*)'Time for       IBM step:', time_IBM
