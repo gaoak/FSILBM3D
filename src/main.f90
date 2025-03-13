@@ -67,7 +67,7 @@ PROGRAM main
     write(*,'(A)') '========================================================='
     !==================================================================================================
     dt_fluid = LBMblks(blockTreeRoot)%dh                       !time step of the fluid 
-    step_ave = flow%timeWriteBegin * flow%Tref / dt_fluid      !the first step for fluid averaging
+    step_ave = int(flow%timeWriteBegin * flow%Tref / dt_fluid) !the first step for fluid averaging
     if (step .ne. 0 .and. step .ge. step_ave) then 
         step_ave = step + 1                  !restart averaging for continue computing
     endif
