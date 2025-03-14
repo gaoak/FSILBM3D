@@ -55,7 +55,7 @@ module FluidDomain
     SUBROUTINE read_fuild_blocks(filename)
         implicit none
         character(LEN=40),intent(in):: filename
-        integer:: iblock
+        integer:: iblock,num_half_wall
         character(LEN=256):: buffer
         character(LEN=40):: keywordstr
         ! creat LBMblks and read parameters
@@ -96,6 +96,18 @@ module FluidDomain
             endif
             if (LBMblks(iblock)%periodic_bc(3) .eq. 1) then
                 LBMblks(iblock)%zmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh
+            endif
+            num_half_wall = count(LBMblks(iblock)%BndConds(1:2) .eq. BCstationary_Wall_halfway)
+            if (num_half_wall .gt. 0) then
+                LBMblks(iblock)%xmax = LBMblks(iblock)%xmax + LBMblks(iblock)%dh * num_half_wall
+            endif
+            num_half_wall = count(LBMblks(iblock)%BndConds(3:4) .eq. BCstationary_Wall_halfway)
+            if (num_half_wall .gt. 0) then
+                LBMblks(iblock)%ymax = LBMblks(iblock)%ymax + LBMblks(iblock)%dh * num_half_wall
+            endif
+            num_half_wall = count(LBMblks(iblock)%BndConds(5:6) .eq. BCstationary_Wall_halfway)
+            if (num_half_wall .gt. 0) then
+                LBMblks(iblock)%zmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh * num_half_wall
             endif
         enddo
         close(111)
@@ -566,7 +578,7 @@ module FluidDomain
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
             enddo
             enddo
-        elseif(this%BndConds(1) .eq. BCPeriodic .or. this%BndConds(1) .eq. BCfluid)then
+        elseif(this%BndConds(1) .eq. BCPeriodic .or. this%BndConds(1) .eq. BCfluid .or. this%BndConds(1) .eq. BCfluid_father)then
             ! no need to set
         else
             stop 'inlet (xmin) has no such boundary condition'
@@ -635,7 +647,7 @@ module FluidDomain
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
-        elseif(this%BndConds(2) .eq. BCPeriodic .or. this%BndConds(2) .eq. BCfluid)then
+        elseif(this%BndConds(2) .eq. BCPeriodic .or. this%BndConds(2) .eq. BCfluid .or. this%BndConds(2) .eq. BCfluid_father)then
             ! no need to set
         else
             stop 'outlet (xmax) has no such boundary condition'
@@ -704,7 +716,7 @@ module FluidDomain
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
             enddo
             enddo
-        elseif(this%BndConds(3) .eq. BCPeriodic .or. this%BndConds(3) .eq. BCfluid)then
+        elseif(this%BndConds(3) .eq. BCPeriodic .or. this%BndConds(3) .eq. BCfluid .or. this%BndConds(3) .eq. BCfluid_father)then
             ! no need to set
         else
             stop 'lower boundary (ymin) has no such boundary condition'
@@ -773,7 +785,7 @@ module FluidDomain
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
-        elseif(this%BndConds(4) .eq. BCPeriodic .or. this%BndConds(4) .eq. BCfluid)then
+        elseif(this%BndConds(4) .eq. BCPeriodic .or. this%BndConds(4) .eq. BCfluid .or. this%BndConds(4) .eq. BCfluid_father)then
             ! no need to set
         else
             stop 'higher boundary (ymax) has no such boundary condition'
@@ -842,7 +854,7 @@ module FluidDomain
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
-        elseif(this%BndConds(5) .eq. BCPeriodic .or. this%BndConds(5) .eq. BCfluid)then
+        elseif(this%BndConds(5) .eq. BCPeriodic .or. this%BndConds(5) .eq. BCfluid .or. this%BndConds(5) .eq. BCfluid_father)then
             ! no need to set
         else
             stop 'front boundary (zmin) has no such boundary condition'
@@ -911,7 +923,7 @@ module FluidDomain
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
             enddo
-        elseif(this%BndConds(6) .eq. BCPeriodic .or. this%BndConds(6) .eq. BCfluid)then
+        elseif(this%BndConds(6) .eq. BCPeriodic .or. this%BndConds(6) .eq. BCfluid .or. this%BndConds(6) .eq. BCfluid_father)then
             ! no need to set
         else
             stop 'back boundary (zmax) has no such boundary condition'
@@ -1584,14 +1596,66 @@ module FluidDomain
         ! partial overlaped, output error
         implicit none
         integer:: i, j, CompareBlocks, cnt
-        logical:: d(6)
+        integer:: p, num_BC_fluid
+        real(8):: i_blk_domain(6), j_blk_domain(6)
+        logical:: d(6), if_fluid_pos(6)
+        i_blk_domain(1) = LBMblks(i)%xmin
+        i_blk_domain(2) = LBMblks(i)%xmax
+        i_blk_domain(3) = LBMblks(i)%ymin
+        i_blk_domain(4) = LBMblks(i)%ymax
+        i_blk_domain(5) = LBMblks(i)%zmin
+        i_blk_domain(6) = LBMblks(i)%zmax
+        j_blk_domain(1) = LBMblks(j)%xmin
+        j_blk_domain(2) = LBMblks(j)%xmax
+        j_blk_domain(3) = LBMblks(j)%ymin
+        j_blk_domain(4) = LBMblks(j)%ymax
+        j_blk_domain(5) = LBMblks(j)%zmin
+        j_blk_domain(6) = LBMblks(j)%zmax
+        if_fluid_pos = LBMblks(i)%BndConds(1:6) .eq. BCfluid
+        num_BC_fluid = count(if_fluid_pos)
+        if (num_BC_fluid .eq. 1) then
+            do p = 1,6
+                if (if_fluid_pos(p)) then
+                    if (mod(p,2) .eq. 1) then
+                        if (LBMblks(j)%BndConds(p+1).eq.BCfluid_father.and. &
+                            LBMblks(i)%BndConds(p+1).ne.BCfluid_father.and. &
+                            abs(j_blk_domain(p+1)-i_blk_domain(p)-LBMblks(j)%dh).lt.MachineTolerace) &
+                            i_blk_domain(p+1) = i_blk_domain(p)
+                    else
+                        if (LBMblks(j)%BndConds(p-1).eq.BCfluid_father.and. &
+                            LBMblks(i)%BndConds(p-1).ne.BCfluid_father.and. &
+                            abs(i_blk_domain(p)-j_blk_domain(p-1)-LBMblks(j)%dh).lt.MachineTolerace) &
+                            i_blk_domain(p-1) = i_blk_domain(p)
+                    endif
+                endif
+            enddo
+        endif
+        if_fluid_pos = LBMblks(j)%BndConds(1:6) .eq. BCfluid
+        num_BC_fluid = count(if_fluid_pos)
+        if (num_BC_fluid .eq. 1) then
+            do p = 1,6
+                if (if_fluid_pos(p)) then
+                    if (mod(p,2) .eq. 1) then
+                        if (LBMblks(i)%BndConds(p+1).eq.BCfluid_father.and. &
+                            LBMblks(j)%BndConds(p+1).ne.BCfluid_father.and. &
+                            abs(i_blk_domain(p+1)-j_blk_domain(p)-LBMblks(i)%dh).lt.MachineTolerace) &
+                            j_blk_domain(p+1) = j_blk_domain(p)
+                    else
+                        if (LBMblks(i)%BndConds(p-1).eq.BCfluid_father.and. &
+                            LBMblks(j)%BndConds(p-1).ne.BCfluid_father.and. &
+                            abs(j_blk_domain(p)-i_blk_domain(p-1)-LBMblks(i)%dh).lt.MachineTolerace) &
+                            j_blk_domain(p-1) = j_blk_domain(p)
+                    endif
+                endif
+            enddo
+        endif
         cnt = 0
-        d(1) = LBMblks(i)%xmin.lt.LBMblks(j)%xmin.or.abs(LBMblks(i)%xmin-LBMblks(j)%xmin).lt.MachineTolerace
-        d(2) = LBMblks(j)%xmax.lt.LBMblks(i)%xmax.or.abs(LBMblks(j)%xmax-LBMblks(i)%xmax).lt.MachineTolerace
-        d(3) = LBMblks(j)%xmin.lt.LBMblks(i)%xmin.or.abs(LBMblks(j)%xmin-LBMblks(i)%xmin).lt.MachineTolerace
-        d(4) = LBMblks(i)%xmax.lt.LBMblks(j)%xmax.or.abs(LBMblks(i)%xmax-LBMblks(j)%xmax).lt.MachineTolerace
-        d(5) = LBMblks(i)%xmax.lt.LBMblks(j)%xmin
-        d(6) = LBMblks(j)%xmax.lt.LBMblks(i)%xmin
+        d(1) = i_blk_domain(1).lt.j_blk_domain(1).or.abs(i_blk_domain(1)-j_blk_domain(1)).lt.MachineTolerace
+        d(2) = j_blk_domain(2).lt.i_blk_domain(2).or.abs(j_blk_domain(2)-i_blk_domain(2)).lt.MachineTolerace
+        d(3) = j_blk_domain(1).lt.i_blk_domain(1).or.abs(j_blk_domain(1)-i_blk_domain(1)).lt.MachineTolerace
+        d(4) = i_blk_domain(2).lt.j_blk_domain(2).or.abs(i_blk_domain(2)-j_blk_domain(2)).lt.MachineTolerace
+        d(5) = i_blk_domain(2).lt.j_blk_domain(1)
+        d(6) = j_blk_domain(2).lt.i_blk_domain(1)
         if(d(1) .and. d(2)) then
             cnt = cnt + 1
         else if(d(3) .and. d(4)) then
@@ -1600,12 +1664,12 @@ module FluidDomain
             CompareBlocks = 0
             return
         endif
-        d(1) = LBMblks(i)%ymin.lt.LBMblks(j)%ymin.or.abs(LBMblks(i)%ymin-LBMblks(j)%ymin).lt.MachineTolerace
-        d(2) = LBMblks(j)%ymax.lt.LBMblks(i)%ymax.or.abs(LBMblks(j)%ymax-LBMblks(i)%ymax).lt.MachineTolerace
-        d(3) = LBMblks(j)%ymin.lt.LBMblks(i)%ymin.or.abs(LBMblks(j)%ymin-LBMblks(i)%ymin).lt.MachineTolerace
-        d(4) = LBMblks(i)%ymax.lt.LBMblks(j)%ymax.or.abs(LBMblks(i)%ymax-LBMblks(j)%ymax).lt.MachineTolerace
-        d(5) = LBMblks(i)%ymax.lt.LBMblks(j)%ymin
-        d(6) = LBMblks(j)%ymax.lt.LBMblks(i)%ymin
+        d(1) = i_blk_domain(3).lt.j_blk_domain(3).or.abs(i_blk_domain(3)-j_blk_domain(3)).lt.MachineTolerace
+        d(2) = j_blk_domain(4).lt.i_blk_domain(4).or.abs(j_blk_domain(4)-i_blk_domain(4)).lt.MachineTolerace
+        d(3) = j_blk_domain(3).lt.i_blk_domain(3).or.abs(j_blk_domain(3)-i_blk_domain(3)).lt.MachineTolerace
+        d(4) = i_blk_domain(4).lt.j_blk_domain(4).or.abs(i_blk_domain(4)-j_blk_domain(4)).lt.MachineTolerace
+        d(5) = i_blk_domain(4).lt.j_blk_domain(3)
+        d(6) = j_blk_domain(4).lt.i_blk_domain(3)
         if(d(1) .and. d(2)) then
             cnt = cnt + 1
         else if(d(3) .and. d(4)) then
@@ -1614,12 +1678,12 @@ module FluidDomain
             CompareBlocks = 0
             return
         endif
-        d(1) = LBMblks(i)%zmin.lt.LBMblks(j)%zmin.or.abs(LBMblks(i)%zmin-LBMblks(j)%zmin).lt.MachineTolerace
-        d(2) = LBMblks(j)%zmax.lt.LBMblks(i)%zmax.or.abs(LBMblks(j)%zmax-LBMblks(i)%zmax).lt.MachineTolerace
-        d(3) = LBMblks(j)%zmin.lt.LBMblks(i)%zmin.or.abs(LBMblks(j)%zmin-LBMblks(i)%zmin).lt.MachineTolerace
-        d(4) = LBMblks(i)%zmax.lt.LBMblks(j)%zmax.or.abs(LBMblks(i)%zmax-LBMblks(j)%zmax).lt.MachineTolerace
-        d(5) = LBMblks(i)%zmax.lt.LBMblks(j)%zmin
-        d(6) = LBMblks(j)%zmax.lt.LBMblks(i)%zmin
+        d(1) = i_blk_domain(5).lt.j_blk_domain(5).or.abs(i_blk_domain(5)-j_blk_domain(5)).lt.MachineTolerace
+        d(2) = j_blk_domain(6).lt.i_blk_domain(6).or.abs(j_blk_domain(6)-i_blk_domain(6)).lt.MachineTolerace
+        d(3) = j_blk_domain(5).lt.i_blk_domain(5).or.abs(j_blk_domain(5)-i_blk_domain(5)).lt.MachineTolerace
+        d(4) = i_blk_domain(6).lt.j_blk_domain(6).or.abs(i_blk_domain(6)-j_blk_domain(6)).lt.MachineTolerace
+        d(5) = i_blk_domain(6).lt.j_blk_domain(5)
+        d(6) = j_blk_domain(6).lt.i_blk_domain(5)
         if(d(1) .and. d(2)) then
             cnt = cnt + 1
         else if(d(3) .and. d(4)) then
@@ -1634,8 +1698,11 @@ module FluidDomain
             CompareBlocks = -1
         else
             write(*,*) 'Warning, blocks partial overlaps', LBMblks(i)%ID, LBMblks(j)%ID
-            write(*,*) LBMblks(i)%xmin, LBMblks(i)%xmax,LBMblks(i)%ymin, LBMblks(i)%ymax,LBMblks(i)%zmin, LBMblks(i)%zmax
-            write(*,*) LBMblks(j)%xmin, LBMblks(j)%xmax,LBMblks(j)%ymin, LBMblks(j)%ymax,LBMblks(j)%zmin, LBMblks(j)%zmax
+            write(*,*) 'If son block overlap the father block, the number of BCfluid should remains 1 ', &
+                       'and the oppsite boundary on the father block shold be BCfluid_father. ', &
+                       'The distance of BCfluid and BCfluid_father sholud be LBMblks(fatherID)%dh.'
+            write(*,*) i_blk_domain(1), i_blk_domain(2),i_blk_domain(3), i_blk_domain(4),i_blk_domain(5), i_blk_domain(6)
+            write(*,*) j_blk_domain(1), j_blk_domain(2),j_blk_domain(3), j_blk_domain(4),j_blk_domain(5), j_blk_domain(6)
             !stop
         endif
     end function CompareBlocks

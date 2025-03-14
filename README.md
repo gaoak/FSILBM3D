@@ -242,6 +242,7 @@ $PBS_WDIR/$PBS_ENAME
   8. *xmin,ymin,zmin*: Starting position of the fluid block
   9. *boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)*: Boundary conditions parameters on six directions
      + 0:  Fluid boundary conditions
+     + 1:  Fluid boundary conditions of the father bolck, only appear with fluid boundary conditions at the same time and not appearing alone
      + 101: Dirichlet boundary condition (velocity equal to a specified value)
      + 102: Dirichlet boundary condition (The value of velocity at the boundary is not a fixed constant, but a non-uniform distribution of function values)
      + 103: First order extrapolation boundary conditions
