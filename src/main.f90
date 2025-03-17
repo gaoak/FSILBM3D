@@ -14,7 +14,7 @@ PROGRAM main
     USE LBMBlockComm
     implicit none
     character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
-    integer:: step=0
+    integer:: step=0,step_ave
     real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
     real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
@@ -62,11 +62,15 @@ PROGRAM main
     call write_flow_blocks(time)
     call write_solid_field(time)
     call Write_solid_v_bodies(time)
-    call get_now_time(time_end1)             ! end time for the preparation before computing
+    call get_now_time(time_end1)             !end time for the preparation before computing
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================='
     !==================================================================================================
     dt_fluid = LBMblks(blockTreeRoot)%dh                       !time step of the fluid 
+    step_ave = int(flow%timeWriteBegin * flow%Tref / dt_fluid) !the first step for fluid averaging
+    if (step .ne. 0 .and. step .ge. step_ave) then 
+        step_ave = step + 1                  !restart averaging for continue computing
+    endif
     write(*,*) 'Time loop beginning'
     do while(time/flow%Tref < flow%timeSimTotal)
         call get_now_time(time_begine1)
@@ -83,6 +87,7 @@ PROGRAM main
         time_FEM       = 0.d0
         call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
         call calculate_macro_quantities_blocks()
+        call calculate_turbulent_statistic_blocks(step,step_ave)
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming
         write(*,*)'Time for       IBM step:', time_IBM
@@ -107,7 +112,7 @@ PROGRAM main
         ! write processing informations
         if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
             call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
-                                              LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu)
+                                              LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu,LBMblks(flow%inWhichBlock)%den)
             call write_solid_Information(time,flow%timeInfoDelta,flow%Asfac,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)
