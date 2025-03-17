@@ -286,7 +286,9 @@ module FluidDomain
         allocate(this%uuu(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%force(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%den(this%zDim,this%yDim,this%xDim))
-        allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:9))
+        if (this%outputtype .ge. 2) then
+            allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:9))
+        endif
         ! allocate output workspace
         xmin = 1 + this%offsetOutput
         ymin = 1 + this%offsetOutput
@@ -294,7 +296,11 @@ module FluidDomain
         xmax = this%xDim - this%offsetOutput
         ymax = this%yDim - this%offsetOutput
         zmax = this%zDim - this%offsetOutput
-        allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,1:12))
+        if(this%outputtype .ge. 2) then
+            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,1:12))
+        else
+            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,1:3))
+        endif
         ! allocate mesh partition
         allocate(this%OMPpartition(1:m_npsize),this%OMPparindex(1:m_npsize+1),this%OMPeid(1:m_npsize))
         allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:m_npsize))
@@ -429,7 +435,9 @@ module FluidDomain
                 this%den(z,y,x) = flow%denIn
                 call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
-                this%uuu_ave(z,y,x,:) = 0.0D0
+                if(this%outputtype .ge. 2) then
+                    this%uuu_ave(z,y,x,:) = 0.0D0
+                endif
             enddo
             enddo
             enddo
@@ -955,7 +963,7 @@ module FluidDomain
             write(*,*) "The start step for fluid averaging is less than zero."
             stop
         endif
-        if(step .ge. step_s) then
+        if(step .ge. step_s .and. this%outputtype .ge. 2) then
             invStep = 1 / real(step - step_s + 1)
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do  x = 1, this%xDim
