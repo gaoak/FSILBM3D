@@ -960,15 +960,15 @@ module FluidDomain
             do  x = 1, this%xDim
             do  y = 1, this%yDim
             do  z = 1, this%zDim
-                this%uuu_ave(z,y,x,1) = this%uuu_ave(z,y,x,1) * (1.d0 - invStep) + this%uuu(z,y,x,1) * invStep
-                this%uuu_ave(z,y,x,2) = this%uuu_ave(z,y,x,2) * (1.d0 - invStep) + this%uuu(z,y,x,2) * invStep
-                this%uuu_ave(z,y,x,3) = this%uuu_ave(z,y,x,3) * (1.d0 - invStep) + this%uuu(z,y,x,3) * invStep
-                this%uuu_ave(z,y,x,4) = this%uuu_ave(z,y,x,4) * (1.d0 - invStep) + this%uuu(z,y,x,1) * this%uuu(z,y,x,1) * invStep
-                this%uuu_ave(z,y,x,5) = this%uuu_ave(z,y,x,5) * (1.d0 - invStep) + this%uuu(z,y,x,2) * this%uuu(z,y,x,2) * invStep
-                this%uuu_ave(z,y,x,6) = this%uuu_ave(z,y,x,6) * (1.d0 - invStep) + this%uuu(z,y,x,3) * this%uuu(z,y,x,3) * invStep
-                this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7) * (1.d0 - invStep) + this%uuu(z,y,x,1) * this%uuu(z,y,x,2) * invStep
-                this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8) * (1.d0 - invStep) + this%uuu(z,y,x,1) * this%uuu(z,y,x,3) * invStep
-                this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9) * (1.d0 - invStep) + this%uuu(z,y,x,2) * this%uuu(z,y,x,3) * invStep
+                this%uuu_ave(z,y,x,1) = this%uuu_ave(z,y,x,1) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,1)
+                this%uuu_ave(z,y,x,2) = this%uuu_ave(z,y,x,2) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,2)
+                this%uuu_ave(z,y,x,3) = this%uuu_ave(z,y,x,3) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,3)
+                this%uuu_ave(z,y,x,4) = this%uuu_ave(z,y,x,4) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1))
+                this%uuu_ave(z,y,x,5) = this%uuu_ave(z,y,x,5) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,6) = this%uuu_ave(z,y,x,6) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
             enddo
             enddo
             enddo
