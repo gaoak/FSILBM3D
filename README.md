@@ -236,10 +236,11 @@ $PBS_WDIR/$PBS_ENAME
      + 14 : *WALE-SRT*: WALE Single Relaxation Time
      + 15 : *Vremann-SRT*: Vremann Single Relaxation Time
   4. *offsetOutput*: The computation domain moves with first body if this equals 1
-  5. *isoutput*: Determines output of the relative flow grid and body
+  5. *outputtype*: Determines output type of the relative flow grid and body
      + 0 : no fluid output
      + 1 : output fluid instantaneous velocity
-     + 2 : output fluid instantaneous and average velocity
+     + 2 : output fluid average velocity
+     + 3 : output fluid instantaneous and average velocity
   6. *xDim,yDim,zDim*: Number of nodes in the x, y, and z directions of the fluid block
   7. *dh*: For uniform grid dh=dx=dy=dz
   8. *xmin,ymin,zmin*: Starting position of the fluid block
