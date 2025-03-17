@@ -120,23 +120,22 @@ module FluidDomain
     end subroutine
 
     ! Check whether the calculation is continued
-    SUBROUTINE check_is_continue(filename,step,time,isContinue)
+    SUBROUTINE check_is_continue(step,time,isContinue)
         implicit none
-        character(LEN=40),intent(in):: filename
         integer,intent(out):: step
         real(8),intent(out):: time
-        integer:: isContinue,iblock
+        integer:: isContinue,iblock,idfile=13
         logical:: alive
-        inquire(file=filename, exist=alive)
+        inquire(file='./DatContinue/continue.dat', exist=alive)
         if (isContinue==1 .and. alive) then
             write(*,'(A)') '========================================================='
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
-            open(unit=13,file=filename,form='unformatted',status='old')
+            open(unit=idfile,file='./DatContinue/continue.dat',form='unformatted',status='old')
             do iblock = 1,m_nblocks
-                call LBMblks(iblock)%read_continue(filename,step,time,13)
+                call LBMblks(iblock)%read_continue(step,time,idfile)
             enddo
-            close(13)
+            close(idfile)
         else
             write(*,'(A)') '========================================================='
             write(*,'(A)') '====================== New computing ===================='
@@ -173,17 +172,22 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE write_continue_blocks(filename,step,time)
+    SUBROUTINE write_continue_blocks(step,time)
         implicit none
-        character(LEN=40),intent(in):: filename
-        integer:: step
         real(8):: time
-        integer:: iblock
-        open(unit=13,file=filename,form='unformatted',status='replace')
-        do iblock = 1,m_nblocks
-            call LBMblks(iblock)%write_continue(filename,step,time,13)
+        integer:: step,i,iblock
+        integer,parameter::nameLen=10,idfile=13
+        character(len=nameLen):: fileName
+        write(filename,'(I10)') nint(time/flow%Tref*1d5)
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+            if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
-        close(13)
+        open(idfile,file='./DatContinue/continue'//trim(fileName),form='unformatted',access='stream')
+        do iblock = 1,m_nblocks
+            call LBMblks(iblock)%write_continue(step,time,idfile)
+        enddo
+        close(idfile)
     END SUBROUTINE
 
     SUBROUTINE update_volume_force_blocks()
@@ -1578,20 +1582,18 @@ module FluidDomain
         write(*,'(A,F18.12)')' FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine
 
-    SUBROUTINE write_continue_(this,filename,step,time,fID)
+    SUBROUTINE write_continue_(this,step,time,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
-        character(LEN=40),intent(in):: filename
         integer,intent(in):: step,fID
         real(8),intent(in):: time
         write(fID) step,time
         write(fID) this%fIn
     ENDSUBROUTINE write_continue_
 
-    SUBROUTINE read_continue_(this,filename,step,time,fID)
+    SUBROUTINE read_continue_(this,step,time,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
-        character(LEN=40),intent(in):: filename
         integer,intent(in) :: fID
         integer,intent(out):: step
         real(8),intent(out):: time

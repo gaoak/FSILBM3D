@@ -13,7 +13,7 @@ PROGRAM main
     USE FluidDomain
     USE LBMBlockComm
     implicit none
-    character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
+    character(LEN=40):: parameterFile='inFlow.dat',checkFile='check.dat'
     integer:: step=0,step_ave
     real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
@@ -50,7 +50,7 @@ PROGRAM main
     call Write_solid_Check(checkFile)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
-    call check_is_continue(continueFile,step,time,flow%isConCmpt)
+    call check_is_continue(step,time,flow%isConCmpt)
     call write_information_titles(m_nFish)
     !==================================================================================================
     ! Update the volume forces and calculate the macro quantities
@@ -97,7 +97,7 @@ PROGRAM main
         call get_now_time(time_begine2)
         ! write data for continue computing
         if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            call write_continue_blocks(continueFile,step,time)
+            call write_continue_blocks(step,time)
         endif
         ! write fluid and soild data
         if((time/flow%Tref - flow%timeWriteBegin) >= -0.5*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5*dt_fluid/flow%Tref) then
