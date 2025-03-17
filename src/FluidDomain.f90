@@ -10,7 +10,7 @@ module FluidDomain
              CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
-        integer :: ID,iCollidModel,offsetOutput,isoutput
+        integer :: ID,iCollidModel,offsetOutput,outputtype
         integer :: xDim,yDim,zDim
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
         integer :: BndConds(1:6),periodic_bc(3)
@@ -67,7 +67,7 @@ module FluidDomain
         allocate(LBMblks(m_nblocks),LBMblksIndex(m_nblocks))
         do iblock = 1,m_nblocks
             call readNextData(111, buffer)
-            read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput,LBMblks(iblock)%isoutput
+            read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput,LBMblks(iblock)%outputtype
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%xDim,LBMblks(iblock)%yDim,LBMblks(iblock)%zDim
             call readNextData(111, buffer)
@@ -1441,7 +1441,7 @@ module FluidDomain
         character (LEN=nameLen):: fileName
         character (LEN=blockLen):: blockName
         real(8):: invUref,invUrefs
-        if(this%isoutput .lt. 1) return
+        if(this%outputtype .lt. 1) return
         nxs  = 1 + this%offsetOutput
         nys  = 1 + this%offsetOutput
         nzs  = 1 + this%offsetOutput
@@ -1455,18 +1455,20 @@ module FluidDomain
         invUref  = 1.d0/flow%Uref
         invUrefs = 1.d0/flow%Uref/flow%Uref
 
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do x=nxs, nxe
-            do y=nys, nye
-                do z=nzs, nze
-                    this%outtmp(z,y,x,1) = this%uuu(z,y,x,1)*invUref !u
-                    this%outtmp(z,y,x,2) = this%uuu(z,y,x,2)*invUref !v
-                    this%outtmp(z,y,x,3) = this%uuu(z,y,x,3)*invUref !w
+        if(this%outputtype .ne. 2) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            do x=nxs, nxe
+                do y=nys, nye
+                    do z=nzs, nze
+                        this%outtmp(z,y,x,1) = this%uuu(z,y,x,1)*invUref !u
+                        this%outtmp(z,y,x,2) = this%uuu(z,y,x,2)*invUref !v
+                        this%outtmp(z,y,x,3) = this%uuu(z,y,x,3)*invUref !w
+                    enddo
                 enddo
             enddo
-        enddo
-        !$OMP END PARALLEL DO
-        if(this%isoutput .ge. 2) then
+            !$OMP END PARALLEL DO
+        endif
+        if(this%outputtype .ge. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do x=nxs, nxe
                 do y=nys, nye
@@ -1503,25 +1505,27 @@ module FluidDomain
         endif
         call myfork(pid)
         if(pid.eq.0) then
-            write(fileName,'(I10)') nint(time/flow%Tref*1d5)
-            fileName = adjustr(fileName)
-            do  i=1,nameLen
-                if(fileName(i:i)==' ')fileName(i:i)='0'
-            enddo
-            write(blockName,'(I3)') this%ID
-            blockName = adjustr(blockName)
-            do  i=1,blockLen
-                if(blockName(i:i)==' ')blockName(i:i)='0'
-            enddo
-            open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
-            nxe = nxe-nxs+1
-            nye = nye-nys+1
-            nze = nze-nzs+1
-            WRITE(idfile) nxe,nye,nze,this%ID
-            WRITE(idfile) xmin,ymin,zmin,this%dh
-            write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
-            close(idfile)
-            if(this%isoutput .ge. 2) then
+            if(this%outputtype .ne. 2) then
+                write(fileName,'(I10)') nint(time/flow%Tref*1d5)
+                fileName = adjustr(fileName)
+                do  i=1,nameLen
+                    if(fileName(i:i)==' ')fileName(i:i)='0'
+                enddo
+                write(blockName,'(I3)') this%ID
+                blockName = adjustr(blockName)
+                do  i=1,blockLen
+                    if(blockName(i:i)==' ')blockName(i:i)='0'
+                enddo
+                open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
+                nxe = nxe-nxs+1
+                nye = nye-nys+1
+                nze = nze-nzs+1
+                WRITE(idfile) nxe,nye,nze,this%ID
+                WRITE(idfile) xmin,ymin,zmin,this%dh
+                write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
+                close(idfile)
+            endif
+            if(this%outputtype .ge. 2) then
                 open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
                 WRITE(idfile) nxe,nye,nze,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
