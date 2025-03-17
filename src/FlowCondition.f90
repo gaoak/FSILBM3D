@@ -204,7 +204,7 @@ module FlowCondition
         integer:: i,j,xDim,yDim,zDim
         real(8):: time,dh,xmin,ymin,zmin,xmax,ymax,zmax
         real(8):: velocityIn(zDim,yDim,xDim,1:3),velocityOut(1:3),density(zDim,yDim,xDim)
-        real(8):: fluxIn=0.d0,fluxMid=0.d0,fluxOut=0.d0
+        real(8):: fluxIn,fluxMid,fluxOut
         integer,parameter::nameLen=3
         character (LEN=nameLen):: probeNum
         ! write fluid probing information
@@ -229,6 +229,9 @@ module FlowCondition
             close(111)
         enddo
         ! write fluid flux
+        fluxIn  = 0.d0
+        fluxMid = 0.d0
+        fluxOut = 0.d0
         do j=1,yDim
         do i=1,xDim
             fluxIn  = fluxIn  + velocityIn(1,j,i,1) * density(1,j,i) * dh * dh
