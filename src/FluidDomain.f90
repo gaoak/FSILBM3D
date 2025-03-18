@@ -49,7 +49,7 @@ module FluidDomain
         procedure :: ResetVolumeForce => ResetVolumeForce_
         procedure :: halfwayBCset => halfwayBCset_
     end type LBMBlock
-    type(LBMBlock), allocatable :: LBMblks(:)
+    type(LBMBlock), allocatable :: LBMblks(:),LBMblks_tmp(:)
     integer,allocatable:: LBMblksIndex(:)
     contains
 
@@ -124,17 +124,58 @@ module FluidDomain
         implicit none
         integer,intent(out):: step
         real(8),intent(out):: time
-        integer:: isContinue,iblock,idfile=13
+        integer:: i,j,x,y,z,iblock
+        integer:: isContinue,nblocks,index_tmp,idfile=13
+        integer, allocatable :: sortdh(:)
+        real(8):: xCoord,yCoord,zCoord
         logical:: alive
-        inquire(file='./DatContinue/continue.dat', exist=alive)
+        inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue==1 .and. alive) then
             write(*,'(A)') '========================================================='
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
-            open(unit=idfile,file='./DatContinue/continue.dat',form='unformatted',status='old')
-            do iblock = 1,m_nblocks
-                call LBMblks(iblock)%read_continue(step,time,idfile)
+            ! read continue file
+            open(unit=idfile,file='./DatContinue/continue',form='unformatted',status='old')
+            read(idfile) step,time,nblocks
+            allocate(LBMblks_tmp(nblocks),sortdh(nblocks))
+            do iblock = 1,nblocks
+                read(idfile) LBMblks_tmp(iblock)%xmin,LBMblks_tmp(iblock)%ymin,LBMblks_tmp(iblock)%zmin,LBMblks_tmp(iblock)%dh
+                read(idfile) LBMblks_tmp(iblock)%xDim,LBMblks_tmp(iblock)%yDim,LBMblks_tmp(iblock)%zDim
             enddo
+            do iblock = 1,nblocks
+                call LBMblks_tmp(iblock)%read_continue(idfile)
+            enddo
+            ! sort the blocks according to dh
+            do iblock = 1,nblocks
+                sortdh(iblock) = iblock
+            enddo
+            do i = 1, nblocks - 1
+            do j = 1, nblocks - i
+                if (LBMblks_tmp(j)%dh > LBMblks_tmp(j + 1)%dh) then
+                    index_tmp = sortdh(j)
+                    sortdh(j) = sortdh(j + 1)
+                    sortdh(j + 1) = index_tmp
+                end if
+            end do
+            end do
+            do iblock = 1,nblocks
+                call LBMblks(iblock)%read_continue(idfile)
+            enddo
+
+            ! interpolate from the continue file
+            !do i = 1,m_nblocks
+            !    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            !    do z=1,LBMblks(i)%zDim
+            !    do y=1,LBMblks(i)%yDim
+            !    do x=1,LBMblks(i)%xDim
+            !        do j = 1,nblocks
+
+            !        enddo
+            !    enddo
+            !    enddo
+            !    enddo
+            !    !$OMP END PARALLEL DO
+            !enddo
             close(idfile)
         else
             write(*,'(A)') '========================================================='
@@ -184,8 +225,13 @@ module FluidDomain
             if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
         open(idfile,file='./DatContinue/continue'//trim(fileName),form='unformatted',access='stream')
+        write(idfile) step,time,m_nblocks
         do iblock = 1,m_nblocks
-            call LBMblks(iblock)%write_continue(step,time,idfile)
+            write(idfile) LBMblks(iblock)%xmin,LBMblks(iblock)%ymin,LBMblks(iblock)%zmin,LBMblks(iblock)%dh
+            write(idfile) LBMblks(iblock)%xDim,LBMblks(iblock)%yDim,LBMblks(iblock)%zDim
+        enddo
+        do iblock = 1,m_nblocks
+            call LBMblks(iblock)%write_continue(idfile)
         enddo
         close(idfile)
     END SUBROUTINE
@@ -1582,22 +1628,17 @@ module FluidDomain
         write(*,'(A,F18.12)')' FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine
 
-    SUBROUTINE write_continue_(this,step,time,fID)
+    SUBROUTINE write_continue_(this,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
-        integer,intent(in):: step,fID
-        real(8),intent(in):: time
-        write(fID) step,time
+        integer,intent(in):: fID
         write(fID) this%fIn
     ENDSUBROUTINE write_continue_
 
-    SUBROUTINE read_continue_(this,step,time,fID)
+    SUBROUTINE read_continue_(this,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         integer,intent(in) :: fID
-        integer,intent(out):: step
-        real(8),intent(out):: time
-        read(fID) step,time
         read(fID) this%fIn
     ENDSUBROUTINE read_continue_
 
