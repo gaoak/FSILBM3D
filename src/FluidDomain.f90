@@ -124,11 +124,12 @@ module FluidDomain
         implicit none
         integer,intent(out):: step
         real(8),intent(out):: time
-        integer:: i,j,x,y,z,iblock
+        integer:: i,j,x,y,z,iblock,indexs(1:6)
         integer:: isContinue,nblocks,index_tmp,idfile=13
-        real(8):: xCoord,yCoord,zCoord,xmax_tmp,ymax_tmp,zmax_tmp
+        real(8):: xCoord,yCoord,zCoord,coeffs(1:3)
         type(LBMBlock), allocatable :: LBMblks_tmp(:)
         integer, allocatable :: sortdh(:)
+        real(8), allocatable :: coor_max(:,:)
         logical:: alive
         inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue==1 .and. alive) then
@@ -138,7 +139,7 @@ module FluidDomain
             ! read continue file
             open(unit=idfile,file='./DatContinue/continue',form='unformatted',status='old',access='stream')
             read(idfile) nblocks,step,time
-            allocate(LBMblks_tmp(nblocks),sortdh(nblocks))
+            allocate(LBMblks_tmp(nblocks),sortdh(nblocks),coor_max(1:3,nblocks))
             do iblock = 1,nblocks
                 call LBMblks_tmp(iblock)%read_continue(idfile)
             enddo
@@ -156,9 +157,15 @@ module FluidDomain
                 end if
             end do
             end do
+            ! calculate the max coordinates of each blocks
+            do iblock = 1,nblocks
+                coor_max(1,iblock) = LBMblks_tmp(iblock)%zmin + (LBMblks_tmp(iblock)%zDim - 1) * LBMblks_tmp(iblock)%dh
+                coor_max(2,iblock) = LBMblks_tmp(iblock)%ymin + (LBMblks_tmp(iblock)%yDim - 1) * LBMblks_tmp(iblock)%dh
+                coor_max(3,iblock) = LBMblks_tmp(iblock)%xmin + (LBMblks_tmp(iblock)%xDim - 1) * LBMblks_tmp(iblock)%dh
+            enddo
             ! interpolate from the continue file
             do i = 1,m_nblocks
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,xCoord,yCoord,zCoord,zmax_tmp,ymax_tmp,xmax_tmp)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,xCoord,yCoord,zCoord,indexs,coeffs)
                 do x=1,LBMblks(i)%xDim
                     xCoord = LBMblks(i)%xmin + (x - 1) * LBMblks(i)%dh
                 do y=1,LBMblks(i)%yDim
@@ -167,14 +174,31 @@ module FluidDomain
                     zCoord = LBMblks(i)%zmin + (z - 1) * LBMblks(i)%dh
                     ! judge in which fluid block
                     do j = 1,nblocks
-                        zmax_tmp = LBMblks_tmp(sortdh(j))%zmin + (LBMblks_tmp(sortdh(j))%zDim - 1) * LBMblks_tmp(sortdh(j))%dh
-                        ymax_tmp = LBMblks_tmp(sortdh(j))%ymin + (LBMblks_tmp(sortdh(j))%yDim - 1) * LBMblks_tmp(sortdh(j))%dh
-                        xmax_tmp = LBMblks_tmp(sortdh(j))%xmin + (LBMblks_tmp(sortdh(j))%xDim - 1) * LBMblks_tmp(sortdh(j))%dh
-                        if(zCoord .ge. LBMblks_tmp(sortdh(j))%zmin .and. zCoord .le. zmax_tmp .and. & 
-                           yCoord .ge. LBMblks_tmp(sortdh(j))%ymin .and. yCoord .le. ymax_tmp .and. &
-                           xCoord .ge. LBMblks_tmp(sortdh(j))%xmin .and. xCoord .le. xmax_tmp) then
-                            ! interpolate
-                            call interpolate_fIn() ! need added
+                        if(zCoord .ge. LBMblks_tmp(sortdh(j))%zmin .and. zCoord .le. coor_max(3,sortdh(j)) .and. & 
+                           yCoord .ge. LBMblks_tmp(sortdh(j))%ymin .and. yCoord .le. coor_max(2,sortdh(j)) .and. &
+                           xCoord .ge. LBMblks_tmp(sortdh(j))%xmin .and. xCoord .le. coor_max(1,sortdh(j))) then
+                            ! calculate the indexs of the 8 around points
+                            indexs(1) = floor(xCoord - LBMblks_tmp(sortdh(j))%xmin) / LBMblks_tmp(sortdh(j))%dh + 1  ! x-1
+                            indexs(2) = indexs(1) + 1                                                                ! x
+                            indexs(3) = floor(yCoord - LBMblks_tmp(sortdh(j))%ymin) / LBMblks_tmp(sortdh(j))%dh + 1  ! y-1
+                            indexs(4) = indexs(3) + 1                                                                ! y
+                            indexs(5) = floor(zCoord - LBMblks_tmp(sortdh(j))%zmin) / LBMblks_tmp(sortdh(j))%dh + 1  ! z-1
+                            indexs(6) = indexs(5) + 1     
+                            ! calculate the interpolation coefficients of the 8 around points
+                            coeffs(1) = (xCoord - (LBMblks_tmp(sortdh(j))%xmin + (indexs(1) - 1) * LBMblks_tmp(sortdh(j))%dh)) / LBMblks(i)%dh
+                            coeffs(2) = (yCoord - (LBMblks_tmp(sortdh(j))%ymin + (indexs(2) - 1) * LBMblks_tmp(sortdh(j))%dh)) / LBMblks(i)%dh
+                            coeffs(3) = (zCoord - (LBMblks_tmp(sortdh(j))%zmin + (indexs(3) - 1) * LBMblks_tmp(sortdh(j))%dh)) / LBMblks(i)%dh
+                            ! calculate the fIn of the 8 around points
+                            LBMblks(i)%fIn(z,y,x,:) = LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(3),indexs(1),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(3),indexs(2),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * coeffs(1) + &
+                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(4),indexs(1),:) * (1 - coeffs(3)) * coeffs(2) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(4),indexs(2),:) * (1 - coeffs(3)) * coeffs(2) * coeffs(1) + &
+                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(3),indexs(1),:) * coeffs(3) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(3),indexs(2),:) * coeffs(3) * (1 - coeffs(2)) * coeffs(1) + &
+                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(4),indexs(1),:) * coeffs(3) * coeffs(2) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(4),indexs(2),:) * coeffs(3) * coeffs(2) * coeffs(1)
+
+                            exit
                         endif
                     enddo
                 enddo
@@ -182,6 +206,7 @@ module FluidDomain
                 enddo
                 !$OMP END PARALLEL DO
             enddo
+            deallocate(LBMblks_tmp,sortdh,coor_max)
         else
             write(*,'(A)') '========================================================='
             write(*,'(A)') '====================== New computing ===================='
