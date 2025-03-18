@@ -127,7 +127,7 @@ module FluidDomain
         integer:: i,j,x,y,z,iblock
         integer:: isContinue,nblocks,index_tmp,idfile=13
         integer, allocatable :: sortdh(:)
-        real(8):: xCoord,yCoord,zCoord
+        real(8):: xCoord,yCoord,zCoord,xmax_tmp,ymax_tmp,zmax_tmp
         logical:: alive
         inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue==1 .and. alive) then
@@ -135,16 +135,13 @@ module FluidDomain
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
             ! read continue file
-            open(unit=idfile,file='./DatContinue/continue',form='unformatted',status='old')
-            read(idfile) step,time,nblocks
+            open(unit=idfile,file='./DatContinue/continue',form='unformatted',status='old',access='stream')
+            read(idfile) nblocks,step,time
             allocate(LBMblks_tmp(nblocks),sortdh(nblocks))
-            do iblock = 1,nblocks
-                read(idfile) LBMblks_tmp(iblock)%xmin,LBMblks_tmp(iblock)%ymin,LBMblks_tmp(iblock)%zmin,LBMblks_tmp(iblock)%dh
-                read(idfile) LBMblks_tmp(iblock)%xDim,LBMblks_tmp(iblock)%yDim,LBMblks_tmp(iblock)%zDim
-            enddo
             do iblock = 1,nblocks
                 call LBMblks_tmp(iblock)%read_continue(idfile)
             enddo
+            close(idfile)
             ! sort the blocks according to dh
             do iblock = 1,nblocks
                 sortdh(iblock) = iblock
@@ -158,25 +155,32 @@ module FluidDomain
                 end if
             end do
             end do
-            do iblock = 1,nblocks
-                call LBMblks(iblock)%read_continue(idfile)
-            enddo
-
             ! interpolate from the continue file
-            !do i = 1,m_nblocks
-            !    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-            !    do z=1,LBMblks(i)%zDim
-            !    do y=1,LBMblks(i)%yDim
-            !    do x=1,LBMblks(i)%xDim
-            !        do j = 1,nblocks
-
-            !        enddo
-            !    enddo
-            !    enddo
-            !    enddo
-            !    !$OMP END PARALLEL DO
-            !enddo
-            close(idfile)
+            do i = 1,m_nblocks
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+                do z=1,LBMblks(i)%zDim
+                do y=1,LBMblks(i)%yDim
+                do x=1,LBMblks(i)%xDim
+                    zCoord = LBMblks(i)%zmin + (z - 1) * LBMblks(i)%dh
+                    yCoord = LBMblks(i)%ymin + (y - 1) * LBMblks(i)%dh
+                    xCoord = LBMblks(i)%xmin + (x - 1) * LBMblks(i)%dh
+                    ! judge in which fluid block
+                    do j = 1,nblocks
+                        zmax_tmp = LBMblks_tmp(j)%zmin + (LBMblks_tmp(j)%zDim - 1) * LBMblks_tmp(j)%dh
+                        ymax_tmp = LBMblks_tmp(j)%ymin + (LBMblks_tmp(j)%yDim - 1) * LBMblks_tmp(j)%dh
+                        xmax_tmp = LBMblks_tmp(j)%xmin + (LBMblks_tmp(j)%xDim - 1) * LBMblks_tmp(j)%dh
+                        if(zCoord .ge. LBMblks_tmp(j)%zmin .and. zCoord .le. zmax_tmp .and. & 
+                           yCoord .ge. LBMblks_tmp(j)%ymin .and. yCoord .le. ymax_tmp .and. &
+                           xCoord .ge. LBMblks_tmp(j)%xmin .and. xCoord .le. xmax_tmp) then
+                            ! interpolate
+                            call interpolate_fIn() ! need added
+                        endif
+                    enddo
+                enddo
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            enddo
         else
             write(*,'(A)') '========================================================='
             write(*,'(A)') '====================== New computing ===================='
@@ -222,14 +226,10 @@ module FluidDomain
         write(filename,'(I10)') nint(time/flow%Tref*1d5)
         fileName = adjustr(fileName)
         do  i=1,nameLen
-            if(fileName(i:i)==' ')fileName(i:i)='0'
+            if(fileName(i:i)==' ') fileName(i:i)='0'
         enddo
         open(idfile,file='./DatContinue/continue'//trim(fileName),form='unformatted',access='stream')
-        write(idfile) step,time,m_nblocks
-        do iblock = 1,m_nblocks
-            write(idfile) LBMblks(iblock)%xmin,LBMblks(iblock)%ymin,LBMblks(iblock)%zmin,LBMblks(iblock)%dh
-            write(idfile) LBMblks(iblock)%xDim,LBMblks(iblock)%yDim,LBMblks(iblock)%zDim
-        enddo
+        write(idfile) m_nblocks,step,time
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%write_continue(idfile)
         enddo
@@ -1009,10 +1009,6 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z,step,step_s
         real(8)::invStep
-        if(step_s .lt. 0) then
-            write(*,*) "The start step for fluid averaging is less than zero."
-            stop
-        endif
         if(step .ge. step_s .and. this%outputtype .ge. 2) then
             invStep = 1 / real(step - step_s + 1)
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
@@ -1632,6 +1628,8 @@ module FluidDomain
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         integer,intent(in):: fID
+        write(fID) this%xmin,this%ymin,this%zmin,this%dh
+        write(fID) this%xDim,this%yDim,this%zDim
         write(fID) this%fIn
     ENDSUBROUTINE write_continue_
 
@@ -1639,6 +1637,8 @@ module FluidDomain
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         integer,intent(in) :: fID
+        read(fID) this%xmin,this%ymin,this%zmin,this%dh
+        read(fID) this%xDim,this%yDim,this%zDim
         read(fID) this%fIn
     ENDSUBROUTINE read_continue_
 
