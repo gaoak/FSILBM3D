@@ -55,7 +55,7 @@ module FluidDomain
     SUBROUTINE read_fuild_blocks(filename)
         implicit none
         character(LEN=40),intent(in):: filename
-        integer:: iblock,num_half_wall
+        integer:: iblock
         character(LEN=256):: buffer
         character(LEN=40):: keywordstr
         ! creat LBMblks and read parameters
@@ -96,18 +96,6 @@ module FluidDomain
             endif
             if (LBMblks(iblock)%periodic_bc(3) .eq. 1) then
                 LBMblks(iblock)%zmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh
-            endif
-            num_half_wall = count(LBMblks(iblock)%BndConds(1:2) .eq. BCstationary_Wall_halfway)
-            if (num_half_wall .gt. 0) then
-                LBMblks(iblock)%xmax = LBMblks(iblock)%xmax + LBMblks(iblock)%dh * num_half_wall
-            endif
-            num_half_wall = count(LBMblks(iblock)%BndConds(3:4) .eq. BCstationary_Wall_halfway)
-            if (num_half_wall .gt. 0) then
-                LBMblks(iblock)%ymax = LBMblks(iblock)%ymax + LBMblks(iblock)%dh * num_half_wall
-            endif
-            num_half_wall = count(LBMblks(iblock)%BndConds(5:6) .eq. BCstationary_Wall_halfway)
-            if (num_half_wall .gt. 0) then
-                LBMblks(iblock)%zmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh * num_half_wall
             endif
         enddo
         close(111)
@@ -463,45 +451,45 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x,y,z
-        if (this%BndConds(1) .eq. BCstationary_Wall_halfway) then
+        if (this%BndConds(1) .eq. BCstationary_Wall_halfway .or. this%BndConds(1) .eq. BCmoving_Wall_halfway) then
             do y = 1,this%yDim
             do z = 1,this%zDim
-                this%fIn_hwx1([1,7,9,11,13],z,y) = this%fIn(z,y,1,oppo([1,7,9,11,13]))
+                this%fIn_hwx1(0:lbmDim,z,y) = this%fIn(z,y,1,0:lbmDim)
             enddo
             enddo
         endif
-        if (this%BndConds(2) .eq. BCstationary_Wall_halfway) then
+        if (this%BndConds(2) .eq. BCstationary_Wall_halfway .or. this%BndConds(2) .eq. BCmoving_Wall_halfway) then
             do y = 1,this%yDim
             do z = 1,this%zDim
-                this%fIn_hwx2([2,8,10,12,14],z,y) = this%fIn(z,y,this%xDim,oppo([2,8,10,12,14]))
+                this%fIn_hwx2(0:lbmDim,z,y) = this%fIn(z,y,this%xDim,0:lbmDim)
             enddo
             enddo
         endif
-        if (this%BndConds(3) .eq. BCstationary_Wall_halfway) then
+        if (this%BndConds(3) .eq. BCstationary_Wall_halfway .or. this%BndConds(3) .eq. BCmoving_Wall_halfway) then
             do x = 1,this%xDim
             do z = 1,this%zDim
-                this%fIn_hwy1([3,7,8,15,17],z,x) = this%fIn(z,1,x,oppo([3,7,8,15,17]))
+                this%fIn_hwy1(0:lbmDim,z,x) = this%fIn(z,1,x,0:lbmDim)
             enddo
             enddo
         endif
-        if (this%BndConds(4) .eq. BCstationary_Wall_halfway) then
+        if (this%BndConds(4) .eq. BCstationary_Wall_halfway .or. this%BndConds(4) .eq. BCmoving_Wall_halfway) then
             do x = 1,this%xDim
             do z = 1,this%zDim
-                this%fIn_hwy2([4,9,10,16,18],z,x) = this%fIn(z,this%yDim,x,oppo([4,9,10,16,18]))
+                this%fIn_hwy2(0:lbmDim,z,x) = this%fIn(z,this%yDim,x,0:lbmDim)
             enddo
             enddo
         endif
-        if (this%BndConds(5) .eq. BCstationary_Wall_halfway) then
+        if (this%BndConds(5) .eq. BCstationary_Wall_halfway .or. this%BndConds(5) .eq. BCmoving_Wall_halfway) then
             do x = 1,this%xDim
             do y = 1,this%yDim
-                this%fIn_hwz1([5,11,12,15,16],y,x) = this%fIn(1,y,x,oppo([5,11,12,15,16]))
+                this%fIn_hwz1(0:lbmDim,y,x) = this%fIn(1,y,x,0:lbmDim)
             enddo
             enddo
         endif
-        if (this%BndConds(6) .eq. BCstationary_Wall_halfway) then
+        if (this%BndConds(6) .eq. BCstationary_Wall_halfway .or. this%BndConds(6) .eq. BCmoving_Wall_halfway) then
             do x = 1,this%xDim
             do y = 1,this%yDim
-                this%fIn_hwz2([6,13,14,17,18],y,x) = this%fIn(this%zDim,y,x,oppo([6,13,14,17,18]))
+                this%fIn_hwz2(0:lbmDim,y,x) = this%fIn(this%zDim,y,x,0:lbmDim)
             enddo
             enddo
         endif
@@ -557,7 +545,8 @@ module FluidDomain
             else
                 do  y = 1,this%yDim
                 do  z = 1,this%zDim
-                    this%fIn(z,y,1,[1,7,9,11,13]) = this%fIn_hwx1([1,7,9,11,13],z,y)
+                    fTmp([1,7,9,11,13]) = this%fIn_hwx1(oppo([1,7,9,11,13]),z,y)
+                    this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
                 enddo
                 enddo
             endif
@@ -571,6 +560,20 @@ module FluidDomain
                 this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
             enddo
             enddo
+        elseif(this%BndConds(1) .eq. BCmoving_Wall_halfway)then
+            if (.not.allocated(this%fIn_hwx1)) then
+                allocate(this%fIn_hwx1(0:lbmDim,this%zDim,this%yDim))
+            else
+                do  y = 1,this%yDim
+                    yCoord = this%ymin + this%dh * (y - 1);
+                do  z = 1,this%zDim
+                    zCoord = this%zmin + this%dh * (z - 1);
+                    call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwx1(0:lbmDim,z,y),fTmp(0:lbmDim))
+                    this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(1) .eq. BCSymmetric)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
@@ -626,7 +629,8 @@ module FluidDomain
             else
                 do  y = 1,this%yDim
                 do  z = 1,this%zDim
-                    this%fIn(z,y,this%xDim,[2,8,10,12,14]) = this%fIn_hwx2([2,8,10,12,14],z,y)
+                    fTmp([2,8,10,12,14]) = this%fIn_hwx2(oppo([2,8,10,12,14]),z,y)
+                    this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
                 enddo
                 enddo
             endif
@@ -640,6 +644,20 @@ module FluidDomain
                 this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
             enddo
             enddo
+        elseif(this%BndConds(2) .eq. BCmoving_Wall_halfway)then
+            if (.not.allocated(this%fIn_hwx2)) then
+                allocate(this%fIn_hwx2(0:lbmDim,this%zDim,this%yDim))
+            else
+                do  y = 1,this%yDim
+                    yCoord = this%ymin + this%dh * (y - 1);
+                do  z = 1,this%zDim
+                    zCoord = this%zmin + this%dh * (z - 1);
+                    call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmax,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwx2(0:lbmDim,z,y),fTmp(0:lbmDim))
+                    this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(2) .eq. BCSymmetric)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
@@ -695,7 +713,8 @@ module FluidDomain
             else
                 do  x = 1,this%xDim
                 do  z = 1,this%zDim
-                    this%fIn(z,1,x,[3,7,8,15,17]) = this%fIn_hwy1([3,7,8,15,17],z,x)
+                    fTmp([3,7,8,15,17]) = this%fIn_hwy1(oppo([3,7,8,15,17]),z,x)
+                    this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
                 enddo
                 enddo
             endif
@@ -709,6 +728,20 @@ module FluidDomain
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
             enddo
             enddo
+        elseif(this%BndConds(3) .eq. BCmoving_Wall_halfway)then
+            if (.not.allocated(this%fIn_hwy1)) then
+                allocate(this%fIn_hwy1(0:lbmDim,this%zDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                    xCoord = this%xmin + this%dh * (x - 1);
+                do  z = 1,this%zDim
+                    zCoord = this%zmin + this%dh * (z - 1);
+                    call evaluate_velocity(this%blktime,zCoord,this%ymin,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwy1(0:lbmDim,z,x),fTmp(0:lbmDim))
+                    this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(3) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
@@ -764,7 +797,8 @@ module FluidDomain
             else
                 do  x = 1,this%xDim
                 do  z = 1,this%zDim
-                    this%fIn(z,this%yDim,x,[4,9,10,16,18]) = this%fIn_hwy2([4,9,10,16,18],z,x)
+                    fTmp([4,9,10,16,18]) = this%fIn_hwy2(oppo([4,9,10,16,18]),z,x)
+                    this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
                 enddo
                 enddo
             endif
@@ -778,6 +812,20 @@ module FluidDomain
                 this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
             enddo
             enddo
+        elseif(this%BndConds(4) .eq. BCmoving_Wall_halfway)then
+            if (.not.allocated(this%fIn_hwy2)) then
+                allocate(this%fIn_hwy2(0:lbmDim,this%zDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                    xCoord = this%xmin + this%dh * (x - 1);
+                do  z = 1,this%zDim
+                    zCoord = this%zmin + this%dh * (z - 1);
+                    call evaluate_velocity(this%blktime,zCoord,this%ymax,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwy2(0:lbmDim,z,x),fTmp(0:lbmDim))
+                    this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(4) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
@@ -833,7 +881,8 @@ module FluidDomain
             else
                 do  x = 1,this%xDim
                 do  y = 1,this%yDim
-                    this%fIn(1,y,x,[5,11,12,15,16]) = this%fIn_hwz1([5,11,12,15,16],y,x)
+                    fTmp([5,11,12,15,16]) = this%fIn_hwz1(oppo([5,11,12,15,16]),y,x)
+                    this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
                 enddo
                 enddo
             endif
@@ -847,6 +896,20 @@ module FluidDomain
                 this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
             enddo
             enddo
+        elseif(this%BndConds(5) .eq. BCmoving_Wall_halfway)then
+            if (.not.allocated(this%fIn_hwz1)) then
+                allocate(this%fIn_hwz1(0:lbmDim,this%yDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                    xCoord = this%xmin + this%dh * (x - 1);
+                do  y = 1,this%yDim
+                    yCoord = this%ymin + this%dh * (y - 1);
+                    call evaluate_velocity(this%blktime,this%zmin,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwz1(0:lbmDim,y,x),fTmp(0:lbmDim))
+                    this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(5) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
@@ -902,7 +965,8 @@ module FluidDomain
             else
                 do  x = 1,this%xDim
                 do  y = 1,this%yDim
-                    this%fIn(this%zDim,y,x,[6,13,14,17,18]) = this%fIn_hwz2([6,13,14,17,18],y,x)
+                    fTmp([6,13,14,17,18]) = this%fIn_hwz2(oppo([6,13,14,17,18]),y,x)
+                    this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
                 enddo
                 enddo
             endif
@@ -916,6 +980,20 @@ module FluidDomain
                 this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
             enddo
             enddo
+        elseif(this%BndConds(6) .eq. BCmoving_Wall_halfway)then
+            if (.not.allocated(this%fIn_hwz2)) then
+                allocate(this%fIn_hwz2(0:lbmDim,this%yDim,this%xDim))
+            else
+                do  x = 1,this%xDim
+                    xCoord = this%xmin + this%dh * (x - 1);
+                do  y = 1,this%yDim
+                    yCoord = this%ymin + this%dh * (y - 1);
+                    call evaluate_velocity(this%blktime,this%zmax,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwz2(0:lbmDim,y,x),fTmp(0:lbmDim))
+                    this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
+                enddo
+                enddo
+            endif
         elseif(this%BndConds(6) .eq. BCSymmetric)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
@@ -1597,20 +1675,20 @@ module FluidDomain
         implicit none
         integer:: i, j, CompareBlocks, cnt
         integer:: p, num_BC_fluid
-        real(8):: i_blk_domain(6), j_blk_domain(6)
+        real(8):: i_vxyzminmax(6), j_vxyzminmax(6)
         logical:: d(6), if_fluid_pos(6)
-        i_blk_domain(1) = LBMblks(i)%xmin
-        i_blk_domain(2) = LBMblks(i)%xmax
-        i_blk_domain(3) = LBMblks(i)%ymin
-        i_blk_domain(4) = LBMblks(i)%ymax
-        i_blk_domain(5) = LBMblks(i)%zmin
-        i_blk_domain(6) = LBMblks(i)%zmax
-        j_blk_domain(1) = LBMblks(j)%xmin
-        j_blk_domain(2) = LBMblks(j)%xmax
-        j_blk_domain(3) = LBMblks(j)%ymin
-        j_blk_domain(4) = LBMblks(j)%ymax
-        j_blk_domain(5) = LBMblks(j)%zmin
-        j_blk_domain(6) = LBMblks(j)%zmax
+        i_vxyzminmax(1) = LBMblks(i)%xmin
+        i_vxyzminmax(2) = LBMblks(i)%xmax
+        i_vxyzminmax(3) = LBMblks(i)%ymin
+        i_vxyzminmax(4) = LBMblks(i)%ymax
+        i_vxyzminmax(5) = LBMblks(i)%zmin
+        i_vxyzminmax(6) = LBMblks(i)%zmax
+        j_vxyzminmax(1) = LBMblks(j)%xmin
+        j_vxyzminmax(2) = LBMblks(j)%xmax
+        j_vxyzminmax(3) = LBMblks(j)%ymin
+        j_vxyzminmax(4) = LBMblks(j)%ymax
+        j_vxyzminmax(5) = LBMblks(j)%zmin
+        j_vxyzminmax(6) = LBMblks(j)%zmax
         if_fluid_pos = LBMblks(i)%BndConds(1:6) .eq. BCfluid
         num_BC_fluid = count(if_fluid_pos)
         if (num_BC_fluid .eq. 1) then
@@ -1619,13 +1697,13 @@ module FluidDomain
                     if (mod(p,2) .eq. 1) then
                         if (LBMblks(j)%BndConds(p+1).eq.BCfluid_father.and. &
                             LBMblks(i)%BndConds(p+1).ne.BCfluid_father.and. &
-                            abs(j_blk_domain(p+1)-i_blk_domain(p)-LBMblks(j)%dh).lt.MachineTolerace) &
-                            i_blk_domain(p+1) = i_blk_domain(p)
+                            abs(j_vxyzminmax(p+1)-i_vxyzminmax(p)-LBMblks(j)%dh).lt.MachineTolerace) &
+                            i_vxyzminmax(p+1) = i_vxyzminmax(p)
                     else
                         if (LBMblks(j)%BndConds(p-1).eq.BCfluid_father.and. &
                             LBMblks(i)%BndConds(p-1).ne.BCfluid_father.and. &
-                            abs(i_blk_domain(p)-j_blk_domain(p-1)-LBMblks(j)%dh).lt.MachineTolerace) &
-                            i_blk_domain(p-1) = i_blk_domain(p)
+                            abs(i_vxyzminmax(p)-j_vxyzminmax(p-1)-LBMblks(j)%dh).lt.MachineTolerace) &
+                            i_vxyzminmax(p-1) = i_vxyzminmax(p)
                     endif
                 endif
             enddo
@@ -1638,24 +1716,24 @@ module FluidDomain
                     if (mod(p,2) .eq. 1) then
                         if (LBMblks(i)%BndConds(p+1).eq.BCfluid_father.and. &
                             LBMblks(j)%BndConds(p+1).ne.BCfluid_father.and. &
-                            abs(i_blk_domain(p+1)-j_blk_domain(p)-LBMblks(i)%dh).lt.MachineTolerace) &
-                            j_blk_domain(p+1) = j_blk_domain(p)
+                            abs(i_vxyzminmax(p+1)-j_vxyzminmax(p)-LBMblks(i)%dh).lt.MachineTolerace) &
+                            j_vxyzminmax(p+1) = j_vxyzminmax(p)
                     else
                         if (LBMblks(i)%BndConds(p-1).eq.BCfluid_father.and. &
                             LBMblks(j)%BndConds(p-1).ne.BCfluid_father.and. &
-                            abs(j_blk_domain(p)-i_blk_domain(p-1)-LBMblks(i)%dh).lt.MachineTolerace) &
-                            j_blk_domain(p-1) = j_blk_domain(p)
+                            abs(j_vxyzminmax(p)-i_vxyzminmax(p-1)-LBMblks(i)%dh).lt.MachineTolerace) &
+                            j_vxyzminmax(p-1) = j_vxyzminmax(p)
                     endif
                 endif
             enddo
         endif
         cnt = 0
-        d(1) = i_blk_domain(1).lt.j_blk_domain(1).or.abs(i_blk_domain(1)-j_blk_domain(1)).lt.MachineTolerace
-        d(2) = j_blk_domain(2).lt.i_blk_domain(2).or.abs(j_blk_domain(2)-i_blk_domain(2)).lt.MachineTolerace
-        d(3) = j_blk_domain(1).lt.i_blk_domain(1).or.abs(j_blk_domain(1)-i_blk_domain(1)).lt.MachineTolerace
-        d(4) = i_blk_domain(2).lt.j_blk_domain(2).or.abs(i_blk_domain(2)-j_blk_domain(2)).lt.MachineTolerace
-        d(5) = i_blk_domain(2).lt.j_blk_domain(1)
-        d(6) = j_blk_domain(2).lt.i_blk_domain(1)
+        d(1) = i_vxyzminmax(1).lt.j_vxyzminmax(1).or.abs(i_vxyzminmax(1)-j_vxyzminmax(1)).lt.MachineTolerace
+        d(2) = j_vxyzminmax(2).lt.i_vxyzminmax(2).or.abs(j_vxyzminmax(2)-i_vxyzminmax(2)).lt.MachineTolerace
+        d(3) = j_vxyzminmax(1).lt.i_vxyzminmax(1).or.abs(j_vxyzminmax(1)-i_vxyzminmax(1)).lt.MachineTolerace
+        d(4) = i_vxyzminmax(2).lt.j_vxyzminmax(2).or.abs(i_vxyzminmax(2)-j_vxyzminmax(2)).lt.MachineTolerace
+        d(5) = i_vxyzminmax(2).lt.j_vxyzminmax(1)
+        d(6) = j_vxyzminmax(2).lt.i_vxyzminmax(1)
         if(d(1) .and. d(2)) then
             cnt = cnt + 1
         else if(d(3) .and. d(4)) then
@@ -1664,12 +1742,12 @@ module FluidDomain
             CompareBlocks = 0
             return
         endif
-        d(1) = i_blk_domain(3).lt.j_blk_domain(3).or.abs(i_blk_domain(3)-j_blk_domain(3)).lt.MachineTolerace
-        d(2) = j_blk_domain(4).lt.i_blk_domain(4).or.abs(j_blk_domain(4)-i_blk_domain(4)).lt.MachineTolerace
-        d(3) = j_blk_domain(3).lt.i_blk_domain(3).or.abs(j_blk_domain(3)-i_blk_domain(3)).lt.MachineTolerace
-        d(4) = i_blk_domain(4).lt.j_blk_domain(4).or.abs(i_blk_domain(4)-j_blk_domain(4)).lt.MachineTolerace
-        d(5) = i_blk_domain(4).lt.j_blk_domain(3)
-        d(6) = j_blk_domain(4).lt.i_blk_domain(3)
+        d(1) = i_vxyzminmax(3).lt.j_vxyzminmax(3).or.abs(i_vxyzminmax(3)-j_vxyzminmax(3)).lt.MachineTolerace
+        d(2) = j_vxyzminmax(4).lt.i_vxyzminmax(4).or.abs(j_vxyzminmax(4)-i_vxyzminmax(4)).lt.MachineTolerace
+        d(3) = j_vxyzminmax(3).lt.i_vxyzminmax(3).or.abs(j_vxyzminmax(3)-i_vxyzminmax(3)).lt.MachineTolerace
+        d(4) = i_vxyzminmax(4).lt.j_vxyzminmax(4).or.abs(i_vxyzminmax(4)-j_vxyzminmax(4)).lt.MachineTolerace
+        d(5) = i_vxyzminmax(4).lt.j_vxyzminmax(3)
+        d(6) = j_vxyzminmax(4).lt.i_vxyzminmax(3)
         if(d(1) .and. d(2)) then
             cnt = cnt + 1
         else if(d(3) .and. d(4)) then
@@ -1678,12 +1756,12 @@ module FluidDomain
             CompareBlocks = 0
             return
         endif
-        d(1) = i_blk_domain(5).lt.j_blk_domain(5).or.abs(i_blk_domain(5)-j_blk_domain(5)).lt.MachineTolerace
-        d(2) = j_blk_domain(6).lt.i_blk_domain(6).or.abs(j_blk_domain(6)-i_blk_domain(6)).lt.MachineTolerace
-        d(3) = j_blk_domain(5).lt.i_blk_domain(5).or.abs(j_blk_domain(5)-i_blk_domain(5)).lt.MachineTolerace
-        d(4) = i_blk_domain(6).lt.j_blk_domain(6).or.abs(i_blk_domain(6)-j_blk_domain(6)).lt.MachineTolerace
-        d(5) = i_blk_domain(6).lt.j_blk_domain(5)
-        d(6) = j_blk_domain(6).lt.i_blk_domain(5)
+        d(1) = i_vxyzminmax(5).lt.j_vxyzminmax(5).or.abs(i_vxyzminmax(5)-j_vxyzminmax(5)).lt.MachineTolerace
+        d(2) = j_vxyzminmax(6).lt.i_vxyzminmax(6).or.abs(j_vxyzminmax(6)-i_vxyzminmax(6)).lt.MachineTolerace
+        d(3) = j_vxyzminmax(5).lt.i_vxyzminmax(5).or.abs(j_vxyzminmax(5)-i_vxyzminmax(5)).lt.MachineTolerace
+        d(4) = i_vxyzminmax(6).lt.j_vxyzminmax(6).or.abs(i_vxyzminmax(6)-j_vxyzminmax(6)).lt.MachineTolerace
+        d(5) = i_vxyzminmax(6).lt.j_vxyzminmax(5)
+        d(6) = j_vxyzminmax(6).lt.i_vxyzminmax(5)
         if(d(1) .and. d(2)) then
             cnt = cnt + 1
         else if(d(3) .and. d(4)) then
@@ -1698,11 +1776,11 @@ module FluidDomain
             CompareBlocks = -1
         else
             write(*,*) 'Warning, blocks partial overlaps', LBMblks(i)%ID, LBMblks(j)%ID
-            write(*,*) 'If son block overlap the father block, the number of BCfluid should remains 1 ', &
-                       'and the oppsite boundary on the father block shold be BCfluid_father. ', &
-                       'The distance of BCfluid and BCfluid_father sholud be LBMblks(fatherID)%dh.'
-            write(*,*) i_blk_domain(1), i_blk_domain(2),i_blk_domain(3), i_blk_domain(4),i_blk_domain(5), i_blk_domain(6)
-            write(*,*) j_blk_domain(1), j_blk_domain(2),j_blk_domain(3), j_blk_domain(4),j_blk_domain(5), j_blk_domain(6)
+            write(*,*) 'If son block overlaps the father block, the number of BCfluid should remain 1 ', &
+                       'and the oppsite boundary on the father block should be BCfluid_father. ', &
+                       'The distance of BCfluid and BCfluid_father should be LBMblks(fatherID)%dh.'
+            write(*,*) i_vxyzminmax(1), i_vxyzminmax(2),i_vxyzminmax(3), i_vxyzminmax(4),i_vxyzminmax(5), i_vxyzminmax(6)
+            write(*,*) j_vxyzminmax(1), j_vxyzminmax(2),j_vxyzminmax(3), j_vxyzminmax(4),j_vxyzminmax(5), j_vxyzminmax(6)
             !stop
         endif
     end function CompareBlocks
