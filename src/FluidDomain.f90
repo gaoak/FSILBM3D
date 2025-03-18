@@ -166,12 +166,12 @@ module FluidDomain
                     xCoord = LBMblks(i)%xmin + (x - 1) * LBMblks(i)%dh
                     ! judge in which fluid block
                     do j = 1,nblocks
-                        zmax_tmp = LBMblks_tmp(j)%zmin + (LBMblks_tmp(j)%zDim - 1) * LBMblks_tmp(j)%dh
-                        ymax_tmp = LBMblks_tmp(j)%ymin + (LBMblks_tmp(j)%yDim - 1) * LBMblks_tmp(j)%dh
-                        xmax_tmp = LBMblks_tmp(j)%xmin + (LBMblks_tmp(j)%xDim - 1) * LBMblks_tmp(j)%dh
-                        if(zCoord .ge. LBMblks_tmp(j)%zmin .and. zCoord .le. zmax_tmp .and. & 
-                           yCoord .ge. LBMblks_tmp(j)%ymin .and. yCoord .le. ymax_tmp .and. &
-                           xCoord .ge. LBMblks_tmp(j)%xmin .and. xCoord .le. xmax_tmp) then
+                        zmax_tmp = LBMblks_tmp(sortdh(j))%zmin + (LBMblks_tmp(sortdh(j))%zDim - 1) * LBMblks_tmp(j)%dh
+                        ymax_tmp = LBMblks_tmp(sortdh(j))%ymin + (LBMblks_tmp(sortdh(j))%yDim - 1) * LBMblks_tmp(j)%dh
+                        xmax_tmp = LBMblks_tmp(sortdh(j))%xmin + (LBMblks_tmp(sortdh(j))%xDim - 1) * LBMblks_tmp(j)%dh
+                        if(zCoord .ge. LBMblks_tmp(sortdh(j))%zmin .and. zCoord .le. zmax_tmp .and. & 
+                           yCoord .ge. LBMblks_tmp(sortdh(j))%ymin .and. yCoord .le. ymax_tmp .and. &
+                           xCoord .ge. LBMblks_tmp(sortdh(j))%xmin .and. xCoord .le. xmax_tmp) then
                             ! interpolate
                             call interpolate_fIn() ! need added
                         endif
