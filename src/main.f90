@@ -14,7 +14,7 @@ PROGRAM main
     USE LBMBlockComm
     implicit none
     character(LEN=40):: parameterFile='inFlow.dat',checkFile='check.dat'
-    integer:: step=0,step_ave
+    integer:: step=0,start_ave
     real(8):: dt_fluid
     real(8):: time=0.0d0,g(3)=[0,0,0]
     real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
@@ -68,11 +68,11 @@ PROGRAM main
     !==================================================================================================
     dt_fluid = LBMblks(blockTreeRoot)%dh                       !time step of the fluid 
     if(flow%timeWriteBegin .ge. time) then
-        step_ave = step + nint((flow%timeWriteBegin - time / flow%Tref) * flow%Tref / dt_fluid)  !the first step for fluid averaging
+        start_ave = step + nint((flow%timeWriteBegin - time / flow%Tref) * flow%Tref / dt_fluid)  !the first step for fluid averaging
     else
-        step_ave = step
+        start_ave = step
     endif
-    write(*,*)'the step for fluid averaging(if used):', step_ave
+    write(*,*)'the start step for fluid averaging(if used):', start_ave
     write(*,'(A)') '========================================================='
     write(*,*) 'Time loop beginning'
     do while(time/flow%Tref < flow%timeSimTotal)
@@ -90,7 +90,7 @@ PROGRAM main
         time_FEM       = 0.d0
         call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
         call calculate_macro_quantities_blocks()
-        call calculate_turbulent_statistic_blocks(step,step_ave)
+        call calculate_turbulent_statistic_blocks(step,start_ave)
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming
         write(*,*)'Time for       IBM step:', time_IBM

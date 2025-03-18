@@ -49,7 +49,7 @@ module FluidDomain
         procedure :: ResetVolumeForce => ResetVolumeForce_
         procedure :: halfwayBCset => halfwayBCset_
     end type LBMBlock
-    type(LBMBlock), allocatable :: LBMblks(:),LBMblks_tmp(:)
+    type(LBMBlock), allocatable :: LBMblks(:)
     integer,allocatable:: LBMblksIndex(:)
     contains
 
@@ -126,8 +126,9 @@ module FluidDomain
         real(8),intent(out):: time
         integer:: i,j,x,y,z,iblock
         integer:: isContinue,nblocks,index_tmp,idfile=13
-        integer, allocatable :: sortdh(:)
         real(8):: xCoord,yCoord,zCoord,xmax_tmp,ymax_tmp,zmax_tmp
+        type(LBMBlock), allocatable :: LBMblks_tmp(:)
+        integer, allocatable :: sortdh(:)
         logical:: alive
         inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue==1 .and. alive) then
@@ -146,24 +147,24 @@ module FluidDomain
             do iblock = 1,nblocks
                 sortdh(iblock) = iblock
             enddo
-            do i = 1, nblocks - 1
-            do j = 1, nblocks - i
-                if (LBMblks_tmp(j)%dh > LBMblks_tmp(j + 1)%dh) then
-                    index_tmp = sortdh(j)
-                    sortdh(j) = sortdh(j + 1)
-                    sortdh(j + 1) = index_tmp
+            do i = 1, nblocks-1
+            do j = i+1, nblocks
+                if (LBMblks_tmp(i)%dh > LBMblks_tmp(j)%dh) then
+                    index_tmp = sortdh(i)
+                    sortdh(i) = sortdh(j)
+                    sortdh(j) = index_tmp
                 end if
             end do
             end do
             ! interpolate from the continue file
             do i = 1,m_nblocks
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-                do z=1,LBMblks(i)%zDim
-                do y=1,LBMblks(i)%yDim
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,xCoord,yCoord,zCoord,zmax_tmp,ymax_tmp,xmax_tmp)
                 do x=1,LBMblks(i)%xDim
-                    zCoord = LBMblks(i)%zmin + (z - 1) * LBMblks(i)%dh
-                    yCoord = LBMblks(i)%ymin + (y - 1) * LBMblks(i)%dh
                     xCoord = LBMblks(i)%xmin + (x - 1) * LBMblks(i)%dh
+                do y=1,LBMblks(i)%yDim
+                    yCoord = LBMblks(i)%ymin + (y - 1) * LBMblks(i)%dh
+                do z=1,LBMblks(i)%zDim
+                    zCoord = LBMblks(i)%zmin + (z - 1) * LBMblks(i)%dh
                     ! judge in which fluid block
                     do j = 1,nblocks
                         zmax_tmp = LBMblks_tmp(sortdh(j))%zmin + (LBMblks_tmp(sortdh(j))%zDim - 1) * LBMblks_tmp(sortdh(j))%dh
