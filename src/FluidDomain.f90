@@ -723,7 +723,7 @@ module FluidDomain
                 xCoord = this%xmin + this%dh * (x - 1);
             do  z = 1,this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                call evaluate_velocity(this%blktime,zCoord,this%ymin-this%dh,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call evaluate_velocity(this%blktime,zCoord,this%ymin,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                 call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn(z,1,x,0:lbmDim),fTmp(0:lbmDim))
                 this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
             enddo
@@ -736,7 +736,7 @@ module FluidDomain
                     xCoord = this%xmin + this%dh * (x - 1);
                 do  z = 1,this%zDim
                     zCoord = this%zmin + this%dh * (z - 1);
-                    call evaluate_velocity(this%blktime,zCoord,this%ymin,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_velocity(this%blktime,zCoord,this%ymin-this%dh,,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                     call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwy1(0:lbmDim,z,x),fTmp(0:lbmDim))
                     this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
                 enddo
