@@ -124,7 +124,7 @@ module FluidDomain
         implicit none
         integer,intent(out):: step
         real(8),intent(out):: time
-        integer:: i,j,x,y,z,iblock,indexs(1:6)
+        integer:: i,j,j2,x,y,z,iblock,indexs(1:6)
         integer:: isContinue,nblocks,index_tmp,idfile=13
         real(8):: xCoord,yCoord,zCoord,coeffs(1:3)
         type(LBMBlock), allocatable :: LBMblks_tmp(:)
@@ -165,7 +165,7 @@ module FluidDomain
             enddo
             ! interpolate from the continue file
             do i = 1,m_nblocks
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,xCoord,yCoord,zCoord,indexs,coeffs,LBMblks)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,j2,xCoord,yCoord,zCoord,indexs,coeffs)
                 do x=1,LBMblks(i)%xDim
                     xCoord = LBMblks(i)%xmin + (x - 1) * LBMblks(i)%dh
                 do y=1,LBMblks(i)%yDim
@@ -174,29 +174,36 @@ module FluidDomain
                     zCoord = LBMblks(i)%zmin + (z - 1) * LBMblks(i)%dh
                     ! judge in which fluid block
                     do j = 1,nblocks
-                        if(zCoord .ge. LBMblks_tmp(sortdh(j))%zmin .and. zCoord .le. coor_max(3,sortdh(j)) .and. & 
-                           yCoord .ge. LBMblks_tmp(sortdh(j))%ymin .and. yCoord .le. coor_max(2,sortdh(j)) .and. &
-                           xCoord .ge. LBMblks_tmp(sortdh(j))%xmin .and. xCoord .le. coor_max(1,sortdh(j))) then
-                            ! calculate the indexs of the 8 around points
-                            indexs(1) = floor(xCoord - LBMblks_tmp(sortdh(j))%xmin) / LBMblks_tmp(sortdh(j))%dh + 1  ! x-1
-                            indexs(2) = indexs(1) + 1                                                                ! x
-                            indexs(3) = floor(yCoord - LBMblks_tmp(sortdh(j))%ymin) / LBMblks_tmp(sortdh(j))%dh + 1  ! y-1
-                            indexs(4) = indexs(3) + 1                                                                ! y
-                            indexs(5) = floor(zCoord - LBMblks_tmp(sortdh(j))%zmin) / LBMblks_tmp(sortdh(j))%dh + 1  ! z-1
-                            indexs(6) = indexs(5) + 1     
+                        j2 = sortdh(j)
+                        if(zCoord .ge. LBMblks_tmp(j2)%zmin .and. zCoord .le. coor_max(3,j2) .and. &
+                           yCoord .ge. LBMblks_tmp(j2)%ymin .and. yCoord .le. coor_max(2,j2) .and. &
+                           xCoord .ge. LBMblks_tmp(j2)%xmin .and. xCoord .le. coor_max(1,j2)) then
                             ! calculate the interpolation coefficients of the 8 around points
-                            coeffs(1) = (xCoord - (LBMblks_tmp(sortdh(j))%xmin + (indexs(1) - 1) * LBMblks_tmp(sortdh(j))%dh)) / LBMblks(i)%dh
-                            coeffs(2) = (yCoord - (LBMblks_tmp(sortdh(j))%ymin + (indexs(2) - 1) * LBMblks_tmp(sortdh(j))%dh)) / LBMblks(i)%dh
-                            coeffs(3) = (zCoord - (LBMblks_tmp(sortdh(j))%zmin + (indexs(3) - 1) * LBMblks_tmp(sortdh(j))%dh)) / LBMblks(i)%dh
+                            coeffs(1) = (xCoord - LBMblks_tmp(j2)%xmin) / LBMblks_tmp(j2)%dh
+                            coeffs(2) = (yCoord - LBMblks_tmp(j2)%ymin) / LBMblks_tmp(j2)%dh
+                            coeffs(3) = (zCoord - LBMblks_tmp(j2)%zmin) / LBMblks_tmp(j2)%dh
+                            indexs(1) = floor(coeffs(1))
+                            indexs(3) = floor(coeffs(2))
+                            indexs(5) = floor(coeffs(3))
+                            coeffs(1) = coeffs(1) - dble(indexs(1))
+                            coeffs(2) = coeffs(2) - dble(indexs(3))
+                            coeffs(3) = coeffs(3) - dble(indexs(5))
+                            ! calculate the indexs of the 8 around points
+                            indexs(1) = indexs(1) + 1  ! x-1
+                            indexs(2) = indexs(1) + 1  ! x
+                            indexs(3) = indexs(3) + 1  ! y-1
+                            indexs(4) = indexs(3) + 1  ! y
+                            indexs(5) = indexs(5) + 1  ! z-1
+                            indexs(6) = indexs(5) + 1  ! z
                             ! calculate the fIn of the 8 around points
-                            LBMblks(i)%fIn(z,y,x,:) = LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(3),indexs(1),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(3),indexs(2),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * coeffs(1) + &
-                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(4),indexs(1),:) * (1 - coeffs(3)) * coeffs(2) * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(5),indexs(4),indexs(2),:) * (1 - coeffs(3)) * coeffs(2) * coeffs(1) + &
-                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(3),indexs(1),:) * coeffs(3) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(3),indexs(2),:) * coeffs(3) * (1 - coeffs(2)) * coeffs(1) + &
-                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(4),indexs(1),:) * coeffs(3) * coeffs(2) * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(sortdh(j))%fIn(indexs(6),indexs(4),indexs(2),:) * coeffs(3) * coeffs(2) * coeffs(1)
+                            LBMblks(i)%fIn(z,y,x,:) = LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(1),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(2),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * coeffs(1) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(4),indexs(1),:) * (1 - coeffs(3)) *      coeffs(2)  * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(4),indexs(2),:) * (1 - coeffs(3)) *      coeffs(2)  * coeffs(1) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(3),indexs(1),:) *      coeffs(3)  * (1 - coeffs(2)) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(3),indexs(2),:) *      coeffs(3)  * (1 - coeffs(2)) * coeffs(1) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(4),indexs(1),:) *      coeffs(3)  *      coeffs(2)  * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(4),indexs(2),:) *      coeffs(3)  *      coeffs(2)  * coeffs(1)
 
                             exit
                         endif
