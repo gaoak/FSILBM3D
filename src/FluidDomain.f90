@@ -165,7 +165,7 @@ module FluidDomain
             enddo
             ! interpolate from the continue file
             do i = 1,m_nblocks
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,xCoord,yCoord,zCoord,indexs,coeffs)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,xCoord,yCoord,zCoord,indexs,coeffs,LBMblks)
                 do x=1,LBMblks(i)%xDim
                     xCoord = LBMblks(i)%xmin + (x - 1) * LBMblks(i)%dh
                 do y=1,LBMblks(i)%yDim
