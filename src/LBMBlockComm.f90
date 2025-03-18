@@ -270,9 +270,8 @@ module LBMBlockComm
     endsubroutine tree_set_boundary_conditions_block
 
     recursive subroutine tree_collision_streaming_IBM_FEM(treenode,time_collision,time_streaming,time_IBM,time_FEM)
-        use SolidBody, only: m_nFish,VBodies
         implicit none
-        integer:: i, s, treenode, n_timeStep, iFish
+        integer:: i, s, treenode, n_timeStep
         real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine2,time_end2
         call LBMblks(treenode)%update_volume_force()
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
