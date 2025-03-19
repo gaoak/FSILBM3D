@@ -4,13 +4,13 @@ module FluidDomain
     implicit none
     private
     public:: LBMblks,LBMblksIndex,m_nblocks
-    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
+    public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_turbulent_statistic_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
              CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
-        integer :: ID,iCollidModel,offsetOutput,isoutput
+        integer :: ID,iCollidModel,offsetOutput,outputtype
         integer :: xDim,yDim,zDim
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
         integer :: BndConds(1:6),periodic_bc(3)
@@ -18,8 +18,8 @@ module FluidDomain
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
-        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:)
-        real(4), allocatable :: OUTutmp(:,:,:),OUTvtmp(:,:,:),OUTwtmp(:,:,:)
+        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:)
+        real(4), allocatable :: OUTtmp(:,:,:,:)
         real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
         real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
@@ -36,6 +36,7 @@ module FluidDomain
         procedure :: Initialise => Initialise_
         procedure :: read_continue => read_continue_
         procedure :: calculate_macro_quantities => calculate_macro_quantities_
+        procedure :: calculate_turbulent_statistic => calculate_turbulent_statistic_
         procedure :: collision => collision_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
@@ -67,7 +68,7 @@ module FluidDomain
         allocate(LBMblks(m_nblocks),LBMblksIndex(m_nblocks))
         do iblock = 1,m_nblocks
             call readNextData(111, buffer)
-            read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput,LBMblks(iblock)%isoutput
+            read(buffer,*)    LBMblks(iblock)%ID,LBMblks(iblock)%iCollidModel,LBMblks(iblock)%offsetOutput,LBMblks(iblock)%outputtype
             call readNextData(111, buffer)
             read(buffer,*)    LBMblks(iblock)%xDim,LBMblks(iblock)%yDim,LBMblks(iblock)%zDim
             call readNextData(111, buffer)
@@ -233,6 +234,14 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
+    SUBROUTINE calculate_turbulent_statistic_blocks(step,step_s)
+        implicit none
+        integer:: iblock,step,step_s
+        do iblock = 1,m_nblocks
+            call LBMblks(iblock)%calculate_turbulent_statistic(step,step_s)
+        enddo
+    END SUBROUTINE
+
     SUBROUTINE calculate_macro_quantities_iblock(iblock)
         implicit none
         integer:: iblock
@@ -277,6 +286,9 @@ module FluidDomain
         allocate(this%uuu(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%force(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%den(this%zDim,this%yDim,this%xDim))
+        if (this%outputtype .ge. 2) then
+            allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:9))
+        endif
         ! allocate output workspace
         xmin = 1 + this%offsetOutput
         ymin = 1 + this%offsetOutput
@@ -284,9 +296,11 @@ module FluidDomain
         xmax = this%xDim - this%offsetOutput
         ymax = this%yDim - this%offsetOutput
         zmax = this%zDim - this%offsetOutput
-        allocate(this%oututmp(zmin:zmax,ymin:ymax,xmin:xmax))
-        allocate(this%outvtmp(zmin:zmax,ymin:ymax,xmin:xmax))
-        allocate(this%outwtmp(zmin:zmax,ymin:ymax,xmin:xmax))
+        if(this%outputtype .ge. 2) then
+            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,1:12))
+        else
+            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,1:3))
+        endif
         ! allocate mesh partition
         allocate(this%OMPpartition(1:m_npsize),this%OMPparindex(1:m_npsize+1),this%OMPeid(1:m_npsize))
         allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:m_npsize))
@@ -421,6 +435,9 @@ module FluidDomain
                 this%den(z,y,x) = flow%denIn
                 call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
+                if(this%outputtype .ge. 2) then
+                    this%uuu_ave(z,y,x,:) = 0.0D0
+                endif
             enddo
             enddo
             enddo
@@ -1027,6 +1044,37 @@ module FluidDomain
         !$OMP END PARALLEL DO
     END SUBROUTINE
 
+    SUBROUTINE calculate_turbulent_statistic_(this,step,step_s)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer::x,y,z,step,step_s
+        real(8)::invStep
+        if(step_s .lt. 0) then
+            write(*,*) "The start step for fluid averaging is less than zero."
+            stop
+        endif
+        if(step .ge. step_s .and. this%outputtype .ge. 2) then
+            invStep = 1 / real(step - step_s + 1)
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            do  x = 1, this%xDim
+            do  y = 1, this%yDim
+            do  z = 1, this%zDim
+                this%uuu_ave(z,y,x,1) = this%uuu_ave(z,y,x,1) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,1)
+                this%uuu_ave(z,y,x,2) = this%uuu_ave(z,y,x,2) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,2)
+                this%uuu_ave(z,y,x,3) = this%uuu_ave(z,y,x,3) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,3)
+                this%uuu_ave(z,y,x,4) = this%uuu_ave(z,y,x,4) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1))
+                this%uuu_ave(z,y,x,5) = this%uuu_ave(z,y,x,5) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,6) = this%uuu_ave(z,y,x,6) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+        endif
+    END SUBROUTINE
+
     SUBROUTINE update_volume_force_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
@@ -1491,72 +1539,100 @@ module FluidDomain
         integer,parameter::nameLen=10,blockLen=3,idfile=100
         character (LEN=nameLen):: fileName
         character (LEN=blockLen):: blockName
-        real(8):: invUref
-        if(this%isoutput.lt.1) return
-        nxs = 1 + this%offsetOutput
-        nys = 1 + this%offsetOutput
-        nzs = 1 + this%offsetOutput
-        nxe = this%xDim - this%offsetOutput
-        nye = this%yDim - this%offsetOutput
-        nze = this%zDim - this%offsetOutput
+        real(8):: invUref,invUrefs
+        if(this%outputtype .lt. 1) return
+        nxs  = 1 + this%offsetOutput
+        nys  = 1 + this%offsetOutput
+        nzs  = 1 + this%offsetOutput
+        nxe  = this%xDim - this%offsetOutput
+        nye  = this%yDim - this%offsetOutput
+        nze  = this%zDim - this%offsetOutput
         xmin = this%xmin + this%offsetOutput * this%dh
         ymin = this%ymin + this%offsetOutput * this%dh
         zmin = this%zmin + this%offsetOutput * this%dh
-        invUref = 1.d0/flow%Uref
 
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do x=nxs, nxe
-            do y=nys, nye
-                do z=nzs, nze
-                    this%oututmp(z,y,x) = this%uuu(z,y,x,1)*invUref
+        invUref  = 1.d0/flow%Uref
+        invUrefs = 1.d0/flow%Uref/flow%Uref
+
+        if(this%outputtype .ne. 2) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            do x=nxs, nxe
+                do y=nys, nye
+                    do z=nzs, nze
+                        this%outtmp(z,y,x,1) = this%uuu(z,y,x,1)*invUref !u
+                        this%outtmp(z,y,x,2) = this%uuu(z,y,x,2)*invUref !v
+                        this%outtmp(z,y,x,3) = this%uuu(z,y,x,3)*invUref !w
+                    enddo
                 enddo
             enddo
-        enddo
-        !$OMP END PARALLEL DO
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do x=nxs, nxe
-            do y=nys, nye
-                do z=nzs, nze
-                    this%outvtmp(z,y,x) = this%uuu(z,y,x,2)*invUref
+            !$OMP END PARALLEL DO
+        endif
+        if(this%outputtype .ge. 2) then
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            do x=nxs, nxe
+                do y=nys, nye
+                    do z=nzs, nze
+                        this%outtmp(z,y,x,4) = this%uuu_ave(z,y,x,1)*invUref  !<u>
+                        this%outtmp(z,y,x,5) = this%uuu_ave(z,y,x,2)*invUref  !<v>
+                        this%outtmp(z,y,x,6) = this%uuu_ave(z,y,x,3)*invUref  !<w>
+                    enddo
                 enddo
             enddo
-        enddo
-        !$OMP END PARALLEL DO
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
-        do x=nxs, nxe
-            do y=nys, nye
-                do z=nzs, nze
-                    this%outwtmp(z,y,x) = this%uuu(z,y,x,3)*invUref
+            !$OMP END PARALLEL DO
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            do x=nxs, nxe
+                do y=nys, nye
+                    do z=nzs, nze
+                        this%outtmp(z,y,x,7) = this%uuu_ave(z,y,x,4)*invUrefs  !<uu>
+                        this%outtmp(z,y,x,8) = this%uuu_ave(z,y,x,5)*invUrefs  !<vv>
+                        this%outtmp(z,y,x,9) = this%uuu_ave(z,y,x,6)*invUrefs  !<ww>
+                    enddo
                 enddo
             enddo
-        enddo
-        !$OMP END PARALLEL DO
-        !this%offsetMoveGrid=0.0
-        !if(isMoveGrid==1)then
-        !    if(isMoveDimX==1) this%offsetMoveGrid(1) = dh*dble(MoveOutputIref(1))
-        !    if(isMoveDimY==1) this%offsetMoveGrid(2) = dh*dble(MoveOutputIref(2))
-        !    if(isMoveDimZ==1) this%offsetMoveGrid(3) = dh*dble(MoveOutputIref(3))
-        !endif
+            !$OMP END PARALLEL DO
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            do x=nxs, nxe
+                do y=nys, nye
+                    do z=nzs, nze
+                        this%outtmp(z,y,x,10) = this%uuu_ave(z,y,x,7)*invUrefs  !<uv>
+                        this%outtmp(z,y,x,11) = this%uuu_ave(z,y,x,8)*invUrefs  !<uw>
+                        this%outtmp(z,y,x,12) = this%uuu_ave(z,y,x,9)*invUrefs  !<vw>
+                    enddo
+                enddo
+            enddo
+            !$OMP END PARALLEL DO
+        endif
         call myfork(pid)
         if(pid.eq.0) then
-            write(fileName,'(I10)') nint(time/flow%Tref*1d5)
-            fileName = adjustr(fileName)
-            do  i=1,nameLen
-                if(fileName(i:i)==' ')fileName(i:i)='0'
-            enddo
-            write(blockName,'(I3)') this%ID
-            blockName = adjustr(blockName)
-            do  i=1,blockLen
-                if(blockName(i:i)==' ')blockName(i:i)='0'
-            enddo
-            open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
-            nxe = nxe-nxs+1
-            nye = nye-nys+1
-            nze = nze-nzs+1
-            WRITE(idfile) nxe,nye,nze,this%ID
-            WRITE(idfile) xmin,ymin,zmin,this%dh
-            write(idfile) this%oututmp,this%outvtmp,this%outwtmp
-            close(idfile)
+            if(this%outputtype .ne. 2) then
+                write(fileName,'(I10)') nint(time/flow%Tref*1d5)
+                fileName = adjustr(fileName)
+                do  i=1,nameLen
+                    if(fileName(i:i)==' ')fileName(i:i)='0'
+                enddo
+                write(blockName,'(I3)') this%ID
+                blockName = adjustr(blockName)
+                do  i=1,blockLen
+                    if(blockName(i:i)==' ')blockName(i:i)='0'
+                enddo
+                open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
+                nxe = nxe-nxs+1
+                nye = nye-nys+1
+                nze = nze-nzs+1
+                WRITE(idfile) nxe,nye,nze,this%ID
+                WRITE(idfile) xmin,ymin,zmin,this%dh
+                write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
+                close(idfile)
+            endif
+            if(this%outputtype .ge. 2) then
+                open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
+                WRITE(idfile) nxe,nye,nze,this%ID
+                WRITE(idfile) xmin,ymin,zmin,this%dh
+                write(idfile) this%outtmp(:,:,:,4),this%outtmp(:,:,:,5),this%outtmp(:,:,:,6)
+                write(idfile) this%outtmp(:,:,:,7),this%outtmp(:,:,:,8),this%outtmp(:,:,:,9)
+                write(idfile) this%outtmp(:,:,:,10),this%outtmp(:,:,:,11),this%outtmp(:,:,:,12)
+                close(idfile)
+            endif
             call myexit(0)
         endif
     END SUBROUTINE write_flow_
