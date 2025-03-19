@@ -139,9 +139,9 @@ module LBMBlockComm
             do j=i+1,nb
                 tmp = CompareBlocks(iblocks(i), iblocks(j))
                 if(tmp.eq.1) then
-                    fa(j) = iblocks(i)
+                    fa(j) = i
                 elseif(tmp.eq.-1) then
-                    fa(i) = iblocks(j)
+                    fa(i) = j
                 endif
             enddo
         enddo
