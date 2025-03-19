@@ -213,6 +213,9 @@ module FluidDomain
                 enddo
                 !$OMP END PARALLEL DO
             enddo
+            do iblock = 1,nblocks
+                deallocate(LBMblks_tmp(iblock)%fIn)
+            enddo
             deallocate(LBMblks_tmp,sortdh,coor_max)
         else
             if(isContinue==1) then
