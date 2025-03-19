@@ -213,7 +213,7 @@ module SolidBody
                 flow%Lref = flow%Lchod
             endif
         else
-            write(*,*) 'use input reference length'
+            write(*,*) 'Use input reference length'
         endif
         ! reference velocity
         if(flow%UrefType==0) then
@@ -244,7 +244,7 @@ module SolidBody
             enddo
             flow%Uref = MAXVAL(nUref(1:m_nFish))
         else
-            write(*,*) 'use input reference velocity'
+            write(*,*) 'Use input reference velocity'
         endif
         ! reference time
         if(flow%TrefType==0) then
@@ -252,7 +252,7 @@ module SolidBody
         elseif(flow%TrefType==1) then
             flow%Tref = 1 / maxval(VBodies(:)%rbm%Freq)
         else
-            write(*,*) 'use input reference time'
+            write(*,*) 'Use input reference time'
         endif
         ! reference acceleration, force, energy, power
         flow%Aref = flow%Uref/flow%Tref
@@ -278,6 +278,7 @@ module SolidBody
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
             write(*,*)'read FEMeshFile ',iFish,' end' 
         enddo
+        write(*,'(A)') '========================================================='
         if (m_nFish .gt. 0) then
             !Use the object with the largest area as the reference object
             maxN  = maxloc(nAsfac, dim=1)

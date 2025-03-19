@@ -501,7 +501,7 @@ module LBMBlockComm
     recursive SUBROUTINE check_blocks_params(treenode)
         implicit none
         integer,intent(in):: treenode
-        integer:: i,nblock,r(3),bc_pair
+        integer:: i,r(3),bc_pair
         type(CommPair)::p
         logical:: flag
         real(8)::res1,res2,res
@@ -518,7 +518,7 @@ module LBMBlockComm
                     mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. r(1) .or. &
                     mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. r(2) .or. &
                     mod(LBMblks(p%sonId)%zDim,m_gridDelta) .ne. r(3)
-            res1 = (LBMblks(p%sonId)%xmin-LBMblks(p%fatherId)%xmin)/LBMblks(p%fatherId)%dh + &
+            res1 =  (LBMblks(p%sonId)%xmin-LBMblks(p%fatherId)%xmin)/LBMblks(p%fatherId)%dh + &
                     (LBMblks(p%sonId)%ymin-LBMblks(p%fatherId)%ymin)/LBMblks(p%fatherId)%dh + &
                     (LBMblks(p%sonId)%zmin-LBMblks(p%fatherId)%zmin)/LBMblks(p%fatherId)%dh
             res2 =  (LBMblks(p%sonId)%xmax-LBMblks(p%fatherId)%xmin)/LBMblks(p%fatherId)%dh + &

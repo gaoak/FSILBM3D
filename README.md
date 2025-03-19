@@ -61,7 +61,15 @@ do
   fi
 done
 
-for file in check.dat continue.dat log.* *.txt
+for folder in DatContinue 
+do
+  if [[ ! -d $folder ]]; then
+    mkdir $folder
+    echo Create $folder
+  fi
+done
+
+for file in check.dat log.* *.txt
 do
   if [[ -e $file ]]; then
     rm $file
@@ -124,13 +132,13 @@ $PBS_WDIR/$PBS_ENAME
 
   1. *isConCmpt* : Determining new simulation or continue simulaion
      + 0 : Calculate from the beginning
-     + 1 : Calculate from last time output
+     + 1 : Calculate from the continue file (in **DatContinue**)
 
   2. *numsubstep*: Number of sub-steps for solid time-stepping solution
 
   3. *timeSimTotal*: Dimensionless total simulation time (time/Tref <= timeSimTotl)
 
-  4. *timeContiDelta*: Dimensionless time interval for writing continue (continue.dat) which used for continue simulation
+  4. *timeContiDelta*: Dimensionless time interval for writing continue files (continue** in **DatContinue**) which used for continue simulation
 
   5. *timeWriteBegin*: Dimensionless time to start fluid mesh (in DatFlow) and body mesh (in DatBody) writing, also is the start time for fluid averaging
 
