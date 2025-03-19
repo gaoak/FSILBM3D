@@ -1817,7 +1817,7 @@ module FluidDomain
             cnt = cnt - 1
         else if(d(1) .and. d(2) .and. d(3) .and. d(4)) then
             align = align + 1
-        else if(d(5) .and. d(6)) then
+        else if(d(5) .or. d(6)) then
             CompareBlocks = 0
             return
         endif
@@ -1833,7 +1833,7 @@ module FluidDomain
             cnt = cnt - 1
         else if(d(1) .and. d(2) .and. d(3) .and. d(4)) then
             align = align + 1
-        else if(d(5) .and. d(6)) then
+        else if(d(5) .or. d(6)) then
             CompareBlocks = 0
             return
         endif
@@ -1849,7 +1849,7 @@ module FluidDomain
             cnt = cnt - 1
         else if(d(1) .and. d(2) .and. d(3) .and. d(4)) then
             align = align + 1
-        else if(d(5) .and. d(6)) then
+        else if(d(5) .or. d(6)) then
             CompareBlocks = 0
             return
         endif
@@ -1862,6 +1862,7 @@ module FluidDomain
         else if(cnt.eq.-3) then
             CompareBlocks = -1
         else
+            CompareBlocks = 0
             write(*,*) 'Warning, blocks partial overlaps', LBMblks(i)%ID, LBMblks(j)%ID
             write(*,*) 'If son block overlaps the father block, the number of BCfluid should remain 1 ', &
                        'and the oppsite boundary on the father block should be BCfluid_father. ', &
