@@ -369,7 +369,9 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer:: xmin,ymin,zmin,xmax,ymax,zmax
         ! allocate fluid memory
-        allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
+        if(.not. allocated(this%fIn)) then
+            allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
+        endif
         allocate(this%uuu(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%force(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%den(this%zDim,this%yDim,this%xDim))
