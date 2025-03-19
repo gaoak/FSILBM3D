@@ -1819,6 +1819,7 @@ module FluidDomain
             align = align + 1
         else if(d(5) .or. d(6)) then
             CompareBlocks = 0
+            write(*,*) 'Notice, blocks no overlaps', LBMblks(i)%ID, LBMblks(j)%ID
             return
         endif
         d(1) = i_vxyzminmax(3).lt.j_vxyzminmax(3).or.abs(i_vxyzminmax(3)-j_vxyzminmax(3)).lt.MachineTolerace
@@ -1835,6 +1836,7 @@ module FluidDomain
             align = align + 1
         else if(d(5) .or. d(6)) then
             CompareBlocks = 0
+            write(*,*) 'Notice, blocks no overlaps', LBMblks(i)%ID, LBMblks(j)%ID
             return
         endif
         d(1) = i_vxyzminmax(5).lt.j_vxyzminmax(5).or.abs(i_vxyzminmax(5)-j_vxyzminmax(5)).lt.MachineTolerace
@@ -1851,6 +1853,7 @@ module FluidDomain
             align = align + 1
         else if(d(5) .or. d(6)) then
             CompareBlocks = 0
+            write(*,*) 'Notice, blocks no overlaps', LBMblks(i)%ID, LBMblks(j)%ID
             return
         endif
         if(align.gt.0) then

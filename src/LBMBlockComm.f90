@@ -122,7 +122,7 @@ module LBMBlockComm
         enddo
         nb = nb - cr
         if(cr.gt.1) then
-            write(*,*) 'Error: there exist more than one block tree root', rootnode
+            write(*,*) 'Error: there exist more than one block tree root, father relationship(-1 is root):', fa
             stop
         endif
     end subroutine
