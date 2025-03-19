@@ -1,4 +1,4 @@
-CMP = gcc# intel,gcc
+CMP = intel# intel,gcc
 
 BUILD ?=
 
