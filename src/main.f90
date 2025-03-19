@@ -66,7 +66,13 @@ PROGRAM main
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================='
     !==================================================================================================
-    dt_fluid = LBMblks(blockTreeRoot)%dh                       !time step of the fluid 
+    dt_fluid = LBMblks(blockTreeRoot)%dh     !time step of the fluid 
+    if(flow%isConCmpt .eq. 1) then
+        time = start_time * flow%Tref        !calculate the computing start time
+    else
+        start_time = 0.0d0
+        step = 0
+    endif
     if(flow%timeWriteBegin .ge. start_time) then
         start_ave = step + nint((flow%timeWriteBegin - start_time) * flow%Tref / dt_fluid)  !the first step for fluid averaging
     else
@@ -75,7 +81,6 @@ PROGRAM main
     write(*,*)'the start step for fluid averaging(if used):', start_ave
     write(*,'(A)') '========================================================='
     write(*,*) 'Time loop beginning'
-    time = start_time * flow%Tref     ! calculate the computing start time
     do while(time/flow%Tref < flow%timeSimTotal)
         call get_now_time(time_begine1)
         time = time + dt_fluid

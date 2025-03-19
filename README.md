@@ -132,7 +132,8 @@ $PBS_WDIR/$PBS_ENAME
 
   1. *isConCmpt* : Determining new simulation or continue simulaion
      + 0 : Calculate from the beginning
-     + 1 : Calculate from the continue file (in **DatContinue**)
+     + 1 : Calculate from the continue file(in **DatContinue**), the calculating time is continuous  
+     + 2 : Calculate from the continue file(in **DatContinue**), the calculating time is reset to zero
 
   2. *numsubstep*: Number of sub-steps for solid time-stepping solution
 

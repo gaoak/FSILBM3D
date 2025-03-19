@@ -132,7 +132,7 @@ module FluidDomain
         real(8), allocatable :: coor_max(:,:)
         logical:: alive
         inquire(file='./DatContinue/continue', exist=alive)
-        if (isContinue==1 .and. alive) then
+        if (isContinue .ge. 1 .and. alive) then
             write(*,'(A)') '========================================================='
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
@@ -218,7 +218,7 @@ module FluidDomain
             enddo
             deallocate(LBMblks_tmp,sortdh,coor_max)
         else
-            if(isContinue==1) then
+            if(isContinue .ge. 1) then
                 write(*,'(A)') '========================================================='
                 write(*,*) 'Warning: the continue file is not found in DatContinue!'
             endif
