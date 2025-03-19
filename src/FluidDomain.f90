@@ -159,9 +159,9 @@ module FluidDomain
             end do
             ! calculate the max coordinates of each blocks
             do iblock = 1,nblocks
-                coor_max(1,iblock) = LBMblks_tmp(iblock)%zmin + (LBMblks_tmp(iblock)%zDim - 1) * LBMblks_tmp(iblock)%dh
+                coor_max(1,iblock) = LBMblks_tmp(iblock)%xmin + (LBMblks_tmp(iblock)%xDim - 1) * LBMblks_tmp(iblock)%dh
                 coor_max(2,iblock) = LBMblks_tmp(iblock)%ymin + (LBMblks_tmp(iblock)%yDim - 1) * LBMblks_tmp(iblock)%dh
-                coor_max(3,iblock) = LBMblks_tmp(iblock)%xmin + (LBMblks_tmp(iblock)%xDim - 1) * LBMblks_tmp(iblock)%dh
+                coor_max(3,iblock) = LBMblks_tmp(iblock)%zmin + (LBMblks_tmp(iblock)%zDim - 1) * LBMblks_tmp(iblock)%dh
             enddo
             ! interpolate from the continue file
             do i = 1,m_nblocks
@@ -216,6 +216,7 @@ module FluidDomain
             deallocate(LBMblks_tmp,sortdh,coor_max)
         else
             if(isContinue==1) then
+                write(*,'(A)') '========================================================='
                 write(*,*) 'Warning: the continue file is not found in DatContinue!'
             endif
             write(*,'(A)') '========================================================='
@@ -1675,6 +1676,9 @@ module FluidDomain
         integer,intent(in) :: fID
         read(fID) this%xmin,this%ymin,this%zmin,this%dh
         read(fID) this%xDim,this%yDim,this%zDim
+        if (.not. allocated(this%fIn)) then
+            allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
+        endif
         read(fID) this%fIn
     ENDSUBROUTINE read_continue_
 
