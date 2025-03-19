@@ -13,10 +13,10 @@ PROGRAM main
     USE FluidDomain
     USE LBMBlockComm
     implicit none
-    character(LEN=40):: parameterFile='inFlow.dat',continueFile='continue.dat',checkFile='check.dat'
-    integer:: step=0,step_ave
+    character(LEN=40):: parameterFile='inFlow.dat',checkFile='check.dat'
+    integer:: step=0,start_ave
     real(8):: dt_fluid
-    real(8):: time=0.0d0,g(3)=[0,0,0]
+    real(8):: time=0.0d0,start_time=0.0d0,g(3)=[0,0,0]
     real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
@@ -50,7 +50,7 @@ PROGRAM main
     call Write_solid_Check(checkFile)
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
-    call check_is_continue(continueFile,step,time,flow%isConCmpt)
+    call check_is_continue(step,start_time,flow%isConCmpt) ! read dimensionless time in continue file as the computing start time
     call write_information_titles(m_nFish)
     !==================================================================================================
     ! Update the volume forces and calculate the macro quantities
@@ -67,11 +67,15 @@ PROGRAM main
     write(*,'(A)') '========================================================='
     !==================================================================================================
     dt_fluid = LBMblks(blockTreeRoot)%dh                       !time step of the fluid 
-    step_ave = int(flow%timeWriteBegin * flow%Tref / dt_fluid) !the first step for fluid averaging
-    if (step .ne. 0 .and. step .ge. step_ave) then 
-        step_ave = step + 1                  !restart averaging for continue computing
+    if(flow%timeWriteBegin .ge. start_time) then
+        start_ave = step + nint((flow%timeWriteBegin - start_time) * flow%Tref / dt_fluid)  !the first step for fluid averaging
+    else
+        start_ave = step
     endif
+    write(*,*)'the start step for fluid averaging(if used):', start_ave
+    write(*,'(A)') '========================================================='
     write(*,*) 'Time loop beginning'
+    time = start_time * flow%Tref     ! calculate the computing start time
     do while(time/flow%Tref < flow%timeSimTotal)
         call get_now_time(time_begine1)
         time = time + dt_fluid
@@ -87,7 +91,7 @@ PROGRAM main
         time_FEM       = 0.d0
         call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
         call calculate_macro_quantities_blocks()
-        call calculate_turbulent_statistic_blocks(step,step_ave)
+        call calculate_turbulent_statistic_blocks(step,start_ave)
         write(*,*)'Time for collision step:', time_collision
         write(*,*)'Time for streaming step:', time_streaming
         write(*,*)'Time for       IBM step:', time_IBM
@@ -97,7 +101,7 @@ PROGRAM main
         call get_now_time(time_begine2)
         ! write data for continue computing
         if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            call write_continue_blocks(continueFile,step,time)
+            call write_continue_blocks(step,time / flow%Tref)   ! output dimensionless time
         endif
         ! write fluid and soild data
         if((time/flow%Tref - flow%timeWriteBegin) >= -0.5*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5*dt_fluid/flow%Tref) then

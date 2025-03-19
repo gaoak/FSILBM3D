@@ -120,24 +120,108 @@ module FluidDomain
     end subroutine
 
     ! Check whether the calculation is continued
-    SUBROUTINE check_is_continue(filename,step,time,isContinue)
+    SUBROUTINE check_is_continue(step,time,isContinue)
         implicit none
-        character(LEN=40),intent(in):: filename
         integer,intent(out):: step
         real(8),intent(out):: time
-        integer:: isContinue,iblock
+        integer:: i,j,j2,x,y,z,iblock,indexs(1:6)
+        integer:: isContinue,nblocks,index_tmp,idfile=13
+        real(8):: xCoord,yCoord,zCoord,coeffs(1:3)
+        type(LBMBlock), allocatable :: LBMblks_tmp(:)
+        integer, allocatable :: sortdh(:)
+        real(8), allocatable :: coor_max(:,:)
         logical:: alive
-        inquire(file=filename, exist=alive)
+        inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue==1 .and. alive) then
             write(*,'(A)') '========================================================='
             write(*,'(A)') '=================== Continue computing =================='
             write(*,'(A)') '========================================================='
-            open(unit=13,file=filename,form='unformatted',status='old')
-            do iblock = 1,m_nblocks
-                call LBMblks(iblock)%read_continue(filename,step,time,13)
+            ! read continue file
+            open(unit=idfile,file='./DatContinue/continue',form='unformatted',status='old',access='stream')
+            read(idfile) nblocks,step,time
+            allocate(LBMblks_tmp(nblocks),sortdh(nblocks),coor_max(1:3,nblocks))
+            do iblock = 1,nblocks
+                call LBMblks_tmp(iblock)%read_continue(idfile)
             enddo
-            close(13)
+            close(idfile)
+            ! sort the blocks according to dh
+            do iblock = 1,nblocks
+                sortdh(iblock) = iblock
+            enddo
+            do i = 1, nblocks-1
+            do j = i+1, nblocks
+                if (LBMblks_tmp(i)%dh > LBMblks_tmp(j)%dh) then
+                    index_tmp = sortdh(i)
+                    sortdh(i) = sortdh(j)
+                    sortdh(j) = index_tmp
+                end if
+            end do
+            end do
+            ! calculate the max coordinates of each blocks
+            do iblock = 1,nblocks
+                coor_max(1,iblock) = LBMblks_tmp(iblock)%xmin + (LBMblks_tmp(iblock)%xDim - 1) * LBMblks_tmp(iblock)%dh
+                coor_max(2,iblock) = LBMblks_tmp(iblock)%ymin + (LBMblks_tmp(iblock)%yDim - 1) * LBMblks_tmp(iblock)%dh
+                coor_max(3,iblock) = LBMblks_tmp(iblock)%zmin + (LBMblks_tmp(iblock)%zDim - 1) * LBMblks_tmp(iblock)%dh
+            enddo
+            ! interpolate from the continue file
+            do i = 1,m_nblocks
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,j,j2,xCoord,yCoord,zCoord,indexs,coeffs)
+                do x=1,LBMblks(i)%xDim
+                    xCoord = LBMblks(i)%xmin + (x - 1) * LBMblks(i)%dh
+                do y=1,LBMblks(i)%yDim
+                    yCoord = LBMblks(i)%ymin + (y - 1) * LBMblks(i)%dh
+                do z=1,LBMblks(i)%zDim
+                    zCoord = LBMblks(i)%zmin + (z - 1) * LBMblks(i)%dh
+                    ! judge in which fluid block
+                    do j = 1,nblocks
+                        j2 = sortdh(j)
+                        if(zCoord .ge. LBMblks_tmp(j2)%zmin .and. zCoord .le. coor_max(3,j2) .and. &
+                           yCoord .ge. LBMblks_tmp(j2)%ymin .and. yCoord .le. coor_max(2,j2) .and. &
+                           xCoord .ge. LBMblks_tmp(j2)%xmin .and. xCoord .le. coor_max(1,j2)) then
+                            ! calculate the interpolation coefficients of the 8 around points
+                            coeffs(1) = (xCoord - LBMblks_tmp(j2)%xmin) / LBMblks_tmp(j2)%dh
+                            coeffs(2) = (yCoord - LBMblks_tmp(j2)%ymin) / LBMblks_tmp(j2)%dh
+                            coeffs(3) = (zCoord - LBMblks_tmp(j2)%zmin) / LBMblks_tmp(j2)%dh
+                            indexs(1) = floor(coeffs(1))
+                            indexs(3) = floor(coeffs(2))
+                            indexs(5) = floor(coeffs(3))
+                            coeffs(1) = coeffs(1) - dble(indexs(1))
+                            coeffs(2) = coeffs(2) - dble(indexs(3))
+                            coeffs(3) = coeffs(3) - dble(indexs(5))
+                            ! calculate the indexs of the 8 around points
+                            indexs(1) = indexs(1) + 1  ! x-1
+                            indexs(2) = indexs(1) + 1  ! x
+                            indexs(3) = indexs(3) + 1  ! y-1
+                            indexs(4) = indexs(3) + 1  ! y
+                            indexs(5) = indexs(5) + 1  ! z-1
+                            indexs(6) = indexs(5) + 1  ! z
+                            ! interpolate the fIn from the 8 around points
+                            LBMblks(i)%fIn(z,y,x,:) = LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(1),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(2),:) * (1 - coeffs(3)) * (1 - coeffs(2)) *      coeffs(1)  + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(4),indexs(1),:) * (1 - coeffs(3)) *      coeffs(2)  * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(4),indexs(2),:) * (1 - coeffs(3)) *      coeffs(2)  *      coeffs(1)  + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(3),indexs(1),:) *      coeffs(3)  * (1 - coeffs(2)) * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(3),indexs(2),:) *      coeffs(3)  * (1 - coeffs(2)) *      coeffs(1)  + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(4),indexs(1),:) *      coeffs(3)  *      coeffs(2)  * (1 - coeffs(1)) + &
+                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(4),indexs(2),:) *      coeffs(3)  *      coeffs(2)  *      coeffs(1)
+
+                            exit
+                        endif
+                    enddo
+                enddo
+                enddo
+                enddo
+                !$OMP END PARALLEL DO
+            enddo
+            do iblock = 1,nblocks
+                deallocate(LBMblks_tmp(iblock)%fIn)
+            enddo
+            deallocate(LBMblks_tmp,sortdh,coor_max)
         else
+            if(isContinue==1) then
+                write(*,'(A)') '========================================================='
+                write(*,*) 'Warning: the continue file is not found in DatContinue!'
+            endif
             write(*,'(A)') '========================================================='
             write(*,'(A)') '====================== New computing ===================='
             write(*,'(A)') '========================================================='
@@ -173,17 +257,23 @@ module FluidDomain
         enddo
     END SUBROUTINE
 
-    SUBROUTINE write_continue_blocks(filename,step,time)
+    SUBROUTINE write_continue_blocks(step,time)
         implicit none
-        character(LEN=40),intent(in):: filename
-        integer:: step
         real(8):: time
-        integer:: iblock
-        open(unit=13,file=filename,form='unformatted',status='replace')
-        do iblock = 1,m_nblocks
-            call LBMblks(iblock)%write_continue(filename,step,time,13)
+        integer:: step,i,iblock
+        integer,parameter::nameLen=10,idfile=13
+        character(len=nameLen):: fileName
+        write(filename,'(I10)') nint(time/flow%Tref*1d5)
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+            if(fileName(i:i)==' ') fileName(i:i)='0'
         enddo
-        close(13)
+        open(idfile,file='./DatContinue/continue'//trim(fileName),form='unformatted',access='stream')
+        write(idfile) m_nblocks,step,time
+        do iblock = 1,m_nblocks
+            call LBMblks(iblock)%write_continue(idfile)
+        enddo
+        close(idfile)
     END SUBROUTINE
 
     SUBROUTINE update_volume_force_blocks()
@@ -282,7 +372,9 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer:: xmin,ymin,zmin,xmax,ymax,zmax
         ! allocate fluid memory
-        allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
+        if(.not. allocated(this%fIn)) then
+            allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
+        endif
         allocate(this%uuu(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%force(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%den(this%zDim,this%yDim,this%xDim))
@@ -959,10 +1051,6 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z,step,step_s
         real(8)::invStep
-        if(step_s .lt. 0) then
-            write(*,*) "The start step for fluid averaging is less than zero."
-            stop
-        endif
         if(step .ge. step_s .and. this%outputtype .ge. 2) then
             invStep = 1 / real(step - step_s + 1)
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
@@ -1578,24 +1666,24 @@ module FluidDomain
         write(*,'(A,F18.12)')' FIELDSTAT Linfinity w ', uLinfty(3)
     endsubroutine
 
-    SUBROUTINE write_continue_(this,filename,step,time,fID)
+    SUBROUTINE write_continue_(this,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
-        character(LEN=40),intent(in):: filename
-        integer,intent(in):: step,fID
-        real(8),intent(in):: time
-        write(fID) step,time
+        integer,intent(in):: fID
+        write(fID) this%xmin,this%ymin,this%zmin,this%dh
+        write(fID) this%xDim,this%yDim,this%zDim
         write(fID) this%fIn
     ENDSUBROUTINE write_continue_
 
-    SUBROUTINE read_continue_(this,filename,step,time,fID)
+    SUBROUTINE read_continue_(this,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
-        character(LEN=40),intent(in):: filename
         integer,intent(in) :: fID
-        integer,intent(out):: step
-        real(8),intent(out):: time
-        read(fID) step,time
+        read(fID) this%xmin,this%ymin,this%zmin,this%dh
+        read(fID) this%xDim,this%yDim,this%zDim
+        if (.not. allocated(this%fIn)) then
+            allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
+        endif
         read(fID) this%fIn
     ENDSUBROUTINE read_continue_
 
