@@ -1673,7 +1673,7 @@ module FluidDomain
         ! separated, return 0
         ! partial overlaped, output error
         implicit none
-        integer:: i, j, CompareBlocks, cnt
+        integer:: i, j, CompareBlocks, cnt, align
         integer:: p, num_BC_fluid
         real(8):: i_vxyzminmax(6), j_vxyzminmax(6)
         logical:: d(6), if_fluid_pos(6)
@@ -1728,16 +1728,19 @@ module FluidDomain
             enddo
         endif
         cnt = 0
+        align = 0
         d(1) = i_vxyzminmax(1).lt.j_vxyzminmax(1).or.abs(i_vxyzminmax(1)-j_vxyzminmax(1)).lt.MachineTolerace
         d(2) = j_vxyzminmax(2).lt.i_vxyzminmax(2).or.abs(j_vxyzminmax(2)-i_vxyzminmax(2)).lt.MachineTolerace
         d(3) = j_vxyzminmax(1).lt.i_vxyzminmax(1).or.abs(j_vxyzminmax(1)-i_vxyzminmax(1)).lt.MachineTolerace
         d(4) = i_vxyzminmax(2).lt.j_vxyzminmax(2).or.abs(i_vxyzminmax(2)-j_vxyzminmax(2)).lt.MachineTolerace
         d(5) = i_vxyzminmax(2).lt.j_vxyzminmax(1)
         d(6) = j_vxyzminmax(2).lt.i_vxyzminmax(1)
-        if(d(1) .and. d(2)) then
+        if(d(1) .and. d(2) .and. .not. (d(3) .and. d(4))) then
             cnt = cnt + 1
-        else if(d(3) .and. d(4)) then
+        else if(d(3) .and. d(4) .and. .not. (d(1) .and. d(2))) then
             cnt = cnt - 1
+        else if(d(1) .and. d(2) .and. d(3) .and. d(4)) then
+            align = align + 1
         else if(d(5) .and. d(6)) then
             CompareBlocks = 0
             return
@@ -1748,10 +1751,12 @@ module FluidDomain
         d(4) = i_vxyzminmax(4).lt.j_vxyzminmax(4).or.abs(i_vxyzminmax(4)-j_vxyzminmax(4)).lt.MachineTolerace
         d(5) = i_vxyzminmax(4).lt.j_vxyzminmax(3)
         d(6) = j_vxyzminmax(4).lt.i_vxyzminmax(3)
-        if(d(1) .and. d(2)) then
+        if(d(1) .and. d(2) .and. .not. (d(3) .and. d(4))) then
             cnt = cnt + 1
-        else if(d(3) .and. d(4)) then
+        else if(d(3) .and. d(4) .and. .not. (d(1) .and. d(2))) then
             cnt = cnt - 1
+        else if(d(1) .and. d(2) .and. d(3) .and. d(4)) then
+            align = align + 1
         else if(d(5) .and. d(6)) then
             CompareBlocks = 0
             return
@@ -1762,13 +1767,19 @@ module FluidDomain
         d(4) = i_vxyzminmax(6).lt.j_vxyzminmax(6).or.abs(i_vxyzminmax(6)-j_vxyzminmax(6)).lt.MachineTolerace
         d(5) = i_vxyzminmax(6).lt.j_vxyzminmax(5)
         d(6) = j_vxyzminmax(6).lt.i_vxyzminmax(5)
-        if(d(1) .and. d(2)) then
+        if(d(1) .and. d(2) .and. .not. (d(3) .and. d(4))) then
             cnt = cnt + 1
-        else if(d(3) .and. d(4)) then
+        else if(d(3) .and. d(4) .and. .not. (d(1) .and. d(2))) then
             cnt = cnt - 1
+        else if(d(1) .and. d(2) .and. d(3) .and. d(4)) then
+            align = align + 1
         else if(d(5) .and. d(6)) then
             CompareBlocks = 0
             return
+        endif
+        if(align.gt.0) then
+            if(cnt.lt.0) cnt = cnt - align
+            if(cnt.gt.0) cnt = cnt + align
         endif
         if(cnt.eq.3) then
             CompareBlocks = 1
