@@ -83,7 +83,7 @@ module FlowCondition
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*)    flow%fluidProbingNum,flow%inWhichBlock
-        if (flow%fluidProbingNum .ne. 0) then
+        if (flow%fluidProbingNum .gt. 0) then
             allocate(flow%fluidProbingCoords(flow%fluidProbingNum,1:3))
             do i=1,flow%fluidProbingNum
                 call readNextData(111, buffer)
@@ -97,7 +97,7 @@ module FlowCondition
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
         read(buffer,*)    flow%solidProbingNum
-        if (flow%solidProbingNum .ne. 0) then
+        if (flow%solidProbingNum .gt. 0) then
             allocate(flow%solidProbingNode(flow%solidProbingNum))
             do i=1,flow%solidProbingNum
                 call readNextData(111, buffer)

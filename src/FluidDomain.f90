@@ -1860,12 +1860,10 @@ module FluidDomain
                 if (if_fluid_pos(p)) then
                     if (mod(p,2) .eq. 1) then
                         if (LBMblks(j)%BndConds(p+1).eq.BCfluid_father.and. &
-                            LBMblks(i)%BndConds(p+1).ne.BCfluid_father.and. &
                             abs(j_vxyzminmax(p+1)-i_vxyzminmax(p)-LBMblks(j)%dh).lt.MachineTolerace) &
                             i_vxyzminmax(p+1) = i_vxyzminmax(p)
                     else
                         if (LBMblks(j)%BndConds(p-1).eq.BCfluid_father.and. &
-                            LBMblks(i)%BndConds(p-1).ne.BCfluid_father.and. &
                             abs(i_vxyzminmax(p)-j_vxyzminmax(p-1)-LBMblks(j)%dh).lt.MachineTolerace) &
                             i_vxyzminmax(p-1) = i_vxyzminmax(p)
                     endif
@@ -1879,12 +1877,10 @@ module FluidDomain
                 if (if_fluid_pos(p)) then
                     if (mod(p,2) .eq. 1) then
                         if (LBMblks(i)%BndConds(p+1).eq.BCfluid_father.and. &
-                            LBMblks(j)%BndConds(p+1).ne.BCfluid_father.and. &
                             abs(i_vxyzminmax(p+1)-j_vxyzminmax(p)-LBMblks(i)%dh).lt.MachineTolerace) &
                             j_vxyzminmax(p+1) = j_vxyzminmax(p)
                     else
                         if (LBMblks(i)%BndConds(p-1).eq.BCfluid_father.and. &
-                            LBMblks(j)%BndConds(p-1).ne.BCfluid_father.and. &
                             abs(j_vxyzminmax(p)-i_vxyzminmax(p-1)-LBMblks(i)%dh).lt.MachineTolerace) &
                             j_vxyzminmax(p-1) = j_vxyzminmax(p)
                     endif
