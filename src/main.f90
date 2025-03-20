@@ -75,9 +75,9 @@ PROGRAM main
     write(*,'(A)') '========================================================='
     !==================================================================================================
     ! Write the initial fluid and solid data
-    call write_flow_blocks(start_time)
-    call write_solid_field(start_time)
-    call Write_solid_v_bodies(start_time)
+    call write_flow_blocks(time)
+    call write_solid_field(time)
+    call Write_solid_v_bodies(time)
     call get_now_time(time_end1)             !end time for the preparation before computing
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================='
