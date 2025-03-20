@@ -58,14 +58,7 @@ PROGRAM main
     call tree_set_boundary_conditions_block(blockTreeRoot)
     call calculate_macro_quantities_blocks()
     !==================================================================================================
-    ! Write the initial fluid and solid data
-    call write_flow_blocks(time)
-    call write_solid_field(time)
-    call Write_solid_v_bodies(time)
-    call get_now_time(time_end1)             !end time for the preparation before computing
-    write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
-    write(*,'(A)') '========================================================='
-    !==================================================================================================
+    ! Determine the time and step of continue computing
     dt_fluid = LBMblks(blockTreeRoot)%dh     !time step of the fluid 
     if(flow%isConCmpt .eq. 1) then
         time = start_time * flow%Tref        !calculate the computing start time
@@ -80,6 +73,15 @@ PROGRAM main
     endif
     write(*,*)'the start step for fluid averaging(if used):', start_ave
     write(*,'(A)') '========================================================='
+    !==================================================================================================
+    ! Write the initial fluid and solid data
+    call write_flow_blocks(time)
+    call write_solid_field(time)
+    call Write_solid_v_bodies(time)
+    call get_now_time(time_end1)             !end time for the preparation before computing
+    write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
+    write(*,'(A)') '========================================================='
+    !==================================================================================================
     write(*,*) 'Time loop beginning'
     do while(time/flow%Tref < flow%timeSimTotal)
         call get_now_time(time_begine1)

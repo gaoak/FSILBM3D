@@ -263,7 +263,7 @@ module FluidDomain
         integer:: step,i,iblock
         integer,parameter::nameLen=10,idfile=13
         character(len=nameLen):: fileName
-        write(filename,'(I10)') nint(time/flow%Tref*1d5)
+        write(filename,'(I10)') nint(time*1d5)
         fileName = adjustr(fileName)
         do  i=1,nameLen
             if(fileName(i:i)==' ') fileName(i:i)='0'
