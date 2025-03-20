@@ -122,7 +122,7 @@ module LBMBlockComm
         enddo
         nb = nb - cr
         if(cr.gt.1) then
-            write(*,*) 'Error: there exist more than one block tree root', rootnode
+            write(*,*) 'Error: there exist more than one block tree root, father relationship(-1 is root):', fa
             stop
         endif
     end subroutine
@@ -529,6 +529,7 @@ module LBMBlockComm
             res = res1 + res2
             if(flag .or. res .gt. 1d-8) then
                 write(*,*) 'grid points do not match between fluid blocks',LBMBlks(p%fatherId)%ID,LBMBlks(p%sonId)%ID,res1,res2
+                write(*,*) 'if son block have periodic boundarys, an even number of grid points is needed. Otherwise an odd number is needed.'
                 stop
             endif
             call check_blocks_params(blocktree(treenode)%sons(i))

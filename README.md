@@ -255,6 +255,7 @@ $PBS_WDIR/$PBS_ENAME
   8. *xmin,ymin,zmin*: Starting position of the fluid block
   9. *boundaryConditions(1:6) (xmin,xmax,ymin,ymax,zmin,zmax)*: Boundary conditions parameters on six directions
      + 0:  Fluid boundary conditions
+     + 1:  Fluid boundary conditions of the father bolck, only appear with fluid boundary conditions at the same time and not appearing alone
      + 101: Dirichlet boundary condition (velocity equal to a specified value)
      + 102: Dirichlet boundary condition (The value of velocity at the boundary is not a fixed constant, but a non-uniform distribution of function values)
      + 103: First order extrapolation boundary conditions
@@ -262,6 +263,7 @@ $PBS_WDIR/$PBS_ENAME
      + 201: Fixed wall(full way bounce back)
      + 202: Moving wall, only for the top and bottom boundaries $(ymin, ymax)$
      + 203: Fixed wall(half way bounce back, good choice for turbulent in LES compute)
+     + 204: Moving wall(half way bounce back, good choice for turbulent in LES compute)
      + 301: Periodic Boundary(For the son block, the xDim/yDim/zDim should have have one more layer than the father block)
      + 302: Symmetric boundary
   10. *params*: Pending Parameters
