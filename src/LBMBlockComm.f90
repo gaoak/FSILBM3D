@@ -139,9 +139,9 @@ module LBMBlockComm
             do j=i+1,nb
                 tmp = CompareBlocks(iblocks(i), iblocks(j))
                 if(tmp.eq.1) then
-                    fa(j) = iblocks(i)
+                    fa(j) = i
                 elseif(tmp.eq.-1) then
-                    fa(i) = iblocks(j)
+                    fa(i) = j
                 endif
             enddo
         enddo
@@ -176,7 +176,7 @@ module LBMBlockComm
         do i=1,cr
             cb = 0
             do j=1,nb
-                if(fa(j).eq.roots(i)) then
+                if(iblocks(fa(j)).eq.roots(i)) then
                     cb = cb + 1
                     subblock(cb) = iblocks(j)
                 endif
