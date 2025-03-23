@@ -263,23 +263,26 @@
             integer:: treenode,i,j,s
             character(len=4):: IDstr
             write(IDstr,'(I4.4)')LBMblks(treenode)%ID
-            write(111,'(A,A,A  )')'============================ BlockID = ',IDstr,' ============================='
+            write(111,'(A,A,A  )')'========================== BlockID = ',IDstr,' =========================='
             write(111,'(A,F20.10)')'Tau  =', LBMblks(treenode)%tau
-            write(111,'(A,F20.10)')'Omega =', LBMblks(treenode)%Omega
-            write(111,'(A,A    )')'---------------------------------------------------------------------------'
+            write(111,'(A,F20.10)')'Omega=', LBMblks(treenode)%Omega
+            write(111,'(A,A    )')'--------------------------------------------------------------------'
             write(IDstr,'(I4.4)')LBMblks(treenode)%carriedBodies(0)
             write(111,'(A,A    )') 'carryBodies : ', IDstr
-            write(111,'(A      )', advance='no') 'bodyIDs :'
+            write(111,'(A      )', advance='no') 'bodyIDs     :'
             do i=1,LBMblks(treenode)%carriedBodies(0)
                 write(IDstr,'(I4.4)')LBMblks(treenode)%carriedBodies(i)
-                write(111,'(A,A    )', advance='no') '    ', IDstr
+                write(111,'(A,A    )', advance='no') ' ', IDstr
             enddo
             write(111,'(A      )') ''
-            write(111,'(A      )', advance='no') 'sonBlocks :'
+            write(111,'(A      )', advance='no') 'sonBlocks   :'
             do j=1,blockTree(treenode)%nsons
-                s = blockTree(treenode)%comm(j)%sonId
+                s = blockTree(treenode)%sons(j)
                 write(IDstr,'(I4.4)')s
-                write(111,'(A,A    )', advance='no') '    ', IDstr
+                write(111,'(A,A    )', advance='no') ' ', IDstr
+            enddo
+            do j=1,blockTree(treenode)%nsons
+                s = blockTree(treenode)%sons(j)
                 write(111,'(A      )') ''
                 call write_parameter_blocks(s)
             enddo
