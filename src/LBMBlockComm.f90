@@ -27,7 +27,7 @@ module LBMBlockComm
     recursive SUBROUTINE build_blocks_comunication(treenode)
         implicit none
         integer,intent(in):: treenode
-        integer:: nsons,i,j,sxD,syD,szD,ratio,fId,sId,islocal
+        integer:: nsons,i,j,sxD,syD,szD,ratio,fId,sId
         type(CommPair)::pair
         nsons = blockTree(treenode)%nsons
         if(nsons .eq. 0) return
@@ -130,7 +130,7 @@ module LBMBlockComm
     recursive subroutine array_to_tree(iblocks, nb, rootnode)
         implicit none
         integer, intent(in):: nb, iblocks(1:nb),rootnode
-        integer:: nr, roots(1:nb),fa(1:nb),subblock(1:nb)
+        integer:: roots(1:nb),fa(1:nb),subblock(1:nb)
         integer:: i, j, tmp,cr,cb
         if(nb.eq.0) return
         ! compare all blocks
@@ -187,7 +187,7 @@ module LBMBlockComm
 
     subroutine bluid_block_tree()
         implicit none
-        integer:: i,f,s,ns(1:m_nblocks),iblocks(1:m_nblocks),nb
+        integer:: i,iblocks(1:m_nblocks),nb
         ! initialise blocktree
         allocate(blockTree(1:m_nblocks))
         do i=1,m_nblocks
