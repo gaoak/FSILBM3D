@@ -481,10 +481,12 @@ module SolidBody
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(out)::force(zDim,yDim,xDim,1:3)
         integer :: i,iFish
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(i,iFish)
         do i = 1,bodies(0)
             iFish = bodies(i)
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
+        !$OMP END PARALLEL DO
         call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
     end subroutine
 
@@ -757,6 +759,7 @@ module SolidBody
         real(8):: dmaxLBM,dsum
         real(8)::tol,ntol
         ! update virtual body shape and velocity
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(i,iFish)
         do i = 1, bodies(0)
             iFish = bodies(i)
             if (VBodies(iFish)%v_move .eq. 1 .or. VBodies(iFish)%rbm%iBodyModel .eq. 2 .or. VBodies(iFish)%count_Interp .eq. 0 ) then
@@ -765,19 +768,22 @@ module SolidBody
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
+        !$OMP END PARALLEL DO
         if (bodies(0) .gt. 0) then
             ! calculate interaction force using immersed-boundary method
             iterLBM=0
             dmaxLBM=1d10
-            do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
+            do while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
                 dmaxLBM = 0.d0
                 dsum=0.0d0
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(i,iFish,ntol) reduction(+:dmaxLBM,dsum)
                 do i = 1, bodies(0)
                     iFish = bodies(i)
                     call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
                     dmaxLBM = dmaxLBM + tol
                     dsum = dsum + ntol
                 enddo
+                !$OMP END PARALLEL DO
                 dmaxLBM=dmaxLBM/(dsum * m_Uref)
                 iterLBM=iterLBM+1
             enddo
@@ -788,10 +794,12 @@ module SolidBody
             VBodies(iFish)%rbm%extful = 0.0d0
             ! to do, consider gravity
         enddo
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(i,iFish)
         do i = 1, bodies(0)
             iFish = bodies(i)
             call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force)
         enddo
+        !$OMP END PARALLEL DO
     END SUBROUTINE
 
     SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,force)
@@ -810,6 +818,7 @@ module SolidBody
         !==================================================================================================
         invh3 = (1.d0/dh)**3
         ! compute the velocity of IB nodes at element center
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,ix,jy,kz,rx,ry,rz,i1,i2,x,y,z,forceElemTemp,forceTemp)
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(1:4,iEL)
             jy = this%v_Ei(5:8,iEL)
@@ -834,6 +843,7 @@ module SolidBody
                 enddo
             enddo
         enddo
+        !$OMP END PARALLEL DO
     END SUBROUTINE FluidVolumeForce_
 
     SUBROUTINE PenaltyForce_(this,dt,dh,xDim,yDim,zDim,tolerance,ntolsum,uuu)
@@ -889,6 +899,7 @@ module SolidBody
         endif
 
         ! correct velocity
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,ix,jy,kz,rx,ry,rz,x,y,z)
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(1:4,iEL)
             jy = this%v_Ei(5:8,iEL)
@@ -904,6 +915,7 @@ module SolidBody
                 enddo
             enddo
         enddo
+        !$OMP END PARALLEL DO
     END SUBROUTINE PenaltyForce_
 
     subroutine PlateBuild_(this)
