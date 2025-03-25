@@ -122,13 +122,9 @@ PROGRAM main
         endif
         ! write processing informations
         if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            if(flow%fluidProbingNum.gt.0)then
-                call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
-                                             LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu,LBMblks(flow%inWhichBlock)%den)
-            endif
-            if(flow%solidProbingNum.gt.0)then
-                call write_solid_Information(time,flow%timeInfoDelta,flow%Asfac,flow%solidProbingNum,flow%solidProbingNode)
-            endif
+            call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
+                                              LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu,LBMblks(flow%inWhichBlock)%den)
+            call write_solid_Information(time,flow%timeInfoDelta,flow%Asfac,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)
         write(*,*)'Time for   writing step:', (time_end2 - time_begine2)
