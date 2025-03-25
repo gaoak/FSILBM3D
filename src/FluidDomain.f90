@@ -1174,10 +1174,25 @@ module FluidDomain
     SUBROUTINE add_volume_force_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        integer:: x
+        integer:: x,i,j,k
+        real(8):: u_volume,u_bulk
+        u_volume = 0.0d0
+        u_bulk = 0.0d0
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(i,j,k) reduction (+:u_bulk,u_volume)
+        do  k = 1, this%zDim
+        do  j = 1, this%yDim
+            u_bulk   = u_bulk + this%uuu(k,j,1,1)
+        do  i = 1, this%xDim
+            u_volume = u_volume + this%uuu(k,j,i,1)
+        enddo
+        enddo
+        enddo
+        !$OMP END PARALLEL DO
+        u_bulk   = u_bulk/this%zDim/this%yDim
+        u_volume = u_volume/this%zDim/this%yDim
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
         do x=1,this%xDim
-            this%force(:,:,x,1) = this%force(:,:,x,1) + this%volumeForce(1)
+            this%force(:,:,x,1) = this%force(:,:,x,1) + this%volumeForce(1) + (u_bulk - u_volume )/this%dh
             this%force(:,:,x,2) = this%force(:,:,x,2) + this%volumeForce(2)
             this%force(:,:,x,3) = this%force(:,:,x,3) + this%volumeForce(3)
         enddo
