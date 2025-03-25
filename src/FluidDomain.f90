@@ -195,6 +195,9 @@ module FluidDomain
                             indexs(4) = indexs(3) + 1  ! y
                             indexs(5) = indexs(5) + 1  ! z-1
                             indexs(6) = indexs(5) + 1  ! z
+                            if(abs(zCoord-coor_max(3,j2)) .lt. MachineTolerace) indexs(6) = indexs(5) - 1  ! z
+                            if(abs(yCoord-coor_max(2,j2)) .lt. MachineTolerace) indexs(4) = indexs(3) - 1  ! y
+                            if(abs(xCoord-coor_max(1,j2)) .lt. MachineTolerace) indexs(2) = indexs(1) - 1  ! x
                             ! interpolate the fIn from the 8 around points
                             LBMblks(i)%fIn(z,y,x,:) = LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(1),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
                                                       LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(2),:) * (1 - coeffs(3)) * (1 - coeffs(2)) *      coeffs(1)  + &
