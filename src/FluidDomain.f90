@@ -209,43 +209,6 @@ module FluidDomain
                                                       LBMblks_tmp(j2)%fIn(indexs(6),indexs(4),indexs(2),:) *      coeffs(3)  *      coeffs(2)  *      coeffs(1)
 
                             exit
-                        else
-                            ! calculate the interpolation coefficients of the 8 around points
-                            coeffs(1) = (xCoord - LBMblks_tmp(j2)%xmin) / LBMblks_tmp(j2)%dh
-                            coeffs(2) = (yCoord - LBMblks_tmp(j2)%ymin) / LBMblks_tmp(j2)%dh
-                            coeffs(3) = (zCoord - LBMblks_tmp(j2)%zmin) / LBMblks_tmp(j2)%dh
-                            indexs(1) = floor(coeffs(1))
-                            indexs(3) = floor(coeffs(2))
-                            indexs(5) = floor(coeffs(3))
-                            coeffs(1) = coeffs(1) - dble(indexs(1))
-                            coeffs(2) = coeffs(2) - dble(indexs(3))
-                            coeffs(3) = coeffs(3) - dble(indexs(5))
-                            indexs(1) = mod(indexs(1),LBMblks_tmp(j2)%xDim)
-                            indexs(3) = mod(indexs(3),LBMblks_tmp(j2)%yDim)
-                            indexs(5) = mod(indexs(5),LBMblks_tmp(j2)%zDim)
-                            if(indexs(1).lt.0) indexs(1) = indexs(1)+LBMblks_tmp(j2)%xDim
-                            if(indexs(3).lt.0) indexs(3) = indexs(3)+LBMblks_tmp(j2)%yDim
-                            if(indexs(5).lt.0) indexs(5) = indexs(5)+LBMblks_tmp(j2)%zDim
-                            ! calculate the indexs of the 8 around points
-                            indexs(1) = indexs(1) + 1  ! x-1
-                            indexs(2) = indexs(1) + 1  ! x
-                            indexs(3) = indexs(3) + 1  ! y-1
-                            indexs(4) = indexs(3) + 1  ! y
-                            indexs(5) = indexs(5) + 1  ! z-1
-                            indexs(6) = indexs(5) + 1  ! z
-                            if(indexs(1).eq.LBMblks_tmp(j2)%xDim) indexs(2) = indexs(1) - 1  ! x
-                            if(indexs(3).eq.LBMblks_tmp(j2)%yDim) indexs(4) = indexs(3) - 1  ! y
-                            if(indexs(5).eq.LBMblks_tmp(j2)%zDim) indexs(6) = indexs(5) - 1  ! z
-                            ! interpolate the fIn from the 8 around points
-                            LBMblks(i)%fIn(z,y,x,:) = LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(1),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(2),:) * (1 - coeffs(3)) * (1 - coeffs(2)) *      coeffs(1)  + &
-                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(4),indexs(1),:) * (1 - coeffs(3)) *      coeffs(2)  * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(j2)%fIn(indexs(5),indexs(4),indexs(2),:) * (1 - coeffs(3)) *      coeffs(2)  *      coeffs(1)  + &
-                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(3),indexs(1),:) *      coeffs(3)  * (1 - coeffs(2)) * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(3),indexs(2),:) *      coeffs(3)  * (1 - coeffs(2)) *      coeffs(1)  + &
-                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(4),indexs(1),:) *      coeffs(3)  *      coeffs(2)  * (1 - coeffs(1)) + &
-                                                      LBMblks_tmp(j2)%fIn(indexs(6),indexs(4),indexs(2),:) *      coeffs(3)  *      coeffs(2)  *      coeffs(1)
-
                         endif
                     enddo
                 enddo
