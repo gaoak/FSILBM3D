@@ -1189,7 +1189,7 @@ module FluidDomain
         enddo
         !$OMP END PARALLEL DO
         u_bulk   = u_bulk/this%zDim/this%yDim
-        u_volume = u_volume/this%zDim/this%yDim
+        u_volume = u_volume/this%zDim/this%yDim/this%xDim
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
         do x=1,this%xDim
             this%force(:,:,x,1) = this%force(:,:,x,1) + this%volumeForce(1) + (u_bulk - u_volume )/this%dh
