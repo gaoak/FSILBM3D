@@ -176,9 +176,11 @@ module LBMBlockComm
         do i=1,cr
             cb = 0
             do j=1,nb
-                if(iblocks(fa(j)).eq.roots(i)) then
-                    cb = cb + 1
-                    subblock(cb) = iblocks(j)
+                if(fa(j).gt.0) then
+                    if(iblocks(fa(j)).eq.roots(i)) then
+                        cb = cb + 1
+                        subblock(cb) = iblocks(j)
+                    endif
                 endif
             enddo
             call array_to_tree(subblock, cb, roots(i))

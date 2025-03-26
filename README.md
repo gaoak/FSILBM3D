@@ -327,7 +327,8 @@ $PBS_WDIR/$PBS_ENAME
 - **ProbingFluid**
 
   1. *fluidProbingNum*: The number of data detection points in flow field
-  2. *fluidProbingCoords* : The coordinates of detection points
+  2. *inWhichBlock*:    The flow field where the data detection point is located.(must greater than 0)
+  3. *fluidProbingCoords* : The coordinates of detection points
 
 - **ProbingSolid**
 

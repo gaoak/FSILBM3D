@@ -185,6 +185,9 @@ module FluidDomain
                             indexs(1) = floor(coeffs(1))
                             indexs(3) = floor(coeffs(2))
                             indexs(5) = floor(coeffs(3))
+                            if(indexs(1).eq.(LBMblks_tmp(j2)%xDim-1)) indexs(1) = indexs(1) - 1  ! x
+                            if(indexs(3).eq.(LBMblks_tmp(j2)%yDim-1)) indexs(3) = indexs(3) - 1  ! y
+                            if(indexs(5).eq.(LBMblks_tmp(j2)%zDim-1)) indexs(5) = indexs(5) - 1  ! z
                             coeffs(1) = coeffs(1) - dble(indexs(1))
                             coeffs(2) = coeffs(2) - dble(indexs(3))
                             coeffs(3) = coeffs(3) - dble(indexs(5))
