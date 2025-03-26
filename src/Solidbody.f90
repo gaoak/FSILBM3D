@@ -391,7 +391,7 @@ module SolidBody
         do  i=1,nameLen
             if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
-        open(idfile, FILE='./DatBodySpan/BodyFake_'//trim(filename)//'.dat')
+        open(idfile, FILE='./DatBodySpan/BodiesVirtual_'//trim(filename)//'.dat')
         write(idfile, '(A)') 'VARIABLES = "x" "y" "z"'
         !write fake solids
         do iFish = 1,m_nFish
@@ -439,7 +439,7 @@ module SolidBody
         DO  i=1,nameLen
             if(fileName(i:i)==' ')fileName(i:i)='0'
         END DO
-        open(idfile,FILE='./DatBody/Body_'//trim(fileName)//'.dat')
+        open(idfile,FILE='./DatBody/Bodies_'//trim(fileName)//'.dat')
         write(idfile, '(A)') 'TITLE = "ASCII File."'
         write(idfile, '(A)') 'VARIABLES = "x" "y" "z" "u" "v" "w" "ax" "ay" "az" "fxi" "fyi" "fzi" "fxr" "fyr" "fzr"'
         do iFish=1,m_nFish
