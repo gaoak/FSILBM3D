@@ -185,6 +185,9 @@ module FluidDomain
                             indexs(1) = floor(coeffs(1))
                             indexs(3) = floor(coeffs(2))
                             indexs(5) = floor(coeffs(3))
+                            if(indexs(1).eq.(LBMblks_tmp(j2)%xDim-1)) indexs(1) = indexs(1) - 1  ! x
+                            if(indexs(3).eq.(LBMblks_tmp(j2)%yDim-1)) indexs(3) = indexs(3) - 1  ! y
+                            if(indexs(5).eq.(LBMblks_tmp(j2)%zDim-1)) indexs(5) = indexs(5) - 1  ! z
                             coeffs(1) = coeffs(1) - dble(indexs(1))
                             coeffs(2) = coeffs(2) - dble(indexs(3))
                             coeffs(3) = coeffs(3) - dble(indexs(5))
@@ -195,9 +198,6 @@ module FluidDomain
                             indexs(4) = indexs(3) + 1  ! y
                             indexs(5) = indexs(5) + 1  ! z-1
                             indexs(6) = indexs(5) + 1  ! z
-                            if(indexs(1).eq.LBMblks_tmp(j2)%xDim) indexs(2) = indexs(1) - 1  ! x
-                            if(indexs(3).eq.LBMblks_tmp(j2)%yDim) indexs(4) = indexs(3) - 1  ! y
-                            if(indexs(5).eq.LBMblks_tmp(j2)%zDim) indexs(6) = indexs(5) - 1  ! z
                             ! interpolate the fIn from the 8 around points
                             LBMblks(i)%fIn(z,y,x,:) = LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(1),:) * (1 - coeffs(3)) * (1 - coeffs(2)) * (1 - coeffs(1)) + &
                                                       LBMblks_tmp(j2)%fIn(indexs(5),indexs(3),indexs(2),:) * (1 - coeffs(3)) * (1 - coeffs(2)) *      coeffs(1)  + &
