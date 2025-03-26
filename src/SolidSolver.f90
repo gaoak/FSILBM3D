@@ -293,35 +293,20 @@ module SolidSolver
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot ASCII format
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,fileName)
+    SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,idfile)
     implicit none
     class(BeamSolver), intent(inout) :: this
     real(8):: Lref,Uref,Aref,Fref
-!   -------------------------------------------------------
-    integer:: i,iFish,ElmType
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileName,idstr
-    !==================================================================================================
-    integer,parameter:: namLen=40,idfile=100,numVar=15
-    character(namLen):: varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fxi','fyi','fzi','fxr','fyr','fzr']
-    !==================================================================================================
+    integer:: i,iFish,ElmType,idfile
+    integer,parameter::nameLen=10,namLen=40,numVar=15
+    character(len=nameLen):: idstr
 
-    ElmType = this%ele(1,4)
-
-    write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-    OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(fileName)//'.dat')
-    
-    ! Write header information
-    write(idfile, '(A)') 'TITLE    = "ASCII File."'
-    write(idfile, '(A)', advance='no') 'variables= '
-    do i=1,numVar-1
-        write(idfile, '(3A)', advance='no') '"', trim(varname(i)), '" '
-    enddo
-    write(idfile, '(A)') varname(numVar)
-
-    write(idfile, '(A)') 'ZONE    T= "ZONE 1"'
+    !Write zone information
+    write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
+    write(idfile, '(A,A,A)') ' ZONE T = "fish',trim(idstr),'"'
     write(idfile, '(A)') ' STRANDID=0, SOLUTIONTIME=0'
     write(idfile, '(A,I8,A,I8,A)', advance='no') ' Nodes=',this%nND,', Elements=',this%nEL,', ZONETYPE='
+    ElmType = this%ele(1,4)
     if(ElmType.eq.2) then
         write(idfile, '(A)') 'FELINESEG'
     elseif (ElmType.eq.3) then
@@ -333,13 +318,11 @@ module SolidSolver
         write(idfile, '(A)', advance='no') 'SINGLE '
     enddo
     write(idfile, '(A)') 'SINGLE )'
-
-    ! Write node data
+    !Write node data
     do i=1,this%nND
         write(idfile, '(10E28.18 )')   real(this%xyzful(i,1:3)/Lref),real(this%velful(i,1:3)/Uref),real(this%accful(i,1:3)/Aref),real(this%extful(i,1:3)/Fref),real(this%repful(i,1:3)/Fref)
     enddo
-
-    ! Write element data
+    !Write element data
     if(ElmType.eq.2) then
         do i = 1, this%nEL
             write(idfile, *) this%ele(i,1),this%ele(i,2)
@@ -349,9 +332,6 @@ module SolidSolver
             write(idfile, *) this%ele(i,1),this%ele(i,2),this%ele(i,3)
         enddo
     endif
-
-    close(idfile)
-!   =============================================
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -417,11 +397,11 @@ module SolidSolver
         enddo
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_info_(this,fid,iFish,time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref,Asfac)
+    SUBROUTINE write_solid_info_(this,fid,iFish,time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref)
     IMPLICIT NONE
     class(BeamSolver), intent(inout) :: this
     integer,intent(in) :: fid
-    real(8),intent(in) :: time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref,Asfac
+    real(8),intent(in) :: time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref
     integer:: i,iFish
     real(8):: EEE(2),strainEnergy(this%nEL,2)
     real(8):: Ptot,Pax,Pay,Paz
@@ -471,12 +451,6 @@ module SolidSolver
         write(fid,'(10E20.10)')time/Tref,Ptot,Pax,Pay,Paz
         close(fid)
 
-        ! write area title
-        ! call cptArea(this%areaElem(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1:6))
-        ! open(fid,file='./DatInfo/FishArea_'//trim(fishNum)//'.plt',position='append')
-        ! write(fid,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
-        ! close(fid)
-
         call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
                                 this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nEL,1:10), &
                                 this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
@@ -494,7 +468,6 @@ module SolidSolver
         open(fid,file='./DatInfo/FishEnergy_'//trim(fishNum)//'.plt', position='append')
         write(fid,'(10E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
         close(fid)
-
     ENDSUBROUTINE
 
     subroutine write_solid_probes_(this,fid,iFish,time,solidProbingNum,solidProbingNode,Tref,Lref,Uref,Aref)
