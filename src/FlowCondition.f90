@@ -121,49 +121,53 @@ module FlowCondition
     !     close(111)
     ! END SUBROUTINE
 
-    SUBROUTINE write_information_titles()
+    SUBROUTINE write_information_titles(nGroup)
         implicit none
-        integer:: i
+        integer:: i,j,iGroup,nGroup
         integer,parameter::nameLen=3
-        character (LEN=nameLen):: probeNum
-        ! write solid forces title
-        open(111,file='./DatInfo/FishForces.plt')
-        write(111,*) 'VARIABLES = "t"  "Fx"  "Fy"  "Fz"'
-        close(111)
-        ! write the first point of the solid titles
-        open(111,file='./DatInfo/FishNodeBegin.plt')
-        write(111,*) 'VARIABLES = "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
-        close(111)
-        ! write the last point of the solid titles
-        open(111,file='./DatInfo/FishNodeEnd.plt')
-        write(111,*) 'VARIABLES = "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
-        close(111)
-        ! write the middle point of the solid titles
-        open(111,file='./DatInfo/FishNodeCenter.plt')
-        write(111,*) 'VARIABLES = "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
-        close(111)
-        ! write solid average titles
-        open(111,file='./DatInfo/FishNodeAverage.plt')
-        write(111,*) 'VARIABLES = "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
-        close(111)
-        ! write solid displacement titles
-        open(111,file='./DatInfo/FishDeformation.plt')
-        write(111,*) 'VARIABLES = "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
-        close(111) 
-        ! write solid power titles
-        open(111,file='./DatInfo/FishPower.plt')
-        write(111,*) 'VARIABLES = "t"  "Ptot"  "Px"  "Py"  "Pz"'
-        close(111)
-        ! write solid energy titles
-        open(111,file='./DatInfo/FishEnergy.plt')
-        write(111,*) 'VARIABLES = "t"  "Es"  "Eb"  "Ep"  "Ek"  "Ew"  "Et"'
-        close(111)
-        ! write solid probing titles
-        do  i=1,flow%solidProbingNum
-            write(probeNum,'(I3.3)') i
-            open(111,file='./DatInfo/FishProbes_'//trim(probeNum)//'.plt')
-            write(111,*) 'VARIABLES = "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+        character (LEN=nameLen):: groupNum,probeNum
+        do iGroup=1,nGroup
+            ! get fish group numbers
+            write(groupNum,'(I3)') iGroup
+            groupNum = adjustr(groupNum)
+            do  i=1,nameLen
+                    if(groupNum(i:i)==' ') groupNum(i:i)='0'
+            enddo
+            ! write the first point of the solid titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.plt')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
+            ! write the last point of the solid titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.plt')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            close(111)
+            ! write the middle point of the solid titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.plt')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            close(111)
+            ! write solid average titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.plt')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            close(111)
+            ! write solid forces title
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_forces.plt')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "Fx"  "Fy"  "Fz"'
+            close(111)
+            ! write solid power titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_power.plt')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "Ptot"  "Px"  "Py"  "Pz"'
+            close(111)
+            ! write solid energy titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_energy.plt')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "Etot"  "Evel"  "Ep"  "Es"  "Eb"'
+            close(111)
+            ! write solid probing titles
+            do  j=1,flow%solidProbingNum
+                write(probeNum,'(I3.3)') j
+                open(111,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.plt')
+                write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+                close(111)
+            enddo
         enddo
         ! write fluid flux title
         open(111,file='./DatInfo/FluidFlux.plt')
