@@ -498,30 +498,30 @@ module SolidBody
                     if(groupNum(i:i)==' ') groupNum(i:i)='0'
             enddo
             ! write zone titles
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
             do  j=1,solidProbingNum
                 write(probeNum,'(I3.3)') j
-                open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.plt',position='append')
+                open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
                 write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
                 close(idfile)
             enddo

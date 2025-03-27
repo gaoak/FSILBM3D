@@ -348,18 +348,18 @@ $PBS_WDIR/$PBS_ENAME
 
 - **Files in DatInfo description**
 
-1. *power.plt* : The power information of the bodies
+1. *power.dat* : The power information of the bodies
    - *Ptot*  : *Px* + *Py* + *Pz*
    - *Px*,*Py*,*Pz* : Output power calculated by ($force * velcity$)
-2. *energy.plt* : The energy of the bodies
+2. *energy.dat* : The energy of the bodies
    - *E_s* : Streching strain energy
    - *E_b* : Bending strain energy
    - *E_p* : Total strain energy calculated by (*E_s* + *E_b*)
    - *E_v* : Kinetic energy
    - *E_tot* : total energy calculated by (*E_p* + *E_w*)
-3. *forces.plt* :The forces exerted on the bodies
-4. *firstNode.plt* : The information of the first point of the bodies 
-5. *centerNode.plt.plt* : The information of the center point of the bodies 
-6. *lastNode.plt* : The information of the last point of the bodies 
-7. *nodeAverage.plt* : The average information of the all points of the bodies 
-8. *FluidFlux.plt* : the flux at inlet and outlet
+3. *forces.dat* :The forces exerted on the bodies
+4. *firstNode.dat* : The information of the first point of the bodies 
+5. *centerNode.dat.dat* : The information of the center point of the bodies 
+6. *lastNode.dat* : The information of the last point of the bodies 
+7. *nodeAverage.dat* : The average information of the all points of the bodies 
+8. *FluidFlux.dat* : the flux at inlet and outlet

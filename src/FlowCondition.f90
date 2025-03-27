@@ -134,49 +134,49 @@ module FlowCondition
                     if(groupNum(i:i)==' ') groupNum(i:i)='0'
             enddo
             ! write the first point of the solid titles
-            open(111,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.plt')
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write the last point of the solid titles
-            open(111,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.plt')
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write the middle point of the solid titles
-            open(111,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.plt')
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write solid average titles
-            open(111,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.plt')
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write solid forces title
-            open(111,file='./DatInfo/Group'//trim(groupNum)//'_forces.plt')
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "Fx"  "Fy"  "Fz"'
             close(111)
             ! write solid power titles
-            open(111,file='./DatInfo/Group'//trim(groupNum)//'_power.plt')
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_power.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "Ptot"  "Px"  "Py"  "Pz"'
             close(111)
             ! write solid energy titles
-            open(111,file='./DatInfo/Group'//trim(groupNum)//'_energy.plt')
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_energy.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "Etot"  "Evel"  "Ep"  "Es"  "Eb"'
             close(111)
             ! write solid probing titles
             do  j=1,flow%solidProbingNum
                 write(probeNum,'(I3.3)') j
-                open(111,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.plt')
+                open(111,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat')
                 write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
                 close(111)
             enddo
         enddo
         ! write fluid flux title
-        open(111,file='./DatInfo/FluidFlux.plt')
+        open(111,file='./DatInfo/FluidFlux.dat')
         write(111,*) 'VARIABLES = "t"  "inlet"  "middle"  "outlet"'
         close(111)
         ! write fluid probing title
         do  i=1,flow%fluidProbingNum
             write(probeNum,'(I3.3)') i
-            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt')
+            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.dat')
             write(111,*) 'VARIABLES = "t"  "u"  "v"  "w" '
             close(111)
         enddo
@@ -207,7 +207,7 @@ module FlowCondition
             enddo
             ! write file
             write(probeNum,'(I3.3)') i
-            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt',position='append')
+            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.dat',position='append')
             write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
@@ -222,7 +222,7 @@ module FlowCondition
             fluxOut = fluxOut + velocityIn(zDim,j,i,1) * density(zDim,j,i) * dh * dh
         enddo
         enddo
-        open(111,file='./DatInfo/FluidFlux.plt',position='append')
+        open(111,file='./DatInfo/FluidFlux.dat',position='append')
         write(111,'(4E20.10)') time/flow%Tref,fluxIn/flow%Uref/flow%denIn,fluxMid/flow%Uref/flow%denIn,fluxOut/flow%Uref/flow%denIn
         close(111)
         END SUBROUTINE

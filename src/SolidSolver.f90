@@ -407,25 +407,25 @@ module SolidSolver
         real(8):: Etot,Ev,Ep,Es,Eb
         
         ! write begin information
-        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.plt',position='append')
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
         write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(1,1:3)-XYZo(1:3))/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
         close(idfile)
         ! write end information titles
-        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.plt',position='append')
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat',position='append')
         write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(this%nND,1:3)-XYZo(1:3))/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
         close(idfile)
         ! write center information titles
-        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.plt',position='append')
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat',position='append')
         write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful((this%nND+1)/2,1:3)-XYZo(1:3))/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
         close(idfile)
         ! write mean information titles
-        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.plt',position='append')
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat',position='append')
         write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)-XYZo(1:3))/Lref, &
                                                                           sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
                                                                           sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
         close(idfile)
         ! write forces
-        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.plt',position='append')
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat',position='append')
         write(idfile,'(6E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,sum(this%extful(1:this%nND,1:3),1)/Fref
         close(idfile)
         ! write power
@@ -433,7 +433,7 @@ module SolidSolver
         Pay=sum(this%extful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
         Paz=sum(this%extful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
         Ptot=Pax+Pay+Paz
-        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.plt',position='append')
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.dat',position='append')
         write(idfile,'(7E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Ptot,Pax,Pay,Paz
         close(idfile)
 
@@ -448,7 +448,7 @@ module SolidSolver
         Ev=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
         Etot=Ev+Ep
         ! write energy title
-        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.plt',position='append')
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.dat',position='append')
         write(idfile,'(8E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Etot,Ev,Ep,Es,Eb
         close(idfile)
     ENDSUBROUTINE
@@ -463,7 +463,7 @@ module SolidSolver
         integer:: i,idfile=100
         do  i=1,solidProbingNum
             write(probeNum,'(I3.3)') i
-            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.plt',position='append')
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
             write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(solidProbingNode(i),1:3)-XYZo(1:3))/Lref, &
                                                                               this%velful(solidProbingNode(i),1:3)/Uref, &
                                                                               this%accful(solidProbingNode(i),1:3)/Aref
