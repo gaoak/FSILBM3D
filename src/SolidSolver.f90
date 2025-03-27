@@ -164,7 +164,7 @@ module SolidSolver
         this%TTT00(2,2)=1.0d0
         this%TTT00(3,3)=1.0d0
 
-        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3))
+        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * time
         this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
 
         call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))
@@ -179,7 +179,7 @@ module SolidSolver
         this%xyzful(1:this%nND,1:6)=this%xyzful0(1:this%nND,1:6)
         this%velful(1:this%nND,1:6)=0.0
 
-        this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3))
+        this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) !time=0
         !rotational velocity
         this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
         this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
@@ -188,10 +188,9 @@ module SolidSolver
         this%WWW3(1:3)=matmul(this%TTT0(1:3,1:3),this%WWW2(1:3))
 
         do  iND=1,this%nND
-            this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
-                                  this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
-                                  this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
-                                  + this%UVW(1:3) + this%initXYZVel(1:3)
+            this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2), &
+                                  this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3), &
+                                  this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)] + this%UVW(1:3)
             this%velful(iND,4:6)=this%WWW3(1:3)
         enddo
 
@@ -409,25 +408,25 @@ module SolidSolver
         
         ! write begin information
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.plt',position='append')
-        write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(1,1:3)-XYZo(1:3))/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(1,1:3)-XYZo(1:3))/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
         close(idfile)
         ! write end information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.plt',position='append')
-        write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(this%nND,1:3)-XYZo(1:3))/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(this%nND,1:3)-XYZo(1:3))/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
         close(idfile)
         ! write center information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.plt',position='append')
-        write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful((this%nND+1)/2,1:3)-XYZo(1:3))/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful((this%nND+1)/2,1:3)-XYZo(1:3))/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
         close(idfile)
         ! write mean information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.plt',position='append')
-        write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)-XYZo(1:3))/Lref, &
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)-XYZo(1:3))/Lref, &
                                                                           sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
                                                                           sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
         close(idfile)
         ! write forces
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.plt',position='append')
-        write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        write(idfile,'(6E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,sum(this%extful(1:this%nND,1:3),1)/Fref
         close(idfile)
         ! write power
         Pax=sum(this%extful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
@@ -435,7 +434,7 @@ module SolidSolver
         Paz=sum(this%extful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
         Ptot=Pax+Pay+Paz
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.plt',position='append')
-        write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Ptot,Pax,Pay,Paz
+        write(idfile,'(7E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Ptot,Pax,Pay,Paz
         close(idfile)
 
         call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
@@ -450,7 +449,7 @@ module SolidSolver
         Etot=Ev+Ep
         ! write energy title
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.plt',position='append')
-        write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Etot,Ev,Ep,Es,Eb
+        write(idfile,'(8E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Etot,Ev,Ep,Es,Eb
         close(idfile)
     ENDSUBROUTINE
 
@@ -465,7 +464,7 @@ module SolidSolver
         do  i=1,solidProbingNum
             write(probeNum,'(I3.3)') i
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.plt',position='append')
-            write(idfile,'(10E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(solidProbingNode(i),1:3)-XYZo(1:3))/Lref, &
+            write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(solidProbingNode(i),1:3)-XYZo(1:3))/Lref, &
                                                                               this%velful(solidProbingNode(i),1:3)/Uref, &
                                                                               this%accful(solidProbingNode(i),1:3)/Aref
             close(idfile)
@@ -610,7 +609,7 @@ module SolidSolver
                 !prescribed motion
                 !------------------------------------------------------
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * time
                 !rotational displacement
                 this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
@@ -623,19 +622,18 @@ module SolidSolver
                 this%xyzful(1:this%nND,1:6)=this%xyzfulnxt(1:this%nND,1:6)
                 !------------------------------------------------------
                 !translational velocity
-                this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3)
                 !rotational velocity
                 this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
-                                 this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
-                                 this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
+                                this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)), &
+                                this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))]
                 this%WWW3(1:3)=matmul(this%TTTnxt(1:3,1:3),this%WWW2(1:3))
                 !given velocity
                 do  iND=1,this%nND
-                    this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
-                                           this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
-                                           this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
-                                           + this%UVW(1:3) + this%initXYZVel(1:3)
+                    this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2), &
+                                          this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3), &
+                                          this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)] + this%UVW(1:3)
                     this%velful(iND,4:6)=this%WWW3(1:3)
                 enddo
                 !-------------------------------------------------------
