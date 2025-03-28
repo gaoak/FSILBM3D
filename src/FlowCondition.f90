@@ -121,82 +121,65 @@ module FlowCondition
     !     close(111)
     ! END SUBROUTINE
 
-    SUBROUTINE write_information_titles(nFish)
+    SUBROUTINE write_information_titles(nGroup)
         implicit none
-        integer:: i,iFish,nFish
+        integer:: i,j,iGroup,nGroup
         integer,parameter::nameLen=3
-        character (LEN=nameLen):: fishNum,probeNum
-        ! fish informations
-        do iFish=1,nFish
-            ! get fish numbers
-            write(fishNum,'(I3)') iFish
-            fishNum = adjustr(fishNum)
+        character (LEN=nameLen):: groupNum,probeNum
+        do iGroup=1,nGroup
+            ! get fish group numbers
+            write(groupNum,'(I3)') iGroup
+            groupNum = adjustr(groupNum)
             do  i=1,nameLen
-                    if(fishNum(i:i)==' ') fishNum(i:i)='0'
+                    if(groupNum(i:i)==' ') groupNum(i:i)='0'
             enddo
-            ! write forces title
-            open(111,file='./DatInfo/FishForce_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t"  "Fx"  "Fy"  "Fz"'
+            ! write the first point of the solid titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
-            ! write begin information titles
-            open(111,file='./DatInfo/FishNodeBegin_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            ! write the last point of the solid titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
-            ! write end information titles
-            open(111,file='./DatInfo/FishNodeEnd_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            ! write the middle point of the solid titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
-            ! write center information titles
-            open(111,file='./DatInfo/FishNodeCenter_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            ! write solid average titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
-            ! write mean information titles
-            open(111,file='./DatInfo/FishNodeMean_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            ! write solid forces title
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "Fx"  "Fy"  "Fz"'
             close(111)
-            ! write angular information titles
-            open(111,file='./DatInfo/FishAngular_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t"  "AoA"  "Ty-Hy"  "Hy"  "Ty"'
-            close(111) 
-            ! write power title
-            open(111,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t" "Ptot" "Px" "Py" "Pz"'
+            ! write solid power titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_power.dat')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "Ptot"  "Px"  "Py"  "Pz"'
             close(111)
-            ! write area title
-            ! open(111,file='./DatInfo/FishArea_'//trim(fishNum)//'.plt')
-            ! write(111,*) 'variables= "t"  "Area"'
-            ! close(111)
-            ! write energy title
-            open(111,file='./DatInfo/FishEnergy_'//trim(fishNum)//'.plt')
-            write(111,*) 'variables= "t","Es","Eb","Ep","Ek","Ew","Et"'
+            ! write solid energy titles
+            open(111,file='./DatInfo/Group'//trim(groupNum)//'_energy.dat')
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "Etot"  "Evel"  "Ep"  "Es"  "Eb"'
             close(111)
-            ! write solid probing title
-            do  i=1,flow%solidProbingNum
-                write(probeNum,'(I3.3)') i
-                open(111,file='./DatInfo/FishProbes_'//trim(fishNum)//'_'//trim(probeNum)//'.plt')
-                write(111,*) 'variables= "t"  "x"  "y"  "z"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            ! write solid probing titles
+            do  j=1,flow%solidProbingNum
+                write(probeNum,'(I3.3)') j
+                open(111,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat')
+                write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
                 close(111)
             enddo
         enddo
         ! write fluid flux title
-        open(111,file='./DatInfo/FluidFlux.plt')
-        write(111,*) 'variables= "t","inlet","middle","outlet"'
+        open(111,file='./DatInfo/FluidFlux.dat')
+        write(111,*) 'VARIABLES = "t"  "inlet"  "middle"  "outlet"'
         close(111)
         ! write fluid probing title
         do  i=1,flow%fluidProbingNum
             write(probeNum,'(I3.3)') i
-            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt')
-            write(111,*) 'variables= "t"  "u"  "v"  "w" '
+            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.dat')
+            write(111,*) 'VARIABLES = "t"  "u"  "v"  "w" '
             close(111)
         enddo
-        ! ! write max vel of fluid title
-        ! open(111,file='./DatInfo/MaMax.plt')
-        ! write(111,*)'variables= "t"  "MaMax"  '
-        ! close(111)
-        ! ! write convergence title
-        ! open(111,file='./DatInfo/Converg.plt')
-        ! write(111,*)'variables= "t"  "Convergence"  '
-        ! close(111)
     END SUBROUTINE
 
     SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocityIn,density)
@@ -224,7 +207,7 @@ module FlowCondition
             enddo
             ! write file
             write(probeNum,'(I3.3)') i
-            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.plt',position='append')
+            open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.dat',position='append')
             write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
             close(111)
         enddo
@@ -239,7 +222,7 @@ module FlowCondition
             fluxOut = fluxOut + velocityIn(zDim,j,i,1) * density(zDim,j,i) * dh * dh
         enddo
         enddo
-        open(111,file='./DatInfo/FluidFlux.plt',position='append')
+        open(111,file='./DatInfo/FluidFlux.dat',position='append')
         write(111,'(4E20.10)') time/flow%Tref,fluxIn/flow%Uref/flow%denIn,fluxMid/flow%Uref/flow%denIn,fluxOut/flow%Uref/flow%denIn
         close(111)
         END SUBROUTINE
