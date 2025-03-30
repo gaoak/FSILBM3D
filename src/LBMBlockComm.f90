@@ -321,12 +321,12 @@ module LBMBlockComm
         dt_solid = LBMblks(carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
         call get_now_time(time_begine2)
         call FSInteraction_force(LBMblks(carrierFluidId)%carriedBodies,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%xmin,LBMblks(carrierFluidId)%ymin,LBMblks(carrierFluidId)%zmin, &
-                                LBMblks(carrierFluidId)%xDim,LBMblks(carrierFluidId)%yDim,LBMblks(carrierFluidId)%zDim,LBMblks(carrierFluidId)%uuu,LBMblks(carrierFluidId)%force)
+                                 LBMblks(carrierFluidId)%xDim,LBMblks(carrierFluidId)%yDim,LBMblks(carrierFluidId)%zDim,LBMblks(carrierFluidId)%uuu,LBMblks(carrierFluidId)%force)
         call get_now_time(time_end2)
         time_IBM = time_IBM + (time_end2 - time_begine2)
         call get_now_time(time_begine2)
         do isubstep=1,flow%numsubstep
-            call Solver(LBMblks(carrierFluidId)%carriedBodies,time,isubstep,LBMblks(carrierFluidId)%dh,dt_solid)
+            call Solver(LBMblks(carrierFluidId)%carriedBodies,time/flow%Tref,isubstep,LBMblks(carrierFluidId)%dh/flow%Tref,dt_solid/flow%Tref)
         enddo !do isubstep=1,numsubstep
         call get_now_time(time_end2)
         time_FEM = time_FEM + (time_end2 - time_begine2)
