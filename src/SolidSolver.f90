@@ -164,7 +164,7 @@ module SolidSolver
         this%TTT00(2,2)=1.0d0
         this%TTT00(3,3)=1.0d0
 
-        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * time
+        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3))
         this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
 
         call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))

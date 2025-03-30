@@ -271,13 +271,14 @@ module SolidBody
         integer :: iFish,maxN
         write(*,'(A)') '========================================================='
         do iFish = 1,m_nFish
-            if (dabs(maxval(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1e-5 .or. &
-                dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3)))    .gt. 1e-5 .or. &
-                dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3)))    .gt. 1e-5) then
+            if (sum(abs(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1e-5 .or. &
+                sum(abs(VBodies(iFish)%rbm%XYZAmpl(1:3)))    .gt. 1e-5 .or. &
+                sum(abs(VBodies(iFish)%rbm%AoAAmpl(1:3)))    .gt. 1e-5 .or. &
+                sum(VBodies(iFish)%rbm%isMotionGiven(1:6))   .lt. 6 ) then
                 VBodies(iFish)%v_move = 1
             endif
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
-            write(*,*)'read FEMeshFile ',iFish,' end' 
+            write(*,*)'read FEMeshFile ',iFish,'end,',' isMoving: ',VBodies(iFish)%v_move
         enddo
         write(*,'(A)') '========================================================='
         if (m_nFish .gt. 0) then
