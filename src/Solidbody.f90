@@ -4,10 +4,12 @@ module SolidBody
     implicit none
     private
     ! Immersed boundary method parameters
-    public :: m_nFish
-    integer:: m_nFish,m_ntolLBM
-    real(8):: m_dtolLBM, m_IBPenaltyAlpha, m_denIn, m_uvwIn(3), m_Aref, m_Eref, m_Fref, m_Lref, m_Pref, m_Tref, m_Uref
+    public :: m_nFish,m_nGroup
+    integer:: m_nFish,m_nGroup,m_ntolLBM
+    real(8):: m_dtolLBM,m_IBPenaltyAlpha,m_denIn,m_uvwIn(3),m_Aref,m_Eref,m_Fref,m_Lref,m_Pref,m_Tref,m_Uref
     integer:: m_boundaryConditions(1:6)
+    integer, allocatable :: m_numX(:),m_numY(:),m_numZ(:),m_fishNum(:)
+    real(8), allocatable :: m_XYZo(:,:)
     ! nFish     number of bodies
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
@@ -67,8 +69,8 @@ module SolidBody
         character(LEN=40),intent(in):: filename
         character(LEN=256):: buffer
         real(8):: alphaf,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
-        integer:: nfishGroup,isKB,ntolFEM
-        integer:: iFish,ifishGroup,numX,numY,numZ
+        integer:: isKB,ntolFEM
+        integer:: iFish,ifishGroup
         character(LEN=40) :: t_FEmeshName,keywordstr
         integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
         real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
@@ -76,10 +78,9 @@ module SolidBody
         real(8):: t_initXYZVel(3),t_XYZAmpl(3),t_XYZPhi(3),t_AoAo(3),t_AoAAmpl(3),t_AoAPhi(3)
         integer:: order1=0,order2=0,order3=0,lineX,lineY,lineZ
         character(LEN=40),allocatable:: FEmeshName(:)
-        integer,allocatable:: fishNum(:)
         integer,allocatable:: iBodyModel(:),iBodyType(:),isMotionGiven(:,:)
         real(8),allocatable:: denR(:),psR(:),EmR(:),tcR(:),KB(:),KS(:)
-        real(8),allocatable:: initXYZVel(:,:),XYZo(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
+        real(8),allocatable:: initXYZVel(:,:),XYZAmpl(:,:),XYZPhi(:,:),freq(:),St(:)
         real(8),allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
         ! read body parameters from inflow file
         open(unit=111, file=filename, status='old', action='read')
@@ -94,22 +95,22 @@ module SolidBody
         call readNextData(111, buffer)
         read(buffer,*)    dtolFEM,ntolFEM
         call readNextData(111, buffer)
-        read(buffer,*)    m_nFish,nfishGroup,isKB
+        read(buffer,*)    m_nFish,m_nGroup,isKB
         if(m_IBPenaltyAlpha.le.1.d-6) then
             write(*,*) 'ERROR: IBPenaltyalpha should be positive (default 1)', m_IBPenaltyAlpha
             stop
         endif
         ! set solid solver global parameters
         call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
-        allocate(FEmeshName(m_nFish),fishNum(nfishGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish), &
-                denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish), &
-                initXYZVel(3,m_nFish),XYZo(3,m_nFish),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish),freq(m_nFish),St(m_nFish), &
-                AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
+        allocate(FEmeshName(m_nFish),m_fishNum(m_nGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish), &
+                denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish),initXYZVel(3,m_nFish), & 
+                m_XYZo(3,m_nFish),m_numX(m_nGroup),m_numY(m_nGroup),m_numZ(m_nGroup),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish), &
+                freq(m_nFish),St(m_nFish),AoAo(3,m_nFish),AoAAmpl(3,m_nFish),AoAPhi(3,m_nFish))
         ! read fish parameters for each type
-        fishNum(1)=1
-        do ifishGroup = 1,nfishGroup
+        m_fishNum(1)=1
+        do ifishGroup = 1,m_nGroup
             call readNextData(111, buffer)
-            read(buffer,*)    fishNum(ifishGroup+1),numX,numY,numZ
+            read(buffer,*)    m_fishNum(ifishGroup+1),m_numX(ifishGroup),m_numY(ifishGroup),m_numZ(ifishGroup)
             call readNextData(111, buffer)
             read(buffer,*)    t_FEmeshName
             call readNextData(111, buffer)
@@ -144,9 +145,9 @@ module SolidBody
             read(buffer,*)    t_AoAAmpl(1:3)
             call readNextData(111, buffer)
             read(buffer,*)    t_AoAPhi(1:3)
-            if(ifishGroup .lt. nfishGroup) call readequal(111)
-            order1 = order1 + fishNum(ifishGroup  );
-            order2 = order2 + fishNum(ifishGroup+1);
+            if(ifishGroup .lt. m_nGroup) call readequal(111)
+            order1 = order1 + m_fishNum(ifishGroup  );
+            order2 = order2 + m_fishNum(ifishGroup+1);
             ! read parameters for each fish
             do iFish=order1,order2
                 FEmeshName(iFish) = t_FEmeshName
@@ -172,12 +173,12 @@ module SolidBody
                 AoAPhi(1:3,iFish)  = t_AoAPhi(1:3)
                 ! calculate the initial location for each fish
                 order3 = iFish - order1
-                lineX  = mod(order3,numX)
-                lineY  = (order3 - lineX)/numX
-                lineZ  = (order3 - mod(order3,numX*numY))/numX*numY
-                XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
-                XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
-                XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
+                lineX  = mod(order3,m_numX(ifishGroup))
+                lineY  = (order3 - lineX)/m_numX(ifishGroup)
+                lineZ  = (order3 - mod(order3,m_numX(ifishGroup)*m_numY(ifishGroup)))/m_numX(ifishGroup)*m_numY(ifishGroup)
+                m_XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
+                m_XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
+                m_XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
             enddo
         enddo
         close(111)
@@ -191,7 +192,7 @@ module SolidBody
             call VBodies(iFish)%rbm%SetSolver(FEmeshName(iFish),&
                 iBodyModel(iFish),isMotionGiven(1:6,iFish), &
                 denR(iFish),KB(iFish),KS(iFish),EmR(iFish),psR(iFish),tcR(iFish),St(iFish), &
-                freq(iFish),initXYZVel(1:3,iFish),XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
+                freq(iFish),initXYZVel(1:3,iFish),m_XYZo(1:3,iFish),XYZAmpl(1:3,iFish),XYZPhi(1:3,iFish), &
                 AoAo(1:3,iFish),AoAAmpl(1:3,iFish),AoAPhi(1:3,iFish))
         enddo
     end subroutine read_solid_files
@@ -270,13 +271,14 @@ module SolidBody
         integer :: iFish,maxN
         write(*,'(A)') '========================================================='
         do iFish = 1,m_nFish
-            if (dabs(maxval(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1e-5 .or. &
-                dabs(maxval(VBodies(iFish)%rbm%XYZAmpl(1:3)))    .gt. 1e-5 .or. &
-                dabs(maxval(VBodies(iFish)%rbm%AoAAmpl(1:3)))    .gt. 1e-5) then
+            if (sum(abs(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1e-5 .or. &
+                sum(abs(VBodies(iFish)%rbm%XYZAmpl(1:3)))    .gt. 1e-5 .or. &
+                sum(abs(VBodies(iFish)%rbm%AoAAmpl(1:3)))    .gt. 1e-5 .or. &
+                sum(VBodies(iFish)%rbm%isMotionGiven(1:6))   .lt. 6 ) then
                 VBodies(iFish)%v_move = 1
             endif
             call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
-            write(*,*)'read FEMeshFile ',iFish,' end' 
+            write(*,*)'read FEMeshFile ',iFish,'end,',' isMoving: ',VBodies(iFish)%v_move
         enddo
         write(*,'(A)') '========================================================='
         if (m_nFish .gt. 0) then
@@ -382,10 +384,22 @@ module SolidBody
     subroutine Write_solid_v_bodies(time)
         implicit none
         real(8),intent(in):: time
-        integer :: iFish
-        do iFish = 1,m_nFish
-            call VBodies(iFish)%Write_body(iFish,time)
+        integer :: i,iFish
+        integer,parameter::nameLen=10,idfile=100
+        character (LEN=nameLen):: fileName
+        !write time titles
+        write(fileName,'(I10)') nint(time/m_Tref*1d5)
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+            if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
+        open(idfile, FILE='./DatBodySpan/BodiesVirtual_'//trim(filename)//'.dat')
+        write(idfile, '(A)') 'VARIABLES = "x" "y" "z"'
+        !write fake solids
+        do iFish = 1,m_nFish
+            call VBodies(iFish)%Write_body(iFish,time,idfile)
+        enddo
+        close(idfile)
     end subroutine Write_solid_v_bodies
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -418,23 +432,22 @@ module SolidBody
     subroutine write_solid_field(time)
         implicit none
         real(8),intent(in):: time
-        real(8):: timeTref
-    !   -------------------------------------------------------
         integer:: i,iFish
-        integer,parameter::nameLen=10
+        integer,parameter::nameLen=10,idfile=100
         character (LEN=nameLen):: fileName
-        !==================================================================================================
-        timeTref = time/m_Tref
-        write(fileName,'(I10)') nint(timeTref*1d5)
+        ! write time titles
+        write(fileName,'(I10)') nint(time/m_Tref*1d5)
         fileName = adjustr(fileName)
         DO  i=1,nameLen
             if(fileName(i:i)==' ')fileName(i:i)='0'
         END DO
-    
+        open(idfile,FILE='./DatBody/Bodies_'//trim(fileName)//'.dat')
+        write(idfile, '(A)') 'TITLE = "ASCII File."'
+        write(idfile, '(A)') 'VARIABLES = "x" "y" "z" "u" "v" "w" "ax" "ay" "az" "fxi" "fyi" "fzi" "fxr" "fyr" "fzr"'
         do iFish=1,m_nFish
-            call VBodies(iFish)%rbm%write_solid(m_Lref,m_Uref,m_Aref,m_Fref,iFish,fileName)
+            call VBodies(iFish)%rbm%write_solid(m_Lref,m_Uref,m_Aref,m_Fref,iFish,idfile)
         enddo
-    !   =============================================
+        close(idfile)
     end subroutine
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -462,14 +475,64 @@ module SolidBody
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !   write solid data
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine write_solid_Information(time,timeOutInfo,Asfac,solidProbingNum,solidProbingNode)
+    subroutine write_solid_Information(time,solidProbingNum,solidProbingNode)
         implicit none
         integer,intent(in):: solidProbingNum,solidProbingNode(solidProbingNum)
-        real(8),intent(in):: time,timeOutInfo,Asfac
-        integer:: iFish,fid = 111
-        do iFish=1,m_nFish
-            call VBodies(iFish)%rbm%write_solid_info(fid,iFish,time,timeOutInfo,m_Tref,m_Lref,m_Uref,m_Aref,m_Fref,m_Pref,m_Eref,Asfac)
-            call VBodies(iFish)%rbm%write_solid_probes(fid,iFish,time,solidProbingNum,solidProbingNode(1:solidProbingNum),m_Tref,m_Lref,m_Uref,m_Aref)
+        real(8),intent(in):: time
+        integer,parameter::nameLen1=10,nameLen2=3,idfile=100
+        integer:: i,j,iFish,iGroup,order1,order2
+        character (LEN=nameLen1):: timeName
+        character (LEN=nameLen2):: groupNum,probeNum
+        !write time titles
+        write(timeName,'(I10)') nint(time/m_Tref*1d5)
+        timeName = adjustr(timeName)
+        do  i=1,nameLen1
+            if(timeName(i:i)==' ')timeName(i:i)='0'
+        enddo
+        !write solid information in each group
+        order1 = 0
+        order2 = 0
+        do iGroup=1,m_nGroup
+            write(groupNum,'(I3)') iGroup
+            groupNum = adjustr(groupNum)
+            do  i=1,nameLen2
+                    if(groupNum(i:i)==' ') groupNum(i:i)='0'
+            enddo
+            ! write zone titles
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
+            do  j=1,solidProbingNum
+                write(probeNum,'(I3.3)') j
+                open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
+                write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+                close(idfile)
+            enddo
+            !write solid data
+            order1 = order1 + m_fishNum(iGroup  );
+            order2 = order2 + m_fishNum(iGroup+1);
+            do iFish=order1,order2
+                call VBodies(iFish)%rbm%write_solid_info(groupNum,m_XYZo(1:3,iFish),m_Lref,m_Uref,m_Aref,m_Fref,m_Pref,m_Eref)
+                call VBodies(iFish)%rbm%write_solid_probes(groupNum,m_XYZo(1:3,iFish),solidProbingNum,solidProbingNode(1:solidProbingNum),m_Lref,m_Uref,m_Aref)
+            enddo
         enddo
     end subroutine
 
@@ -596,9 +659,9 @@ module SolidBody
         integer:: i
         do  i=1,this%v_nelmts
             this%v_Exyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),this%v_Exyz0(1:3,i))+this%rbm%XYZ(1:3)
-            this%v_Evel(1:3,i)=[this%rbm%WWW3(2)*this%v_Exyz(3,i)-this%rbm%WWW3(3)*this%v_Exyz(2,i),    &
-                                this%rbm%WWW3(3)*this%v_Exyz(1,i)-this%rbm%WWW3(1)*this%v_Exyz(3,i),    &
-                                this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)    ]&
+            this%v_Evel(1:3,i)=[this%rbm%WWW3(2)*this%v_Exyz(3,i)-this%rbm%WWW3(3)*this%v_Exyz(2,i), &
+                                this%rbm%WWW3(3)*this%v_Exyz(1,i)-this%rbm%WWW3(1)*this%v_Exyz(3,i), &
+                                this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)] &
                                 + this%rbm%UVW(1:3) + this%rbm%initXYZVel(1:3)
         enddo
     end subroutine SurfaceUpdatePosVel_
@@ -1027,46 +1090,33 @@ module SolidBody
         close(fileiD)
     endsubroutine SurfacetoBeam_write
 
-    subroutine Write_body_(this,iFish,time)
+    subroutine Write_body_(this,iFish,time,idfile)
         implicit none
         class(VirtualBody), intent(inout) :: this
-        integer,intent(in) :: iFish
+        integer,intent(in) :: iFish,idfile
         real(8),intent(in) :: time
         if (this%v_type .eq. 1) then
-            call this%PlateWrite_body(iFish,time)
+            call this%PlateWrite_body(iFish,idfile)
         elseif (this%v_type .eq. -1) then
-            call this%SurfaceWrite_body(iFish,time)
+            call this%SurfaceWrite_body(iFish,time,idfile)
         else
             write(*, *) "body type not implemented", this%v_type
         endif
     endsubroutine Write_body_
 
-    subroutine PlateWrite_body_(this,iFish,time)
+    subroutine PlateWrite_body_(this,iFish,idfile)
         ! to do: generate a temporary mesh
         implicit none
         class(VirtualBody), intent(inout) :: this
-        integer,intent(in) :: iFish
-        real(8),intent(in) :: time
-        !   -------------------------------------------------------
-        real(8):: timeTref
+        integer,intent(in) :: iFish,idfile
+        real(8):: tmpxyz(3)
         integer:: i, i1, i2
-        real(8) :: tmpxyz(3)
         integer,parameter::nameLen=10
-        character (LEN=nameLen):: fileName,idstr
-        integer,parameter:: idfile=100
-        !==========================================================================
-        timeTref = time/m_Tref
-        write(fileName,'(I10)') nint(timeTref*1d5)
-        fileName = adjustr(fileName)
-        do  I=1,nameLen
-            if(fileName(i:i)==' ')fileName(i:i)='0'
-        enddo
-        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        !==========================================================================
-        open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
-        write(idfile, '(A)') 'variables = "x" "y" "z"'
-        write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',2*this%rbm%nND,', E=',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
-
+        character (LEN=nameLen):: idstr
+        !write zone title
+        write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
+        write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "fish',trim(idstr), '" N = ',2*this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        !write data
         do i = 1,this%rbm%nNd
             tmpxyz = this%rbm%xyzful(i,1:3)
             write(idfile, *) (tmpxyz - this%rbm%r_Lspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
@@ -1077,42 +1127,27 @@ module SolidBody
             i2 = this%rbm%ele(i,2)
             write(idfile, *) 2*i1 -1, 2*i1,2*i2,2*i2-1
         enddo
-        close(idfile)
     end subroutine PlateWrite_body_
 
-    subroutine SurfaceWrite_body_(this,iFish,time)
+    subroutine SurfaceWrite_body_(this,iFish,time,idfile)
         ! to do: generate a temporary mesh
         implicit none
         class(VirtualBody), intent(inout) :: this
-        integer,intent(in) :: iFish
-        real(8),intent(in) :: time
-        !   -------------------------------------------------------
-        real(8):: timeTref
+        integer,intent(in) :: iFish,idfile
+        real(8):: time,tmpxyz(3)
         integer:: i, i1, i2, i3
-        real(8) :: tmpxyz(3)
         integer,parameter::nameLen=10
-        character (LEN=nameLen):: fileName,idstr
-        integer,parameter:: idfile=100
+        character (LEN=nameLen):: idstr
         integer:: Surfacetmpnpts, Surfacetmpnelmts
         real(8),allocatable :: Surfacetmpxyz(:,:)
         integer,allocatable :: Surfacetmpele(:,:)
-        !==========================================================================
-        timeTref = time/m_Tref
-        write(fileName,'(I10)') nint(timeTref*1d5)
-        fileName = adjustr(fileName)
-        do  I=1,nameLen
-            if(fileName(i:i)==' ')fileName(i:i)='0'
-        enddo
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        !==========================================================================
-        open(idfile, FILE='./DatBodySpan/BodyFake'//trim(idstr)//'_'//trim(filename)//'.dat')
         if (time .lt. 1e-5) then
             call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
             do  i=1,Surfacetmpnpts
                 Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
             enddo
-            write(idfile, '(A)') 'variables = "x" "y" "z"'
-            write(idfile, '(A,I7,A,I7,A)') 'ZONE N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
+            write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "',trim(idstr), '" N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
             do i = 1,Surfacetmpnpts
                 tmpxyz = Surfacetmpxyz(1:3,i)
                 write(idfile, *) tmpxyz/m_Lref
@@ -1125,13 +1160,12 @@ module SolidBody
             enddo
             deallocate(Surfacetmpxyz,Surfacetmpele)
         else
-            write(idfile, '(A)') 'variables = "X" "Y" "Z" "TTTnxt(RotMat)"'
+            !write(idfile, '(A)') 'variables = "X" "Y" "Z" "TTTnxt(RotMat)"'
             write(idfile, '(10E20.10)') this%rbm%XYZ(1),this%rbm%XYZ(2),this%rbm%XYZ(3)
-            write(idfile, '(10E20.10)') this%rbm%TTTnxt(1,1),this%rbm%TTTnxt(1,2),this%rbm%TTTnxt(1,3)
-            write(idfile, '(10E20.10)') this%rbm%TTTnxt(2,1),this%rbm%TTTnxt(2,2),this%rbm%TTTnxt(2,3)
-            write(idfile, '(10E20.10)') this%rbm%TTTnxt(3,1),this%rbm%TTTnxt(3,2),this%rbm%TTTnxt(3,3)
+            !write(idfile, '(10E20.10)') this%rbm%TTTnxt(1,1),this%rbm%TTTnxt(1,2),this%rbm%TTTnxt(1,3)
+            !write(idfile, '(10E20.10)') this%rbm%TTTnxt(2,1),this%rbm%TTTnxt(2,2),this%rbm%TTTnxt(2,3)
+            !write(idfile, '(10E20.10)') this%rbm%TTTnxt(3,1),this%rbm%TTTnxt(3,2),this%rbm%TTTnxt(3,3)
         endif
-        close(idfile)
     end subroutine SurfaceWrite_body_
 
 end module SolidBody
