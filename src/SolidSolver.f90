@@ -609,7 +609,7 @@ module SolidSolver
                 !prescribed motion
                 !------------------------------------------------------
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * time
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+isubstep*subdeltat)
                 !rotational displacement
                 this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))

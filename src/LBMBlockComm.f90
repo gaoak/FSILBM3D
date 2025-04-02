@@ -317,7 +317,7 @@ module LBMBlockComm
         use FlowCondition, only: flow
         implicit none
         real(8):: time,dt_solid,time_IBM,time_FEM,time_begine2,time_end2
-        integer:: carrierFluidId,isubstep=0
+        integer:: carrierFluidId,isubstep
         dt_solid = LBMblks(carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
         call get_now_time(time_begine2)
         call FSInteraction_force(LBMblks(carrierFluidId)%carriedBodies,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%xmin,LBMblks(carrierFluidId)%ymin,LBMblks(carrierFluidId)%zmin, &
