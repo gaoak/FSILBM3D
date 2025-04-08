@@ -179,7 +179,7 @@ module SolidSolver
         this%xyzful(1:this%nND,1:6)=this%xyzful0(1:this%nND,1:6)
         this%velful(1:this%nND,1:6)=0.0
 
-        this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3))
+        this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) !time=0
         !rotational velocity
         this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
         this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
@@ -188,10 +188,9 @@ module SolidSolver
         this%WWW3(1:3)=matmul(this%TTT0(1:3,1:3),this%WWW2(1:3))
 
         do  iND=1,this%nND
-            this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
-                                  this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
-                                  this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
-                                  + this%UVW(1:3) + this%initXYZVel(1:3)
+            this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2), &
+                                  this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3), &
+                                  this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)] + this%UVW(1:3)
             this%velful(iND,4:6)=this%WWW3(1:3)
         enddo
 
@@ -293,35 +292,20 @@ module SolidSolver
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot ASCII format
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,fileName)
+    SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,idfile)
     implicit none
     class(BeamSolver), intent(inout) :: this
     real(8):: Lref,Uref,Aref,Fref
-!   -------------------------------------------------------
-    integer:: i,iFish,ElmType
-    integer,parameter::nameLen=10
-    character (LEN=nameLen):: fileName,idstr
-    !==================================================================================================
-    integer,parameter:: namLen=40,idfile=100,numVar=15
-    character(namLen):: varname(numVar)=[character(namLen)::'x','y','z','u','v','w','ax','ay','az','fxi','fyi','fzi','fxr','fyr','fzr']
-    !==================================================================================================
+    integer:: i,iFish,ElmType,idfile
+    integer,parameter::nameLen=10,namLen=40,numVar=15
+    character(len=nameLen):: idstr
 
-    ElmType = this%ele(1,4)
-
-    write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-    OPEN(idfile,FILE='./DatBody/Body'//trim(idstr)//'_'//trim(fileName)//'.dat')
-    
-    ! Write header information
-    write(idfile, '(A)') 'TITLE    = "ASCII File."'
-    write(idfile, '(A)', advance='no') 'variables= '
-    do i=1,numVar-1
-        write(idfile, '(3A)', advance='no') '"', trim(varname(i)), '" '
-    enddo
-    write(idfile, '(A)') varname(numVar)
-
-    write(idfile, '(A)') 'ZONE    T= "ZONE 1"'
+    !Write zone information
+    write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
+    write(idfile, '(A,A,A)') ' ZONE T = "fish',trim(idstr),'"'
     write(idfile, '(A)') ' STRANDID=0, SOLUTIONTIME=0'
     write(idfile, '(A,I8,A,I8,A)', advance='no') ' Nodes=',this%nND,', Elements=',this%nEL,', ZONETYPE='
+    ElmType = this%ele(1,4)
     if(ElmType.eq.2) then
         write(idfile, '(A)') 'FELINESEG'
     elseif (ElmType.eq.3) then
@@ -333,13 +317,11 @@ module SolidSolver
         write(idfile, '(A)', advance='no') 'SINGLE '
     enddo
     write(idfile, '(A)') 'SINGLE )'
-
-    ! Write node data
+    !Write node data
     do i=1,this%nND
         write(idfile, '(10E28.18 )')   real(this%xyzful(i,1:3)/Lref),real(this%velful(i,1:3)/Uref),real(this%accful(i,1:3)/Aref),real(this%extful(i,1:3)/Fref),real(this%repful(i,1:3)/Fref)
     enddo
-
-    ! Write element data
+    !Write element data
     if(ElmType.eq.2) then
         do i = 1, this%nEL
             write(idfile, *) this%ele(i,1),this%ele(i,2)
@@ -349,9 +331,6 @@ module SolidSolver
             write(idfile, *) this%ele(i,1),this%ele(i,2),this%ele(i,3)
         enddo
     endif
-
-    close(idfile)
-!   =============================================
     END SUBROUTINE
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -417,106 +396,78 @@ module SolidSolver
         enddo
     ENDSUBROUTINE
 
-    SUBROUTINE write_solid_info_(this,fid,iFish,time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref,Asfac)
-    IMPLICIT NONE
-    class(BeamSolver), intent(inout) :: this
-    integer,intent(in) :: fid
-    real(8),intent(in) :: time,timeOutInfo,Tref,Lref,Uref,Aref,Fref,Pref,Eref,Asfac
-    integer:: i,iFish
-    real(8):: EEE(2),strainEnergy(this%nEL,2)
-    real(8):: Ptot,Pax,Pay,Paz
-    real(8):: Et,Ek,Ep,Es,Eb,Ew
-    integer,parameter::nameLen=3
-    character (LEN=nameLen):: fishNum
-        ! get fish numbers
-        write(fishNum,'(I3)') iFish
-        fishNum = adjustr(fishNum)
-        do  i=1,nameLen
-                if(fishNum(i:i)==' ') fishNum(i:i)='0'
-        enddo
-        ! write forces
-        open(fid,file='./DatInfo/FishForce_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,sum(this%extful(1:this%nND,1:3),1)/Fref
-        close(fid)
+    SUBROUTINE write_solid_info_(this,groupNum,XYZo,Lref,Uref,Aref,Fref,Pref,Eref)
+        IMPLICIT NONE
+        class(BeamSolver), intent(inout) :: this
+        real(8),intent(in):: XYZo(1:3),Lref,Uref,Aref,Fref,Pref,Eref
+        character(LEN=3),intent(in):: groupNum
+        integer:: idfile=100
+        real(8):: strainEnergy(this%nEL,2)
+        real(8):: Ptot,Pax,Pay,Paz
+        real(8):: Etot,Ev,Ep,Es,Eb
+        
         ! write begin information
-        open(fid,file='./DatInfo/FishNodeBegin_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,this%xyzful(1,1:3)/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
-        close(fid)
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(1,1:3)-XYZo(1:3))/Lref,this%velful(1,1:3)/Uref,this%accful(1,1:3)/Aref
+        close(idfile)
         ! write end information titles
-        open(fid,file='./DatInfo/FishNodeEnd_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,this%xyzful(this%nND,1:3)/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
-        close(fid)
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat',position='append')
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(this%nND,1:3)-XYZo(1:3))/Lref,this%velful(this%nND,1:3)/Uref,this%accful(this%nND,1:3)/Aref
+        close(idfile)
         ! write center information titles
-        open(fid,file='./DatInfo/FishNodeCenter_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,this%xyzful((this%nND+1)/2,1:3)/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
-        close(fid)
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat',position='append')
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful((this%nND+1)/2,1:3)-XYZo(1:3))/Lref,this%velful((this%nND+1)/2,1:3)/Uref,this%accful((this%nND+1)/2,1:3)/Aref
+        close(idfile)
         ! write mean information titles
-        open(fid,file='./DatInfo/FishNodeMean_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Lref, &
-                                         sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
-                                         sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
-        close(fid)
-        ! write angular information titles
-        open(fid,file='./DatInfo/FishAngular_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,datan((this%xyzful(this%nND,2)-this%xyzful(1,2))/(this%xyzful(this%nND,1)-this%xyzful(1,1))),    &
-                                        this%xyzful(this%nND,2)/Lref-this%xyzful(1,2)/Lref,this%xyzful(1,2)/Lref,this%xyzful(this%nND,2)/Lref
-        close(fid)
-
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat',position='append')
+        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(sum(this%xyzful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)-XYZo(1:3))/Lref, &
+                                                                          sum(this%velful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Uref, &
+                                                                          sum(this%accful(1:this%nND,1:3)*this%mssful(1:this%nND,1:3),1)/sum(this%mssful(1:this%nND,1:3),1)/Aref
+        close(idfile)
+        ! write forces
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat',position='append')
+        write(idfile,'(6E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        close(idfile)
+        ! write power
         Pax=sum(this%extful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
         Pay=sum(this%extful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
         Paz=sum(this%extful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
         Ptot=Pax+Pay+Paz
-        ! write power title
-        open(fid,file='./DatInfo/FishPower_'//trim(fishNum)//'.plt',position='append')
-        write(fid,'(10E20.10)')time/Tref,Ptot,Pax,Pay,Paz
-        close(fid)
-
-        ! write area title
-        ! call cptArea(this%areaElem(1:this%nEL),this%nND,this%nEL,this%ele(1:this%nEL,1:5),this%xyzful(1:this%nND,1:6))
-        ! open(fid,file='./DatInfo/FishArea_'//trim(fishNum)//'.plt',position='append')
-        ! write(fid,'(2E20.10)')time/Tref,sum(this%areaElem(:))/Asfac
-        ! close(fid)
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.dat',position='append')
+        write(idfile,'(7E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Ptot,Pax,Pay,Paz
+        close(idfile)
 
         call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
                                 this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nEL,1:10), &
                                 this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
                                 this%triad_ee(1:3,1:3,1:this%nEL), &
                                 this%nND,this%nEL)
-        EEE(1)=sum(strainEnergy(1:this%nEL,1))
-        EEE(2)=sum(strainEnergy(1:this%nEL,2))
-        Es=EEE(1)/Eref
-        Eb=EEE(2)/Eref
+        Es=sum(strainEnergy(1:this%nEL,1))/Eref
+        Eb=sum(strainEnergy(1:this%nEL,2))/Eref
         Ep=Es+Eb
-        Ew=Ew+Ptot*timeOutInfo
-        Ek=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
-        Et=Ek+Ep
+        Ev=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
+        Etot=Ev+Ep
         ! write energy title
-        open(fid,file='./DatInfo/FishEnergy_'//trim(fishNum)//'.plt', position='append')
-        write(fid,'(10E20.10)')time/Tref,Es,Eb,Ep,Ek,Ew,Et
-        close(fid)
-
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.dat',position='append')
+        write(idfile,'(8E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Etot,Ev,Ep,Es,Eb
+        close(idfile)
     ENDSUBROUTINE
 
-    subroutine write_solid_probes_(this,fid,iFish,time,solidProbingNum,solidProbingNode,Tref,Lref,Uref,Aref)
+    subroutine write_solid_probes_(this,groupNum,XYZo,solidProbingNum,solidProbingNode,Lref,Uref,Aref)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        integer,intent(in):: fid,iFish,solidProbingNum,solidProbingNode(solidProbingNum)
-        real(8),intent(in):: time,Tref,Lref,Uref,Aref
-        integer:: i
-        integer,parameter::nameLen=3
-        character (LEN=nameLen):: fishNum,probeNum
-        write(fishNum,'(I3)') iFish
-        fishNum = adjustr(fishNum)
-        do  i=1,nameLen
-             if(fishNum(i:i)==' ') fishNum(i:i)='0'
-        enddo
+        integer,intent(in):: solidProbingNum,solidProbingNode(solidProbingNum)
+        real(8),intent(in):: XYZo(1:3),Lref,Uref,Aref
+        character(LEN=3),intent(in):: groupNum
+        character (LEN=3):: probeNum
+        integer:: i,idfile=100
         do  i=1,solidProbingNum
             write(probeNum,'(I3.3)') i
-            open(fid,file='./DatInfo/FishProbes_'//trim(fishNum)//'_'//trim(probeNum)//'.plt',position='append')
-            write(fid,'(10E20.10)')time/Tref, this%xyzful(solidProbingNode(i),1:3)/Lref, &
-                                              this%velful(solidProbingNode(i),1:3)/Uref, &
-                                              this%accful(solidProbingNode(i),1:3)/Aref
-            close(fid)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
+            write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%xyzful(solidProbingNode(i),1:3)-XYZo(1:3))/Lref, &
+                                                                              this%velful(solidProbingNode(i),1:3)/Uref, &
+                                                                              this%accful(solidProbingNode(i),1:3)/Aref
+            close(idfile)
         enddo
     end subroutine
 
@@ -658,7 +609,7 @@ module SolidSolver
                 !prescribed motion
                 !------------------------------------------------------
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+isubstep*subdeltat)
                 !rotational displacement
                 this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
@@ -671,19 +622,18 @@ module SolidSolver
                 this%xyzful(1:this%nND,1:6)=this%xyzfulnxt(1:this%nND,1:6)
                 !------------------------------------------------------
                 !translational velocity
-                this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
+                this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3)
                 !rotational velocity
                 this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
                 this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
-                                 this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
-                                 this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
+                                this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)), &
+                                this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))]
                 this%WWW3(1:3)=matmul(this%TTTnxt(1:3,1:3),this%WWW2(1:3))
                 !given velocity
                 do  iND=1,this%nND
-                    this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2),    &
-                                           this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3),    &
-                                           this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)    ]&
-                                           + this%UVW(1:3) + this%initXYZVel(1:3)
+                    this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2), &
+                                          this%WWW3(3)*this%xyzful(iND,1)-this%WWW3(1)*this%xyzful(iND,3), &
+                                          this%WWW3(1)*this%xyzful(iND,2)-this%WWW3(2)*this%xyzful(iND,1)] + this%UVW(1:3)
                     this%velful(iND,4:6)=this%WWW3(1:3)
                 enddo
                 !-------------------------------------------------------

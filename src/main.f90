@@ -51,7 +51,7 @@ PROGRAM main
     !==================================================================================================
     ! Determine whether to continue calculating and write output informantion titles
     call check_is_continue(step,start_time,flow%isConCmpt) ! read dimensionless time in continue file as the computing start time
-    call write_information_titles(m_nFish)
+    call write_information_titles(m_nGroup)
     !==================================================================================================
     ! Update the volume forces and calculate the macro quantities
     call update_volume_force_blocks()
@@ -122,10 +122,10 @@ PROGRAM main
         endif
         ! write processing informations
         if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            if (flow%inWhichBlock.le.0) write(*,*) 'Warning: The flow field where the probe is located (flow%inWhichBlock) must be greater than 0!'
+            if(flow%inWhichBlock.le.0) write(*,*) 'Warning: The flow field where the probe is located (flow%inWhichBlock) must be greater than 0!'
             call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
-                                            LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu,LBMblks(flow%inWhichBlock)%den)
-            call write_solid_Information(time,flow%timeInfoDelta,flow%Asfac,flow%solidProbingNum,flow%solidProbingNode)
+                                              LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu,LBMblks(flow%inWhichBlock)%den)
+            call write_solid_Information(time,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)
         write(*,*)'Time for   writing step:', (time_end2 - time_begine2)
