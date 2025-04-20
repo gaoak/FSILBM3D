@@ -302,6 +302,10 @@ $PBS_WDIR/$PBS_ENAME
 
   13. *iBodyType(iFish)* : Type of virtual object
 
+      + -1: surface mesh object (need gmsh file, .msh is written in "version 2 ASCII")
+      +  0: rod (.dat)
+      +  1: plate (.dat)
+
   14. *isMotionGiven* : Degrees of freedom in six directions
 
   15. *denR(iFish)* : Density ratio $(rho_b * h / rho_f * L)$, where $L$ is the virtual plate thickness

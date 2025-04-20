@@ -46,13 +46,16 @@ module SolidBody
     contains
         procedure :: Initialise => Initialise_
         procedure :: PlateBuild => PlateBuild_
+        procedure :: RodBuild => RodBuild_
         procedure :: SurfaceBuild => SurfaceBuild_
         procedure :: UpdatePosVelArea => UpdatePosVelArea_
         procedure :: PlateUpdatePosVelArea => PlateUpdatePosVelArea_
+        procedure :: RodUpdatePosVelArea => RodUpdatePosVelArea_
         procedure :: SurfaceBuildPosVelArea => SurfaceBuildPosVelArea_
         procedure :: SurfaceUpdatePosVel => SurfaceUpdatePosVel_
         procedure :: Write_body => Write_body_
         procedure :: PlateWrite_body => PlateWrite_body_
+        procedure :: RodWrite_body => RodWrite_body_
         procedure :: SurfaceWrite_body => SurfaceWrite_body_
         procedure :: UpdateElmtInterp => UpdateElmtInterp_
         procedure :: PenaltyForce => PenaltyForce_
@@ -344,6 +347,8 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         if (this%v_type .eq. 1) then
             call this%PlateBuild()
+        elseif (this%v_type .eq. 0) then
+            call this%RodBuild()
         elseif (this%v_type .eq. -1) then
             call this%SurfaceBuild()
         else
@@ -588,6 +593,28 @@ module SolidBody
         enddo
     endsubroutine PlateUpdatePosVelArea_
 
+    subroutine RodUpdatePosVelArea_(this)
+        !   compute displacement, velocity, area at surface element center
+        IMPLICIT NONE
+        class(VirtualBody), intent(inout) :: this
+        integer :: i,i1,i2
+        real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3)
+        real(8) :: dh, area, IBPenaltyBeta
+        IBPenaltyBeta = - m_IBPenaltyalpha* 2.0d0*m_denIn
+        do i = 1,this%rbm%nEL
+            i1 = this%rbm%ele(i,1)
+            i2 = this%rbm%ele(i,2)
+            tmpxyz = 0.5d0 * (this%rbm%xyzful(i1,1:3) + this%rbm%xyzful(i2,1:3))
+            tmpvel = 0.5d0 * (this%rbm%velful(i1,1:3) + this%rbm%velful(i2,1:3))
+            tmpdx = this%rbm%xyzful(i2,1:3) - this%rbm%xyzful(i1,1:3)
+            dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3)) ! rod length
+            area = dh * IBPenaltyBeta
+            this%v_Exyz(1:3,i) = tmpxyz
+            this%v_Evel(1:3,i) = tmpvel
+            this%v_Ea(i) = area
+        enddo
+    endsubroutine RodUpdatePosVelArea_
+
     subroutine SurfaceBuildPosVelArea_(this,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         !   compute displacement, velocity, area at surface element center
         IMPLICIT NONE
@@ -671,6 +698,8 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         if (this%v_type .eq. 1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
             call this%PlateUpdatePosVelArea()
+        elseif (this%v_type .eq. 0 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
+            call this%RodUpdatePosVelArea()
         elseif (this%v_type .eq. -1 .and. (this%v_move .eq. 1 .or. this%rbm%iBodyModel .eq. 2)) then
             call this%SurfaceUpdatePosVel()
         else
@@ -684,6 +713,8 @@ module SolidBody
         integer :: vtor_
         vtor_ = 0
         if (this%v_type .eq. 1)then
+            vtor_ = this%vtor(x)
+        elseif (this%v_type .eq. 0)then
             vtor_ = this%vtor(x)
         elseif (this%v_type .eq. -1)then
             vtor_ = 1
@@ -991,6 +1022,20 @@ module SolidBody
         call this%PlateUpdatePosVelArea()
     end subroutine PlateBuild_
 
+    subroutine RodBuild_(this)
+        implicit none
+        class(VirtualBody), intent(inout) :: this
+        integer:: i
+        this%v_nelmts = this%rbm%nEL
+        allocate(this%vtor(this%v_nelmts))
+        do i=1,this%v_nelmts
+            this%vtor(i) = i
+        enddo
+        allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
+        allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+        call this%RodUpdatePosVelArea()
+    end subroutine RodBuild_
+
     subroutine SurfaceBuild_(this)
         implicit none
         class(VirtualBody), intent(inout) :: this
@@ -1097,6 +1142,8 @@ module SolidBody
         real(8),intent(in) :: time
         if (this%v_type .eq. 1) then
             call this%PlateWrite_body(iFish,idfile)
+        elseif (this%v_type .eq. 0) then
+            call this%RodWrite_body(iFish,idfile)
         elseif (this%v_type .eq. -1) then
             call this%SurfaceWrite_body(iFish,time,idfile)
         else
@@ -1115,9 +1162,9 @@ module SolidBody
         character (LEN=nameLen):: idstr
         !write zone title
         write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
-        write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "fish',trim(idstr), '" N = ',2*this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        write(idfile, '(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N = ',2*this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
         !write data
-        do i = 1,this%rbm%nNd
+        do i = 1,this%rbm%nND
             tmpxyz = this%rbm%xyzful(i,1:3)
             write(idfile, *) (tmpxyz - this%rbm%r_Lspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
             write(idfile, *) (tmpxyz + this%rbm%r_Rspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
@@ -1128,6 +1175,28 @@ module SolidBody
             write(idfile, *) 2*i1 -1, 2*i1,2*i2,2*i2-1
         enddo
     end subroutine PlateWrite_body_
+
+    subroutine RodWrite_body_(this,iFish,idfile)
+        ! to do: generate a temporary mesh
+        implicit none
+        class(VirtualBody), intent(inout) :: this
+        integer,intent(in) :: iFish,idfile
+        integer:: i, i1, i2
+        integer,parameter::nameLen=10
+        character (LEN=nameLen):: idstr
+        !write zone title
+        write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
+        write(idfile, '(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N = ',this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FELINESEG'
+        !write data
+        do i = 1,this%rbm%nND
+            write(idfile, *) this%rbm%xyzful(i,1:3)/m_Lref
+        enddo
+        do  i=1,this%rbm%nEL
+            i1 = this%rbm%ele(i,1)
+            i2 = this%rbm%ele(i,2)
+            write(idfile, *) i1,i2
+        enddo
+    end subroutine RodWrite_body_
 
     subroutine SurfaceWrite_body_(this,iFish,time,idfile)
         ! to do: generate a temporary mesh
@@ -1147,7 +1216,7 @@ module SolidBody
             do  i=1,Surfacetmpnpts
                 Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
             enddo
-            write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "',trim(idstr), '" N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
+            write(idfile, '(A,A,A,I7,A,I7,A)') 'ZONE    T = "',trim(idstr), '" N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
             do i = 1,Surfacetmpnpts
                 tmpxyz = Surfacetmpxyz(1:3,i)
                 write(idfile, *) tmpxyz/m_Lref
