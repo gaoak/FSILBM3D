@@ -3,7 +3,7 @@ module SythTurb
     use FlowCondition
     implicit none
     private
-    public:: SythTurb_Input
+    public:: InitialiseTurbulentBC, GetDisturbeVelocity
     integer,parameter:: Dim=3,Nk=200
     real(8),parameter:: RL=40000
     ! real(8),parameter:: L=1
@@ -12,13 +12,45 @@ module SythTurb
     real(8):: ukn(1:Nk),kn(1:Nk)
     real(8):: tke,tn,tm
     real(8):: m_nu,m_L
-    integer:: NX,NY,NZ,Nt
-    real(8),allocatable:: x(:),y(:),z(:),t(:)
-    real(8),allocatable:: uHIT(:,:,:,:,:)
+    real(8):: turbIntensity
+    real(8),allocatable:: buffer(:,:), rands(:,:)
+    integer:: windex, rindex, bsize
 
     contains
 
-    subroutine SythTurb_Input(xDim,yDim,zDim)
+    subroutine InitialiseTurbulentBC(turbIntensity, buffersize)
+        implicit none
+        if(.not.allocated(buffer)) then
+            bsize = buffersize
+            allocate(buffer(1:Dim, 1:bsize), rands(0:3,1:bsize))
+            rindex = 1
+            do windex = 1, bsize
+                call UpdateVelocity(windex)
+            enddo
+            call myfork(pid)
+            if(pid.eq.0) then
+                do while (.true.)
+                    if(windex>bsize) then
+                        windex = 1
+                        call Rand_Generation()
+                    endif
+                    call UpdateDisturbeVelocity(buffer(windex))
+                    windex = windex + 1
+                enddo
+            endif
+        endif
+    end subroutine Initialise
+
+    subroutine GetDisturbeVelocity(vel)
+        implicit none
+        real(8):: vel(1:Dim), r
+        rindex =  round(rands(3,rindex) * bsize)
+        if(rindex<1) rindex = 1
+        if(rindex>bsize) rindex = bsize
+        vel = buffer(:,rindex)
+    end subroutine GetTurbVelocity
+
+    subroutine initparams()
         implicit none
         integer:: xDim,yDim,zDim
         integer:: i,j,m
@@ -68,9 +100,6 @@ module SythTurb
         tn  = (m_nu/epsilon)**0.5d0
         tm  = 100d0*tn
 
-        allocate(uHIT(Nt,NX,NY,NZ,Dim))
-        uHIT = 0.0d0
-
         allocate(KN_(Nt,Nk,Dim),Psi(Nt,Nk),Sigma(Nt,Nk,Dim),point_uHIT(Nt,Dim))
 
         if (Dim.eq.3) call Flow_Generation(KN_,Sigma,Psi)
@@ -106,7 +135,7 @@ module SythTurb
         enddo
     endsubroutine
 
-    subroutine Flow_Generation(KN_,Sigma,Psi)
+    subroutine Rand_Generation(KN_,Sigma,Psi)
         implicit none
         ! Turbulence power spectrum E(K) with -5/3 Kolmogorov spectrum 
         ! von Karman spectrum
@@ -174,8 +203,10 @@ module SythTurb
         ! close(111)
     endsubroutine
 
-    subroutine point_uHIT_Generate(KN_,Sigma,Psi,i,j,m,point_uHIT)
+    subroutine UpdateDisturbeVelocity(uHit)
+        !, KN_,Sigma,Psi,i,j,m,point_uHIT)
         implicit none
+        !write at buffer(:,windex)
         real(8),intent(in):: KN_(Nt,Nk,Dim),Sigma(Nt,Nk,Dim),Psi(Nt,Nk)
         real(8):: tmp(Nt,Nk),ukn_(Nt,Nk),tmp_(Nt,Nk,Dim),uHIT_(Nt,Nk,Dim)
         real(8),intent(out):: point_uHIT(Nt,Dim)
