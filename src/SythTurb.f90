@@ -1,32 +1,27 @@
 module SythTurb
     use ConstParams
-    use FlowCondition
     implicit none
     private
-    public:: InitialiseTurbulentBC, GetDisturbeVelocity
+    public:: Initparams, InitialiseTurbulentBC, SyntheticVelocity
     integer,parameter:: Dim=3,Nk=200
-    real(8),parameter:: RL=40000
-    ! real(8),parameter:: L=1
-    ! real(8),parameter:: nu=1e-6
-    real(8):: eta,epsilon,u_eta,k0,kc,K(1:Nk+1),E_k(1:Nk+1)
-    real(8):: ukn(1:Nk),kn(1:Nk)
-    real(8):: tke,tn,tm
-    real(8):: m_nu,m_L
-    real(8):: turbIntensity
-    real(8),allocatable:: buffer(:,:), rands(:,:)
+    real(8):: RL
+    real(8):: m_nu,m_L,m_U,m_xmin,m_ymin,m_zmin,m_dh
+    real(8):: ukn(1:Nk),kn(1:Nk),tke,tn
+    integer:: NX,NY,NZ,Nt
+    real(8),allocatable:: t(:)
+    real(8),allocatable:: vel_buffer(:,:), rands(:,:,:),rand_psi(:)
     integer:: windex, rindex, bsize
 
     contains
 
-    subroutine InitialiseTurbulentBC(turbIntensity, buffersize)
+    subroutine InitialiseTurbulentBC(buffersize)
         implicit none
-        if(.not.allocated(buffer)) then
+        integer:: pid,buffersize
+        if(.not.allocated(vel_buffer)) then
             bsize = buffersize
-            allocate(buffer(1:Dim, 1:bsize), rands(0:3,1:bsize))
+            allocate(vel_buffer(1:Dim, 1:bsize), rands(0:1,1:Dim,1:Nk),rand_psi(1:Nk))
             rindex = 1
-            do windex = 1, bsize
-                call UpdateVelocity(windex)
-            enddo
+            windex = 1
             call myfork(pid)
             if(pid.eq.0) then
                 do while (.true.)
@@ -34,34 +29,41 @@ module SythTurb
                         windex = 1
                         call Rand_Generation()
                     endif
-                    call UpdateDisturbeVelocity(buffer(windex))
+                    call UpdateDisturbeVelocity(vel_buffer(:,windex))
                     windex = windex + 1
                 enddo
             endif
         endif
-    end subroutine Initialise
+    end subroutine InitialiseTurbulentBC
 
-    subroutine GetDisturbeVelocity(vel)
+    subroutine SyntheticVelocity(vel)
         implicit none
-        real(8):: vel(1:Dim), r
-        rindex =  round(rands(3,rindex) * bsize)
+        real(8):: vel(1:Dim)
+        rindex = nint(rand_psi(rindex) * bsize)
         if(rindex<1) rindex = 1
         if(rindex>bsize) rindex = bsize
-        vel = buffer(:,rindex)
-    end subroutine GetTurbVelocity
+        vel(:) = vel(:)+vel_buffer(:,rindex)
+    end subroutine SyntheticVelocity
 
-    subroutine initparams()
+    subroutine Initparams(turbIntensity,Uref,Lref,nu,xDim,yDim,zDim,xmin,ymin,zmin,dh)
         implicit none
+        real(8):: turbIntensity,Uref,Lref,nu,xmin,ymin,zmin,dh
         integer:: xDim,yDim,zDim
-        integer:: i,j,m
+        real(8):: eta,epsilon,u_eta,k0,kc,K(1:Nk+1),E_k(1:Nk+1)
+        integer:: i
         real(8):: d
-        real(8),allocatable:: KN_(:,:,:),Psi(:,:),Sigma(:,:,:),point_uHIT(:,:)
         NX      = xDim
         NY      = yDim
         NZ      = zDim
         Nt      = 1
-        m_L     = flow%Lref
-        m_nu    = flow%nu
+        m_U     = Uref
+        m_L     = Lref
+        m_nu    = nu
+        m_xmin  = xmin
+        m_ymin  = ymin
+        m_zmin  = zmin
+        m_dh  = dh
+        RL      = turbIntensity*m_U*m_L/m_nu
         eta     = m_L/(RL)**(3d0/4d0)
         epsilon = (m_nu**3d0)/(eta**4d0)
 
@@ -75,75 +77,46 @@ module SythTurb
         enddo
         call Ek()
 
-        allocate(x(NX),y(NY),z(NZ),t(Nt))
-        do i = 1,NX
-            x(i) = (m_L-0)*dble(i-1)/dble(NX-1)+0d0
-        enddo
-        do j = 1,NY
-            y(j) = (m_L-0)*dble(j-1)/dble(NY-1)+0d0
-        enddo
-        do m = 1,NZ
-            z(m) = (m_L-0)*dble(m-1)/dble(NZ-1)+0d0
-        enddo
-        if (Nt.eq.1)then
-            t(1) = tm
-        else
-            do i = 1,Nt
-                t(i) = (tm-0)*dble(i-1)/dble(Nt-1)+0d0
-            enddo
-        endif
+        allocate(t(Nt))
+        tn  = (m_nu/epsilon)**0.5d0
+        t(1) = tn
 
         ukn = sqrt((E_k(1:Nk)+E_k(2:Nk+1))/2d0*(K(2:Nk+1)-K(1:Nk)))
         kn  = 0.5d0*(K(1:Nk)+K(2:Nk+1))
 
         tke = sum((E_k(1:Nk)+E_k(2:Nk+1))/2d0*(K(2:Nk+1)-K(1:Nk)))
-        tn  = (m_nu/epsilon)**0.5d0
-        tm  = 100d0*tn
 
-        allocate(KN_(Nt,Nk,Dim),Psi(Nt,Nk),Sigma(Nt,Nk,Dim),point_uHIT(Nt,Dim))
+        contains
 
-        if (Dim.eq.3) call Flow_Generation(KN_,Sigma,Psi)
+        subroutine Ek()
+            implicit none
+            ! Turbulence power spectrum E(K) with -5/3 Kolmogorov spectrum 
+            ! von Karman spectrum
+            real(8):: c,beta,p0,cl,cn
+            real(8):: fl(1:Nk+1),fn(1:Nk+1)
 
-        do i = 1,NX
-            do j = 1,NY
-                do m = 1,NZ
-                    call point_uHIT_Generate(KN_,Sigma,Psi,i,j,m,point_uHIT)
-                    uHIT(:,i,j,m,:) = point_uHIT(:,:)
-                enddo
+            c    = 1.5d0
+            beta = 5.2d0
+            p0   = 2.0d0
+            cl   = 6.78d0
+            cn   = 0.4d0
+
+            do i = 1,Nk+1
+                fl(i)  = (K(i)*m_L/sqrt((K(i)*m_L)**2d0+cl))**(5d0/3d0+p0)
+                fn(i)  = exp(-beta*(((K(i)*eta)**4d0+cn**4d0)**0.25d0-cn))
+                E_k(i) = c*epsilon**(2d0/3d0)*K(i)**(-5d0/3d0)*fl(i)*fn(i)
             enddo
-        enddo
+        endsubroutine
     endsubroutine
 
-    subroutine Ek()
-        implicit none
-        ! Turbulence power spectrum E(K) with -5/3 Kolmogorov spectrum 
-        ! von Karman spectrum
-        real(8):: c,beta,p0,cl,cn
-        real(8):: fl(1:Nk+1),fn(1:Nk+1)
-        integer:: i
-
-        c    = 1.5d0
-        beta = 5.2d0
-        p0   = 2.0d0
-        cl   = 6.78d0
-        cn   = 0.4d0
-
-        do i = 1,Nk+1
-            fl(i)  = (K(i)*m_L/sqrt((K(i)*m_L)**2d0+cl))**(5d0/3d0+p0)
-            fn(i)  = exp(-beta*(((K(i)*eta)**4d0+cn**4d0)**0.25d0-cn))
-            E_k(i) = c*epsilon**(2d0/3d0)*K(i)**(-5d0/3d0)*fl(i)*fn(i)
-        enddo
-    endsubroutine
-
-    subroutine Rand_Generation(KN_,Sigma,Psi)
+    subroutine Rand_Generation()
         implicit none
         ! Turbulence power spectrum E(K) with -5/3 Kolmogorov spectrum 
         ! von Karman spectrum
         real(8):: r(Nt,Nk),Theta(Nt,Nk),Phi(Nt,Nk),Alpha(Nt,Nk),k_dir(Nt,Nk,Dim)
-        real(8),intent(out):: Psi(Nt,Nk),Sigma(Nt,Nk,Dim)
+        real(8):: KN_(Nt,Nk,Dim),Psi(Nt,Nk),Sigma(Nt,Nk,Dim)
         real(8):: theta_,psi_,phi_,alpha_,Ry(3,3),Rz(3,3),sigma0(3),sigma_(3)
-        real(8),intent(out):: KN_(Nt,Nk,Dim)
-        integer:: i,j,m
+        integer:: i,j
 
         ! Dim=3
         call random_number(r)
@@ -198,28 +171,50 @@ module SythTurb
         Sigma(:,:,1)=-sin(Phi(:,:));
         Sigma(:,:,2)= cos(Phi(:,:));
 
-        ! open(111,file='1.dat',position='append')
-        ! write(111,'(150E20.10)') uHIT(1,:,:,1,1)
-        ! close(111)
+        do i =1,Nk
+            rands(0,:,i) = KN_(1,i,:)
+            rands(1,:,i) = Sigma(1,i,:)
+            rand_psi(i)  = Psi(1,i)
+        enddo
     endsubroutine
 
     subroutine UpdateDisturbeVelocity(uHit)
-        !, KN_,Sigma,Psi,i,j,m,point_uHIT)
         implicit none
-        !write at buffer(:,windex)
-        real(8),intent(in):: KN_(Nt,Nk,Dim),Sigma(Nt,Nk,Dim),Psi(Nt,Nk)
-        real(8):: tmp(Nt,Nk),ukn_(Nt,Nk),tmp_(Nt,Nk,Dim),uHIT_(Nt,Nk,Dim)
-        real(8),intent(out):: point_uHIT(Nt,Dim)
-        integer:: i,j,m
+        real(8):: Sigma(Nt,Nk,Dim)
+        real(8):: tmp(Nt,Nk),ukn_(Nt,Nk),tmp_(Nt,Nk,Dim),uHIT_(Nk,Dim)
+        real(8),intent(out):: uHit(Dim)
+        real(8):: x,y,z
+        integer:: i,j,m,dd
 
-        tmp = cos(KN_(:,:,1)*x(i)+KN_(:,:,2)*y(j)+KN_(:,:,3)*z(m)+Psi(:,:))
+        if (NZ.eq.1) then
+            i = (windex-1)/NX+1
+            j = mod(windex-1,NX)+1
+            m = 1
+        elseif (NY.eq.1) then
+            i = mod(windex-1,NZ)+1
+            j = 1
+            m = (windex-1)/NZ+1
+        elseif (NX.eq.1) then
+            i = 1
+            j = (windex-1)/NY+1
+            m = mod(windex-1,NY)+1
+        endif
+
+        x = m_xmin + (i - 1) * m_dh
+        y = m_ymin + (j - 1) * m_dh
+        z = m_zmin + (m - 1) * m_dh
+
+        tmp(1,:) = cos(rands(0,1,:)*x+rands(0,2,:)*y+rands(0,3,:)*z+rand_psi(:))
 
         call repmat1dim2(ukn,Nk,Nt,1,ukn_)
 
         call repmat2dim3(tmp(:,:)*ukn_(:,:),Nt,Nk,1,1,Dim,tmp_)
 
-        uHIT_(:,:,:) = tmp_(:,:,:)*Sigma(:,:,:)
-        point_uHIT(:,:) = sum(uHIT_,dim=2)
+        do dd = 1,Dim
+            Sigma(1,:,dd) = rands(0,dd,:)
+        enddo
+        uHIT_(:,:) = tmp_(1,:,:)*Sigma(1,:,:)
+        uHit(:) = sum(uHIT_(:,:),dim=1)
     endsubroutine
 
     subroutine repmat1dim3(mat,matDim2,Dim1,Dim2,Dim3,mat_)

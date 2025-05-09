@@ -261,6 +261,7 @@ module LBMBlockComm
     recursive subroutine tree_set_boundary_conditions_block(treenode)
         implicit none
         integer:: i, s, treenode
+        if (treenode.eq.blockTreeRoot) call set_synthetic_turbulence_inlet_block(treenode)
         call set_boundary_conditions_block(treenode)
         ! tree cycle
         if(blockTree(treenode)%nsons.gt.0) then

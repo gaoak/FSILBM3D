@@ -6,7 +6,7 @@ module FlowCondition
     type :: FlowCondType
         integer :: isConCmpt,numsubstep,npsize
         real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
-        real(8) :: Re,denIn,nu,Mu,dtolLBM
+        real(8) :: Re,denIn,nu,Mu,dtolLBM,turbIntensity
         integer :: LrefType,TrefType,UrefType,ntolLBM
         integer :: velocityKind,interpolateScheme
         real(8) :: uvwIn(1:3),shearRateIn(1:3)
@@ -45,7 +45,7 @@ module FlowCondition
         call readNextData(111, buffer)
         read(buffer,*)    flow%timeFlowDelta,flow%timeBodyDelta,flow%timeInfoDelta
         call readNextData(111, buffer)
-        read(buffer,*)    flow%Re,flow%denIn
+        read(buffer,*)    flow%Re,flow%denIn,flow%turbIntensity
         call readNextData(111, buffer)
         read(buffer,*)    flow%uvwIn(1:3)
         call readNextData(111, buffer)

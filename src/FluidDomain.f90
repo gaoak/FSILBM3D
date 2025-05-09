@@ -1,13 +1,14 @@
 module FluidDomain
     use ConstParams
     use FlowCondition
+    use SythTurb
     implicit none
     private
     public:: LBMblks,LBMblksIndex,m_nblocks
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_turbulent_statistic_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
-             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block
+             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block,set_synthetic_turbulence_inlet_block
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,outputtype
@@ -40,6 +41,8 @@ module FluidDomain
         procedure :: collision => collision_
         procedure :: streaming => streaming_
         procedure :: set_boundary_conditions => set_boundary_conditions_
+        procedure :: set_synthetic_turbulence_inlet => set_synthetic_turbulence_inlet_
+        procedure :: check_synthetic_turbulence_inlet => check_synthetic_turbulence_inlet_
         procedure :: check_periodic_boundary => check_periodic_boundary_
         procedure :: update_volume_force => update_volume_force_
         procedure :: add_volume_force => add_volume_force_
@@ -311,6 +314,17 @@ module FluidDomain
         implicit none
         integer:: nblock
         call LBMblks(nblock)%set_boundary_conditions()
+    END SUBROUTINE
+
+    SUBROUTINE set_synthetic_turbulence_inlet_block(Rootblock)
+        implicit none
+        integer:: Rootblock,iblock
+        do iblock = 1,m_nblocks
+            if (iblock.ne.Rootblock) then
+                call LBMblks(iblock)%check_synthetic_turbulence_inlet()
+            endif
+        enddo
+        call LBMblks(Rootblock)%set_synthetic_turbulence_inlet()
     END SUBROUTINE
 
     SUBROUTINE halfwayBCset_block(nblock)
@@ -644,6 +658,17 @@ module FluidDomain
             this%fIn(:,:,1,[1,7,9,11,13]) = this%fIn(:,:,2,[1,7,9,11,13])
         elseif(this%BndConds(1) .eq. BCorder2_Extrapolate)then
             this%fIn(:,:,1,[1,7,9,11,13]) = 2.0*this%fIn(:,:,2,[1,7,9,11,13]) - this%fIn(:,:,3,[1,7,9,11,13])
+        elseif (this%BndConds(1) .eq. BCEq_DirecletU_SythTurbInlet) then
+            ! equilibriun scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call SyntheticVelocity(velocity(1:SpaceDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,1,0:lbmDim))
+            enddo
+            enddo
         elseif(this%BndConds(1) .eq. BCstationary_Wall)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
@@ -728,6 +753,17 @@ module FluidDomain
             this%fIn(:,:,this%xDim,[2,8,10,12,14]) = this%fIn(:,:,this%xDim-1,[2,8,10,12,14])
         elseif(this%BndConds(2) .eq. BCorder2_Extrapolate)then
             this%fIn(:,:,this%xDim,[2,8,10,12,14]) = 2.0*this%fIn(:,:,this%xDim-1,[2,8,10,12,14])-this%fIn(:,:,this%xDim-2,[2,8,10,12,14])
+        elseif (this%BndConds(2) .eq. BCEq_DirecletU_SythTurbInlet) then
+            ! equilibriun scheme
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmax,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call SyntheticVelocity(velocity(1:SpaceDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,y,this%xDim,0:lbmDim))
+            enddo
+            enddo
         elseif(this%BndConds(2) .eq. BCstationary_Wall)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
@@ -812,6 +848,17 @@ module FluidDomain
             this%fIn(:,1,:,[3,7,8,15,17]) = this%fIn(:,2,:,[3,7,8,15,17])
         elseif(this%BndConds(3) .eq. BCorder2_Extrapolate)then
             this%fIn(:,1,:,[3,7,8,15,17]) = 2.0*this%fIn(:,2,:,[3,7,8,15,17]) - this%fIn(:,3,:,[3,7,8,15,17])
+        elseif (this%BndConds(3) .eq. BCEq_DirecletU_SythTurbInlet) then
+            ! equilibriun scheme
+            do  x = 1,this%xDim
+                xCoord = this%xmin + this%dh * (x - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_velocity(this%blktime,zCoord,this%ymin,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call SyntheticVelocity(velocity(1:SpaceDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,1,x,0:lbmDim))
+            enddo
+            enddo
         elseif(this%BndConds(3) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
@@ -896,6 +943,17 @@ module FluidDomain
             this%fIn(:,this%yDim,:,[4,9,10,16,18]) = this%fIn(:,this%yDim-1,:,[4,9,10,16,18])
         elseif(this%BndConds(4) .eq. BCorder2_Extrapolate)then
             this%fIn(:,this%yDim,:,[4,9,10,16,18]) = 2.0*this%fIn(:,this%yDim-1,:,[4,9,10,16,18]) - this%fIn(:,this%yDim-2,:,[4,9,10,16,18])
+        elseif (this%BndConds(4) .eq. BCEq_DirecletU_SythTurbInlet) then
+            ! equilibriun scheme
+            do  x = 1,this%xDim
+                xCoord = this%xmin + this%dh * (x - 1);
+            do  z = 1,this%zDim
+                zCoord = this%zmin + this%dh * (z - 1);
+                call evaluate_velocity(this%blktime,zCoord,this%ymax,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call SyntheticVelocity(velocity(1:SpaceDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(z,this%yDim,x,0:lbmDim))
+            enddo
+            enddo
         elseif(this%BndConds(4) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
@@ -980,6 +1038,17 @@ module FluidDomain
             this%fIn(1,:,:,[5,11,12,15,16]) = this%fIn(2,:,:,[5,11,12,15,16])
         elseif(this%BndConds(5) .eq. BCorder2_Extrapolate)then
             this%fIn(1,:,:,[5,11,12,15,16]) = 2.0*this%fIn(2,:,:,[5,11,12,15,16]) - this%fIn(3,:,:,[5,11,12,15,16])
+        elseif (this%BndConds(5) .eq. BCEq_DirecletU_SythTurbInlet) then
+            ! equilibriun scheme
+            do  x = 1,this%xDim
+                xCoord = this%xmin + this%dh * (x - 1);
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+                call evaluate_velocity(this%blktime,this%zmin,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call SyntheticVelocity(velocity(1:SpaceDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(1,y,x,0:lbmDim))
+            enddo
+            enddo
         elseif(this%BndConds(5) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
@@ -1064,6 +1133,17 @@ module FluidDomain
             this%fIn(this%zDim,:,:,[6,13,14,17,18]) = this%fIn(this%zDim-1,:,:,[6,13,14,17,18])
         elseif(this%BndConds(6) .eq. BCorder2_Extrapolate)then
             this%fIn(this%zDim,:,:,[6,13,14,17,18]) = 2.0*this%fIn(this%zDim-1,:,:,[6,13,14,17,18])-this%fIn(this%zDim-2,:,:,[6,13,14,17,18])
+        elseif (this%BndConds(6) .eq. BCEq_DirecletU_SythTurbInlet) then
+            ! equilibriun scheme
+            do  x = 1,this%xDim
+                xCoord = this%xmin + this%dh * (x - 1);
+            do  y = 1,this%yDim
+                yCoord = this%ymin + this%dh * (y - 1);
+                call evaluate_velocity(this%blktime,this%zmax,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                call SyntheticVelocity(velocity(1:SpaceDim))
+                call calculate_distribution_funcion(flow%denIn,velocity(1:SpaceDim),this%fIn(this%zDim,y,x,0:lbmDim))
+            enddo
+            enddo
         elseif(this%BndConds(6) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
@@ -1118,6 +1198,51 @@ module FluidDomain
         else
             stop 'back boundary (zmax) has no such boundary condition'
         endif
+    END SUBROUTINE
+
+    SUBROUTINE set_synthetic_turbulence_inlet_(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer:: i,j
+        i = count(this%BndConds(:).eq.BCEq_DirecletU_SythTurbInlet)
+        if (i.ne.0.and.i.ne.1) then
+            stop 'Only one synthetic turbulence inlet is allowed (More than 2 BCs are equal to 105)'
+        endif
+        if (i .eq. 1) then
+            do j = 1,6
+                if (this%BndConds(j).eq.BCEq_DirecletU_SythTurbInlet) exit
+            enddo
+            if (j.eq.1) then
+                call Initparams(flow%turbIntensity,flow%Uref,flow%Lref,flow%nu,1,this%yDim,this%zDim,this%xmin,this%ymin,this%zmin,this%dh)
+                call InitialiseTurbulentBC(this%yDim*this%zDim)
+            elseif (j.eq.2) then
+                call Initparams(flow%turbIntensity,flow%Uref,flow%Lref,flow%nu,1,this%yDim,this%zDim,this%xmin+(this%xDim-1)*this%dh,this%ymin,this%zmin,this%dh)
+                call InitialiseTurbulentBC(this%yDim*this%zDim)
+            elseif (j.eq.3) then
+                call Initparams(flow%turbIntensity,flow%Uref,flow%Lref,flow%nu,this%xDim,1,this%zDim,this%xmin,this%ymin,this%zmin,this%dh)
+                call InitialiseTurbulentBC(this%xDim*this%zDim)
+            elseif (j.eq.4) then
+                call Initparams(flow%turbIntensity,flow%Uref,flow%Lref,flow%nu,this%xDim,1,this%zDim,this%xmin,this%ymin+(this%yDim-1)*this%dh,this%zmin,this%dh)
+                call InitialiseTurbulentBC(this%xDim*this%zDim)
+            elseif (j.eq.5) then
+                call Initparams(flow%turbIntensity,flow%Uref,flow%Lref,flow%nu,this%xDim,this%yDim,1,this%xmin,this%ymin,this%zmin,this%dh)
+                call InitialiseTurbulentBC(this%xDim*this%yDim)
+            elseif (j.eq.6) then
+                call Initparams(flow%turbIntensity,flow%Uref,flow%Lref,flow%nu,this%xDim,this%yDim,1,this%xmin,this%ymin,this%zmin+(this%zDim-1)*this%dh,this%dh)
+                call InitialiseTurbulentBC(this%xDim*this%yDim)
+            endif
+        endif
+    END SUBROUTINE
+
+    SUBROUTINE check_synthetic_turbulence_inlet_(this)
+        implicit none
+        class(LBMBlock), intent(inout) :: this
+        integer:: i
+        do i =1,6 
+            if (this%BndConds(i).eq.BCEq_DirecletU_SythTurbInlet) then
+                stop 'Synthetic turbulence inlet can only exist at the root block'
+            endif
+        enddo
     END SUBROUTINE
 
     SUBROUTINE calculate_macro_quantities_(this)
