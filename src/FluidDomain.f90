@@ -392,9 +392,9 @@ module FluidDomain
         ymax = this%yDim - this%offsetOutput
         zmax = this%zDim - this%offsetOutput
         if(this%outputtype .ge. 2) then
-            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,1:12))
+            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,0:12))
         else
-            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,1:3))
+            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,0:3))
         endif
         ! allocate mesh partition
         allocate(this%OMPpartition(1:m_npsize),this%OMPparindex(1:m_npsize+1),this%OMPeid(1:m_npsize))
@@ -1650,6 +1650,7 @@ module FluidDomain
             do x=nxs, nxe
                 do y=nys, nye
                     do z=nzs, nze
+                        this%outtmp(z,y,x,0) = Cs2*(this%den(z,y,x)-flow%denIn) !p
                         this%outtmp(z,y,x,1) = this%uuu(z,y,x,1)*invUref !u
                         this%outtmp(z,y,x,2) = this%uuu(z,y,x,2)*invUref !v
                         this%outtmp(z,y,x,3) = this%uuu(z,y,x,3)*invUref !w
@@ -1712,6 +1713,7 @@ module FluidDomain
                 nze = nze-nzs+1
                 WRITE(idfile) nxe,nye,nze,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
+                write(idfile) this%outtmp(:,:,:,0)
                 write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
                 close(idfile)
             endif
@@ -1719,6 +1721,7 @@ module FluidDomain
                 open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
                 WRITE(idfile) nxe,nye,nze,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
+                write(idfile) this%outtmp(:,:,:,0)
                 write(idfile) this%outtmp(:,:,:,4),this%outtmp(:,:,:,5),this%outtmp(:,:,:,6)
                 write(idfile) this%outtmp(:,:,:,7),this%outtmp(:,:,:,8),this%outtmp(:,:,:,9)
                 write(idfile) this%outtmp(:,:,:,10),this%outtmp(:,:,:,11),this%outtmp(:,:,:,12)
