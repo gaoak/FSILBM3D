@@ -1115,7 +1115,7 @@ module SolidBody
         character (LEN=nameLen):: idstr
         !write zone title
         write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
-        write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "fish',trim(idstr), '" N = ',2*this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        write(idfile, '(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N = ',2*this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
         !write data
         do i = 1,this%rbm%nNd
             tmpxyz = this%rbm%xyzful(i,1:3)
@@ -1147,7 +1147,7 @@ module SolidBody
             do  i=1,Surfacetmpnpts
                 Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
             enddo
-            write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "',trim(idstr), '" N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
+            write(idfile, '(A,A,A,I7,A,I7,A)') 'ZONE    T = "',trim(idstr), '" N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
             do i = 1,Surfacetmpnpts
                 tmpxyz = Surfacetmpxyz(1:3,i)
                 write(idfile, *) tmpxyz/m_Lref
