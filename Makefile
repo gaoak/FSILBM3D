@@ -1,12 +1,15 @@
-CMP = intel# intel,gcc
+CMP = ifx# ifort,ifx,gfortran
 
 BUILD ?=
 
 #######CMP settings###########
-ifeq ($(CMP),intel)
+ifeq ($(CMP),ifort)
 FC = ifort
 FFLAGS = -diag-disable=10448 -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32 -double-size 64
-else ifeq ($(CMP),gcc)
+else ifeq ($(CMP),ifx)
+FC = ifx
+FFLAGS = -diag-disable=10448 -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32 -double-size 64
+else ifeq ($(CMP),gfortran)
 FC = gfortran
 FFLAGS = -O3
 ifeq ($(BUILD),debug)
