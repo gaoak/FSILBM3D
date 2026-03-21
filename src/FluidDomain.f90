@@ -19,6 +19,7 @@ module FluidDomain
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:)
+        real(8), allocatable :: phi(:,:,:),phi_new(:,:,:),chemPot(:,:,:)
         real(4), allocatable :: OUTtmp(:,:,:,:)
         real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
@@ -381,6 +382,11 @@ module FluidDomain
         allocate(this%uuu(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%force(this%zDim,this%yDim,this%xDim,1:3))
         allocate(this%den(this%zDim,this%yDim,this%xDim))
+        if(flow%multiphaseModel .eq. MPModelPhaseField) then
+            allocate(this%phi(this%zDim,this%yDim,this%xDim))
+            allocate(this%phi_new(this%zDim,this%yDim,this%xDim))
+            allocate(this%chemPot(this%zDim,this%yDim,this%xDim))
+        endif
         if (this%outputtype .ge. 2) then
             allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:9))
         endif
@@ -518,7 +524,7 @@ module FluidDomain
 
         SUBROUTINE initialise_flow()
             implicit none
-            real(8):: xCoord,yCoord,zCoord
+            real(8):: xCoord,yCoord,zCoord,radius,phi0
             integer:: x, y, z
             ! calculating initial flow velocity and the distribution function
             do  x = 1, this%xDim
@@ -527,7 +533,27 @@ module FluidDomain
                 yCoord = this%ymin + this%dh * (y - 1);
             do  z = 1, this%zDim
                 zCoord = this%zmin + this%dh * (z - 1);
-                this%den(z,y,x) = flow%denIn
+                radius = dsqrt((xCoord-flow%bubbleCenter(1))**2 + (yCoord-flow%bubbleCenter(2))**2 + (zCoord-flow%bubbleCenter(3))**2)
+                phi0 = 1.0d0
+                if(flow%multiphaseModel .ne. MPModelNone) then
+                    if(flow%interfaceWidth .gt. MachineTolerace) then
+                        phi0 = -dtanh((radius-flow%bubbleRadius)/max(flow%interfaceWidth,MachineTolerace))
+                    elseif(radius .le. flow%bubbleRadius) then
+                        phi0 = 1.0d0
+                    else
+                        phi0 = -1.0d0
+                    endif
+                endif
+                if(flow%multiphaseModel .eq. MPModelShanChen) then
+                    this%den(z,y,x) = 0.5d0*((1.0d0+phi0)*flow%rhoLiquid + (1.0d0-phi0)*flow%rhoGas)
+                elseif(flow%multiphaseModel .eq. MPModelPhaseField) then
+                    this%phi(z,y,x) = phi0
+                    this%phi_new(z,y,x) = phi0
+                    this%chemPot(z,y,x) = 0.0d0
+                    this%den(z,y,x) = 0.5d0*((1.0d0+phi0)*flow%rhoLiquid + (1.0d0-phi0)*flow%rhoGas)
+                else
+                    this%den(z,y,x) = flow%denIn
+                endif
                 call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
                 if(this%outputtype .ge. 2) then
@@ -1203,16 +1229,28 @@ module FluidDomain
     SUBROUTINE collision_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega,f_1
+        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega,f_1,rhoLocal
         integer:: x,y,z
         dt3 = 3.d0*this%dh
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
+        if(flow%multiphaseModel .eq. MPModelShanChen) then
+            call apply_shan_chen_force()
+        elseif(flow%multiphaseModel .eq. MPModelPhaseField) then
+            call advance_phase_field()
+            call apply_phase_field_force()
+        endif
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega,rhoLocal)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
+            if(flow%multiphaseModel .eq. MPModelPhaseField) then
+                rhoLocal = 0.5d0*((1.0d0+this%phi(z,y,x))*flow%rhoLiquid + (1.0d0-this%phi(z,y,x))*flow%rhoGas)
+                this%den(z,y,x) = rhoLocal
+            else
+                rhoLocal = this%den(z,y,x)
+            endif
             uSqr           = sum(this%uuu(z,y,x,1:3)*this%uuu(z,y,x,1:3))
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * rhoLocal * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
                  (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
                 +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
@@ -1257,6 +1295,140 @@ module FluidDomain
         enddo
         !$OMP END PARALLEL DO
         contains
+        subroutine apply_shan_chen_force()
+            implicit none
+            integer:: x0,y0,z0,e,xn,yn,zn
+            real(8):: psi0,psiN,forceSC(3)
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x0,y0,z0,e,xn,yn,zn,psi0,psiN,forceSC)
+            do x0 = 1, this%xDim
+            do y0 = 1, this%yDim
+            do z0 = 1, this%zDim
+                psi0 = pseudopotential(this%den(z0,y0,x0))
+                forceSC = 0.0d0
+                do e = 1, lbmDim
+                    xn = neighbour_index(x0,ee(e,1),this%xDim,this%periodic_bc(1))
+                    yn = neighbour_index(y0,ee(e,2),this%yDim,this%periodic_bc(2))
+                    zn = neighbour_index(z0,ee(e,3),this%zDim,this%periodic_bc(3))
+                    psiN = pseudopotential(this%den(zn,yn,xn))
+                    forceSC(1:3) = forceSC(1:3) + wt(e) * psiN * dble(ee(e,1:3))
+                enddo
+                this%force(z0,y0,x0,1:3) = this%force(z0,y0,x0,1:3) - flow%shanChenG * psi0 * forceSC(1:3) / Cs2
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+        end subroutine
+
+        subroutine advance_phase_field()
+            implicit none
+            integer:: x0,y0,z0
+            real(8):: gradPhi(3),lapMu,muLocal,phiLocal,advTerm
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x0,y0,z0,muLocal)
+            do x0 = 1, this%xDim
+            do y0 = 1, this%yDim
+            do z0 = 1, this%zDim
+                muLocal = flow%phaseBeta * (this%phi(z0,y0,x0)**3 - this%phi(z0,y0,x0)) - flow%phaseKappa * laplacian_scalar(this%phi,x0,y0,z0)
+                this%chemPot(z0,y0,x0) = muLocal
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x0,y0,z0,gradPhi,lapMu,phiLocal,advTerm)
+            do x0 = 1, this%xDim
+            do y0 = 1, this%yDim
+            do z0 = 1, this%zDim
+                gradPhi = gradient_scalar(this%phi,x0,y0,z0)
+                lapMu = laplacian_scalar(this%chemPot,x0,y0,z0)
+                phiLocal = this%phi(z0,y0,x0)
+                advTerm = this%uuu(z0,y0,x0,1) * gradPhi(1) + this%uuu(z0,y0,x0,2) * gradPhi(2) + this%uuu(z0,y0,x0,3) * gradPhi(3)
+                this%phi_new(z0,y0,x0) = phiLocal - this%dh * advTerm + this%dh * flow%phaseMobility * lapMu
+                this%phi_new(z0,y0,x0) = max(-1.0d0,min(1.0d0,this%phi_new(z0,y0,x0)))
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+            this%phi = this%phi_new
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x0,y0,z0,muLocal)
+            do x0 = 1, this%xDim
+            do y0 = 1, this%yDim
+            do z0 = 1, this%zDim
+                muLocal = flow%phaseBeta * (this%phi(z0,y0,x0)**3 - this%phi(z0,y0,x0)) - flow%phaseKappa * laplacian_scalar(this%phi,x0,y0,z0)
+                this%chemPot(z0,y0,x0) = muLocal
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+        end subroutine
+
+        subroutine apply_phase_field_force()
+            implicit none
+            integer:: x0,y0,z0
+            real(8):: gradMu(3)
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x0,y0,z0,gradMu)
+            do x0 = 1, this%xDim
+            do y0 = 1, this%yDim
+            do z0 = 1, this%zDim
+                gradMu = gradient_scalar(this%chemPot,x0,y0,z0)
+                this%force(z0,y0,x0,1:3) = this%force(z0,y0,x0,1:3) - this%phi(z0,y0,x0) * gradMu(1:3)
+            enddo
+            enddo
+            enddo
+            !$OMP END PARALLEL DO
+        end subroutine
+
+        integer function neighbour_index(i0,di,imax,isPeriodic)
+            implicit none
+            integer,intent(in):: i0,di,imax,isPeriodic
+            neighbour_index = i0 + di
+            if(isPeriodic .eq. 1) then
+                if(neighbour_index .lt. 1) neighbour_index = imax
+                if(neighbour_index .gt. imax) neighbour_index = 1
+            else
+                neighbour_index = max(1,min(imax,neighbour_index))
+            endif
+        end function
+
+        real(8) function pseudopotential(rho)
+            implicit none
+            real(8),intent(in):: rho
+            if(flow%shanChenPsi0 .gt. MachineTolerace) then
+                pseudopotential = flow%shanChenPsi0 * (1.0d0 - dexp(-rho / flow%shanChenPsi0))
+            else
+                pseudopotential = 1.0d0 - dexp(-rho)
+            endif
+        end function
+
+        function gradient_scalar(field,x0,y0,z0) result(gradOut)
+            implicit none
+            real(8),intent(in):: field(this%zDim,this%yDim,this%xDim)
+            integer,intent(in):: x0,y0,z0
+            real(8):: gradOut(3)
+            integer:: xp,xm,yp,ym,zp,zm
+            xp = neighbour_index(x0, 1,this%xDim,this%periodic_bc(1))
+            xm = neighbour_index(x0,-1,this%xDim,this%periodic_bc(1))
+            yp = neighbour_index(y0, 1,this%yDim,this%periodic_bc(2))
+            ym = neighbour_index(y0,-1,this%yDim,this%periodic_bc(2))
+            zp = neighbour_index(z0, 1,this%zDim,this%periodic_bc(3))
+            zm = neighbour_index(z0,-1,this%zDim,this%periodic_bc(3))
+            gradOut(1) = (field(z0,y0,xp) - field(z0,y0,xm)) / (2.0d0*this%dh)
+            gradOut(2) = (field(z0,yp,x0) - field(z0,ym,x0)) / (2.0d0*this%dh)
+            gradOut(3) = (field(zp,y0,x0) - field(zm,y0,x0)) / (2.0d0*this%dh)
+        end function
+
+        real(8) function laplacian_scalar(field,x0,y0,z0)
+            implicit none
+            real(8),intent(in):: field(this%zDim,this%yDim,this%xDim)
+            integer,intent(in):: x0,y0,z0
+            integer:: xp,xm,yp,ym,zp,zm
+            xp = neighbour_index(x0, 1,this%xDim,this%periodic_bc(1))
+            xm = neighbour_index(x0,-1,this%xDim,this%periodic_bc(1))
+            yp = neighbour_index(y0, 1,this%yDim,this%periodic_bc(2))
+            ym = neighbour_index(y0,-1,this%yDim,this%periodic_bc(2))
+            zp = neighbour_index(z0, 1,this%zDim,this%periodic_bc(3))
+            zm = neighbour_index(z0,-1,this%zDim,this%periodic_bc(3))
+            laplacian_scalar = (field(z0,y0,xp) + field(z0,y0,xm) + field(z0,yp,x0) + field(z0,ym,x0) + field(zp,y0,x0) + field(zm,y0,x0) - 6.0d0*field(z0,y0,x0)) / (this%dh*this%dh)
+        end function
+
         SUBROUTINE smag(fneq,rho,x0,y0,z0,omega0)
             implicit none
             real(8):: fneq(0:lbmDim),rho,omega0,tau_t
@@ -1626,7 +1798,7 @@ module FluidDomain
         real(8), intent(in):: time
         integer:: x,y,z,pid,i
         real(8)::xmin,ymin,zmin
-        integer::nxs,nxe,nys,nye,nzs,nze
+        integer::nxs,nxe,nys,nye,nzs,nze,nxout,nyout,nzout
         integer,parameter::nameLen=10,blockLen=3,idfile=100
         character (LEN=nameLen):: fileName
         character (LEN=blockLen):: blockName
@@ -1641,9 +1813,22 @@ module FluidDomain
         xmin = this%xmin + this%offsetOutput * this%dh
         ymin = this%ymin + this%offsetOutput * this%dh
         zmin = this%zmin + this%offsetOutput * this%dh
+        nxout = nxe - nxs + 1
+        nyout = nye - nys + 1
+        nzout = nze - nzs + 1
 
         invUref  = 1.d0/flow%Uref
         invUrefs = 1.d0/flow%Uref/flow%Uref
+        write(fileName,'(I10)') nint(time/flow%Tref*1d5)
+        fileName = adjustr(fileName)
+        do  i=1,nameLen
+            if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+        write(blockName,'(I3)') this%ID
+        blockName = adjustr(blockName)
+        do  i=1,blockLen
+            if(blockName(i:i)==' ')blockName(i:i)='0'
+        enddo
 
         if(this%outputtype .ne. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
@@ -1696,32 +1881,31 @@ module FluidDomain
         call myfork(pid)
         if(pid.eq.0) then
             if(this%outputtype .ne. 2) then
-                write(fileName,'(I10)') nint(time/flow%Tref*1d5)
-                fileName = adjustr(fileName)
-                do  i=1,nameLen
-                    if(fileName(i:i)==' ')fileName(i:i)='0'
-                enddo
-                write(blockName,'(I3)') this%ID
-                blockName = adjustr(blockName)
-                do  i=1,blockLen
-                    if(blockName(i:i)==' ')blockName(i:i)='0'
-                enddo
                 open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
-                nxe = nxe-nxs+1
-                nye = nye-nys+1
-                nze = nze-nzs+1
-                WRITE(idfile) nxe,nye,nze,this%ID
+                WRITE(idfile) nxout,nyout,nzout,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
                 write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
                 close(idfile)
             endif
             if(this%outputtype .ge. 2) then
                 open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
-                WRITE(idfile) nxe,nye,nze,this%ID
+                WRITE(idfile) nxout,nyout,nzout,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
                 write(idfile) this%outtmp(:,:,:,4),this%outtmp(:,:,:,5),this%outtmp(:,:,:,6)
                 write(idfile) this%outtmp(:,:,:,7),this%outtmp(:,:,:,8),this%outtmp(:,:,:,9)
                 write(idfile) this%outtmp(:,:,:,10),this%outtmp(:,:,:,11),this%outtmp(:,:,:,12)
+                close(idfile)
+            endif
+            if(flow%multiphaseModel .ne. MPModelNone) then
+                open(idfile,file='./DatFlow/Phase'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
+                WRITE(idfile) nxout,nyout,nzout,this%ID
+                WRITE(idfile) xmin,ymin,zmin,this%dh
+                write(idfile) real(this%den(nzs:nze,nys:nye,nxs:nxe),4)
+                if(flow%multiphaseModel .eq. MPModelPhaseField) then
+                    write(idfile) real(this%phi(nzs:nze,nys:nye,nxs:nxe),4)
+                else
+                    write(idfile) real(max(-1.0d0,min(1.0d0,(2.0d0*(this%den(nzs:nze,nys:nye,nxs:nxe)-flow%rhoGas)/max(flow%rhoLiquid-flow%rhoGas,MachineTolerace))-1.0d0)),4)
+                endif
                 close(idfile)
             endif
             call myexit(0)
@@ -1763,21 +1947,35 @@ module FluidDomain
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         integer,intent(in):: fID
+        integer :: phaseFlag
         write(fID) this%xmin,this%ymin,this%zmin,this%dh
         write(fID) this%xDim,this%yDim,this%zDim
         write(fID) this%fIn
+        phaseFlag = 0
+        if(flow%multiphaseModel .eq. MPModelPhaseField .and. allocated(this%phi)) phaseFlag = 1
+        write(fID) phaseFlag
+        if(phaseFlag .eq. 1) write(fID) this%phi
     ENDSUBROUTINE write_continue_
 
     SUBROUTINE read_continue_(this,fID)
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         integer,intent(in) :: fID
+        integer :: phaseFlag, ios
         read(fID) this%xmin,this%ymin,this%zmin,this%dh
         read(fID) this%xDim,this%yDim,this%zDim
         if (.not. allocated(this%fIn)) then
             allocate(this%fIn(this%zDim,this%yDim,this%xDim,0:lbmDim))
         endif
         read(fID) this%fIn
+        phaseFlag = 0
+        read(fID,IOSTAT=ios) phaseFlag
+        if(ios.eq.0 .and. phaseFlag.eq.1) then
+            if(.not.allocated(this%phi)) allocate(this%phi(this%zDim,this%yDim,this%xDim),this%phi_new(this%zDim,this%yDim,this%xDim),this%chemPot(this%zDim,this%yDim,this%xDim))
+            read(fID) this%phi
+            this%phi_new = this%phi
+            this%chemPot = 0.0d0
+        endif
     ENDSUBROUTINE read_continue_
 
     SUBROUTINE evaluate_velocity(time,zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)

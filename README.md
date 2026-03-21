@@ -335,6 +335,20 @@ $PBS_WDIR/$PBS_ENAME
   1. *solidProbingNum*:  The number of data detection points in bodies
   2. *solidProbingNode*: The serial number of each detection points in the specific body
 
+- **MultiPhase** *(optional, defaults to single-phase when omitted)*
+
+  1. *multiphaseModel*: multiphase model selector
+     + 0 : single-phase solver
+     + 1 : Shan-Chen pseudo-potential model
+     + 2 : phase-field model
+  2. *rhoLiquid*, *rhoGas*: liquid/gas reference densities
+  3. *bubbleCenter*: initial droplet/bubble center coordinate
+  4. *bubbleRadius*, *interfaceWidth*: initial interface geometry and thickness
+  5. *shanChenG*, *shanChenPsi0*: Shan-Chen coupling strength and pseudo-potential scaling
+  6. *phaseMobility*, *phaseKappa*, *phaseBeta*: phase-field mobility, gradient-energy coefficient, and double-well coefficient
+
+  When multiphase mode is enabled, the solver additionally writes `Phase*****_b***` files into `DatFlow` that store density and phase-indicator fields for each block.
+
 ## Output file description
 
 - **Output files and directories**

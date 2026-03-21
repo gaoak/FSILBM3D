@@ -27,6 +27,7 @@ module ConstParams
                         !given balance function,unbalanced extrapolation,1st order extrapolate,2nd order extrapolate
     integer, parameter:: BCstationary_Wall = 201, BCmoving_Wall = 202, BCstationary_Wall_halfway = 203, BCmoving_Wall_halfway = 204
     integer, parameter:: BCPeriodic = 301,BCSymmetric = 302,BCfluid = 0,BCfluid_father = 1
+    integer, parameter:: MPModelNone = 0, MPModelShanChen = 1, MPModelPhaseField = 2
 
     real(8), parameter:: Pi = 3.141592653589793d0,eps = 1.0d-5,MachineTolerace = 1.0d-12
     integer, parameter:: DOFDim = 6
