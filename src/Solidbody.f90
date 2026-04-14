@@ -16,7 +16,7 @@ module SolidBody
     ! Pbeta     coefficient in penalty force calculation
     public :: VBodies,read_solid_files,allocate_solid_memory,Initialise_solid_bodies,Write_solid_v_bodies,FSInteraction_force, &
               Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check, write_solid_Information, &
-              calculate_reference_params,set_solidbody_parameters
+              calculate_reference_params,set_solidbody_parameters,compute_single_sided_surface_force
     type :: VirtualBody
         type(BeamSolver):: rbm
         ! vitural body in which fluid ID
@@ -42,6 +42,9 @@ module SolidBody
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)! of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
+        integer :: surf_npts = 0, surf_nelmts = 0
+        real(8), allocatable :: surf_xyz0(:, :), surf_xyz(:, :)
+        integer, allocatable :: surf_ele(:, :)
         
     contains
         procedure :: Initialise => Initialise_
@@ -551,6 +554,107 @@ module SolidBody
         call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
     end subroutine
 
+    subroutine compute_single_sided_surface_force(iFish,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocity,density,pressure,forcePressure,forceViscous)
+        use FlowCondition, only: flow
+        implicit none
+        integer,intent(in) :: iFish,xDim,yDim,zDim
+        real(8),intent(in) :: dh,xmin,ymin,zmin
+        real(8),intent(in) :: velocity(zDim,yDim,xDim,1:3),density(zDim,yDim,xDim),pressure(zDim,yDim,xDim)
+        real(8),intent(out) :: forcePressure(3),forceViscous(3)
+        integer,parameter :: nStencil = 3
+        integer :: i,i1,i2,i3,s
+        real(8) :: A(3),B(3),C(3),center(3),normal(3),normN,area
+        real(8) :: samplePoint(3),uS(3),u0(3),du_dn(3),sumSS,muLocal,rhoLocal,pLocal
+        if (iFish .lt. 1 .or. iFish .gt. m_nFish) then
+            write(*,*) 'Error in compute_single_sided_surface_force: invalid iFish =', iFish
+            stop
+        endif
+        if (.not. allocated(VBodies(iFish)%surf_ele) .or. .not. allocated(VBodies(iFish)%surf_xyz)) then
+            write(*,*) 'Error in compute_single_sided_surface_force: surface mesh is unavailable for body', iFish
+            stop
+        endif
+        forcePressure = 0.0d0
+        forceViscous = 0.0d0
+        sumSS = 0.0d0
+        do s=1,nStencil
+            sumSS = sumSS + (dble(s) * dh) * (dble(s) * dh)
+        enddo
+        do i = 1,VBodies(iFish)%surf_nelmts
+            i1 = VBodies(iFish)%surf_ele(1,i)
+            i2 = VBodies(iFish)%surf_ele(2,i)
+            i3 = VBodies(iFish)%surf_ele(3,i)
+            A = VBodies(iFish)%surf_xyz(1:3,i1)
+            B = VBodies(iFish)%surf_xyz(1:3,i2)
+            C = VBodies(iFish)%surf_xyz(1:3,i3)
+            call compute_triangle_geometry(A,B,C,center,normal,area,normN)
+            if(normN .le. MachineTolerace) cycle
+            pLocal = interpolate_scalar(pressure,center)
+            forcePressure = forcePressure - pLocal * normal * area
+            rhoLocal = max(interpolate_scalar(density,center),MachineTolerace)
+            muLocal = flow%nu * rhoLocal
+            u0 = interpolate_velocity(velocity,center)
+            du_dn = 0.0d0
+            do s = 1,nStencil
+                samplePoint = center + normal * (dble(s) * dh)
+                uS = interpolate_velocity(velocity,samplePoint)
+                du_dn = du_dn + (dble(s) * dh) * (uS - u0)
+            enddo
+            du_dn = du_dn / max(sumSS,MachineTolerace)
+            forceViscous = forceViscous + muLocal * (du_dn + normal * dot_product(normal,du_dn)) * area
+        enddo
+        contains
+        subroutine compute_triangle_geometry(P1,P2,P3,ctr,nvec,triArea,normLen)
+            implicit none
+            real(8),intent(in) :: P1(3),P2(3),P3(3)
+            real(8),intent(out):: ctr(3),nvec(3),triArea,normLen
+            real(8):: AB(3),AC(3),cr(3)
+            AB = P2 - P1
+            AC = P3 - P1
+            cr(1) = AB(2)*AC(3) - AB(3)*AC(2)
+            cr(2) = AB(3)*AC(1) - AB(1)*AC(3)
+            cr(3) = AB(1)*AC(2) - AB(2)*AC(1)
+            normLen = dsqrt(sum(cr*cr))
+            triArea = 0.5d0 * normLen
+            if(normLen .gt. MachineTolerace) then
+                nvec = cr / normLen
+            else
+                nvec = 0.0d0
+            endif
+            ctr = (P1 + P2 + P3) / 3.0d0
+        end subroutine
+        function clamp(v,vmin,vmax) result(vout)
+            implicit none
+            real(8),intent(in):: v,vmin,vmax
+            real(8):: vout
+            vout = min(vmax,max(vmin,v))
+        end function
+        function interpolate_scalar(field,pt) result(vout)
+            implicit none
+            real(8),intent(in):: field(zDim,yDim,xDim),pt(3)
+            real(8):: vout,rx,ry,rz,xp,yp,zp
+            integer:: x0,y0,z0,x1,y1,z1
+            xp = clamp((pt(1)-xmin)/dh + 1.0d0,1.0d0,dble(xDim)-MachineTolerace)
+            yp = clamp((pt(2)-ymin)/dh + 1.0d0,1.0d0,dble(yDim)-MachineTolerace)
+            zp = clamp((pt(3)-zmin)/dh + 1.0d0,1.0d0,dble(zDim)-MachineTolerace)
+            x0 = int(floor(xp)); y0 = int(floor(yp)); z0 = int(floor(zp))
+            x1 = min(x0+1,xDim); y1 = min(y0+1,yDim); z1 = min(z0+1,zDim)
+            rx = xp - dble(x0); ry = yp - dble(y0); rz = zp - dble(z0)
+            vout = field(z0,y0,x0)*(1-rx)*(1-ry)*(1-rz) + field(z0,y0,x1)*rx*(1-ry)*(1-rz) + &
+                   field(z0,y1,x0)*(1-rx)*ry*(1-rz) + field(z0,y1,x1)*rx*ry*(1-rz) + &
+                   field(z1,y0,x0)*(1-rx)*(1-ry)*rz + field(z1,y0,x1)*rx*(1-ry)*rz + &
+                   field(z1,y1,x0)*(1-rx)*ry*rz + field(z1,y1,x1)*rx*ry*rz
+        end function
+        function interpolate_velocity(field,pt) result(vout)
+            implicit none
+            real(8),intent(in):: field(zDim,yDim,xDim,1:3),pt(3)
+            real(8):: vout(3)
+            integer:: c
+            do c=1,3
+                vout(c) = interpolate_scalar(field(:,:,:,c),pt)
+            enddo
+        end function
+    end subroutine compute_single_sided_surface_force
+
     subroutine PlateUpdatePosVelArea_(this)
         !   compute displacement, velocity, area at surface element center
         IMPLICIT NONE
@@ -664,6 +768,11 @@ module SolidBody
                                 this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)] &
                                 + this%rbm%UVW(1:3) + this%rbm%initXYZVel(1:3)
         enddo
+        if (allocated(this%surf_xyz0)) then
+            do i = 1,this%surf_npts
+                this%surf_xyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),this%surf_xyz0(1:3,i))+this%rbm%XYZ(1:3)
+            enddo
+        endif
     end subroutine SurfaceUpdatePosVel_
 
     subroutine UpdatePosVelArea_(this)
@@ -998,6 +1107,13 @@ module SolidBody
         real(8),allocatable :: Surfacetmpxyz(:,:)
         integer,allocatable :: Surfacetmpele(:,:)
         call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
+        this%surf_npts = Surfacetmpnpts
+        this%surf_nelmts = Surfacetmpnelmts
+        if (.not. allocated(this%surf_xyz0)) allocate(this%surf_xyz0(3,Surfacetmpnpts),this%surf_xyz(3,Surfacetmpnpts))
+        if (.not. allocated(this%surf_ele)) allocate(this%surf_ele(3,Surfacetmpnelmts))
+        this%surf_xyz0 = Surfacetmpxyz
+        this%surf_xyz = Surfacetmpxyz
+        this%surf_ele = Surfacetmpele
         this%v_nelmts = Surfacetmpnelmts
         allocate(this%v_Exyz0(3,this%v_nelmts))
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
