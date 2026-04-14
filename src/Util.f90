@@ -284,9 +284,6 @@
         write(111,'(A,F20.10)')'interfaceWidth  =', flow%interfaceWidth
         write(111,'(A,F20.10)')'shanChenG       =', flow%shanChenG
         write(111,'(A,F20.10)')'shanChenPsi0    =', flow%shanChenPsi0
-        write(111,'(A,F20.10)')'phaseMobility   =', flow%phaseMobility
-        write(111,'(A,F20.10)')'phaseKappa      =', flow%phaseKappa
-        write(111,'(A,F20.10)')'phaseBeta       =', flow%phaseBeta
         call write_parameter_blocks(blockTreeRoot)
         close(111)
 

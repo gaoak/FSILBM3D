@@ -16,7 +16,6 @@ module FlowCondition
         real(8) :: rhoLiquid,rhoGas
         real(8) :: bubbleCenter(1:3),bubbleRadius,interfaceWidth
         real(8) :: shanChenG,shanChenPsi0
-        real(8) :: phaseMobility,phaseKappa,phaseBeta
         real(8) :: Uref,Lref,Tref
         real(8) :: Aref,Fref,Eref,Pref
         real(8) :: Asfac,Lchod,Lspan,AR 
@@ -43,9 +42,6 @@ module FlowCondition
         flow%interfaceWidth = 1.5d0
         flow%shanChenG = 0.0d0
         flow%shanChenPsi0 = 1.0d0
-        flow%phaseMobility = 1.0d-2
-        flow%phaseKappa = 1.0d-2
-        flow%phaseBeta = 1.0d0
         open(unit=111, file=filename, status='old', action='read')
         keywordstr = 'Parallel'
         call found_keyword(111,keywordstr)
@@ -96,8 +92,6 @@ module FlowCondition
             read(buffer,*)    flow%bubbleRadius,flow%interfaceWidth
             call readNextData(111, buffer)
             read(buffer,*)    flow%shanChenG,flow%shanChenPsi0
-            call readNextData(111, buffer)
-            read(buffer,*)    flow%phaseMobility,flow%phaseKappa,flow%phaseBeta
         endif
         close(111)
         ! flow%denIn is not 1
