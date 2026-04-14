@@ -174,8 +174,8 @@ module SolidBody
                 ! calculate the initial location for each fish
                 order3 = iFish - order1
                 lineX  = mod(order3,m_numX(ifishGroup))
-                lineY  = (order3 - lineX)/m_numX(ifishGroup)
-                lineZ  = (order3 - mod(order3,m_numX(ifishGroup)*m_numY(ifishGroup)))/m_numX(ifishGroup)*m_numY(ifishGroup)
+                lineY  = mod((order3 - lineX)/m_numX(ifishGroup),m_numY(ifishGroup))
+                lineZ  = (order3 - mod(order3,m_numX(ifishGroup)*m_numY(ifishGroup)))/(m_numX(ifishGroup)*m_numY(ifishGroup))
                 m_XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
                 m_XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
                 m_XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ

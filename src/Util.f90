@@ -118,6 +118,28 @@
         now_time = cpu_time(6)*60.d0 + cpu_time(7)*1.d0 + cpu_time(8)*0.001d0
     END SUBROUTINE
 
+    SUBROUTINE found_keyword_optional(fileID,keyword,found)
+        implicit none
+        integer:: fileID, IOstatus
+        logical:: found
+        character(LEN=40) :: keyword
+        character(len=50) :: readString
+        readString = 'null'
+        IOstatus = 0
+        found = .false.
+        call to_lowercase(keyword)
+        do while(IOstatus.eq.0)
+            read(fileID, *, IOSTAT=IOstatus) readString
+            if (IOstatus.ne.0) exit
+            call to_lowercase(readString)
+            readString = adjustl(readString)
+            if (index(readString, keyword) .GT. 0) then
+                found = .true.
+                exit
+            endif
+        enddo
+    END SUBROUTINE
+
     ! Found keyword in inflow.dat for next parameters read
     SUBROUTINE found_keyword(fileID,keyword)
         implicit none
@@ -253,6 +275,15 @@
         write(111,'(A,F20.10)')'Pref =', flow%Pref
         write(111,'(A,F20.10)')'Eref =', flow%Eref
         write(111,'(A,F20.10)')'Fref =', flow%Fref
+        write(111,'(A      )')'===================================================================='
+        write(111,'(A,I10  )')'MultiPhaseModel =', flow%multiphaseModel
+        write(111,'(A,F20.10)')'rhoLiquid       =', flow%rhoLiquid
+        write(111,'(A,F20.10)')'rhoGas          =', flow%rhoGas
+        write(111,'(A,3F20.10)')'bubbleCenter    =', flow%bubbleCenter
+        write(111,'(A,F20.10)')'bubbleRadius    =', flow%bubbleRadius
+        write(111,'(A,F20.10)')'interfaceWidth  =', flow%interfaceWidth
+        write(111,'(A,F20.10)')'shanChenG       =', flow%shanChenG
+        write(111,'(A,F20.10)')'shanChenPsi0    =', flow%shanChenPsi0
         call write_parameter_blocks(blockTreeRoot)
         close(111)
 
