@@ -167,8 +167,9 @@ module SolidSolver
         this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3))
         this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
 
-        call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))
-        call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
+        this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
+        call evaluate_prescribed_rotation(this%AoA(1:3), this%WWW1(1:3), this%TTT0(1:3,1:3), this%WWW3(1:3))
+        this%TTTnxt(1:3,1:3)=this%TTT0(1:3,1:3)
         call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
 
         do iND=1,this%nND
@@ -180,12 +181,6 @@ module SolidSolver
         this%velful(1:this%nND,1:6)=0.0
 
         this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) !time=0
-        !rotational velocity
-        this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
-        this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
-                        this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
-                        this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
-        this%WWW3(1:3)=matmul(this%TTT0(1:3,1:3),this%WWW2(1:3))
 
         do  iND=1,this%nND
             this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2), &
@@ -288,6 +283,136 @@ module SolidSolver
     endif
 
     END SUBROUTINE calculate_angle_material_
+
+    subroutine evaluate_prescribed_rotation(AoA, AoARate, TTT, omega)
+        implicit none
+        real(8), intent(in) :: AoA(3), AoARate(3)
+        real(8), intent(out) :: TTT(3,3), omega(3)
+        real(8) :: quat(4), quatDot(4), quatConj(4), omegaQuat(4)
+
+        call aoa_to_quaternion(AoA, quat)
+        call aoa_rate_to_quaternion_rate(AoA, AoARate, quatDot)
+        call quaternion_normalize(quat)
+        call quaternion_to_matrix(quat, TTT)
+        call quaternion_conjugate(quat, quatConj)
+        call quaternion_multiply(quatDot, quatConj, omegaQuat)
+        omega(1:3) = 2.0d0 * omegaQuat(2:4)
+    end subroutine evaluate_prescribed_rotation
+
+    subroutine aoa_to_quaternion(AoA, quat)
+        implicit none
+        real(8), intent(in) :: AoA(3)
+        real(8), intent(out) :: quat(4)
+        real(8) :: qx(4), qy(4), qz(4), qtmp(4)
+
+        call axis_angle_to_quaternion(1, AoA(1), qx)
+        call axis_angle_to_quaternion(2, AoA(2), qy)
+        call axis_angle_to_quaternion(3, AoA(3), qz)
+        call quaternion_multiply(qz, qy, qtmp)
+        call quaternion_multiply(qtmp, qx, quat)
+    end subroutine aoa_to_quaternion
+
+    subroutine aoa_rate_to_quaternion_rate(AoA, AoARate, quatDot)
+        implicit none
+        real(8), intent(in) :: AoA(3), AoARate(3)
+        real(8), intent(out) :: quatDot(4)
+        real(8) :: qx(4), qy(4), qz(4), qxDot(4), qyDot(4), qzDot(4)
+        real(8) :: qtmp(4), qDotX(4), qDotY(4), qDotZ(4)
+
+        call axis_angle_to_quaternion(1, AoA(1), qx)
+        call axis_angle_to_quaternion(2, AoA(2), qy)
+        call axis_angle_to_quaternion(3, AoA(3), qz)
+        call axis_angle_rate_to_quaternion_rate(1, AoA(1), AoARate(1), qxDot)
+        call axis_angle_rate_to_quaternion_rate(2, AoA(2), AoARate(2), qyDot)
+        call axis_angle_rate_to_quaternion_rate(3, AoA(3), AoARate(3), qzDot)
+
+        call quaternion_multiply(qzDot, qy, qtmp)
+        call quaternion_multiply(qtmp, qx, qDotZ)
+        call quaternion_multiply(qz, qyDot, qtmp)
+        call quaternion_multiply(qtmp, qx, qDotY)
+        call quaternion_multiply(qz, qy, qtmp)
+        call quaternion_multiply(qtmp, qxDot, qDotX)
+        quatDot(1:4) = qDotX(1:4) + qDotY(1:4) + qDotZ(1:4)
+    end subroutine aoa_rate_to_quaternion_rate
+
+    subroutine axis_angle_to_quaternion(axisId, angle, quat)
+        implicit none
+        integer, intent(in) :: axisId
+        real(8), intent(in) :: angle
+        real(8), intent(out) :: quat(4)
+        real(8) :: halfAngle, sinHalf
+
+        quat(1:4) = 0.0d0
+        halfAngle = 0.5d0 * angle
+        sinHalf = dsin(halfAngle)
+        quat(1) = dcos(halfAngle)
+        quat(axisId + 1) = sinHalf
+    end subroutine axis_angle_to_quaternion
+
+    subroutine axis_angle_rate_to_quaternion_rate(axisId, angle, angleRate, quatRate)
+        implicit none
+        integer, intent(in) :: axisId
+        real(8), intent(in) :: angle, angleRate
+        real(8), intent(out) :: quatRate(4)
+        real(8) :: halfAngle, scale
+
+        quatRate(1:4) = 0.0d0
+        halfAngle = 0.5d0 * angle
+        scale = 0.5d0 * angleRate
+        quatRate(1) = -dsin(halfAngle) * scale
+        quatRate(axisId + 1) = dcos(halfAngle) * scale
+    end subroutine axis_angle_rate_to_quaternion_rate
+
+    subroutine quaternion_multiply(qa, qb, qc)
+        implicit none
+        real(8), intent(in) :: qa(4), qb(4)
+        real(8), intent(out) :: qc(4)
+
+        qc(1) = qa(1) * qb(1) - qa(2) * qb(2) - qa(3) * qb(3) - qa(4) * qb(4)
+        qc(2) = qa(1) * qb(2) + qa(2) * qb(1) + qa(3) * qb(4) - qa(4) * qb(3)
+        qc(3) = qa(1) * qb(3) - qa(2) * qb(4) + qa(3) * qb(1) + qa(4) * qb(2)
+        qc(4) = qa(1) * qb(4) + qa(2) * qb(3) - qa(3) * qb(2) + qa(4) * qb(1)
+    end subroutine quaternion_multiply
+
+    subroutine quaternion_conjugate(quat, quatConj)
+        implicit none
+        real(8), intent(in) :: quat(4)
+        real(8), intent(out) :: quatConj(4)
+
+        quatConj(1) = quat(1)
+        quatConj(2:4) = -quat(2:4)
+    end subroutine quaternion_conjugate
+
+    subroutine quaternion_normalize(quat)
+        implicit none
+        real(8), intent(inout) :: quat(4)
+        real(8) :: quatNorm
+
+        quatNorm = dsqrt(sum(quat(1:4) * quat(1:4)))
+        if (quatNorm .gt. 1.0d-30) quat(1:4) = quat(1:4) / quatNorm
+    end subroutine quaternion_normalize
+
+    subroutine quaternion_to_matrix(quat, TTT)
+        implicit none
+        real(8), intent(in) :: quat(4)
+        real(8), intent(out) :: TTT(3,3)
+        real(8) :: q0, q1, q2, q3
+
+        q0 = quat(1)
+        q1 = quat(2)
+        q2 = quat(3)
+        q3 = quat(4)
+
+        TTT(1,1) = 1.0d0 - 2.0d0 * (q2 * q2 + q3 * q3)
+        TTT(1,2) = 2.0d0 * (q1 * q2 - q0 * q3)
+        TTT(1,3) = 2.0d0 * (q1 * q3 + q0 * q2)
+        TTT(2,1) = 2.0d0 * (q1 * q2 + q0 * q3)
+        TTT(2,2) = 1.0d0 - 2.0d0 * (q1 * q1 + q3 * q3)
+        TTT(2,3) = 2.0d0 * (q2 * q3 - q0 * q1)
+        TTT(3,1) = 2.0d0 * (q1 * q3 - q0 * q2)
+        TTT(3,2) = 2.0d0 * (q2 * q3 + q0 * q1)
+        TTT(3,3) = 1.0d0 - 2.0d0 * (q1 * q1 + q2 * q2)
+    end subroutine quaternion_to_matrix
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot ASCII format
@@ -612,7 +737,8 @@ module SolidSolver
                 this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+isubstep*subdeltat)
                 !rotational displacement
                 this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
-                call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
+                this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                call evaluate_prescribed_rotation(this%AoA(1:3), this%WWW1(1:3), this%TTTnxt(1:3,1:3), this%WWW3(1:3))
                 call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do  iND=1,this%nND
@@ -623,12 +749,6 @@ module SolidSolver
                 !------------------------------------------------------
                 !translational velocity
                 this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3)
-                !rotational velocity
-                this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
-                this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
-                                this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)), &
-                                this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))]
-                this%WWW3(1:3)=matmul(this%TTTnxt(1:3,1:3),this%WWW2(1:3))
                 !given velocity
                 do  iND=1,this%nND
                     this%velful(iND,1:3)=[this%WWW3(2)*this%xyzful(iND,3)-this%WWW3(3)*this%xyzful(iND,2), &
@@ -642,7 +762,8 @@ module SolidSolver
                 this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3))
                 !rotational displacement
                 this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
-                call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
+                this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                call evaluate_prescribed_rotation(this%AoA(1:3), this%WWW1(1:3), this%TTTnxt(1:3,1:3), this%WWW3(1:3))
                 call get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do  iND=1,this%nND
