@@ -12,12 +12,13 @@ module BeamStructure
         real(8), allocatable :: lodInte(:), lodExte(:), lodEffe(:), lodFlow(:), lodRepl(:), lodGrav(:), vBC(:)
     end type BeamContext
     type :: Segment
-        integer :: node0, node1, m_localToGlobal(1:nElmtDofs), itype
+        integer :: node0, node1, m_localToGlobal(1:nElmtDofs), itype, bc(1:nElmtDofs), Nspan
         real(8) :: x00(1:nElmtDofs),x0(1:nElmtDofs),x1(1:nElmtDofs),xnxt(1:nElmtDofs)
         real(8) :: dx0, dy0, dz0, dx1, dy1, dz1, xll0, xmm0, xnn0, xll1, xmm1, xnn1, len0, len1
-        real(8) :: Lspan, spanlen, Nspan, dirc(3)
-        real(8) :: bc(1:nElmtDofs), geoFRM
+        real(8) :: Lspan, spanlen, dirc(3)
+        real(8) :: geoFRM
         real(8) :: areaElem00
+        real(8) :: strainEnergy(2)
         real(8) :: triad_ee(3,3),triad_n1(3,3),triad_n2(3,3)
         real(8) :: m_property(1:8)
         real(8) :: m_coefMat(1:nElmtDofs, 1:nElmtDofs)
@@ -30,7 +31,6 @@ module BeamStructure
         procedure :: Build => Segment_Build
         procedure :: Init => Segment_Init
         procedure :: cptdxyz1 => Segment_cptdxyz1
-        procedure :: cptArea => Segment_cptArea
         procedure :: Multiply => Segment_Multiply
         procedure :: UpdateMatrix => Segment_UpdateMatrix
         procedure :: Preconditioned => Segment_Preconditioned
@@ -43,21 +43,23 @@ module BeamStructure
         procedure :: RotateMatrix => Segment_RotateMatrix
         procedure :: RKR => Segment_RKR
         procedure :: BoundaryCond => Segment_BoundaryCond
-        procedure :: BodyStress => Segment_BodyStress_D
+        procedure :: BodyStress_D => Segment_BodyStress_D
+        procedure :: StrainEnergy_D => Segment_StrainEnergy_D
         procedure :: InitTriad_D => Segment_InitTriad_D
         procedure :: BuildAxisDirTriad => Segment_BuildAxisDirTriad
         procedure :: UpdateTriad_D => Segment_UpdateTriad_D
         procedure :: MakeTriad_ee => Segment_MakeTriad_ee
+        procedure :: MapReferenceToCurrent => Segment_MapReferenceToCurrent
     end type Segment
 
   contains
 
-    subroutine Segment_Build(this, context, p0Id, p1Id, Nspan_, itype_, xyz, material, boundary)
+    subroutine Segment_Build(this, context, p0Id, p1Id, itype_, Nspan_, xyz, material, boundary)
         implicit none
         class(Segment), intent(inout) :: this
         type(BeamContext), intent(in) :: context
-        real(8), intent(in) :: xyz(1:8, 1:context%nND), material(1:8), boundary(1:6, 1:context%nND)
-        integer, intent(in) :: itype_, Nspan_
+        real(8), intent(in) :: xyz(1:8, 1:context%nND), material(1:8)
+        integer, intent(in) :: boundary(1:6, 1:context%nND), itype_, Nspan_
         integer :: p0Id, p1Id, i, offset0, offset1
         real(8) :: dirc_norm
         this%node0 = p0Id
@@ -75,6 +77,9 @@ module BeamStructure
         this%x00(7:9) = xyz(1:3, p1Id)
         this%x00(4:6) = 0.0d0
         this%x00(10:12) = 0.0d0
+        this%areaElem00 = dsqrt((this%x00(7)-this%x00(1))**2+&
+                                (this%x00(8)-this%x00(2))**2+&
+                                (this%x00(9)-this%x00(3))**2)
         this%bc(1:6) = boundary(1:6, p0Id)
         this%bc(7:12) = boundary(1:6, p1Id)
         this%itype = itype_
@@ -118,27 +123,6 @@ module BeamStructure
         this%xnn1 = this%dz1/this%len1
     end subroutine Segment_cptdxyz1
 
-    subroutine Segment_cptArea(this, xyz)
-        implicit none
-        class(Segment), intent(inout) :: this
-        real(8), intent(in) :: xyz(1:3)
-        real(8) :: v12(3), v23(3), cross(3)
-        if (this%itype == 2) then
-            this%areaElem00 = this%len0
-        elseif (this%itype == 3) then
-            v12(1) = this%x0(7) - this%x0(1)
-            v12(2) = this%x0(8) - this%x0(2)
-            v12(3) = this%x0(9) - this%x0(3)
-            v23(1) = xyz(1) - this%x0(7)
-            v23(2) = xyz(2) - this%x0(8)
-            v23(3) = xyz(3) - this%x0(9)
-            cross(1) = v12(2)*v23(3) - v12(3)*v23(2)
-            cross(2) = v12(3)*v23(1) - v12(1)*v23(3)
-            cross(3) = v12(1)*v23(2) - v12(2)*v23(1)
-            this%areaElem00 = 0.5d0 * dsqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
-        endif
-    end subroutine Segment_cptArea
-
     subroutine Segment_UpdateMatrix(this, coeffs, gamma, dampM, dampK)
         ! Form the tangent stiffness matrix
         ! ISBN 9781441929105 James F. Doyle. P268
@@ -179,25 +163,32 @@ module BeamStructure
         class(Segment), intent(inout) :: this
         type(BeamContext), intent(inout) :: context
         real(8), intent(in) :: coeffs(0:7), dampM, dampK
-        real(8) :: dspO(1:6, 1:context%nND)
-        real(8) :: mass(1:nElmtDofs),wk1(1:nElmtDofs),wk2(1:nElmtDofs)
+        real(8), intent(in) :: dspO(1:6, 1:context%nND)
+        real(8) :: qM(1:nElmtDofs), qC(1:nElmtDofs), qMC(1:nElmtDofs)
+        real(8) :: massLoad(1:nElmtDofs),dampKLoad(1:nElmtDofs)
         integer :: i,node0,node1
         node0 = this%node0
         node1 = this%node1
-        do i = 1,6
-            mass(i)   = (coeffs(0)*(dspO(i,node0)-context%dsp(i,node0))+coeffs(2)*context%vel(i,node0)+coeffs(3)*context%acc(i,node0))*this%m_masMat(i,i)   &
-                       +(coeffs(1)*(dspO(i,node0)-context%dsp(i,node0))+coeffs(4)*context%vel(i,node0)+coeffs(5)*context%acc(i,node0))*dampM*this%m_masMat(i,i)
-            mass(i+6) = (coeffs(0)*(dspO(i,node1)-context%dsp(i,node1))+coeffs(2)*context%vel(i,node1)+coeffs(3)*context%acc(i,node1))*this%m_masMat(i+6,i+6)   &
-                       +(coeffs(1)*(dspO(i,node1)-context%dsp(i,node1))+coeffs(4)*context%vel(i,node1)+coeffs(5)*context%acc(i,node1))*dampM*this%m_masMat(i+6,i+6)
+        do i = 1, 6
+            qM(i)  = coeffs(0)*(dspO(i,node0)-context%dsp(i,node0)) + coeffs(2)*context%vel(i,node0) + coeffs(3)*context%acc(i,node0)
+            qM(i+6) = coeffs(0)*(dspO(i,node1)-context%dsp(i,node1)) + coeffs(2)*context%vel(i,node1) + coeffs(3)*context%acc(i,node1)
+            qC(i)  = coeffs(1)*(dspO(i,node0)-context%dsp(i,node0)) + coeffs(4)*context%vel(i,node0) + coeffs(5)*context%acc(i,node0)
+            qC(i+6) = coeffs(1)*(dspO(i,node1)-context%dsp(i,node1)) + coeffs(4)*context%vel(i,node1) + coeffs(5)*context%acc(i,node1)
         enddo
-        call this%LocToGlobal(mass, context%lodEffe, context%gEQ)
+        qMC = qM + dampM*qC
+        massLoad(:) = 0.0d0
+        ! translational lumped massLoad blocks: m I_3
+        do i = 1, 3
+            massLoad(i) = this%m_masMat(i,i) * qMC(i)
+            massLoad(i+6) = this%m_masMat(i+6,i+6) * qMC(i+6)
+        enddo
+        ! rotational inertia blocks: full 3x3 after rotation
+        massLoad(4:6)   = matmul(this%m_masMat(4:6,4:6), qMC(4:6))
+        massLoad(10:12) = matmul(this%m_masMat(10:12,10:12), qMC(10:12))
+        call this%LocToGlobal(massLoad, context%lodEffe, context%gEQ)
         if (dampK .gt. 0.0d0) then
-            do i = 1,6
-                wk1(i)  = coeffs(1)*(dspO(i,node0)-context%dsp(i,node0)) + coeffs(4)*context%vel(i,node0) +coeffs(5)*context%acc(i,node0)
-                wk1(i+6)= coeffs(1)*(dspO(i,node1)-context%dsp(i,node1)) + coeffs(4)*context%vel(i,node1) +coeffs(5)*context%acc(i,node1)
-            enddo
-            wk2 = dampK*matmul(this%m_stfMat, wk1)
-            call this%LocToGlobal(wk2, context%lodEffe, context%gEQ)
+            dampKLoad = dampK * matmul(this%m_stfMat, qC)
+            call this%LocToGlobal(dampKLoad, context%lodEffe, context%gEQ)
         endif
         return
     end subroutine Segment_UpdateLoad
@@ -208,9 +199,9 @@ module BeamStructure
         type(BeamContext), intent(inout) :: context
         integer :: i,iter
         do i=1,nElmtDofs
-            if (this%bc(i).gt.0.0d0)then
+            if (this%bc(i).gt.0)then
                 this%m_coefMat(i,i) = this%m_coefMat(i,i) * 1.0d20
-                if(iter.eq.0)then
+                if(iter.eq.1)then
                     context%lodEffe(this%m_localToGlobal(i))=this%m_coefMat(i,i)*context%vBC(this%m_localToGlobal(i)) &
                                                                                 +context%lodEffe(this%m_localToGlobal(i))
                 else
@@ -247,8 +238,8 @@ module BeamStructure
     subroutine Segment_GlobalToLoc(this, x, lx, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
-        real(8) :: x(1:gEQ)
-        real(8) :: lx(1:nElmtDofs)
+        real(8), intent(in) :: x(1:gEQ)
+        real(8), intent(out) :: lx(1:nElmtDofs)
         integer :: i
         do i=1,nElmtDofs
             lx(i) = x(this%m_localToGlobal(i))
@@ -259,8 +250,8 @@ module BeamStructure
     subroutine Segment_LocToGlobal(this, lx, x, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
-        real(8) :: x(1:gEQ)
-        real(8) :: lx(1:nElmtDofs)
+        real(8), intent(in) :: lx(1:nElmtDofs)
+        real(8), intent(inout) :: x(1:gEQ)
         integer :: i
         do i=1,nElmtDofs
             x(this%m_localToGlobal(i)) = x(this%m_localToGlobal(i)) + lx(i)
@@ -271,7 +262,7 @@ module BeamStructure
     subroutine Segment_FormMassMatrix(this)
         ! ELeMent MASs matrix for the FRaMe
         ! Same as Abaqus B31 Timoshenko frame
-        ! Lumped mass matrix
+        ! Lumped massLoad matrix
         ! ISBN 9781441929105 James F. Doyle. P273
         ! ISBN 9780792312086 James F. Doyle. P423
         implicit none
@@ -755,6 +746,74 @@ module BeamStructure
         return
     end subroutine Segment_BodyStress_D
 
+    subroutine Segment_StrainEnergy_D(this)
+        implicit none
+        class(Segment), intent(inout) :: this
+        real(8) :: Strech(nElmtDofs,nElmtDofs),BendTor(nElmtDofs,nElmtDofs)
+        real(8) :: triad_00(3,3),triad_11(3,3),triad_22(3,3)
+        real(8) :: ub(12),dl
+        real(8) :: du,dv,dw
+        real(8) :: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
+        integer :: i,j
+
+        du = this%dx1 - this%dx0
+        dv = this%dy1 - this%dy0
+        dw = this%dz1 - this%dz0
+        ! Define the the xyz directional distance of the two nodes of the beam element after deformation
+        ! as well as the length, xl, of the element after deformation
+        dl = ( (this%dx0+this%dx1)*du +(this%dy0+this%dy1)*dv +(this%dz0+this%dz1)*dw )/ (this%len0+this%len1)
+        ! get twisting angles
+        do    i=1,3
+        do    j=1,3
+            triad_00(i,j)=this%triad_ee(i,j)
+            triad_11(i,j)=this%triad_ee(i,j)
+            triad_22(i,j)=this%triad_n1(i,j)
+        enddo
+        enddo
+        call Segment_get_angle_triad(triad_11,triad_22,tx,ty,tz)
+        call Segment_global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
+        !
+        do    i=1,3
+        do    j=1,3
+            triad_11(i,j)=this%triad_ee(i,j)
+            triad_22(i,j)=this%triad_n2(i,j)
+        enddo
+        enddo
+        call Segment_get_angle_triad(triad_11,triad_22,tx,ty,tz)
+        call Segment_global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
+
+        ! non-zero ty1 tz1 u2 tx2 ty2 tz2
+        ub(1)=0.0
+        ub(2)=0.0
+        ub(3)=0.0
+        ub(4)=tx1
+        ub(5)=ty1
+        ub(6)=tz1
+        !
+        ub(7)=dl
+        ub(8)=0.0
+        ub(9)=0.0
+        ub(10)=tx2
+        ub(11)=ty2
+        ub(12)=tz2
+
+        Strech(:,:)=0.0d0
+        Strech(1,1)=this%m_stfMat(1,1)
+        Strech(1,7)=this%m_stfMat(1,7)
+        Strech(7,7)=this%m_stfMat(7,7)
+        Strech(7,1)=this%m_stfMat(7,1)
+
+        BendTor(:,:)=this%m_stfMat(:,:)
+        BendTor(1,1)=0.0d0
+        BendTor(1,7)=0.0d0
+        BendTor(7,7)=0.0d0
+        BendTor(7,1)=0.0d0
+
+        ! nodal strain in local coords
+        this%strainEnergy(1)=0.5d0*sum(matmul(Strech,ub)*ub)
+        this%strainEnergy(2)=0.5d0*sum(matmul(BendTor,ub)*ub)
+    end subroutine Segment_StrainEnergy_D
+
     subroutine Segment_get_angle_triad(triad_11,triad_22,tx,ty,tz)
         ! GET ANGLE of between TRIADs
         ! ISBN 9781441929105 James F. Doyle. P186,187 Equ.(3.7) (3.8)
@@ -972,18 +1031,18 @@ module BeamStructure
         return
     end subroutine Segment_FiniteRot
 
-    subroutine Segment_UpdateNodeCoords(coordsIn, coordsOut, TTT, XYZ, AoA)
+    subroutine Segment_MapReferenceToCurrent(this, coordsOut, TTT, XYZ, AoA)
         implicit none
-        real(8), intent(in) :: coordsIn(12)
+        class(Segment), intent(in) :: this
         real(8), intent(out) :: coordsOut(12)
         real(8), intent(in) :: TTT(3,3)
         real(8), intent(in) :: XYZ(3)
         real(8), intent(in) :: AoA(3)
-        coordsOut(1:3) = matmul(TTT, coordsIn(1:3)) + XYZ
+        coordsOut(1:3) = matmul(TTT, this%x00(1:3)) + XYZ
         coordsOut(4:6) = AoA
-        coordsOut(7:9) = matmul(TTT, coordsIn(1:3)) + XYZ
+        coordsOut(7:9) = matmul(TTT, this%x00(7:9)) + XYZ
         coordsOut(10:12) = AoA
-    end subroutine Segment_UpdateNodeCoords
+    end subroutine Segment_MapReferenceToCurrent
 
 end module BeamStructure
 
@@ -1011,9 +1070,9 @@ module SolidSolver
         real(8):: TTT00(3,3),TTT0(3,3),TTTnxt(3,3)
         integer:: isMotionGiven(6)
     contains
-        procedure :: SetSolver => SetSolver_
-        procedure :: Beam_ReadBuild => Beam_ReadBuild_
-        procedure :: Initialise => Initialise_
+        procedure :: SetSolver => Beam_SetSolver
+        procedure :: ReadBuild => Beam_ReadBuild
+        procedure :: Initialise => Beam_Initialise
         procedure :: calculate_angle_material => calculate_angle_material_
         procedure :: write_solid => write_solid_
         procedure :: write_solid_temp => write_solid_temp_
@@ -1025,7 +1084,7 @@ module SolidSolver
         procedure :: structure => structure_
     end type BeamSolver
   contains
-    Subroutine SetSolver_(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
+    subroutine Beam_SetSolver(this,FEmeshName_,iBodyModel_,isMotionGiven_,denR_,KB_,KS_,EmR_,psR_,tcR_,St_, &
                             Freq_,initXYZVel_,XYZo_,XYZAmpl_,XYZPhi_,AoAo_,AoAAmpl_,AoAPhi_)
         implicit none
         class(BeamSolver), intent(inout) :: this
@@ -1054,11 +1113,11 @@ module SolidSolver
         this%AoAo(1:3)     = AoAo_(1:3)
         this%AoAAmpl(1:3)  = AoAAmpl_(1:3)
         this%AoAPhi(1:3)   = AoAPhi_(1:3)
-    ENDSUBROUTINE SetSolver_
-    Subroutine Set_SolidSolver_Params(dt,dampK,dampM,GeoGamma,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,iKB)
+    end subroutine Beam_SetSolver
+    subroutine Set_SolidSolver_Params(dt,dampK,dampM,GeoGamma,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,iKB,g)
         implicit none
         real(8),intent(in):: dt,dampK,dampM,GeoGamma,NewmarkGamma,NewmarkBeta
-        real(8),intent(in):: dtolFEM
+        real(8),intent(in):: dtolFEM,g(3)
         integer,intent(in):: ntolFEM,iKB
         ! coefficients in the Newmark-beta method
         coeffs(2) = 1. / (NewmarkBeta * dt)
@@ -1076,19 +1135,21 @@ module SolidSolver
         m_ntolFEM = ntolFEM
         m_pi = 3.141592653589793d0
         m_iKB = iKB
-    ENDSUBROUTINE Set_SolidSolver_Params
+        m_g = g
+    end subroutine Set_SolidSolver_Params
 
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!   READ structural DaTafile
+!   READ structural Datafile
 !   Allocate memory for solid simulation
 !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine Beam_ReadBuild_(this,nAsfac,nLchod)
+    subroutine Beam_ReadBuild(this,nAsfac,nLchod)
         implicit none
         class(BeamSolver), intent(inout) :: this
         character (LEN=40):: filename
         integer :: fileiD = 996
         character (LEN=1000):: buffer
-        real(8), allocatable :: xyz(:, :), material(:, :), boundary(:, :)
+        real(8), allocatable :: xyz(:, :), material(:, :)
+        integer, allocatable :: boundary(:, :)
         real(8), intent(out):: nAsfac,nLchod
         ! load mesh information
         filename = this%FEmeshName
@@ -1181,8 +1242,6 @@ module SolidSolver
                     read(fileiD,*) tmpid, i, j, k, itype, imat, Nspan
                     if(1.le.tmpid .and. tmpid.le.this%ctx%nEL) then
                         call this%m_elements(tmpid)%Build(this%ctx, i, j, itype, Nspan, xyz, material(1:8, imat), boundary)
-                        !   calculate area
-                        call this%m_elements(tmpid)%cptArea(xyz(1:3, k))
                     endif
                 enddo
             close(fileiD)
@@ -1190,16 +1249,16 @@ module SolidSolver
 
         subroutine Beam_cptAsfac()
             implicit none
-            integer :: iND
             real(8) :: lentemp
-            nAsfac=sum(this%m_elements(:)%areaElem00)
-            this%elmax=maxval(this%m_elements(:)%areaElem00)
-            this%elmin=minval(this%m_elements(:)%areaElem00)
+            integer :: i
+            nAsfac = sum([(this%m_elements(i)%areaElem00, i=1,this%ctx%nEL)])
+            this%elmax = maxval([(this%m_elements(i)%areaElem00, i=1,this%ctx%nEL)])
+            this%elmin = minval([(this%m_elements(i)%areaElem00, i=1,this%ctx%nEL)])
             !calculate spanwise length, chord length, aspect ratio
-            nLchod  = maxval([maxval(this%m_elements(:)%x00(1)),maxval(this%m_elements(:)%x00(7))]) - &
-                      minval([minval(this%m_elements(:)%x00(1)),minval(this%m_elements(:)%x00(7))])
-            lentemp = maxval([maxval(this%m_elements(:)%x00(2)),maxval(this%m_elements(:)%x00(8))]) - &
-                      minval([minval(this%m_elements(:)%x00(2)),minval(this%m_elements(:)%x00(8))])
+            nLchod  = maxval([(this%m_elements(i)%x00(1), this%m_elements(i)%x00(7), i=1,this%ctx%nEL)]) - &
+                      minval([(this%m_elements(i)%x00(1), this%m_elements(i)%x00(7), i=1,this%ctx%nEL)])
+            lentemp = maxval([(this%m_elements(i)%x00(2), this%m_elements(i)%x00(8), i=1,this%ctx%nEL)]) - &
+                      minval([(this%m_elements(i)%x00(2), this%m_elements(i)%x00(8), i=1,this%ctx%nEL)])
             if(lentemp .gt. nLchod) nLchod = lentemp
         end subroutine
 
@@ -1216,14 +1275,13 @@ module SolidSolver
             enddo
         end subroutine
 
-    end subroutine Beam_ReadBuild_
+    end subroutine Beam_ReadBuild
 
-    SUBROUTINE Initialise_(this,time,g)
+    subroutine Beam_Initialise(this,time)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(in):: time,g(3)
+        real(8), intent(in):: time
         integer:: n
-        m_g = g
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !   initialize solid field
     !   compute initial values
@@ -1241,7 +1299,7 @@ module SolidSolver
         call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
 
         do n=1,this%ctx%nEL
-            call Segment_UpdateNodeCoords(this%m_elements(n)%x00, this%m_elements(n)%x0, this%TTT0, this%XYZ, this%AoAd)
+            call this%m_elements(n)%MapReferenceToCurrent(this%m_elements(n)%x0, this%TTT0, this%XYZ, this%AoAd)
             call this%m_elements(n)%Init()
         enddo
 
@@ -1263,7 +1321,7 @@ module SolidSolver
         call Beam_InitTriadANDFormMass(this%ctx,this%m_elements)
         call Beam_FormGrav(this%ctx,this%m_elements)
 
-    END SUBROUTINE Initialise_
+    end subroutine Beam_Initialise
 
     subroutine Beam_InitLoad(context)
         implicit none
@@ -1284,7 +1342,7 @@ module SolidSolver
         type(BeamContext), intent(inout) :: context
         type(Segment), intent(inout) :: element(1:context%nEL)
         integer :: n
-        allocate(context%pos(1:6, 1:context%nND),context%dsp(1:6, 1:context%nND),context%vel(1:6, 1:context%nND),context%acc(1:6, 1:context%nND),context%mss(1:6, 1:context%nND))
+        allocate(context%pos(1:6, 1:context%nND),context%dsp(1:6, 1:context%nND),context%vel(1:6, 1:context%nND),context%acc(1:6, 1:context%nND),context%mss(1:3, 1:context%nND))
         context%pos(:, :) = 0.0d0
         do n = 1,context%nEL
             context%pos(1:6,element(n)%node0)=element(n)%x1(1:6)
@@ -1333,40 +1391,30 @@ module SolidSolver
         implicit none
         type(BeamContext), intent(inout) :: context
         type(Segment), intent(inout) :: element(1:context%nEL)
-        integer :: i, j
-        real(8) :: grav(1:12),l_mss(1:12),g_mss(1:context%gEQ)
-        g_mss(:)=0.0d0
+        integer :: i, j, node0, node1
+        real(8) :: grav(1:12)
         do i = 1, context%nEL
-            do j = 1, 12
-                l_mss(j) = element(i)%m_masMat(j,j)
-            enddo
-            call element(i)%LocToGlobal(l_mss, g_mss, context%gEQ)
             grav(:) = matmul(element(i)%m_masMat, [m_g(1), m_g(2), m_g(3), 0.0d0 ,0.0d0 ,0.0d0 , m_g(1), m_g(2), m_g(3), 0.0d0 ,0.0d0 ,0.0d0] )
             call element(i)%LocToGlobal(grav, context%lodGrav, context%gEQ)
+            node0 = element(i)%node0
+            node1 = element(i)%node1
+            do j = 1, 3
+                context%mss(j,node0) = context%mss(j,node0) + element(i)%m_masMat(j,j)
+                context%mss(j,node1) = context%mss(j,node1) + element(i)%m_masMat(j+6,j+6)
+            enddo
         enddo
-        call Beam_GlobalToNode(context, g_mss, context%mss)
     end subroutine Beam_FormGrav
 
-    subroutine Beam_GlobalToNode(context, x, nx)
-        implicit none
-        type(BeamContext), intent(in) :: context
-        real(8) :: x(1:context%gEQ)
-        real(8) :: nx(1:6,1:context%nND)
-        integer :: i
-        do i=1,context%nND
-            nx(1:6,i) = x((i-1)*6+1:(i-1)*6+6)
-        enddo
-        return
-    end subroutine Beam_GlobalToNode
-
-    SUBROUTINE calculate_angle_material_(this, Lref, Uref, denIn, uMax, uuuIn, nLthck)
+    subroutine calculate_angle_material_(this, Lref, Uref, denIn, uMax, uuuIn, nLthck)
     implicit none
     class(BeamSolver), intent(inout) :: this
-    real(8),intent(in):: Lref, Uref, denIn, uuuIn(3)
-    real(8),intent(inout):: uMax
-    real(8),intent(out):: nLthck
-    integer:: i
-    real(8):: len,ratio
+    real(8),intent(in) :: Lref, Uref, denIn, uuuIn(3)
+    real(8),intent(inout) :: uMax
+    real(8),intent(out) :: nLthck
+    real(8) :: xmax, ymax, zmax
+    real(8) :: rRot(3)
+    integer :: i
+    real(8) :: len,ratio
 
     this%St = Lref * this%Freq / Uref
     ! angle to radian
@@ -1374,11 +1422,17 @@ module SolidSolver
     this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0*m_pi
     this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0*m_pi
     this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*m_pi
-    uMax=maxval([uMax, maxval(dabs(uuuIn(1:3))),2.0*m_pi*MAXVAL(dabs(this%xyzAmpl(1:3)))*this%Freq, &
-            2.0*m_pi*MAXVAL(dabs(this%AoAAmpl(1:3))*[ &
-            maxval([maxval(dabs(this%m_elements(:)%x00(1))),maxval(dabs(this%m_elements(:)%x00(7)))]), &
-            maxval([maxval(dabs(this%m_elements(:)%x00(2))),maxval(dabs(this%m_elements(:)%x00(8)))]), &
-            maxval([maxval(dabs(this%m_elements(:)%x00(3))),maxval(dabs(this%m_elements(:)%x00(9)))])])*this%Freq])
+    xmax = maxval([(dabs(this%m_elements(i)%x00(1)), dabs(this%m_elements(i)%x00(7)), i=1,this%ctx%nEL)])
+    ymax = maxval([(dabs(this%m_elements(i)%x00(2)), dabs(this%m_elements(i)%x00(8)), i=1,this%ctx%nEL)])
+    zmax = maxval([(dabs(this%m_elements(i)%x00(3)), dabs(this%m_elements(i)%x00(9)), i=1,this%ctx%nEL)])
+    ! effective rotation radius for rotations about x, y, z
+    rRot(1) = max(ymax, zmax)   ! rotation about x
+    rRot(2) = max(xmax, zmax)   ! rotation about y
+    rRot(3) = max(xmax, ymax)   ! rotation about z
+    uMax = maxval([ uMax, &
+                maxval(dabs(uuuIn(1:3))), &
+                2.0d0*m_pi*maxval(dabs(this%XYZAmpl(1:3)))*this%Freq, &
+                2.0d0*m_pi*maxval(dabs(this%AoAAmpl(1:3))*rRot(1:3))*this%Freq ])
 
     ! property data will use the parameters read from the file if isKB != 0 or 1
     ! calculate material parameters
@@ -1427,16 +1481,16 @@ module SolidSolver
     ! 7 Iy/b    Iy is moment of inertia for y-direction
     ! 8 Iz/b    Iz is moment of inertia for z-direction
 
-    END SUBROUTINE calculate_angle_material_
+    end subroutine calculate_angle_material_
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write structure field, tecplot ASCII format
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_(this,Lref,Uref,Aref,Fref,iFish,idfile)
+    subroutine write_solid_(this,Lref,Uref,Aref,Fref,iFish,idfile)
     implicit none
     class(BeamSolver), intent(inout) :: this
     real(8):: Lref,Uref,Aref,Fref
-    integer:: i,iFish,ElmType,idfile,offset(3)
+    integer:: i,iFish,ElmType,idfile
     integer,parameter::nameLen=10,namLen=40,numVar=15
     character(len=nameLen):: idstr
 
@@ -1458,9 +1512,12 @@ module SolidSolver
     enddo
     write(idfile, '(A)') 'SINGLE )'
     !Write node data
-    do i=1,this%ctx%nND
-        offset=[(i-1)*6+1,(i-1)*6+1,(i-1)*6+3]
-        write(idfile, '(15E28.18 )')   real(this%ctx%pos(1:3,i)/Lref),real(this%ctx%vel(1:3,i)/Uref),real(this%ctx%acc(1:3,i)/Aref),real(this%ctx%lodFlow(offset)/Fref),real(this%ctx%lodRepl(offset)/Fref)
+    do i = 1, this%ctx%nND
+        write(idfile,'(15E28.18)') this%ctx%pos(1:3,i)/Lref, &
+                                   this%ctx%vel(1:3,i)/Uref, &
+                                   this%ctx%acc(1:3,i)/Aref, &
+                                   this%ctx%lodFlow((i-1)*6+1:(i-1)*6+3)/Fref, &
+                                   this%ctx%lodRepl((i-1)*6+1:(i-1)*6+3)/Fref
     enddo
     !Write element data
     if(ElmType.eq.2) then
@@ -1472,34 +1529,38 @@ module SolidSolver
     !         write(idfile, *) this%ele(i,1),this%ele(i,2),this%ele(i,3)
     !     enddo
     endif
-    END SUBROUTINE
+    end subroutine
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write check point file for restarting simulation
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE write_solid_temp_(this,fid)
-    IMPLICIT NONE
+    subroutine write_solid_temp_(this,fid)
+    implicit none
     class(BeamSolver), intent(inout) :: this
     integer,intent(in) :: fid
         write(fid) this%m_elements
         write(fid) this%ctx%nND,this%ctx%nEL,this%ctx%nMT,this%ctx%gEQ
-        write(fid) this%ctx%lodInte,this%ctx%lodExte,this%ctx%lodEffe,this%ctx%lodFlow,this%ctx%lodRepl,this%ctx%lodGrav,this%ctx%vBC
-    ENDSUBROUTINE
+        write(fid) this%ctx%pos,this%ctx%dsp,this%ctx%vel,this%ctx%acc,this%ctx%mss
+        write(fid) this%ctx%lodInte,this%ctx%lodExte,this%ctx%lodEffe
+        write(fid) this%ctx%lodFlow,this%ctx%lodRepl,this%ctx%lodGrav,this%ctx%vBC
+    end subroutine
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    read check point file for restarting simulation
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE read_solid_temp_(this,fid)
-    IMPLICIT NONE
+    subroutine read_solid_temp_(this,fid)
+    implicit none
     class(BeamSolver), intent(inout) :: this
     integer,intent(in) :: fid
         read(fid) this%m_elements
         read(fid) this%ctx%nND,this%ctx%nEL,this%ctx%nMT,this%ctx%gEQ
-        read(fid) this%ctx%lodInte,this%ctx%lodExte,this%ctx%lodEffe,this%ctx%lodFlow,this%ctx%lodRepl,this%ctx%lodGrav,this%ctx%vBC
-    ENDSUBROUTINE
+        read(fid) this%ctx%pos,this%ctx%dsp,this%ctx%vel,this%ctx%acc,this%ctx%mss
+        read(fid) this%ctx%lodInte,this%ctx%lodExte,this%ctx%lodEffe
+        read(fid) this%ctx%lodFlow,this%ctx%lodRepl,this%ctx%lodGrav,this%ctx%vBC
+    end subroutine
 
-    SUBROUTINE write_solid_params_(this,fid)
-    IMPLICIT NONE
+    subroutine write_solid_params_(this,fid)
+    implicit none
     class(BeamSolver), intent(inout) :: this
     integer,intent(in) :: fid
         !write(fid,'(A,2F20.10)')'Freq,St     =',this%Freq,this%St
@@ -1514,15 +1575,15 @@ module SolidSolver
         !write(fid,'(A,1x,3F20.10,2x)')'AoAPhi(1:3) =',this%AoAPhi(1:3)
         write(fid,'(2(A,1x,I8,2x))')'nND =',this%ctx%nND,'nEL =',this%ctx%nEL
         write(fid,'(2(A,1x,I8,2x))')'nMT =',this%ctx%nMT,'gEQ =',this%ctx%gEQ
-    ENDSUBROUTINE
+    end subroutine
 
-    SUBROUTINE write_solid_materials_(this,fid)
-    IMPLICIT NONE
+    subroutine write_solid_materials_(this,fid)
+    implicit none
     class(BeamSolver), intent(inout) :: this
     character(len=4):: IDstr
     integer,intent(in) :: fid
         write(IDstr,'(I4.4)') 1
-        write(111,'(A,A,A  )')'------------------------------- m_element( ',IDstr,' ) ------------------------------'
+        write(fid,'(A,A,A  )')'------------------------------- m_element( ',IDstr,' ) ------------------------------'
         write(fid,'(A,E20.10 )')'E*b  =',this%m_elements(1)%m_property(1)
         write(fid,'(A,E20.10 )')'G*b  =',this%m_elements(1)%m_property(2)
         write(fid,'(A,E20.10 )')'h    =',this%m_elements(1)%m_property(3)
@@ -1531,64 +1592,79 @@ module SolidSolver
         write(fid,'(A,E20.10 )')'Jt/b =',this%m_elements(1)%m_property(6)
         write(fid,'(A,E20.10 )')'Iy/b =',this%m_elements(1)%m_property(7)
         write(fid,'(A,E20.10 )')'Iz/b =',this%m_elements(1)%m_property(8)
-    ENDSUBROUTINE
+    end subroutine
 
-    SUBROUTINE write_solid_info_(this,groupNum,XYZo,Lref,Uref,Aref,Fref,Pref,Eref)
-        IMPLICIT NONE
+    subroutine write_solid_info_(this,groupNum,XYZo,Lref,Uref,Aref,Fref,Pref,Eref)
+        implicit none
         class(BeamSolver), intent(inout) :: this
         real(8),intent(in):: XYZo(1:3),Lref,Uref,Aref,Fref,Pref,Eref
         character(LEN=3),intent(in):: groupNum
-        integer:: idfile=100
-        real(8):: strainEnergy(this%nEL,2)
+        integer:: idfile=100,i,node0,node1
+        real(8):: msum(3),xcm(3),vcm(3),acm(3)
         real(8):: Ptot,Pax,Pay,Paz
         real(8):: Etot,Ev,Ep,Es,Eb
+        real(8)::ve(12)
         
         ! write begin information
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%ctx%pos(1:3,1)-XYZo(1:3))/Lref,this%ctx%vel(1:3,1)/Uref,this%ctx%acc(1:3,1)/Aref
+        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%ctx%pos(1:3,1)-XYZo(1:3))/Lref,this%ctx%vel(1:3,1)/Uref,this%ctx%acc(1:3,1)/Aref
         close(idfile)
         ! write end information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%ctx%pos(1:3,this%ctx%nND)-XYZo(1:3))/Lref,this%ctx%vel(1:3,this%ctx%nND)/Uref,this%ctx%acc(1:3,this%ctx%nND)/Aref
+        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%ctx%pos(1:3,this%ctx%nND)-XYZo(1:3))/Lref,this%ctx%vel(1:3,this%ctx%nND)/Uref,this%ctx%acc(1:3,this%ctx%nND)/Aref
         close(idfile)
         ! write center information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%ctx%pos(1:3,(this%ctx%nND+1)/2)-XYZo(1:3))/Lref,this%ctx%vel(1:3,(this%ctx%nND+1)/2)/Uref,this%ctx%acc(1:3,(this%ctx%nND+1)/2)/Aref
+        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%ctx%pos(1:3,(this%ctx%nND+1)/2)-XYZo(1:3))/Lref,this%ctx%vel(1:3,(this%ctx%nND+1)/2)/Uref,this%ctx%acc(1:3,(this%ctx%nND+1)/2)/Aref
         close(idfile)
         ! write mean information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(sum(this%ctx%pos(1:3,1:this%ctx%nND)*this%ctx%mss(1:3,1:this%ctx%nND),1)/sum(this%ctx%mss(1:3,1:this%ctx%nND),1)-XYZo(1:3))/Lref, &
-                                                                          sum(this%ctx%vel(1:3,1:this%ctx%nND)*this%ctx%mss(1:3,1:this%ctx%nND),1)/sum(this%ctx%mss(1:3,1:this%ctx%nND),1)/Uref, &
-                                                                          sum(this%ctx%acc(1:3,1:this%ctx%nND)*this%ctx%mss(1:3,1:this%ctx%nND),1)/sum(this%ctx%mss(1:3,1:this%ctx%nND),1)/Aref
+        msum=sum(this%ctx%mss(1:3,1:this%ctx%nND),2)
+        xcm=sum(this%ctx%pos(1:3,1:this%ctx%nND)*this%ctx%mss(1:3,1:this%ctx%nND),2)/msum
+        vcm=sum(this%ctx%vel(1:3,1:this%ctx%nND)*this%ctx%mss(1:3,1:this%ctx%nND),2)/msum
+        acm=sum(this%ctx%acc(1:3,1:this%ctx%nND)*this%ctx%mss(1:3,1:this%ctx%nND),2)/msum
+        write(idfile,'(12E20.10)') XYZo(1:3)/Lref,(xcm-XYZo(1:3))/Lref,vcm/Uref,acm/Aref
         close(idfile)
         ! write forces
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat',position='append')
-        write(idfile,'(6E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,sum(this%extful(1:this%nND,1:3),1)/Fref
+        write(idfile,'(6E20.10)')XYZo(1:3)/Lref,sum(this%ctx%lodFlow(1:this%ctx%gEQ:6))/Fref, &
+                                                sum(this%ctx%lodFlow(2:this%ctx%gEQ:6))/Fref, &
+                                                sum(this%ctx%lodFlow(3:this%ctx%gEQ:6))/Fref
         close(idfile)
         ! write power
-        Pax=sum(this%extful(1:this%nND,1)*this%velful(1:this%nND,1))/Pref
-        Pay=sum(this%extful(1:this%nND,2)*this%velful(1:this%nND,2))/Pref
-        Paz=sum(this%extful(1:this%nND,3)*this%velful(1:this%nND,3))/Pref
+        Pax=sum(this%ctx%lodFlow(1:this%ctx%gEQ:6)*this%ctx%vel(1,1:this%ctx%nND))/Pref
+        Pay=sum(this%ctx%lodFlow(2:this%ctx%gEQ:6)*this%ctx%vel(2,1:this%ctx%nND))/Pref
+        Paz=sum(this%ctx%lodFlow(3:this%ctx%gEQ:6)*this%ctx%vel(3,1:this%ctx%nND))/Pref
         Ptot=Pax+Pay+Paz
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_power.dat',position='append')
-        write(idfile,'(7E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Ptot,Pax,Pay,Paz
+        write(idfile,'(7E20.10)')XYZo(1:3)/Lref,Ptot,Pax,Pay,Paz
         close(idfile)
 
-        call strain_energy_D(strainEnergy(1:this%nEL,1:2),this%xyzful0(1:this%nND,1),this%xyzful0(1:this%nND,2),this%xyzful0(1:this%nND,3), &
-                                this%xyzful(1:this%nND,1), this%xyzful(1:this%nND,2), this%xyzful(1:this%nND,3),this%ele(1:this%nEL,1:5), this%prop(1:this%nEL,1:10), &
-                                this%triad_n1(1:3,1:3,1:this%nEL),this%triad_n2(1:3,1:3,1:this%nEL), &
-                                this%triad_ee(1:3,1:3,1:this%nEL), &
-                                this%nND,this%nEL)
-        Es=sum(strainEnergy(1:this%nEL,1))/Eref
-        Eb=sum(strainEnergy(1:this%nEL,2))/Eref
+        call Beam_UpdateStrainEnergy(this%ctx, this%m_elements)
+        Es=0.0d0
+        Eb=0.0d0
+        do i=1,this%ctx%nEL
+            Es=Es+this%m_elements(i)%strainEnergy(1)
+            Eb=Eb+this%m_elements(i)%strainEnergy(2)
+        enddo
+        Es=Es/Eref
+        Eb=Eb/Eref
         Ep=Es+Eb
-        Ev=0.5*sum(this%mssful(1:this%nND,1:6)*this%velful(1:this%nND,1:6)*this%velful(1:this%nND,1:6))/Eref
+        Ev=0.0d0
+        do i=1, this%ctx%nEL
+            node0=this%m_elements(i)%node0
+            node1=this%m_elements(i)%node1
+            ve(1:6) =this%ctx%vel(1:6,node0)
+            ve(7:12)=this%ctx%vel(1:6,node1)
+            Ev=Ev+0.5d0*dot_product(ve, matmul(this%m_elements(i)%m_masMat, ve))
+        enddo
+        Ev=Ev/Eref
         Etot=Ev+Ep
         ! write energy title
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_energy.dat',position='append')
-        write(idfile,'(8E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,Etot,Ev,Ep,Es,Eb
+        write(idfile,'(8E20.10)')XYZo(1:3)/Lref,Etot,Ev,Ep,Es,Eb
         close(idfile)
-    ENDSUBROUTINE
+    end subroutine
 
     subroutine write_solid_probes_(this,groupNum,XYZo,solidProbingNum,solidProbingNode,Lref,Uref,Aref)
         implicit none
@@ -1601,144 +1677,17 @@ module SolidSolver
         do  i=1,solidProbingNum
             write(probeNum,'(I3.3)') i
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
-            write(idfile,'(12E20.10)')XYZo(1)/Lref,XYZo(2)/Lref,XYZo(3)/Lref,(this%ctx%pos(1:3,solidProbingNode(i))-XYZo(1:3))/Lref, &
+            write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%ctx%pos(1:3,solidProbingNode(i))-XYZo(1:3))/Lref, &
                                                                               this%ctx%vel(1:3,solidProbingNode(i))/Uref, &
                                                                               this%ctx%acc(1:3,solidProbingNode(i))/Aref
             close(idfile)
         enddo
     end subroutine
 
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    compute strain energy
-!    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    SUBROUTINE strain_energy_D(  strainEnergy, xord0,yord0,zord0,xord,yord,zord, &
-                                 ele,prop,triad_n1,triad_n2,triad_ee, &
-                                 nND,nEL &
-                               )
-    implicit none
-    integer:: nEL,nND
-    integer:: ele(nEL,5)
-    real(8):: xord0(nND), yord0(nND), zord0(nND), strainEnergy(nEL,2)
-    real(8):: xord(nND), yord(nND), zord(nND)
-!
-    real(8):: prop(nEL,10)
-
-    real(8):: ekb12(12,12),ekb12Strech(12,12),ekb12BendTor(12,12)
-!
-    real(8):: triad_ee(3,3,nEL)
-    real(8):: triad_n1(3,3,nEL),triad_n2(3,3,nEL)
-
-    real(8):: triad_00(3,3),triad_11(3,3),triad_22(3,3)
-    real(8):: ub(18),dl
-!
-    real(8):: dx0,dy0,dz0,du,dv,dw,dx,dy,dz,xl0
-    real(8):: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
-
-    real(8):: e0,g0,a0,b0,r0,zix0,ziy0,ziz0,xl
-    integer:: i,j,n,i1,j1,k1,nELt
-
-!   For each element, calculate the nodal forces
-    do    n=1,nEL
-
-        i1  = ele(n,1)
-        j1  = ele(n,2)
-        k1  = ele(n,3)
-        nELt= ele(n,4)
-        if    ( nELt == 2) then
-!           frame
-            e0  =prop(n,1)
-            g0  =prop(n,2)
-            a0  =prop(n,3)
-            r0  =prop(n,4)
-            b0  =prop(n,5)
-            zix0=prop(n,6)
-            ziy0=prop(n,7)
-            ziz0=prop(n,8)
-
-            dx0 = xord0(j1) - xord0(i1)
-            dy0 = yord0(j1) - yord0(i1)
-            dz0 = zord0(j1) - zord0(i1)
-            xl0 = dsqrt(dx0*dx0+dy0*dy0+dz0*dz0)
-!
-!           orientation
-            du = (xord(j1)-xord0(j1))-(xord(i1)-xord0(i1))
-            dv = (yord(j1)-yord0(j1))-(yord(i1)-yord0(i1))
-            dw = (zord(j1)-zord0(j1))-(zord(i1)-zord0(i1))
-
-            dx = dx0 + du
-            dy = dy0 + dv
-            dz = dz0 + dw
-            xl =dsqrt(dx*dx+dy*dy+dz*dz)
-!
-            dl = ( (2*dx0+du)*du +(2*dy0+dv)*dv +(2*dz0+dw)*dw )/ (xl+xl0)
-!           get twisting angles
-            do    i=1,3
-            do    j=1,3
-                triad_00(i,j)=triad_ee(i,j,n)
-                triad_11(i,j)=triad_ee(i,j,n)
-                triad_22(i,j)=triad_n1(i,j,n)
-            enddo
-            enddo
-            call get_angle_triad(triad_11,triad_22,tx,ty,tz)
-            call global_to_local(triad_00,tx,ty,tz,tx1,ty1,tz1)
-!
-            do    i=1,3
-            do    j=1,3
-                triad_11(i,j)=triad_ee(i,j,n)
-                triad_22(i,j)=triad_n2(i,j,n)
-            enddo
-            enddo
-            call get_angle_triad(triad_11,triad_22,tx,ty,tz)
-            call global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
-
-!            non-zero ty1 tz1 u2 tx2 ty2 tz2
-            ub(1)=0.0d0
-            ub(2)=0.0d0
-            ub(3)=0.0d0
-            ub(4)=tx1
-            ub(5)=ty1
-            ub(6)=tz1
-!
-            ub(7)=dl
-            ub(8)=0.0d0
-            ub(9)=0.0d0
-            ub(10)=tx2
-            ub(11)=ty2
-            ub(12)=tz2
-
-!
-!
-!           get current stiffness in local coords. use L0
-
-            call elmstfFRM_D(xl0,zix0,ziy0,ziz0,a0,e0,g0,ekb12,nELt )
-
-            ekb12Strech(1:12,1:12)=0.0d0
-            ekb12Strech(1,1)=ekb12(1,1)
-            ekb12Strech(1,7)=ekb12(1,7)
-            ekb12Strech(7,7)=ekb12(7,7)
-            ekb12Strech(7,1)=ekb12(7,1)
-
-            ekb12BendTor(1:12,1:12)=ekb12(1:12,1:12)
-            ekb12BendTor(1,1)=0.0d0
-            ekb12BendTor(1,7)=0.0d0
-            ekb12BendTor(7,7)=0.0d0
-            ekb12BendTor(7,1)=0.0d0
-
-!           nodal forces in local coords
-            strainEnergy(n,1)=0.5d0*sum(matmul(ekb12Strech(1:12,1:12),ub(1:12))*ub(1:12))
-            strainEnergy(n,2)=0.5d0*sum(matmul(ekb12BendTor(1:12,1:12),ub(1:12))*ub(1:12))
-        else
-            !write(*,*)'not this nELt:',nELt
-            !stop
-            strainEnergy(n,:) = 0.0d0
-        endif
-    enddo
-    ENDSUBROUTINE strain_energy_D
-
-    SUBROUTINE structure_(this,iFish,time,isubstep,deltat,subdeltat)
+    subroutine structure_(this,iFish,time,isubstep,deltat,subdeltat)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        integer:: iFish,iND,isubstep,i
+        integer:: iFish,isubstep,i
         real(8):: deltat,subdeltat,time
         !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
             if(this%iBodyModel.eq.1)then     ! rigid body
@@ -1753,7 +1702,7 @@ module SolidSolver
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do i=1,this%ctx%nEL
-                    call Segment_UpdateNodeCoords(this%m_elements(i)%x00, this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferenceToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
                     this%m_elements(i)%x1(:)=this%m_elements(i)%xnxt(:)
                     this%ctx%pos(1:6,this%m_elements(i)%node0)=this%m_elements(i)%x1(1:6)
                     this%ctx%pos(1:6,this%m_elements(i)%node1)=this%m_elements(i)%x1(7:12)
@@ -1780,7 +1729,7 @@ module SolidSolver
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do i=1,this%ctx%nEL
-                    call Segment_UpdateNodeCoords(this%m_elements(i)%x00, this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferenceToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
                 enddo
                 !-----------------------------------------
                 CALL Beam_Solve(this%ctx,this%m_elements,iFish)
@@ -1788,7 +1737,7 @@ module SolidSolver
                 stop 'no define body model'
             endif
             !!$OMP END PARALLEL DO
-    END SUBROUTINE
+    end subroutine
 
     subroutine Beam_Solve(context, element, iFish)
         implicit none
@@ -1796,14 +1745,15 @@ module SolidSolver
         type(Segment), intent(inout) :: element(1:context%nEL)
         real(8) :: dspO(1:6, 1:context%nND), velO(1:6, 1:context%nND), accO(1:6, 1:context%nND)
         real(8) :: dspn(1:context%gEQ)
-        integer :: iter=0, iFish
+        integer :: iter, iFish
         real(8) :: dnorm=1.0d0
         ! solve the next dispalce, velocity and acceleration using CG method
         call Beam_InitDspVelAccATTimeT(context, element, dspO, velO, accO)
-        do while(dnorm .gt. m_dtolFEM .and. iter .le. m_ntolFEM ) ! m_ntolFEM is maxNewtonRaphson
+        do iter = 1, m_ntolFEM ! m_ntolFEM is maxNewtonRaphson
             call Beam_UpdateMatrixANDLoad(context, element, iter, dspO)
             call CG_Solve(element, dspn, context%lodEffe, context%gEQ, context%nEL)
             call Beam_UpdateDspANDTride(context, element, iter, dspn, dnorm)
+            if (dnorm .le. m_dtolFEM) exit
         enddo
         call Beam_UpdateVelAcc(context, dspO, velO, accO)
         call Beam_UpdateIterInfo(context, iFish, iter, dnorm)
@@ -1834,8 +1784,8 @@ module SolidSolver
 
         context%lodInte = 0.0d0
         do i = 1, context%nEL
-            call element(i)%FormStiffMatrix
-            call element(i)%BodyStress(context)
+            call element(i)%FormStiffMatrix()
+            call element(i)%BodyStress_D(context)
             call element(i)%UpdateMatrix(coeffs, m_GeoGamma, m_dampM, m_dampK)
         enddo
         context%lodEffe = context%lodExte - context%lodInte
@@ -1843,7 +1793,7 @@ module SolidSolver
             call element(i)%UpdateLoad(context, coeffs, m_dampM, m_dampK, dspO)
             call element(i)%BoundaryCond(context, iter)
         enddo
-    end subroutine
+    end subroutine Beam_UpdateMatrixANDLoad
 
     subroutine CG_Solve(element, x, b, gEQ, nEL)
         ! Conjugate Gradient Method
@@ -1919,11 +1869,12 @@ module SolidSolver
         implicit none
         type(BeamContext), intent(inout) :: context
         type(Segment), intent(inout) :: element(1:context%nEL)
+        real(8), intent(out) :: dnorm
         real(8) :: dspn(1:context%gEQ), dspnn(1:6, 1:context%nND)
-        real(8) :: beta0,beta,zi,z0,dnorm
+        real(8) :: beta0,beta,zi,z0
         integer :: iter,i,maxramp
         beta0 = 1.0d0
-        maxramp = 0
+        maxramp = 1
         if    (iter <= maxramp) then
             zi=2.0d0**(iter)
             z0=2.0d0**(maxramp)
@@ -1948,9 +1899,19 @@ module SolidSolver
             call element(i)%MakeTriad_ee
         enddo
         dnorm=dabs(maxval((beta*dspn(1:context%gEQ))**2))
-        iter=iter+1
         return
     end subroutine Beam_UpdateDspANDTride
+
+    subroutine Beam_UpdateStrainEnergy(context, element)
+        implicit none
+        type(BeamContext), intent(inout) :: context
+        type(Segment), intent(inout) :: element(1:context%nEL)
+        integer :: i
+        do i = 1, context%nEL
+            call element(i)%FormStiffMatrix
+            call element(i)%StrainEnergy_D
+        enddo
+    end subroutine Beam_UpdateStrainEnergy
 
     subroutine Beam_UpdateVelAcc(context, dspO, velO, accO)
         implicit none
