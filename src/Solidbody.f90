@@ -37,8 +37,8 @@ module SolidBody
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         real(8), allocatable :: v_Eforce(:, :) ! element center (x, y, z)
-        integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
-        real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+        integer, allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
+        real(8), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)! of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
@@ -63,12 +63,13 @@ module SolidBody
 
     contains
 
-    SUBROUTINE read_solid_files(filename)
+    SUBROUTINE read_solid_files(filename,g)
         ! read global body parameters
         implicit none
         character(LEN=40),intent(in):: filename
+        real(8),intent(in):: g(3)
         character(LEN=256):: buffer
-        real(8):: alphaf,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
+        real(8):: GeoGamma,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
         integer:: isKB,ntolFEM
         integer:: iFish,ifishGroup
         character(LEN=40) :: t_FEmeshName,keywordstr
@@ -87,7 +88,7 @@ module SolidBody
         keywordstr = 'SolidBody'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
-        read(buffer,*)    m_IBPenaltyAlpha,alphaf
+        read(buffer,*)    m_IBPenaltyAlpha,GeoGamma
         call readNextData(111, buffer)
         read(buffer,*)    NewmarkGamma,NewmarkBeta
         call readNextData(111, buffer)
@@ -101,7 +102,7 @@ module SolidBody
             stop
         endif
         ! set solid solver global parameters
-        call Set_SolidSolver_Params(dampK,dampM,NewmarkGamma,NewmarkBeta,alphaf,dtolFEM,ntolFEM,isKB)
+        call Set_SolidSolver_Params(dampK,dampM,GeoGamma,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,isKB,g)
         allocate(FEmeshName(m_nFish),m_fishNum(m_nGroup+1),iBodyModel(m_nFish),iBodyType(m_nFish),isMotionGiven(6,m_nFish), &
                 denR(m_nFish),psR(m_nFish),EmR(m_nFish),tcR(m_nFish),KB(m_nFish),KS(m_nFish),initXYZVel(3,m_nFish), & 
                 m_XYZo(3,m_nFish),m_numX(m_nGroup),m_numY(m_nGroup),m_numZ(m_nGroup),XYZAmpl(3,m_nFish),XYZPhi(3,m_nFish), &
@@ -173,9 +174,9 @@ module SolidBody
                 AoAPhi(1:3,iFish)  = t_AoAPhi(1:3)
                 ! calculate the initial location for each fish
                 order3 = iFish - order1
-                lineX  = mod(order3,m_numX(ifishGroup))
-                lineY  = (order3 - lineX)/m_numX(ifishGroup)
-                lineZ  = (order3 - mod(order3,m_numX(ifishGroup)*m_numY(ifishGroup)))/m_numX(ifishGroup)*m_numY(ifishGroup)
+                lineX = mod(order3,m_numX(ifishGroup))
+                lineY = mod(order3 / m_numX(ifishGroup), m_numY(ifishGroup))
+                lineZ = order3 / (m_numX(ifishGroup)*m_numY(ifishGroup))
                 m_XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
                 m_XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
                 m_XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
@@ -268,7 +269,7 @@ module SolidBody
     subroutine allocate_solid_memory(Asfac,Lchod,Lspan,AR)
         real(8),intent(out):: Asfac,Lchod,Lspan,AR
         real(8) :: nAsfac(m_nFish),nLchod(m_nFish)
-        integer :: iFish,maxN
+        integer :: iFish,maxN,i
         write(*,'(A)') '========================================================='
         do iFish = 1,m_nFish
             if (sum(abs(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1e-5 .or. &
@@ -277,7 +278,7 @@ module SolidBody
                 sum(VBodies(iFish)%rbm%isMotionGiven(1:6))   .lt. 6 ) then
                 VBodies(iFish)%v_move = 1
             endif
-            call VBodies(iFish)%rbm%Allocate_solid(nAsfac(iFish),nLchod(iFish))
+            call VBodies(iFish)%rbm%ReadBuild(nAsfac(iFish),nLchod(iFish))
             write(*,*)'read FEMeshFile ',iFish,'end,',' isMoving: ',VBodies(iFish)%v_move
         enddo
         write(*,'(A)') '========================================================='
@@ -287,9 +288,10 @@ module SolidBody
             Asfac = nAsfac(maxN)
             Lchod = nLchod(maxN)
             if (VBodies(maxN)%v_type .eq. 1) then
-                Lspan = sum(VBodies(maxN)%rbm%r_Lspan(:)+VBodies(maxN)%rbm%r_Rspan(:))/dble(VBodies(maxN)%rbm%nND)
+                Lspan = sum([(VBodies(maxN)%rbm%m_elements(i)%spanlen, i=1,VBodies(maxN)%rbm%nEL)]) / dble(VBodies(maxN)%rbm%nEL)
             else
-                Lspan = maxval(VBodies(maxN)%rbm%xyzful00(:,3))-minval(VBodies(maxN)%rbm%xyzful00(:,3))
+                Lspan = maxval([(VBodies(maxN)%rbm%m_elements(i)%x00(3), VBodies(maxN)%rbm%m_elements(i)%x00(9), i=1,VBodies(maxN)%rbm%nEL)]) - &
+                        minval([(VBodies(maxN)%rbm%m_elements(i)%x00(3), VBodies(maxN)%rbm%m_elements(i)%x00(9), i=1,VBodies(maxN)%rbm%nEL)])
             endif
             if((Lchod-1.0d0)<=1.0d-2)Lchod=1.0d0
             if((Lspan-1.0d0)<=1.0d-2)Lspan=1.0d0
@@ -328,12 +330,12 @@ module SolidBody
         call Calculate_Solid_params(uMax,Lthck)
     end subroutine set_solidbody_parameters
 
-    subroutine Initialise_solid_bodies(time,g)
+    subroutine Initialise_solid_bodies(time)
         implicit none
-        real(8),intent(in):: time,g(3)
+        real(8),intent(in):: time
         integer :: iFish
         do iFish = 1,m_nFish
-            call VBodies(iFish)%rbm%Initialise(time,g)
+            call VBodies(iFish)%rbm%Initialise(time)
             call VBodies(iFish)%Initialise()
         enddo
     end subroutine Initialise_solid_bodies
@@ -542,7 +544,7 @@ module SolidBody
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
-        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
+        real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         integer :: i,iFish
         do i = 1,bodies(0)
             iFish = bodies(i)
@@ -556,37 +558,35 @@ module SolidBody
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         integer :: i,s,cnt,i1,i2
-        real(8) :: tmpxyz(3), tmpvel(3), tmpdx(3), dirc(3)
-        real(8) :: dh, left, len, dl, ls, area, dirc_norm, IBPenaltyBeta
+        real(8) :: tmpxyz(3), tmpvel(3), dirc(3)
+        real(8) :: dh, left, len, dl, ls, area, IBPenaltyBeta
+        real(8) :: omega(3), rspan(3), wspin(3)
         IBPenaltyBeta = - m_IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
-            i1 = this%rbm%ele(i,1)
-            i2 = this%rbm%ele(i,2)
-            tmpxyz = 0.5d0 * (this%rbm%xyzful(i1,1:3) + this%rbm%xyzful(i2,1:3))
-            tmpvel = 0.5d0 * (this%rbm%velful(i1,1:3) + this%rbm%velful(i2,1:3))
-            left = 0.5d0 * (this%rbm%r_Lspan(i1) + this%rbm%r_Lspan(i2))
-            len = 0.5d0 * (this%rbm%r_Rspan(i1) + this%rbm%r_Rspan(i2)) + left
-            dl = len / dble(this%rbm%r_Nspan(i))
-            tmpdx = this%rbm%xyzful(i2,1:3) - this%rbm%xyzful(i1,1:3)
-            dh = dsqrt(tmpdx(1)*tmpdx(1)+tmpdx(2)*tmpdx(2)+tmpdx(3)*tmpdx(3))
+            i1 = this%rbm%m_elements(i)%node0
+            i2 = this%rbm%m_elements(i)%node1
+            tmpxyz = 0.5d0 * (this%rbm%pos(1:3,i1) + this%rbm%pos(1:3,i2))
+            tmpvel = 0.5d0 * (this%rbm%vel(1:3,i1) + this%rbm%vel(1:3,i2))
+            omega = 0.5d0 * (this%rbm%vel(4:6,i1) + this%rbm%vel(4:6,i2))
+            left = this%rbm%m_elements(i)%Lspan
+            len = this%rbm%m_elements(i)%spanlen
+            dl = len / dble(this%rbm%m_elements(i)%Nspan)
+            dh = this%rbm%m_elements(i)%len1
             area = dl * dh * IBPenaltyBeta
-            dirc(1:3) = this%rbm%r_dirc(i1,1:3) + this%rbm%r_dirc(i2,1:3)
-            dirc_norm = dsqrt(sum(dirc**2))
-            if (dirc_norm .gt. 1e-10) then
-                dirc = dirc / dirc_norm
-            else
-                write(*,*) this%rbm%r_dirc(i1,1:3), "and", this%rbm%r_dirc(i2,1:3), "are opposite directions; no unique bisector exists."
-                stop
-            endif
+            dirc(1:3) = this%rbm%m_elements(i)%triad_ee(1:3,2)
             cnt = this%rtov(i) - 1
-            do s=1,this%rbm%r_Nspan(i)
+            do s=1,this%rbm%m_elements(i)%Nspan
                 ls = dl * (0.5d0 + dble(s-1)) - left
-                this%v_Exyz(1:3,cnt+s) = tmpxyz + dirc*ls
-                this%v_Evel(1:3,cnt+s) = tmpvel
+                rspan = dirc * ls
+                wspin = [ omega(2)*rspan(3) - omega(3)*rspan(2), &
+                          omega(3)*rspan(1) - omega(1)*rspan(3), &
+                          omega(1)*rspan(2) - omega(2)*rspan(1) ]
+                this%v_Exyz(1:3,cnt+s) = tmpxyz + rspan
+                this%v_Evel(1:3,cnt+s) = tmpvel + wspin
                 this%v_Ea(cnt+s) = area
             enddo
         enddo
-    endsubroutine PlateUpdatePosVelArea_
+    end subroutine PlateUpdatePosVelArea_
 
     subroutine SurfaceBuildPosVelArea_(this,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         !   compute displacement, velocity, area at surface element center
@@ -656,13 +656,16 @@ module SolidBody
     subroutine SurfaceUpdatePosVel_(this)
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
+        real(8) :: rel(3), omg(3)
         integer:: i
         do  i=1,this%v_nelmts
-            this%v_Exyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),this%v_Exyz0(1:3,i))+this%rbm%XYZ(1:3)
-            this%v_Evel(1:3,i)=[this%rbm%WWW3(2)*this%v_Exyz(3,i)-this%rbm%WWW3(3)*this%v_Exyz(2,i), &
-                                this%rbm%WWW3(3)*this%v_Exyz(1,i)-this%rbm%WWW3(1)*this%v_Exyz(3,i), &
-                                this%rbm%WWW3(1)*this%v_Exyz(2,i)-this%rbm%WWW3(2)*this%v_Exyz(1,i)] &
-                                + this%rbm%UVW(1:3) + this%rbm%initXYZVel(1:3)
+            rel = matmul(this%rbm%TTTnxt(1:3,1:3), this%v_Exyz0(1:3,i))
+            this%v_Exyz(1:3,i) = rel + this%rbm%XYZ(1:3)
+            omg = this%rbm%WWW3(1:3)
+            this%v_Evel(1:3,i) = [omg(2)*rel(3)-omg(3)*rel(2), &
+                                  omg(3)*rel(1)-omg(1)*rel(3), &
+                                  omg(1)*rel(2)-omg(2)*rel(1)] &
+                                  + this%rbm%UVW(1:3)
         enddo
     end subroutine SurfaceUpdatePosVel_
 
@@ -813,7 +816,7 @@ module SolidBody
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
-        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
+        real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         !================================
         integer:: iFish, i
         integer:: iterLBM
@@ -848,7 +851,7 @@ module SolidBody
         ! update body load and fluid force
         do i = 1, bodies(0)
             iFish = bodies(i)
-            VBodies(iFish)%rbm%extful = 0.0d0
+            VBodies(iFish)%rbm%lodFlow = 0.0d0
             ! to do, consider gravity
         enddo
         do i = 1, bodies(0)
@@ -863,13 +866,13 @@ module SolidBody
         class(VirtualBody), intent(inout) :: this
         real(8),intent(in):: dh
         integer,intent(in):: xDim,yDim,zDim
-        real(8),intent(out)::force(zDim,yDim,xDim,1:3)
+        real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: forceElemTemp(3),invh3
         !==================================================================================================
-        integer::x,y,z,iEL,i1,i2
+        integer::x,y,z,iEL,iElem,id0(3),id1(3)
         !==================================================================================================
         invh3 = (1.d0/dh)**3
         ! compute the velocity of IB nodes at element center
@@ -882,10 +885,11 @@ module SolidBody
             rz = this%v_Ew(9:12,iEL)
             forceElemTemp = this%v_Eforce(1:3,iEL)
             ! update beam load, momentum is not included
-            i1=this%rbm%ele(this%vtor_f(iEL),1)
-            i2=this%rbm%ele(this%vtor_f(iEL),2)
-            this%rbm%extful(i1,1:3) = this%rbm%extful(i1,1:3) + 0.5d0 * forceElemTemp
-            this%rbm%extful(i2,1:3) = this%rbm%extful(i2,1:3) + 0.5d0 * forceElemTemp
+            iElem = this%vtor_f(iEL)
+            id0 = this%rbm%m_elements(iElem)%m_localToGlobal(1:3)
+            id1 = this%rbm%m_elements(iElem)%m_localToGlobal(7:9)
+            this%rbm%lodFlow(id0) = this%rbm%lodFlow(id0) + 0.5d0 * forceElemTemp(1:3)
+            this%rbm%lodFlow(id1) = this%rbm%lodFlow(id1) + 0.5d0 * forceElemTemp(1:3)
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
@@ -977,7 +981,7 @@ module SolidBody
         this%v_nelmts = 0
         do i=1,this%rbm%nEL
             this%rtov(i) = this%v_nelmts + 1
-            this%v_nelmts = this%v_nelmts + this%rbm%r_Nspan(i)
+            this%v_nelmts = this%v_nelmts + this%rbm%m_elements(i)%Nspan
         enddo
         this%rtov(this%rbm%nEL+1) = this%v_nelmts + 1
         allocate(this%vtor(this%v_nelmts))
@@ -1046,13 +1050,13 @@ module SolidBody
                 read(fileiD,*)num,temp_prop(1:4),Surfacetmpele(1,i),Surfacetmpele(2,i),Surfacetmpele(3,i)
             enddo
         close(fileiD)
-    endsubroutine Read_gmsh
+    end subroutine Read_gmsh
 
     subroutine SurfacetoBeam_write(FEmeshName)
         implicit none
         character (LEN=40),intent(inout):: FEmeshName
         integer :: fileiD = 111, i, num
-        real(8) :: Surfacetmpxyz(3,3)
+        real(8) :: Surfacetmpxyz(3,2)
         i = index(FEmeshName, '.')
         FEmeshName = FEmeshName(:i) // 'msh'
         open(unit=fileiD, file = trim(adjustl(FEmeshName)) )
@@ -1061,7 +1065,7 @@ module SolidBody
             read(fileiD,*)
             read(fileiD,*)
             read(fileiD,*)
-            do i = 1,3
+            do i = 1,2
                 read(fileiD,*)num,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i)
             enddo
         close(fileiD)
@@ -1071,24 +1075,24 @@ module SolidBody
             write(fileiD,*) "Frame3D(This is a .dat file converted from .msh file)"
         close(fileiD)
         open(unit=fileiD, file = trim(adjustl(FEmeshName)),position='append')! write *.dat file
-            write(fileiD,*) "     3     1     1"
-            write(fileiD,*) "END"
-            write(fileiD,*) "     3"
-            do i = 1,3
-                write(fileiD,*) i,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i),"   0.0   0.0   0. 0. 1."
+            write(fileiD,*) "     2     1     1"
+            write(fileiD,*) "POINT"
+            write(fileiD,*) "            2                    X                              Y                         Z  Lspan Rspan dirc"
+            do i = 1,2
+                write(fileiD,*) i,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i),"   1.0   1.0   0.0   0.0   1.0"
             enddo
-            write(fileiD,*) "END"
-            write(fileiD,*) "     1     I     J     K  TYPE   MAT   LEN"
-            write(fileiD,*) "     1     1     2     3     3     1     0"
-            write(fileiD,*) "END"
+            write(fileiD,*) "ELEMENT"
+            write(fileiD,*) "     1     I     J     K  TYPE   MAT Nspan"
+            write(fileiD,*) "     1     1     2     2     2     1     1"
+            write(fileiD,*) "CONSTRAIN"
             write(fileiD,*) "     1  XTRA  YTRA  ZTRA  XROT  YROT  ZROT"
-            write(fileiD,*) "     1     1     0     0     0     0     0"
-            write(fileiD,*) "END"
-            write(fileiD,*) "     1   E           G           A           RHO         GAMMA       IP          IA          IB"
+            write(fileiD,*) "     1     1     1     1     1     1     1"
+            write(fileiD,*) "MATERIAL"
+            write(fileiD,*) "     1   E           G           A           RHO         GAMMA       JT          IY          IZ"
             write(fileiD,*) "     1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00"
             write(fileiD,*) "END"
         close(fileiD)
-    endsubroutine SurfacetoBeam_write
+    end subroutine SurfacetoBeam_write
 
     subroutine Write_body_(this,iFish,time,idfile)
         implicit none
@@ -1102,33 +1106,91 @@ module SolidBody
         else
             write(*, *) "body type not implemented", this%v_type
         endif
-    endsubroutine Write_body_
+    end subroutine Write_body_
 
     subroutine PlateWrite_body_(this,iFish,idfile)
         ! to do: generate a temporary mesh
         implicit none
         class(VirtualBody), intent(inout) :: this
         integer,intent(in) :: iFish,idfile
-        real(8):: tmpxyz(3)
-        integer:: i, i1, i2
-        integer,parameter::nameLen=10
-        character (LEN=nameLen):: idstr
-        !write zone title
-        write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
-        write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "fish',trim(idstr), '" N = ',2*this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
-        !write data
-        do i = 1,this%rbm%nNd
-            tmpxyz = this%rbm%xyzful(i,1:3)
-            write(idfile, *) (tmpxyz - this%rbm%r_Lspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
-            write(idfile, *) (tmpxyz + this%rbm%r_Rspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
+        integer :: i, nEL, nSta
+        integer, parameter :: nameLen=10
+        character(LEN=nameLen) :: idstr
+        real(8) :: xc(3), xc1(3), xc2(3)
+        real(8) :: Ls, Rs
+        real(8) :: dir(3)
+        nEL  = this%rbm%nEL
+        nSta = nEL + 2
+        ! write zone title
+        write(idstr,'(I3.3)') iFish ! assume iFish < 1000
+        write(idfile,'(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "fish',trim(idstr), '" N = ', 2*nSta, ', E = ', nSta-1, ', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        ! ------------------------------------------------------------
+        ! 1. First extrapolated section
+        ! ------------------------------------------------------------
+        if (nEL >= 2) then
+            xc1 = 0.5d0*(this%rbm%m_elements(1)%x1(1:3) + this%rbm%m_elements(1)%x1(7:9))
+            xc2 = 0.5d0*(this%rbm%m_elements(2)%x1(1:3) + this%rbm%m_elements(2)%x1(7:9))
+            xc  = xc1 - 0.5d0*(xc2 - xc1)
+            Ls  = 1.5d0*this%rbm%m_elements(1)%Lspan - 0.5d0*this%rbm%m_elements(2)%Lspan
+            Rs  = 1.5d0*(this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan) - &
+                  0.5d0*(this%rbm%m_elements(2)%spanlen - this%rbm%m_elements(2)%Lspan)
+            dir = 1.5d0*this%rbm%m_elements(1)%triad_ee(1:3,2) - 0.5d0*this%rbm%m_elements(2)%triad_ee(1:3,2)
+        else
+            xc  = this%rbm%m_elements(1)%x1(1:3)
+            Ls  = this%rbm%m_elements(1)%Lspan
+            Rs  = this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan
+            dir = this%rbm%m_elements(1)%triad_ee(1:3,2)
+        endif
+        call write_section()
+        ! ------------------------------------------------------------
+        ! 2. Element-center sections
+        ! ------------------------------------------------------------
+        do i = 1, nEL
+            xc  = 0.5d0*(this%rbm%m_elements(i)%x1(1:3) + this%rbm%m_elements(i)%x1(7:9))
+            Ls  = this%rbm%m_elements(i)%Lspan
+            Rs  = this%rbm%m_elements(i)%spanlen - this%rbm%m_elements(i)%Lspan
+            dir = this%rbm%m_elements(i)%triad_ee(1:3,2)
+            call write_section()
         enddo
-        do  i=1,this%rbm%nEL
-            i1 = this%rbm%ele(i,1)
-            i2 = this%rbm%ele(i,2)
-            write(idfile, *) 2*i1 -1, 2*i1,2*i2,2*i2-1
+        ! ------------------------------------------------------------
+        ! 3. Last extrapolated section
+        ! ------------------------------------------------------------
+        if (nEL >= 2) then
+            xc1 = 0.5d0*(this%rbm%m_elements(nEL)%x1(1:3) + this%rbm%m_elements(nEL)%x1(7:9))
+            xc2 = 0.5d0*(this%rbm%m_elements(nEL-1)%x1(1:3) + this%rbm%m_elements(nEL-1)%x1(7:9))
+            xc  = xc1 + 0.5d0*(xc1 - xc2)
+            Ls  = 1.5d0*this%rbm%m_elements(nEL)%Lspan - 0.5d0*this%rbm%m_elements(nEL-1)%Lspan
+            Rs  = 1.5d0*(this%rbm%m_elements(nEL)%spanlen - this%rbm%m_elements(nEL)%Lspan) - &
+                  0.5d0*(this%rbm%m_elements(nEL-1)%spanlen - this%rbm%m_elements(nEL-1)%Lspan)
+            dir = 1.5d0*this%rbm%m_elements(nEL)%triad_ee(1:3,2) - 0.5d0*this%rbm%m_elements(nEL-1)%triad_ee(1:3,2)
+        else
+            xc  = this%rbm%m_elements(1)%x1(7:9)
+            Ls  = this%rbm%m_elements(1)%Lspan
+            Rs  = this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan
+            dir = this%rbm%m_elements(1)%triad_ee(1:3,2)
+        endif
+        call write_section()
+        ! ------------------------------------------------------------
+        ! 4. Connectivity
+        ! ------------------------------------------------------------
+        do i = 1, nSta-1
+            write(idfile, *) 2*i-1, 2*i, 2*(i+1), 2*(i+1)-1
         enddo
+    
+    contains
+    
+        subroutine write_section()
+            implicit none
+            real(8) :: d(3), nd
+            d = dir
+            nd = dsqrt(sum(d**2))
+            if (nd > 1.0d-14) d = d / nd
+            write(idfile, *) (xc - Ls*d) / m_Lref
+            write(idfile, *) (xc + Rs*d) / m_Lref
+        end subroutine write_section
+    
     end subroutine PlateWrite_body_
-
+    
     subroutine SurfaceWrite_body_(this,iFish,time,idfile)
         ! to do: generate a temporary mesh
         implicit none

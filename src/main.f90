@@ -22,7 +22,7 @@ PROGRAM main
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
     call read_flow_conditions(parameterFile)
-    call read_solid_files(parameterFile)
+    call read_solid_files(parameterFile,g)
     call read_fuild_blocks(parameterFile)
     call read_probe_params(parameterFile)
     call bluid_block_tree()
@@ -40,7 +40,7 @@ PROGRAM main
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
     !==================================================================================================
     ! Initialization before simulation
-    call initialise_solid_bodies(0.d0, g)
+    call Initialise_solid_bodies(0.d0)
     call FindCarrierFluidBlock()
     call initialise_fuild_blocks(time)
     !==================================================================================================
