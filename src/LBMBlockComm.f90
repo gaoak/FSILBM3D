@@ -187,7 +187,7 @@ module LBMBlockComm
         enddo
     end subroutine
 
-    subroutine bluid_block_tree()
+    subroutine build_block_tree()
         implicit none
         integer:: i,iblocks(1:m_nblocks),nb
         ! initialise blocktree
@@ -203,7 +203,7 @@ module LBMBlockComm
         call build_blocks_comunication(blockTreeRoot)
         ! allocate father slices in sons node
         call allocate_fIn_tau(blockTreeRoot)
-    endsubroutine bluid_block_tree
+    endsubroutine build_block_tree
 
     recursive subroutine allocate_fIn_tau(treenode)
         implicit none

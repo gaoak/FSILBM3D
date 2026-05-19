@@ -1084,9 +1084,10 @@ module SolidBody
             write(fileiD,*) "ELEMENT"
             write(fileiD,*) "     1     I     J     K  TYPE   MAT Nspan"
             write(fileiD,*) "     1     1     2     2     2     1     1"
-            write(fileiD,*) "CONSTRAIN"
-            write(fileiD,*) "     1  XTRA  YTRA  ZTRA  XROT  YROT  ZROT"
+            write(fileiD,*) "CONSTRAINT"
+            write(fileiD,*) "     2  XTRA  YTRA  ZTRA  XROT  YROT  ZROT"
             write(fileiD,*) "     1     1     1     1     1     1     1"
+            write(fileiD,*) "     2     0     0     0     0     0     0"
             write(fileiD,*) "MATERIAL"
             write(fileiD,*) "     1   E           G           A           RHO         GAMMA       JT          IY          IZ"
             write(fileiD,*) "     1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00"
@@ -1123,7 +1124,7 @@ module SolidBody
         nSta = nEL + 2
         ! write zone title
         write(idstr,'(I3.3)') iFish ! assume iFish < 1000
-        write(idfile,'(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "fish',trim(idstr), '" N = ', 2*nSta, ', E = ', nSta-1, ', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        write(idfile,'(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N = ', 2*nSta, ', E = ', nSta-1, ', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
         ! ------------------------------------------------------------
         ! 1. First extrapolated section
         ! ------------------------------------------------------------

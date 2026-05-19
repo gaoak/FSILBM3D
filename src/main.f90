@@ -25,7 +25,7 @@ PROGRAM main
     call read_solid_files(parameterFile,g)
     call read_fuild_blocks(parameterFile)
     call read_probe_params(parameterFile)
-    call bluid_block_tree()
+    call build_block_tree()
     !==================================================================================================
     ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)
@@ -122,9 +122,13 @@ PROGRAM main
         endif
         ! write processing informations
         if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            if(flow%inWhichBlock.le.0) write(*,*) 'Warning: The flow field where the probe is located (flow%inWhichBlock) must be greater than 0!'
-            call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
-                                              LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu,LBMblks(flow%inWhichBlock)%den)
+            call write_fluid_flux(time)
+            if(flow%inWhichBlock.ge.1 .and. flow%inWhichBlock.le.m_nblocks) then
+                call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
+                                                  LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu)
+            else
+                write(*,'(A,I0,A,I0,A)') 'Warning: invalid flow%inWhichBlock = ', flow%inWhichBlock, '; it must be in [1, ', m_nblocks, '].'
+            endif
             call write_solid_Information(time,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)

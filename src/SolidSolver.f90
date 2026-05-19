@@ -1222,6 +1222,7 @@ module SolidSolver
         allocate(this%m_elements(1:this%nEL))
         call Beam_ReadBuildElements()
         call Beam_cptAsfac()
+        call Beam_adjustBC()
 
     contains
 
@@ -1267,7 +1268,7 @@ module SolidSolver
                 do i=1,10000
                     read(fileiD,*) buffer
                     buffer = trim(buffer)
-                    if(buffer(1:9) .eq. 'CONSTRAIN') exit
+                    if(buffer(1:10) .eq. 'CONSTRAINT') exit
                 enddo
                 read(fileiD,*) this%nND
                 do i = 1,this%nND
