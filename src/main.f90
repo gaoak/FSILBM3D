@@ -16,7 +16,7 @@ PROGRAM main
     character(LEN=40):: parameterFile='inFlow.dat',checkFile='check.dat'
     integer:: step=0,start_ave
     real(8):: dt_fluid
-    real(8):: time=0.0d0,start_time=0.0d0,g(3)=[0,0,0]
+    real(8):: time=0.0d0,start_time=0.0d0,g(3)=[0.0d0,0.0d0,0.0d0]
     real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
@@ -107,22 +107,22 @@ PROGRAM main
         write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
-        if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
+        if(DABS(time/flow%Tref-flow%timeContiDelta*dble(NINT(time/flow%Tref/flow%timeContiDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
             call write_continue_blocks(step,time / flow%Tref)   ! output dimensionless time
         endif
         ! write fluid and soild data
-        if((time/flow%Tref - flow%timeWriteBegin) >= -0.5*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5*dt_fluid/flow%Tref) then
-            if(DABS(time/flow%Tref-flow%timeBodyDelta*NINT(time/flow%Tref/flow%timeBodyDelta)) <= 0.5*dt_fluid/flow%Tref)then
+        if((time/flow%Tref - flow%timeWriteBegin) >= -0.5d0*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5d0*dt_fluid/flow%Tref) then
+            if(DABS(time/flow%Tref-flow%timeBodyDelta*dble(NINT(time/flow%Tref/flow%timeBodyDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
                 call write_solid_field(time)
                 call Write_solid_v_bodies(time)
             endif
-            if(DABS(time/flow%Tref-flow%timeFlowDelta*NINT(time/flow%Tref/flow%timeFlowDelta)) <= 0.5*dt_fluid/flow%Tref)then
+            if(DABS(time/flow%Tref-flow%timeFlowDelta*dble(NINT(time/flow%Tref/flow%timeFlowDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
                 call write_flow_blocks(time)
             endif
         endif
         ! write processing informations
-        if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            call write_fluid_flux(time)
+        if(DABS(time/flow%Tref-flow%timeInfoDelta*dble(NINT(time/flow%Tref/flow%timeInfoDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
+            call write_fluid_flux(blockTreeRoot,time)
             if(flow%inWhichBlock.ge.1 .and. flow%inWhichBlock.le.m_nblocks) then
                 call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
                                                   LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu)

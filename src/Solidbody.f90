@@ -37,8 +37,8 @@ module SolidBody
         !area center with equal weight on both sides
         real(8), allocatable :: v_Evel(:, :)
         real(8), allocatable :: v_Eforce(:, :) ! element center (x, y, z)
-        integer, allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
-        real(8), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+        integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
+        real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)! of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
@@ -65,6 +65,11 @@ module SolidBody
 
     SUBROUTINE read_solid_files(filename,g)
         ! read global body parameters
+        ! GeoGamma     : scaling factor for geometric stiffness in the tangent matrix
+        ! NewmarkGamma : Newmark time-integration parameter gamma
+        ! NewmarkBeta  : Newmark time-integration parameter beta
+        ! dampK        : stiffness-proportional damping coefficient
+        ! dampM        : mass-proportional damping coefficient
         implicit none
         character(LEN=40),intent(in):: filename
         real(8),intent(in):: g(3)
@@ -163,6 +168,11 @@ module SolidBody
                 elseif(isKB==1) then
                     KB(iFish)  = t_KB
                     KS(iFish)  = t_KS
+                else
+                    EmR(iFish) = 0.0d0
+                    tcR(iFish) = 0.0d0
+                    KB(iFish)  = 0.0d0
+                    KS(iFish)  = 0.0d0
                 endif
                 freq(iFish) = t_freq
                 St(iFish) = t_St
@@ -177,9 +187,9 @@ module SolidBody
                 lineX = mod(order3,m_numX(ifishGroup))
                 lineY = mod(order3 / m_numX(ifishGroup), m_numY(ifishGroup))
                 lineZ = order3 / (m_numX(ifishGroup)*m_numY(ifishGroup))
-                m_XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * lineX
-                m_XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * lineY
-                m_XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * lineZ
+                m_XYZo(1,iFish) = firstXYZ(1) + deltaXYZ(1) * dble(lineX)
+                m_XYZo(2,iFish) = firstXYZ(2) + deltaXYZ(2) * dble(lineY)
+                m_XYZo(3,iFish) = firstXYZ(3) + deltaXYZ(3) * dble(lineZ)
             enddo
         enddo
         close(111)
@@ -258,9 +268,9 @@ module SolidBody
         endif
         ! reference acceleration, force, energy, power
         flow%Aref = flow%Uref/flow%Tref
-        flow%Fref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac
-        flow%Eref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac*flow%Lref
-        flow%Pref = 0.5*flow%denIn*flow%Uref**2*flow%Asfac*flow%Uref
+        flow%Fref = 0.5d0*flow%denIn*flow%Uref**2*flow%Asfac
+        flow%Eref = 0.5d0*flow%denIn*flow%Uref**2*flow%Asfac*flow%Lref
+        flow%Pref = 0.5d0*flow%denIn*flow%Uref**2*flow%Asfac*flow%Uref
         ! fluid viscosity
         flow%nu =  flow%Uref*flow%Lref/flow%Re
         flow%Mu =  flow%nu*flow%denIn
@@ -272,9 +282,9 @@ module SolidBody
         integer :: iFish,maxN,i
         write(*,'(A)') '========================================================='
         do iFish = 1,m_nFish
-            if (sum(abs(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1e-5 .or. &
-                sum(abs(VBodies(iFish)%rbm%XYZAmpl(1:3)))    .gt. 1e-5 .or. &
-                sum(abs(VBodies(iFish)%rbm%AoAAmpl(1:3)))    .gt. 1e-5 .or. &
+            if (sum(abs(VBodies(iFish)%rbm%initXYZVel(1:3))) .gt. 1d-5 .or. &
+                sum(abs(VBodies(iFish)%rbm%XYZAmpl(1:3)))    .gt. 1d-5 .or. &
+                sum(abs(VBodies(iFish)%rbm%AoAAmpl(1:3)))    .gt. 1d-5 .or. &
                 sum(VBodies(iFish)%rbm%isMotionGiven(1:6))   .lt. 6 ) then
                 VBodies(iFish)%v_move = 1
             endif
@@ -730,9 +740,9 @@ module SolidBody
             call trimedindex(i, xDim, ix, m_boundaryConditions(1:2))
             call trimedindex(j, yDim, jy, m_boundaryConditions(3:4))
             call trimedindex(k, zDim, kz, m_boundaryConditions(5:6))
-            this%v_Ei(1:4,iEL) = ix
-            this%v_Ei(5:8,iEL) = jy
-            this%v_Ei(9:12,iEL) = kz
+            this%v_Ei(1:4,iEL) = int(ix, kind=2)
+            this%v_Ei(5:8,iEL) = int(jy, kind=2)
+            this%v_Ei(9:12,iEL) = int(kz, kind=2)
             do x=-1,2
                 rx(x)=Phi(dble(x)-detx)
             enddo
@@ -742,9 +752,9 @@ module SolidBody
             do z=-1,2
                 rz(z)=Phi(dble(z)-detz)
             enddo
-            this%v_Ew(1:4,iEL) = rx
-            this%v_Ew(5:8,iEL) = ry
-            this%v_Ew(9:12,iEL) = rz
+            this%v_Ew(1:4,iEL) = real(rx, kind=4)
+            this%v_Ew(5:8,iEL) = real(ry, kind=4)
+            this%v_Ew(9:12,iEL) = real(rz, kind=4)
         enddo
         !$OMP END PARALLEL DO
 
@@ -1072,26 +1082,25 @@ module SolidBody
         i = index(FEmeshName, '.')
         FEmeshName = FEmeshName(:i) // 'dat'
         open(unit=fileiD, file = trim(adjustl(FEmeshName)))! write *.dat file
-            write(fileiD,*) "Frame3D(This is a .dat file converted from .msh file)"
-        close(fileiD)
-        open(unit=fileiD, file = trim(adjustl(FEmeshName)),position='append')! write *.dat file
-            write(fileiD,*) "     2     1     1"
-            write(fileiD,*) "POINT"
-            write(fileiD,*) "            2                    X                              Y                         Z  Lspan Rspan dirc"
-            do i = 1,2
-                write(fileiD,*) i,Surfacetmpxyz(1,i),Surfacetmpxyz(2,i),Surfacetmpxyz(3,i),"   1.0   1.0   0.0   0.0   1.0"
+            write(fileiD,'(A)') 'Frame3D : point number, element number, material number'
+            write(fileiD,'(3I5)') 2, 1, 1
+            write(fileiD,'(A)') 'POINT'
+            write(fileiD,'(I5,8A22)') 2, 'X', 'Y', 'Z', 'Lspan', 'Rspan', 'dirX', 'dirY', 'dirZ'
+            do i = 1, 2
+                write(fileiD,'(I5,8F22.18)') i, &
+                    Surfacetmpxyz(1,i), Surfacetmpxyz(2,i), Surfacetmpxyz(3,i), 1.0d0, 1.0d0, 0.0d0, 0.0d0, 1.0d0
             enddo
-            write(fileiD,*) "ELEMENT"
-            write(fileiD,*) "     1     I     J     K  TYPE   MAT Nspan"
-            write(fileiD,*) "     1     1     2     2     2     1     1"
-            write(fileiD,*) "CONSTRAINT"
-            write(fileiD,*) "     2  XTRA  YTRA  ZTRA  XROT  YROT  ZROT"
-            write(fileiD,*) "     1     1     1     1     1     1     1"
-            write(fileiD,*) "     2     0     0     0     0     0     0"
-            write(fileiD,*) "MATERIAL"
-            write(fileiD,*) "     1   E           G           A           RHO         GAMMA       JT          IY          IZ"
-            write(fileiD,*) "     1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00"
-            write(fileiD,*) "END"
+            write(fileiD,'(A)') 'ELEMENT'
+            write(fileiD,'(I5,6A6)') 1, 'I', 'J', 'K', 'TYPE', 'MAT', 'Nspan'
+            write(fileiD,'(I5,6I6)') 1, 1, 2, 2, 2, 1, 1
+            write(fileiD,'(A)') 'CONSTRAINT'
+            write(fileiD,'(I5,6A6)') 2, 'XTRA', 'YTRA', 'ZTRA', 'XROT', 'YROT', 'ZROT'
+            write(fileiD,'(I5,6I6)') 1, 1, 1, 1, 1, 1, 1
+            write(fileiD,'(I5,6I6)') 2, 0, 0, 0, 0, 0, 0
+            write(fileiD,'(A)') 'MATERIAL'
+            write(fileiD,'(I5,8A12)') 1, 'E', 'G', 'A', 'RHO', 'GAMMA', 'JT', 'IY', 'IZ'
+            write(fileiD,'(A)') '    1   0.100D+01   0.100D+01   0.100D+01   0.100D+01   0.000D+00   0.100D+01   0.150D+01   0.500D+00'
+            write(fileiD,'(A)') 'END'
         close(fileiD)
     end subroutine SurfacetoBeam_write
 
@@ -1175,7 +1184,7 @@ module SolidBody
         ! 4. Connectivity
         ! ------------------------------------------------------------
         do i = 1, nSta-1
-            write(idfile, *) 2*i-1, 2*i, 2*(i+1), 2*(i+1)-1
+            write(idfile,'(4I8)') 2*i-1, 2*i, 2*(i+1), 2*(i+1)-1
         enddo
     
     contains
@@ -1186,8 +1195,8 @@ module SolidBody
             d = dir
             nd = dsqrt(sum(d**2))
             if (nd > 1.0d-14) d = d / nd
-            write(idfile, *) (xc - Ls*d) / m_Lref
-            write(idfile, *) (xc + Rs*d) / m_Lref
+            write(idfile,'(3E20.10)') (xc - Ls*d) / m_Lref
+            write(idfile,'(3E20.10)') (xc + Rs*d) / m_Lref
         end subroutine write_section
     
     end subroutine PlateWrite_body_
@@ -1205,26 +1214,27 @@ module SolidBody
         real(8),allocatable :: Surfacetmpxyz(:,:)
         integer,allocatable :: Surfacetmpele(:,:)
         write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        if (time .lt. 1e-5) then
+        if (time .lt. 1d-5) then
             call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
             do  i=1,Surfacetmpnpts
                 Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
             enddo
-            write(idfile, '(A,A,A,I7,A,I7,A)', advance='no') 'ZONE    T = "',trim(idstr), '" N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
+            write(idfile, '(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N=',Surfacetmpnpts,', E=',Surfacetmpnelmts,', DATAPACKING=POINT, ZONETYPE=FETRIANGLE'
             do i = 1,Surfacetmpnpts
                 tmpxyz = Surfacetmpxyz(1:3,i)
-                write(idfile, *) tmpxyz/m_Lref
+                write(idfile,'(3E20.10)') tmpxyz/m_Lref
             enddo
             do  i=1,Surfacetmpnelmts
                 i1 = Surfacetmpele(1,i)
                 i2 = Surfacetmpele(2,i)
                 i3 = Surfacetmpele(3,i)
-                write(idfile, *) i1, i2, i3
+                write(idfile,'(3I10)') i1, i2, i3
             enddo
             deallocate(Surfacetmpxyz,Surfacetmpele)
         else
             !write(idfile, '(A)') 'variables = "X" "Y" "Z" "TTTnxt(RotMat)"'
-            write(idfile, '(10E20.10)') this%rbm%XYZ(1),this%rbm%XYZ(2),this%rbm%XYZ(3)
+            write(idfile, '(A,A,A)') 'ZONE    T = "fish', trim(idstr), '" I=1, DATAPACKING=POINT'
+            write(idfile, '(3E20.10)') this%rbm%XYZ(1:3) / m_Lref
             !write(idfile, '(10E20.10)') this%rbm%TTTnxt(1,1),this%rbm%TTTnxt(1,2),this%rbm%TTTnxt(1,3)
             !write(idfile, '(10E20.10)') this%rbm%TTTnxt(2,1),this%rbm%TTTnxt(2,2),this%rbm%TTTnxt(2,3)
             !write(idfile, '(10E20.10)') this%rbm%TTTnxt(3,1),this%rbm%TTTnxt(3,2),this%rbm%TTTnxt(3,3)

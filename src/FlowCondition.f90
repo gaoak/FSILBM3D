@@ -171,7 +171,7 @@ module FlowCondition
         enddo
         ! write fluid flux title
         open(111,file='./DatInfo/FluidFlux.dat')
-        write(111,*) 'VARIABLES = "t"  "inlet"  "middle"  "outlet"  "all"'
+        write(111,*) 'VARIABLES = "t"  "inlet"  "middle"  "outlet"'
         close(111)
         ! write fluid probing title
         do  i=1,flow%fluidProbingNum

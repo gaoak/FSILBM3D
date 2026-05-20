@@ -1,5 +1,5 @@
 ! program algorithm: ISBN 9781441929105 James F. Doyle. P354
-module BeamStructure
+module SegmentStructure
     !use mkl
     implicit none
     private
@@ -83,7 +83,7 @@ module BeamStructure
         this%spanlen = 0.5d0 * (xyz(5,p0Id) + xyz(5,p1Id)) + this%Lspan
         this%dirc(1:3) = 0.5d0 * (xyz(6:8,p0Id) + xyz(6:8,p1Id))
         dirc_norm = dsqrt(sum(this%dirc**2))
-        if (dirc_norm .gt. 1e-10) then
+        if (dirc_norm .gt. 1d-10) then
             this%dirc = this%dirc / dirc_norm
         else
             write(*,*) xyz(6:8,p0Id), "and", xyz(6:8,p1Id), "are opposite directions; no unique bisector exists."
@@ -294,31 +294,44 @@ module BeamStructure
     end subroutine Segment_LocToGlobal
 
     subroutine Segment_FormMassMatrix(this)
-        ! ELeMent MASs matrix for the FRaMe
+        ! ELeMent MASs matrix for 3D Timoshenko FRaMe
         ! Same as Abaqus B31 Timoshenko frame
         ! Lumped massLoad matrix
         ! ISBN 9781441929105 James F. Doyle. P273
         ! ISBN 9780792312086 James F. Doyle. P423
+        !
+        ! Rotary inertia about the local x-axis uses polar second moment Ip = Iy + Iz.
+        ! This is not generally equal to the St. Venant torsion constant Jt, except for circular sections.
         implicit none
         class(Segment), intent(inout) :: this
         real(8):: area,rho,zix,ziy,ziz,length
         real(8):: roal
 
-        area = this%m_property(3)
-        rho  = this%m_property(4)
-        zix  = this%m_property(6)
-        ziy  = this%m_property(7)
-        ziz  = this%m_property(8)
+                                  ! b    : local y-axis width
+        area = this%m_property(3) ! h    : local z-axis thickness and b>h
+        rho  = this%m_property(4) ! rho*b: density
+        zix  = this%m_property(6) ! Jt/b : St. Venant torsion constant, used for torsional stiffness G*Jt
+        ziy  = this%m_property(7) ! Iy/b : second moment of area about local y-axis
+        ziz  = this%m_property(8) ! Iz/b : second moment of area about local z-axis
         length  = this%len0
 
         this%m_masMat(1:12,1:12) = 0.0d0
         roal = rho*area*length/2.0d0
+        ! Translational lumped mass at node 0.
         this%m_masMat(1,1)     = roal
         this%m_masMat(2,2)     = roal
         this%m_masMat(3,3)     = roal
+
+        ! Rotary inertia per node.
+        ! The rotational inertia about the local beam axis uses the polar second
+        ! moment of area Ip = Iy + Iz, not the St. Venant torsion constant Jt.
+        ! For circular sections, Jt = Ip.
+        ! For rectangular sections, Jt generally differs from Ip, so (Iy + Iz) should be used here.
         this%m_masMat(4,4)     = roal*(ziy+ziz)/area
         this%m_masMat(5,5)     = roal*ziy/area
         this%m_masMat(6,6)     = roal*ziz/area
+
+        ! Lumped mass at node 1.
         this%m_masMat(7,7)     = this%m_masMat(1,1)
         this%m_masMat(8,8)     = this%m_masMat(2,2)
         this%m_masMat(9,9)     = this%m_masMat(3,3)
@@ -329,13 +342,16 @@ module BeamStructure
     end subroutine Segment_FormMassMatrix
 
     subroutine Segment_FormStiffMatrix(this)
-        ! ELeMent STiFfness for Timoshenko FRaMe
+        ! ELeMent STiFfness for 3D Timoshenko FRaMe
         ! calculates the element stiffness matrices.
         ! https://people.duke.edu/~hpgavin/cee421/frame-finite-def.pdf
         ! Henri Gavin, Department of Civil and Environmental Engineering, Duke University
         ! For Euler-Bernoulli :
         ! ISBN 9787040258417 Zeng Pan. P70
         ! ISBN 9780792312086 James F. Doyle. P81
+        !
+        ! The default shear correction factors ksy=ksz=5/6 are for rectangular sections.
+        ! Set phiy = phiz = 0 for Euler-Bernoulli beam behavior.
     
         implicit none
         class(Segment), intent(inout) :: this
@@ -346,23 +362,30 @@ module BeamStructure
         real(8):: ky1,ky2,ky3,ky4
         real(8):: kz1,kz2,kz3,kz4
     
-        emod = this%m_property(1)   ! E*b
-        gmod = this%m_property(2)   ! G*b
-        area = this%m_property(3)   ! h
-        zix  = this%m_property(6)   ! St. Venant torsion constant Jt/b
-        ziy  = this%m_property(7)   ! Iy/b
-        ziz  = this%m_property(8)   ! Iz/b
+                                    ! b     local y-axis width
+        emod = this%m_property(1)   ! E*b : Young's modulus E
+        gmod = this%m_property(2)   ! G*b : Shear modulus G
+        area = this%m_property(3)   ! h   : local z-axis thickness and b>h
+        zix  = this%m_property(6)   ! Jt/b: St. Venant torsion constant, used in torsional stiffness G*Jt/L.
+        ziy  = this%m_property(7)   ! Iy/b: second moment of area about local y-axis.
+        ziz  = this%m_property(8)   ! Iz/b: second moment of area about local z-axis.
+        ! Note that Jt is generally not equal to Iy+Iz except for circular sections.
+
         length = this%len0
     
         this%m_stfMat(1:12,1:12)=0.0d0
     
         Invlength = 1.0d0/length
     
-        ! shear correction factors
+        ! Shear correction factors; 5/6 is the rectangular-section default.
+        ! Replace with section-specific values, e.g. 6/7 for circular sections.
         ksy = 5.0d0/6.0d0
         ksz = 5.0d0/6.0d0
     
         ! Timoshenko shear parameters
+        ! v-theta_z plane: bending about local z, uses Iz and ksy.
+        ! w-theta_y plane: bending about local y, uses Iy and ksz.
+        ! For an Euler-Bernoulli beam, set phiy = phiz = 0.0d0.
         phiy = 12.0d0*emod*ziz/(ksy*gmod*area*length*length)
         phiz = 12.0d0*emod*ziy/(ksz*gmod*area*length*length)
     
@@ -435,12 +458,14 @@ module BeamStructure
     end subroutine Segment_FormStiffMatrix
 
     subroutine Segment_FormGeomMatrix(this)
-        ! ELeMent GEOMetric stiffness matrix for Timoshenko FRaMe
+        ! ELeMent GEOMetric stiffness matrix for 3D Timoshenko FRaMe
         ! https://people.duke.edu/~hpgavin/cee421/frame-finite-def.pdf
         ! Henri Gavin, Department of Civil and Environmental Engineering, Duke University
         ! For Euler-Bernoulli :
         ! ISBN 9781441929105 James F. Doyle. P217,228,229,405
         ! ISBN 9780792312086 James F. Doyle. P129,424
+        !
+        ! Uses the same section convention and shear parameters as Segment_FormStiffMatrix.
         !
         ! DOF order:
         ! [u1,v1,w1,tx1,ty1,tz1,u2,v2,w2,tx2,ty2,tz2]
@@ -455,35 +480,35 @@ module BeamStructure
         real(8):: gt
     
         s = this%geoFRM
-    
-        emod = this%m_property(1)
-        gmod = this%m_property(2)
-        area = this%m_property(3)
-    
-        ! zix = Jt, St. Venant torsion constant
-        ! ziy = Iy
-        ! ziz = Iz
-        zix  = this%m_property(6)
-        ziy  = this%m_property(7)
-        ziz  = this%m_property(8)
-    
+
+                                    ! b     local y-axis width
+        emod = this%m_property(1)   ! E*b : Young's modulus E
+        gmod = this%m_property(2)   ! G*b : Shear modulus G
+        area = this%m_property(3)   ! h   : local z-axis thickness and b>h
+        zix  = this%m_property(6)   ! Jt/b: St. Venant torsion constant, used in torsional stiffness G*Jt/L.
+        ziy  = this%m_property(7)   ! Iy/b: second moment of area about local y-axis.
+        ziz  = this%m_property(8)   ! Iz/b: second moment of area about local z-axis.
+        ! Note that Jt is generally not equal to Iy+Iz except for circular sections.
+
         length = this%len0
     
         ! initialize all geometric stiffness terms to zero
         this%m_geoMat(1:12,1:12) = 0.0d0
     
-        ! shear correction factors
+        ! Shear correction factors; 5/6 is the rectangular-section default.
+        ! Replace with section-specific values, e.g. 6/7 for circular sections.
         ksy = 5.0d0/6.0d0
         ksz = 5.0d0/6.0d0
     
         ! Timoshenko shear parameters
-        ! v-tz plane bends about local z, uses Iz
-        ! w-ty plane bends about local y, uses Iy
+        ! v-theta_z plane: bending about local z, uses Iz and ksy.
+        ! w-theta_y plane: bending about local y, uses Iy and ksz.
+        ! For an Euler-Bernoulli beam, set phiy = phiz = 0.0d0.
         phiy = 12.0d0*emod*ziz/(ksy*gmod*area*length*length)
         phiz = 12.0d0*emod*ziy/(ksz*gmod*area*length*length)
     
         ! ------------------------------------------------------------
-        ! v - theta_z plane, DOFs 2,6,8,12
+        ! v-theta_z plane, DOFs 2,6,8,12
         ! ------------------------------------------------------------
         gy1 = s/length * (6.0d0/5.0d0 + 2.0d0*phiy + phiy*phiy) / (1.0d0 + phiy)**2
         gy2 = s/length * (length/10.0d0) / (1.0d0 + phiy)**2
@@ -503,7 +528,7 @@ module BeamStructure
         this%m_geoMat(8,12)  = -gy2
     
         ! ------------------------------------------------------------
-        ! w - theta_y plane, DOFs 3,5,9,11
+        ! w-theta_y plane, DOFs 3,5,9,11
         ! sign convention follows your elastic stiffness matrix
         ! ------------------------------------------------------------
         gz1 = s/length * (6.0d0/5.0d0 + 2.0d0*phiz + phiz*phiz) / (1.0d0 + phiz)**2
@@ -653,7 +678,8 @@ module BeamStructure
     subroutine Segment_RKR(this,ek)
         implicit none
         class(Segment), intent(inout) :: this
-        real(8):: r(3,3),rt(3,3),ktemp(12,12),ek(12,12)
+        real(8), intent(inout) :: ek(12,12)
+        real(8):: r(3,3),rt(3,3),ktemp(12,12)
         integer:: i,j,k,j1,j2,ii,jj,in,jn
         r = 0.0d0
         r = this%m_rotMat
@@ -667,10 +693,10 @@ module BeamStructure
         !
         do  i=0,3
         do  j=0,3
+            j1=i*3
+            j2=j*3
             do    k=1,3
             do    ii=1,3
-                j1=i*3
-                j2=j*3
                 ktemp(j1+k,j2+ii)=0.0d0
                 do     jj=1,3
                 ktemp(j1+k,j2+ii)=ktemp(j1+k,j2+ii)+ek(j1+k,j2+jj)*r(jj,ii)
@@ -1079,11 +1105,11 @@ module BeamStructure
         coordsOut(10:12) = AoA
     end subroutine Segment_MapReferenceToCurrent
 
-end module BeamStructure
+end module SegmentStructure
 
 
 module SolidSolver
-    use BeamStructure
+    use SegmentStructure
     implicit none
     private
     integer, parameter:: m_idat=12
@@ -1341,8 +1367,8 @@ module SolidSolver
         this%TTT00(2,2)=1.0d0
         this%TTT00(3,3)=1.0d0
 
-        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3)*time
-        this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
+        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3)*time
+        this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*time+this%AoAPhi(1:3))
 
         call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))
         call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
@@ -1357,9 +1383,9 @@ module SolidSolver
         call this%InitPosDspVelAcc()
         
         if(this%iBodyModel.eq.1)then
-            this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) !time=0
+            this%UVW(1:3) =-2.0d0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) !time=0
             !rotational velocity
-            this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*time+this%AoAPhi(1:3))
+            this%WWW1(1:3)=-2.0d0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*time+this%AoAPhi(1:3))
             this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
                             this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
                             this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
@@ -1471,10 +1497,10 @@ module SolidSolver
 
     this%St = Lref * this%Freq / Uref
     ! angle to radian
-    this%AoAo(1:3)=this%AoAo(1:3)/180.0*m_pi
-    this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0*m_pi
-    this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0*m_pi
-    this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0*m_pi
+    this%AoAo(1:3)=this%AoAo(1:3)/180.0d0*m_pi
+    this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0d0*m_pi
+    this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0d0*m_pi
+    this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0d0*m_pi
     xmax = maxval([(dabs(this%m_elements(i)%x00(1)), dabs(this%m_elements(i)%x00(7)), i=1,this%nEL)])
     ymax = maxval([(dabs(this%m_elements(i)%x00(2)), dabs(this%m_elements(i)%x00(8)), i=1,this%nEL)])
     zmax = maxval([(dabs(this%m_elements(i)%x00(3)), dabs(this%m_elements(i)%x00(9)), i=1,this%nEL)])
@@ -1487,7 +1513,22 @@ module SolidSolver
                 2.0d0*m_pi*maxval(dabs(this%XYZAmpl(1:3)))*this%Freq, &
                 2.0d0*m_pi*maxval(dabs(this%AoAAmpl(1:3))*rRot(1:3))*this%Freq ])
 
-    ! property data will use the parameters read from the file if isKB != 0 or 1
+    ! Effective section-property convention used by the beam element.
+    ! For the automatically generated plate-reduced model:
+    ! len = b     : local y-axis (spanwise) width
+    ! 1 E*b       : E is Young'smodulus (plus b for width weighted)
+    ! 2 G*b       : G is shear modulus (plus b for width weighted)
+    ! 3 h         : h is local z-axis thickness and b>h
+    ! 4 rho*b     : rho is density (plus b for width weighted)
+    ! 5 gamma     : self-rotation angle in degree (no use)
+    ! 6 Jt/b      : Jt is Saint-Venant torsion constant for local x-axis (divide b for per unit width)
+    ! 7 Iy/b      : Iy is moment of inertia for local y-axis (divide b for per unit width)
+    ! 8 Iz/b      : Iz is moment of inertia for local z-axis (divide b for per unit width)
+
+    ! property data will use the parameters read from the file if isKB != 0 or 1.
+    ! Standard beam-section inputs (E, G, A, rho, Jt, Iy, Iz) are also valid,
+    ! provided that EA, GJt, EIy, EIz, and rho*A are formed consistently.
+
     ! calculate material parameters
     if(m_isKB==0)then
         do i = 1, this%nEL
@@ -1502,8 +1543,9 @@ module SolidSolver
             this%m_elements(i)%m_property(7) = this%m_elements(i)%m_property(3)**3/12.0d0
             this%m_elements(i)%m_property(8) = this%m_elements(i)%m_property(3)*len**2/12.0d0
         enddo
-        this%KB=this%m_elements(1)%m_property(1)*this%m_elements(i)%m_property(7)/(denIn*Uref**2*Lref**3*len)
-        this%KS=this%m_elements(1)%m_property(1)*this%m_elements(i)%m_property(3)/(denIn*Uref**2*Lref*len)
+        len = this%m_elements(1)%spanlen
+        this%KB=this%m_elements(1)%m_property(1)*this%m_elements(1)%m_property(7)/(denIn*Uref**2*Lref**3*len)
+        this%KS=this%m_elements(1)%m_property(1)*this%m_elements(1)%m_property(3)/(denIn*Uref**2*Lref*len)
     endif
 
     if(m_isKB==1)then
@@ -1518,21 +1560,11 @@ module SolidSolver
             this%m_elements(i)%m_property(7) = this%m_elements(i)%m_property(3)**3/12.0d0
             this%m_elements(i)%m_property(8) = this%m_elements(i)%m_property(3)*len**2/12.0d0
         enddo
+        len = this%m_elements(1)%spanlen
         this%EmR = this%m_elements(1)%m_property(1)/(denIn*Uref**2*len)
         this%tcR = this%m_elements(1)%m_property(3)/(Lref*len)
         nLthck=this%m_elements(1)%m_property(3)
     endif
-
-    ! property
-    ! len b     b is y-direction width
-    ! 1 E*b     E is Young'smodulus
-    ! 2 G*b     G is shear modulus
-    ! 3 h       h is z-direction thick and b>h
-    ! 4 rho*b   rho is density
-    ! 5 gamma   self-rotation angle in degree (no use)
-    ! 6 Jt/b    Jt is Saint-Venant torsion constant for x-direction
-    ! 7 Iy/b    Iy is moment of inertia for y-direction
-    ! 8 Iz/b    Iz is moment of inertia for z-direction
 
     end subroutine Beam_calculate_angle_material
 
@@ -1748,9 +1780,9 @@ module SolidSolver
                 !prescribed motion
                 !------------------------------------------------------
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+isubstep*subdeltat)
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+dble(isubstep)*subdeltat)
                 !rotational displacement
-                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
@@ -1763,9 +1795,9 @@ module SolidSolver
                 enddo
                 !------------------------------------------------------
                 !translational velocity
-                this%UVW(1:3) =-2.0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3)
+                this%UVW(1:3) =-2.0d0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3)
                 !rotational velocity
-                this%WWW1(1:3)=-2.0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                this%WWW1(1:3)=-2.0d0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%AoAPhi(1:3))
                 this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
                                 this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)), &
                                 this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))]
@@ -1775,9 +1807,9 @@ module SolidSolver
                 !-------------------------------------------------------
             elseif(this%iBodyModel.eq.2)then !elastic model
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+isubstep*subdeltat)
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+dble(isubstep)*subdeltat)
                 !rotational displacement
-                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0*m_pi*this%Freq*(time-deltat+isubstep*subdeltat)+this%AoAPhi(1:3))
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
@@ -2031,5 +2063,75 @@ module SolidSolver
             write(fileUnit,'(A,1X,A,1X,A,1X,ES24.16)') 'FIELDSTAT', trim(groupName), 'Linfinity ' // trim(dofName(i)), linfty(i)
         enddo
     end subroutine Beam_ReportDispGroup
+
+    subroutine AoAtoTTT(AoA,TTT)
+        implicit none
+        real(8), parameter:: pi=3.141562653589793d0,eps=1.0d-5
+        real(8)::AoA(3),TTT(3,3),rrx(3,3),rry(3,3),rrz(3,3),vcos,vsin
+        TTT(:,:)=0.0d0
+        TTT(1,1)=1.0d0
+        TTT(2,2)=1.0d0
+        TTT(3,3)=1.0d0
+    
+        vcos=dcos(AoA(1))
+        vsin=dsin(AoA(1))
+        if(dabs(AoA(1))<eps)then
+        vcos=1.0d0
+        vsin=0.0d0
+        endif
+        if(dabs(AoA(1)-0.5d0*pi)<eps)then
+        vcos=0.0d0
+        vsin=1.0d0
+        endif
+        if(dabs(AoA(1)+0.5d0*pi)<eps)then
+        vcos=0.0d0
+        vsin=-1.0d0
+        endif
+    
+        rrx(1:3,1:3)=reshape([  1.0d0,0.0d0,0.0d0,  &
+                                0.0d0,vcos,vsin, &
+                                0.0d0,-vsin,vcos],[3,3])
+        vcos=dcos(AoA(2))
+        vsin=dsin(AoA(2))
+        if(dabs(AoA(2))<eps)then
+        vcos=1.0d0
+        vsin=0.0d0
+        endif
+        if(dabs(AoA(2)-0.5d0*pi)<eps)then
+        vcos=0.0d0
+        vsin=1.0d0
+        endif
+        if(dabs(AoA(2)+0.5d0*pi)<eps)then
+        vcos=0.0d0
+        vsin=-1.0d0
+        endif
+    
+        rry(1:3,1:3)=reshape([  vcos,0.0d0,-vsin,  &
+                                0.0d0,1.0d0,0.0d0, &
+                               vsin,0.0d0,vcos],[3,3])
+    
+        vcos=dcos(AoA(3))
+        vsin=dsin(AoA(3))
+        if(dabs(AoA(3))<eps)then
+        vcos=1.0d0
+        vsin=0.0d0
+        endif
+        if(dabs(AoA(3)-0.5d0*pi)<eps)then
+        vcos=0.0d0
+        vsin=1.0d0
+        endif
+        if(dabs(AoA(3)+0.5d0*pi)<eps)then
+        vcos=0.0d0
+        vsin=-1.0d0
+        endif
+    
+        rrz(1:3,1:3)=reshape([ vcos,vsin,0.0d0, &
+                              -vsin,vcos,0.0d0, &
+                               0.0d0,0.0d0,1.0d0],[3,3])
+        TTT=matmul(rrz,TTT)
+        TTT=matmul(rry,TTT)
+        TTT=matmul(rrx,TTT)
+    
+    end subroutine
 
 end module SolidSolver

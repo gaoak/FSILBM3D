@@ -1,4 +1,4 @@
-    subroutine cptArea(areaElem,nND,nEL,ele,xyzful)
+    SUBROUTINE cptArea(areaElem,nND,nEL,ele,xyzful)
     implicit none
     integer:: nND,nEL,ele(nEL,5)
     real(8):: areaElem(nEL),xyzful(nND,6)
@@ -35,79 +35,7 @@
         endif
 
     enddo
-    endsubroutine
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!
-!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine AoAtoTTT(AoA,TTT)
-    implicit none
-    real(8), parameter:: pi=3.141562653589793d0,eps=1.0d-5
-    real(8)::AoA(3),TTT(3,3),rrx(3,3),rry(3,3),rrz(3,3),vcos,vsin
-    TTT(:,:)=0.0d0
-    TTT(1,1)=1.0d0
-    TTT(2,2)=1.0d0
-    TTT(3,3)=1.0d0
-
-    vcos=dcos(AoA(1))
-    vsin=dsin(AoA(1))
-    if(dabs(AoA(1))<eps)then
-    vcos=1.0d0
-    vsin=0.0d0
-    endif
-    if(dabs(AoA(1)-0.5d0*pi)<eps)then
-    vcos=0.0d0
-    vsin=1.0d0
-    endif
-    if(dabs(AoA(1)+0.5d0*pi)<eps)then
-    vcos=0.0d0
-    vsin=-1.0d0
-    endif
-
-    rrx(1:3,1:3)=reshape([  1.0d0,0.0d0,0.0d0,  &
-                            0.0d0,vcos,vsin, &
-                            0.0d0,-vsin,vcos],[3,3])
-    vcos=dcos(AoA(2))
-    vsin=dsin(AoA(2))
-    if(dabs(AoA(2))<eps)then
-    vcos=1.0d0
-    vsin=0.0d0
-    endif
-    if(dabs(AoA(2)-0.5d0*pi)<eps)then
-    vcos=0.0d0
-    vsin=1.0d0
-    endif
-    if(dabs(AoA(2)+0.5d0*pi)<eps)then
-    vcos=0.0d0
-    vsin=-1.0d0
-    endif
-
-    rry(1:3,1:3)=reshape([  vcos,0.0d0,-vsin,  &
-                            0.0d0,1.0d0,0.0d0, &
-                           vsin,0.0d0,vcos],[3,3])
-
-    vcos=dcos(AoA(3))
-    vsin=dsin(AoA(3))
-    if(dabs(AoA(3))<eps)then
-    vcos=1.0d0
-    vsin=0.0d0
-    endif
-    if(dabs(AoA(3)-0.5d0*pi)<eps)then
-    vcos=0.0d0
-    vsin=1.0d0
-    endif
-    if(dabs(AoA(3)+0.5d0*pi)<eps)then
-    vcos=0.0d0
-    vsin=-1.0d0
-    endif
-
-    rrz(1:3,1:3)=reshape([ vcos,vsin,0.0d0, &
-                          -vsin,vcos,0.0d0, &
-                           0.0d0,0.0d0,1.0d0],[3,3])
-    TTT=matmul(rrz,TTT)
-    TTT=matmul(rry,TTT)
-    TTT=matmul(rrx,TTT)
-
-    end subroutine
+    END SUBROUTINE
 
     ! get the time right now
     SUBROUTINE get_now_time(now_time) 

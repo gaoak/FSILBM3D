@@ -2008,78 +2008,43 @@ module FluidDomain
         enddo
     end subroutine
     
-    SUBROUTINE write_fluid_flux(time)
-        ! Only (1) one root block or (2) multiple stacked sub-blocks can be calculated correctly
-        ! This flux diagnostic is valid only for a single root block or for multiple blocks stacked only in the y direction.
+    subroutine write_fluid_flux(root,time)
+        ! Flux diagnostic for a single selected root block.
+        ! Computes inlet, mid-plane, and outlet x-fluxes.
         implicit none
-        integer:: i,j,k,xDim_,yDim_,zDim_,iblock
-        real(8):: time,dh_
-        real(8),allocatable:: velocityIn(:,:,:,:),density(:,:,:)
-        real(8):: fluxIn,fluxMid,fluxOut,fluxAll,wx,wy,wz,Xref,Yref,Zref
-        ! write fluid flux
-        fluxIn  = 0.d0
-        fluxMid = 0.d0
-        fluxOut = 0.d0
-        fluxAll = 0.d0
-        Xref = 0.d0
-        Yref = 0.d0
-        Zref = 0.d0
-        do iblock = 1,m_nblocks
-            if ( (LBMblks(iblock)%BndConds(1) .ne. BCfluid)        .and. &
-                 (LBMblks(iblock)%BndConds(1) .ne. BCfluid_father) .and. &
-                 (LBMblks(iblock)%BndConds(2) .ne. BCfluid)        .and. &
-                 (LBMblks(iblock)%BndConds(2) .ne. BCfluid_father) ) then
-                dh_=LBMblks(iblock)%dh
-                xDim_=LBMblks(iblock)%xDim
-                yDim_=LBMblks(iblock)%yDim
-                zDim_=LBMblks(iblock)%zDim
-                allocate(velocityIn(zDim_,yDim_,xDim_,1:3),density(zDim_,yDim_,xDim_))
-                velocityIn=LBMblks(iblock)%uuu
-                density=LBMblks(iblock)%den
-                do k = 1, zDim_
-                    if (k .eq. 1 .or. k .eq. zDim_) then
-                        wz = 0.5d0
-                    else
-                        wz = 1.0d0
-                    endif
-    
-                    do j = 1, yDim_
-                        if (j .eq. 1 .or. j .eq. yDim_) then
-                            wy = 0.5d0
-                        else
-                            wy = 1.0d0
-                        endif
-    
-                        fluxIn  = fluxIn  + velocityIn(k,j,1,1)             * density(k,j,1)             * dh_ * dh_ * wy * wz
-                        fluxMid = fluxMid + velocityIn(k,j,int(xDim_/2),1)  * density(k,j,int(xDim_/2))  * dh_ * dh_ * wy * wz
-                        fluxOut = fluxOut + velocityIn(k,j,xDim_,1)         * density(k,j,xDim_)         * dh_ * dh_ * wy * wz
-    
-                        do i = 1, xDim_
-                            if (i .eq. 1 .or. i .eq. xDim_) then
-                                wx = 0.5d0
-                            else
-                                wx = 1.0d0
-                            endif
-                            fluxAll = fluxAll + velocityIn(k,j,i,1) * density(k,j,i) * dh_ * dh_ * dh_ * wx * wy * wz
-                        enddo
-                    enddo
+        integer, intent(in) :: root
+        real(8), intent(in) :: time
+        integer :: j, k, ixMid
+        real(8) :: dh, fluxIn, fluxMid, fluxOut
+        real(8) :: wy, wz, Yref, Zref
+        associate(b => LBMblks(root))
+            dh = b%dh
+            ixMid = (b%xDim + 1) / 2
+            fluxIn  = 0.0d0
+            fluxMid = 0.0d0
+            fluxOut = 0.0d0
+            do k = 1, b%zDim
+                wz = 1.0d0
+                if (k .eq. 1 .or. k .eq. b%zDim) wz = 0.5d0
+                do j = 1, b%yDim
+                    wy = 1.0d0
+                    if (j .eq. 1 .or. j .eq. b%yDim) wy = 0.5d0
+                    fluxIn  = fluxIn  + b%uuu(k,j,1,1)      * b%den(k,j,1)      * dh*dh * wy*wz
+                    fluxMid = fluxMid + b%uuu(k,j,ixMid,1)  * b%den(k,j,ixMid)  * dh*dh * wy*wz
+                    fluxOut = fluxOut + b%uuu(k,j,b%xDim,1) * b%den(k,j,b%xDim) * dh*dh * wy*wz
                 enddo
-                deallocate(velocityIn,density)
-                if (Xref.lt.(LBMblks(iblock)%xmax-LBMblks(iblock)%xmin)) Xref=LBMblks(iblock)%xmax-LBMblks(iblock)%xmin
-                Yref=Yref+LBMblks(iblock)%ymax-LBMblks(iblock)%ymin
-                 ! Only (1) one root block or (2) multiple stacked sub-blocks can be calculated correctly
-                if (Zref.lt.(LBMblks(iblock)%zmax-LBMblks(iblock)%zmin)) Zref=LBMblks(iblock)%zmax-LBMblks(iblock)%zmin
-    
-            endif
-        enddo
-    
+            enddo
+            Yref = b%ymax - b%ymin
+            Zref = b%zmax - b%zmin
+        end associate
+
         open(111,file='./DatInfo/FluidFlux.dat',position='append')
-        write(111,'(5E20.10)') time/flow%Tref, &
+        write(111,'(4E20.10)') time/flow%Tref, &
                                 fluxIn  /(flow%denIn*flow%Uref*Zref*Yref), &
                                 fluxMid /(flow%denIn*flow%Uref*Zref*Yref), &
-                                fluxOut /(flow%denIn*flow%Uref*Zref*Yref), &
-                                fluxAll /(flow%denIn*flow%Uref*Zref*Yref*Xref)
+                                fluxOut /(flow%denIn*flow%Uref*Zref*Yref)
         close(111)
-        END SUBROUTINE
+    
+    end subroutine
     
 end module FluidDomain

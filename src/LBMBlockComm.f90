@@ -516,7 +516,7 @@ module LBMBlockComm
                     r(bc_pair) = 0
                 endif
             enddo
-            flag =  abs(LBMblks(p%fatherId)%dh - LBMblks(p%sonId)%dh*m_gridDelta).gt.1d-8 .or. &
+            flag =  abs(LBMblks(p%fatherId)%dh - LBMblks(p%sonId)%dh*dble(m_gridDelta)).gt.1d-8 .or. &
                     mod(LBMblks(p%sonId)%xDim,m_gridDelta) .ne. r(1) .or. &
                     mod(LBMblks(p%sonId)%yDim,m_gridDelta) .ne. r(2) .or. &
                     mod(LBMblks(p%sonId)%zDim,m_gridDelta) .ne. r(3)
