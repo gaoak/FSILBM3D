@@ -349,7 +349,7 @@ $PBS_WDIR/$PBS_ENAME
 3. *DatFlow*      : Floder of flow field results
 4. *DatInfo*      : Floder of force and power *et. al.* results
 5. *DatContinue*  : Floder of record file for continue calculating
-6. *Check.dat*    : Parameters record file for checking
+6. *check.dat*    : Parameters record file for checking
 
 - **Files in DatInfo description**
 
