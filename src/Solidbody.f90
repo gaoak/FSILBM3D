@@ -14,9 +14,9 @@ module SolidBody
     ! ntolLBM maximum number of iterations for IB force calculation
     ! dtolIBM   tolerance for IB force calculation
     ! Pbeta     coefficient in penalty force calculation
-    public :: VBodies,read_solid_files,allocate_solid_memory,Initialise_solid_bodies,Write_solid_v_bodies,FSInteraction_force, &
-              Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field,Write_solid_Check, write_solid_Information, &
-              calculate_reference_params,set_solidbody_parameters
+    public :: VBodies,read_solid_files,allocate_solid_memory,Initialise_solid_bodies,Write_solid_v_bodies,Write_solid_v_forces, &
+              FSInteraction_force,Calculate_Solid_params,Solver,Write_solid_cont,Read_solid_cont,write_solid_field, &
+              Write_solid_Check, write_solid_Information,calculate_reference_params,set_solidbody_parameters
     type :: VirtualBody
         type(BeamSolver):: rbm
         ! vitural body in which fluid ID
@@ -52,6 +52,8 @@ module SolidBody
         procedure :: SurfaceBuildPosVelArea => SurfaceBuildPosVelArea_
         procedure :: SurfaceUpdatePosVel => SurfaceUpdatePosVel_
         procedure :: Write_body => Write_body_
+        procedure :: Write_force => Write_force_
+        procedure :: Write_moment => Write_moment_
         procedure :: PlateWrite_body => PlateWrite_body_
         procedure :: SurfaceWrite_body => SurfaceWrite_body_
         procedure :: UpdateElmtInterp => UpdateElmtInterp_
@@ -402,17 +404,43 @@ module SolidBody
         !write time titles
         write(fileName,'(I10)') nint(time/m_Tref*1d5)
         fileName = adjustr(fileName)
-        do  i=1,nameLen
+        do i=1,nameLen
             if(fileName(i:i)==' ')fileName(i:i)='0'
         enddo
-        open(idfile, FILE='./DatBodySpan/BodiesVirtual_'//trim(filename)//'.dat')
-        write(idfile, '(A)') 'VARIABLES = "x" "y" "z"'
+        open(idfile, FILE='./DatBodySpan/BodiesVirtual_'//trim(fileName)//'.dat')
+        write(idfile,'(A)') 'TITLE = "ASCII File."'
+        write(idfile,'(A)') 'VARIABLES = "x" "y" "z"'
         !write fake solids
         do iFish = 1,m_nFish
             call VBodies(iFish)%Write_body(iFish,time,idfile)
         enddo
         close(idfile)
     end subroutine Write_solid_v_bodies
+
+    !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !    write virtual-body force field, tecplot ASCII format
+    !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    subroutine Write_solid_v_forces(time)
+        implicit none
+        real(8),intent(in) :: time
+        integer :: i, iFish
+        integer,parameter :: nameLen=10, idfile=101
+        character(LEN=nameLen) :: fileName
+        ! write time titles
+        write(fileName,'(I10)') nint(time/m_Tref*1d5)
+        fileName = adjustr(fileName)
+        do i=1,nameLen
+            if(fileName(i:i)==' ')fileName(i:i)='0'
+        enddo
+        open(idfile, FILE='./DatBodySpan/ForcesVirtual_'//trim(fileName)//'.dat')
+        write(idfile,'(A)') 'TITLE = "ASCII File."'
+        write(idfile,'(A)') 'VARIABLES = "x" "y" "z" "fx" "fy" "fz" "Mx" "My" "Mz"'
+        !write fake solid force
+        do iFish = 1, m_nFish
+            call VBodies(iFish)%Write_force(iFish, idfile)
+        enddo
+        close(idfile)
+    end subroutine Write_solid_v_forces
 
 !    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !    write check point file for restarting simulation
@@ -514,6 +542,9 @@ module SolidBody
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
+            open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_moment.dat',position='append')
+            write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
+            close(idfile)
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
@@ -544,6 +575,7 @@ module SolidBody
             do iFish=order1,order2
                 call VBodies(iFish)%rbm%write_solid_info(groupNum,m_XYZo(1:3,iFish),m_Lref,m_Uref,m_Aref,m_Fref,m_Pref,m_Eref)
                 call VBodies(iFish)%rbm%write_solid_probes(groupNum,m_XYZo(1:3,iFish),solidProbingNum,solidProbingNode(1:solidProbingNum),m_Lref,m_Uref,m_Aref)
+                call VBodies(iFish)%Write_moment(groupNum, m_XYZo(1:3,iFish), m_Lref, m_Fref)
             enddo
         enddo
     end subroutine
@@ -1200,6 +1232,69 @@ module SolidBody
         end subroutine write_section
     
     end subroutine PlateWrite_body_
+    
+    subroutine Write_force_(this,iFish,idfile)
+        implicit none
+        class(VirtualBody), intent(inout) :: this
+        integer,intent(in) :: iFish, idfile
+        integer :: i
+        integer,parameter :: nameLen=10
+        character(LEN=nameLen) :: idstr
+        real(8) :: xyz(3), xyz0(3), rxyz(3)
+        real(8) :: forceElem(3), momentElem(3), invLFref
+
+        write(idstr,'(I3.3)') iFish ! assume iFish < 1000
+        ! One zone for each fish at the current output time.
+        write(idfile,'(A,A,A,I8,A)') 'ZONE    T = "fish', trim(idstr), '" I = ', this%v_nelmts, ', DATAPACKING=POINT'
+        invLFref = 1.0d0 / (m_Lref*m_Fref)
+    
+        ! Moment reference point: current rigid-body reference point.
+        xyz0 = this%rbm%pos(1:3,1)
+    
+        do i = 1, this%v_nelmts
+            xyz = this%v_Exyz(1:3,i)
+            rxyz = xyz - xyz0
+    
+            forceElem = this%v_Eforce(1:3,i)
+    
+            momentElem(1) = rxyz(2)*forceElem(3) - rxyz(3)*forceElem(2)
+            momentElem(2) = rxyz(3)*forceElem(1) - rxyz(1)*forceElem(3)
+            momentElem(3) = rxyz(1)*forceElem(2) - rxyz(2)*forceElem(1)
+    
+            write(idfile,'(9E20.10)') xyz/m_Lref, forceElem/m_Fref, momentElem*invLFref
+        enddo
+    
+    end subroutine Write_force_
+
+    subroutine Write_moment_(this, groupNum, XYZo, Lref, Fref)
+        implicit none
+        class(VirtualBody), intent(inout) :: this
+        character(LEN=3), intent(in) :: groupNum
+        real(8), intent(in) :: XYZo(3), Lref, Fref
+        integer :: iEL
+        integer, parameter :: idfile = 102
+        real(8) :: xyz(3), xyz0(3), rxyz(3)
+        real(8) :: forceElem(3), momentSum(3), invLFref
+    
+        momentSum = 0.0d0
+        xyz0 = this%rbm%pos(1:3,1)
+        invLFref = 1.0d0 / (Lref * Fref)
+    
+        do iEL = 1, this%v_nelmts
+            xyz = this%v_Exyz(1:3,iEL)
+            rxyz = xyz - xyz0
+            forceElem = this%v_Eforce(1:3,iEL)
+    
+            momentSum(1) = momentSum(1) + rxyz(2)*forceElem(3) - rxyz(3)*forceElem(2)
+            momentSum(2) = momentSum(2) + rxyz(3)*forceElem(1) - rxyz(1)*forceElem(3)
+            momentSum(3) = momentSum(3) + rxyz(1)*forceElem(2) - rxyz(2)*forceElem(1)
+        enddo
+    
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_moment.dat',position='append')
+        write(idfile,'(6E20.10)') XYZo(1:3)/Lref, momentSum(1:3)*invLFref
+        close(idfile)
+    
+    end subroutine Write_moment_
     
     subroutine SurfaceWrite_body_(this,iFish,time,idfile)
         ! to do: generate a temporary mesh

@@ -78,6 +78,7 @@ PROGRAM main
     call write_flow_blocks(time)
     call write_solid_field(time)
     call Write_solid_v_bodies(time)
+    call Write_solid_v_forces(time)
     call get_now_time(time_end1)             !end time for the preparation before computing
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================='
@@ -115,6 +116,7 @@ PROGRAM main
             if(DABS(time/flow%Tref-flow%timeBodyDelta*dble(NINT(time/flow%Tref/flow%timeBodyDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
                 call write_solid_field(time)
                 call Write_solid_v_bodies(time)
+                call Write_solid_v_forces(time)
             endif
             if(DABS(time/flow%Tref-flow%timeFlowDelta*dble(NINT(time/flow%Tref/flow%timeFlowDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
                 call write_flow_blocks(time)
