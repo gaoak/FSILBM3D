@@ -286,13 +286,13 @@ $PBS_WDIR/$PBS_ENAME
 
   7. *nfishGroup* : Numbers of the solid bodies type
 
-  8. *isKB* :  Determining the kind of parameters of the flexible bodies 
+  8. *isKB* :  Determines the kind of parameters of the flexible bodies 
 
-     * 0 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic Time Ratio)
+     * 0 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic thickness ratio)
      * 1 : *KB, KS* (Bending Stiffness, Stretching Stiffness)
      * other values : read the section properties directly from the solid information file ***.dat**.
-       For standard beam inputs, use $E$, $G$, $A$, $\rho$, $J_t$, $I_y$, and $I_z$. 
-       For the automatically generated plate-reduced model, the effective inputs are 
+       For standard beam inputs, provide $E$, $G$, $A$, $\rho$, $\gamma$, $J_t$, $I_y$, and $I_z$, 
+       where $\gamma$ denotes the self-rotation angle in degrees and is currently unused.
 
   9. *fishnum  (fishGroup)* : The number of the solid bodies in the specific type
 

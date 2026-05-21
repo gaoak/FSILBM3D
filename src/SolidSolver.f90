@@ -307,12 +307,11 @@ module SegmentStructure
         real(8):: area,rho,zix,ziy,ziz,length
         real(8):: roal
 
-                                  ! b    : local y-axis width
-        area = this%m_property(3) ! h    : local z-axis thickness and b>h
-        rho  = this%m_property(4) ! rho*b: density
-        zix  = this%m_property(6) ! Jt/b : St. Venant torsion constant, used for torsional stiffness G*Jt
-        ziy  = this%m_property(7) ! Iy/b : second moment of area about local y-axis
-        ziz  = this%m_property(8) ! Iz/b : second moment of area about local z-axis
+        area = this%m_property(3) ! A    : cross-sectional area 
+        rho  = this%m_property(4) ! rho  : density
+        zix  = this%m_property(6) ! Jt   : St. Venant torsion constant, used in torsional stiffness G*Jt
+        ziy  = this%m_property(7) ! Iy   : second moment of area about local y-axis
+        ziz  = this%m_property(8) ! Iz   : second moment of area about local z-axis
         length  = this%len0
 
         this%m_masMat(1:12,1:12) = 0.0d0
@@ -362,13 +361,12 @@ module SegmentStructure
         real(8):: ky1,ky2,ky3,ky4
         real(8):: kz1,kz2,kz3,kz4
     
-                                    ! b     local y-axis width
-        emod = this%m_property(1)   ! E*b : Young's modulus E
-        gmod = this%m_property(2)   ! G*b : Shear modulus G
-        area = this%m_property(3)   ! h   : local z-axis thickness and b>h
-        zix  = this%m_property(6)   ! Jt/b: St. Venant torsion constant, used in torsional stiffness G*Jt/L.
-        ziy  = this%m_property(7)   ! Iy/b: second moment of area about local y-axis.
-        ziz  = this%m_property(8)   ! Iz/b: second moment of area about local z-axis.
+        emod = this%m_property(1)   ! E   : Young's modulus
+        gmod = this%m_property(2)   ! G   : Shear modulus
+        area = this%m_property(3)   ! A   : cross-sectional area
+        zix  = this%m_property(6)   ! Jt  : St. Venant torsion constant, used in torsional stiffness G*Jt
+        ziy  = this%m_property(7)   ! Iy  : second moment of area about local y-axis
+        ziz  = this%m_property(8)   ! Iz  : second moment of area about local z-axis
         ! Note that Jt is generally not equal to Iy+Iz except for circular sections.
 
         length = this%len0
@@ -481,13 +479,12 @@ module SegmentStructure
     
         s = this%geoFRM
 
-                                    ! b     local y-axis width
-        emod = this%m_property(1)   ! E*b : Young's modulus E
-        gmod = this%m_property(2)   ! G*b : Shear modulus G
-        area = this%m_property(3)   ! h   : local z-axis thickness and b>h
-        zix  = this%m_property(6)   ! Jt/b: St. Venant torsion constant, used in torsional stiffness G*Jt/L.
-        ziy  = this%m_property(7)   ! Iy/b: second moment of area about local y-axis.
-        ziz  = this%m_property(8)   ! Iz/b: second moment of area about local z-axis.
+        emod = this%m_property(1)   ! E   : Young's modulus
+        gmod = this%m_property(2)   ! G   : Shear modulus
+        area = this%m_property(3)   ! A   : cross-sectional area
+        zix  = this%m_property(6)   ! Jt  : St. Venant torsion constant, used in torsional stiffness G*Jt
+        ziy  = this%m_property(7)   ! Iy  : second moment of area about local y-axis
+        ziz  = this%m_property(8)   ! Iz  : second moment of area about local z-axis
         ! Note that Jt is generally not equal to Iy+Iz except for circular sections.
 
         length = this%len0
@@ -1513,57 +1510,58 @@ module SolidSolver
                 2.0d0*m_pi*maxval(dabs(this%XYZAmpl(1:3)))*this%Freq, &
                 2.0d0*m_pi*maxval(dabs(this%AoAAmpl(1:3))*rRot(1:3))*this%Freq ])
 
-    ! Effective section-property convention used by the beam element.
-    ! For the automatically generated plate-reduced model:
-    ! len = b     : local y-axis (spanwise) width
-    ! 1 E*b       : E is Young'smodulus (plus b for width weighted)
-    ! 2 G*b       : G is shear modulus (plus b for width weighted)
-    ! 3 h         : h is local z-axis thickness and b>h
-    ! 4 rho*b     : rho is density (plus b for width weighted)
-    ! 5 gamma     : self-rotation angle in degree (no use)
-    ! 6 Jt/b      : Jt is Saint-Venant torsion constant for local x-axis (divide b for per unit width)
-    ! 7 Iy/b      : Iy is moment of inertia for local y-axis (divide b for per unit width)
-    ! 8 Iz/b      : Iz is moment of inertia for local z-axis (divide b for per unit width)
+    ! Standard section-property convention used by the beam element:
+    ! len = b     : local y-axis spanwise width
+    ! nLthck = h  : local z-axis thickness, with b > h
+    ! 1 E         : Young's modulus
+    ! 2 G         : shear modulus
+    ! 3 A         : cross-sectional area
+    ! 4 rho       : density
+    ! 5 gamma     : self-rotation angle in degrees, unused
+    ! 6 Jt        : St. Venant torsion constant about local x-axis
+    ! 7 Iy        : second moment of area about local y-axis
+    ! 8 Iz        : second moment of area about local z-axis
+    !
+    ! For the automatically generated rectangular plate section:
+    ! A = b*h, Iy = b*h^3/12, Iz = h*b^3/12.
 
     ! property data will use the parameters read from the file if isKB != 0 or 1.
-    ! Standard beam-section inputs (E, G, A, rho, Jt, Iy, Iz) are also valid,
-    ! provided that EA, GJt, EIy, EIz, and rho*A are formed consistently.
-
     ! calculate material parameters
     if(m_isKB==0)then
         do i = 1, this%nEL
             len = this%m_elements(i)%spanlen
-            this%m_elements(i)%m_property(1) = (this%EmR*len)*denIn*Uref**2
-            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1)/2.0d0/(1.0d0+this%psR)
+            this%m_elements(i)%m_property(1) = this%EmR * denIn * Uref**2
+            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1) / (2.0d0*(1.0d0+this%psR))
             nLthck = (this%tcR*len)*Lref
-            this%m_elements(i)%m_property(3) = (this%tcR*len)*Lref
-            this%m_elements(i)%m_property(4) = (this%denR*len)*Lref*denIn/this%m_elements(i)%m_property(3)
-            ratio = this%m_elements(i)%m_property(3)/len
-            this%m_elements(i)%m_property(6) = this%m_elements(i)%m_property(3)**3/3.0d0*(1d0-0.63d0*ratio+0.052d0*(ratio)**5)
-            this%m_elements(i)%m_property(7) = this%m_elements(i)%m_property(3)**3/12.0d0
-            this%m_elements(i)%m_property(8) = this%m_elements(i)%m_property(3)*len**2/12.0d0
+            this%m_elements(i)%m_property(3) = len * nLthck
+            this%m_elements(i)%m_property(4) = this%denR*len*Lref*denIn / this%m_elements(i)%m_property(3)
+            ratio = nLthck/len
+            this%m_elements(i)%m_property(6) = len * nLthck**3/3.0d0 * (1d0-0.63d0*ratio+0.052d0*(ratio)**5)
+            this%m_elements(i)%m_property(7) = len * nLthck**3/12.0d0
+            this%m_elements(i)%m_property(8) = nLthck * len**3/12.0d0
         enddo
         len = this%m_elements(1)%spanlen
-        this%KB=this%m_elements(1)%m_property(1)*this%m_elements(1)%m_property(7)/(denIn*Uref**2*Lref**3*len)
-        this%KS=this%m_elements(1)%m_property(1)*this%m_elements(1)%m_property(3)/(denIn*Uref**2*Lref*len)
+        this%KB = this%m_elements(1)%m_property(1)*this%m_elements(1)%m_property(7) / (denIn*Uref**2*Lref**3*len)
+        this%KS = this%m_elements(1)%m_property(1)*this%m_elements(1)%m_property(3) / (denIn*Uref**2*Lref*len)
     endif
 
     if(m_isKB==1)then
         do i = 1, this%nEL
             len = this%m_elements(i)%spanlen
-            this%m_elements(i)%m_property(3) = dsqrt((this%KB*len)/(this%KS*len)*12.0d0)*Lref
-            this%m_elements(i)%m_property(4) = (this%denR*len)*Lref*denIn/this%m_elements(i)%m_property(3)
-            this%m_elements(i)%m_property(1) = (this%KS*len)*denIn*Uref**2*Lref/this%m_elements(i)%m_property(3)
-            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1)/2.0d0/(1.0d0+this%psR)
-            ratio = this%m_elements(i)%m_property(3)/len
-            this%m_elements(i)%m_property(6) = this%m_elements(i)%m_property(3)**3/3.0d0*(1d0-0.63d0*ratio+0.052d0*(ratio)**5)
-            this%m_elements(i)%m_property(7) = this%m_elements(i)%m_property(3)**3/12.0d0
-            this%m_elements(i)%m_property(8) = this%m_elements(i)%m_property(3)*len**2/12.0d0
+            nLthck =  dsqrt(this%KB/this%KS*12.0d0) * Lref
+            this%m_elements(i)%m_property(3) = len * nLthck
+            this%m_elements(i)%m_property(1) = this%KS * denIn * Uref**2 * Lref * len / this%m_elements(i)%m_property(3)
+            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1) / (2.0d0*(1.0d0+this%psR))
+            this%m_elements(i)%m_property(4) = this%denR*len*Lref*denIn / this%m_elements(i)%m_property(3)
+            ratio = nLthck / len
+            this%m_elements(i)%m_property(6) = len * nLthck**3/3.0d0 * (1.0d0 - 0.63d0*ratio + 0.052d0*ratio**5)
+            this%m_elements(i)%m_property(7) = len * nLthck**3/12.0d0
+            this%m_elements(i)%m_property(8) = nLthck * len**3/12.0d0
         enddo
         len = this%m_elements(1)%spanlen
-        this%EmR = this%m_elements(1)%m_property(1)/(denIn*Uref**2*len)
-        this%tcR = this%m_elements(1)%m_property(3)/(Lref*len)
-        nLthck=this%m_elements(1)%m_property(3)
+        nLthck = this%m_elements(1)%m_property(3) / len
+        this%EmR = this%m_elements(1)%m_property(1)/(denIn*Uref**2)
+        this%tcR = nLthck/(Lref*len)
     endif
 
     end subroutine Beam_calculate_angle_material
@@ -1669,14 +1667,14 @@ module SolidSolver
     integer,intent(in) :: fid
         write(IDstr,'(I4.4)') 1
         write(fid,'(A,A,A  )')'------------------------------- m_element( ',IDstr,' ) ------------------------------'
-        write(fid,'(A,E20.10 )')'E*b  =',this%m_elements(1)%m_property(1)
-        write(fid,'(A,E20.10 )')'G*b  =',this%m_elements(1)%m_property(2)
-        write(fid,'(A,E20.10 )')'h    =',this%m_elements(1)%m_property(3)
-        write(fid,'(A,E20.10 )')'rho*b=',this%m_elements(1)%m_property(4)
+        write(fid,'(A,E20.10 )')'E    =',this%m_elements(1)%m_property(1)
+        write(fid,'(A,E20.10 )')'G    =',this%m_elements(1)%m_property(2)
+        write(fid,'(A,E20.10 )')'A    =',this%m_elements(1)%m_property(3)
+        write(fid,'(A,E20.10 )')'rho  =',this%m_elements(1)%m_property(4)
         write(fid,'(A,E20.10 )')'gamma=',this%m_elements(1)%m_property(5)
-        write(fid,'(A,E20.10 )')'Jt/b =',this%m_elements(1)%m_property(6)
-        write(fid,'(A,E20.10 )')'Iy/b =',this%m_elements(1)%m_property(7)
-        write(fid,'(A,E20.10 )')'Iz/b =',this%m_elements(1)%m_property(8)
+        write(fid,'(A,E20.10 )')'Jt   =',this%m_elements(1)%m_property(6)
+        write(fid,'(A,E20.10 )')'Iy   =',this%m_elements(1)%m_property(7)
+        write(fid,'(A,E20.10 )')'Iz   =',this%m_elements(1)%m_property(8)
     end subroutine
 
     subroutine Beam_write_solid_info(this,groupNum,XYZo,Lref,Uref,Aref,Fref,Pref,Eref)
