@@ -1117,9 +1117,9 @@ module SolidBody
             write(fileiD,'(A)') 'Frame3D : point number, element number, material number'
             write(fileiD,'(3I5)') 2, 1, 1
             write(fileiD,'(A)') 'POINT'
-            write(fileiD,'(I5,8A22)') 2, 'X', 'Y', 'Z', 'Lspan', 'Rspan', 'dirX', 'dirY', 'dirZ'
+            write(fileiD,'(I5,8(1X,A20))') 2, 'X', 'Y', 'Z', 'Lspan', 'Rspan', 'dirX', 'dirY', 'dirZ'
             do i = 1, 2
-                write(fileiD,'(I5,8F22.18)') i, &
+                write(fileiD,'(I5,8(1X,F20.10))') i, &
                     Surfacetmpxyz(1,i), Surfacetmpxyz(2,i), Surfacetmpxyz(3,i), 1.0d0, 1.0d0, 0.0d0, 0.0d0, 1.0d0
             enddo
             write(fileiD,'(A)') 'ELEMENT'
