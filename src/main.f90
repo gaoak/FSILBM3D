@@ -13,7 +13,7 @@ PROGRAM main
     USE FluidDomain
     USE LBMBlockComm
     implicit none
-    character(LEN=40):: parameterFile='inFlow.dat',checkFile='check.dat'
+    character(LEN=40):: parameterFile='inFlow.dat',checkFile='Check.dat'
     integer:: step=0,start_ave
     real(8):: dt_fluid
     real(8):: time=0.0d0,start_time=0.0d0,g(3)=[0.0d0,0.0d0,0.0d0]
