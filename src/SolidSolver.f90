@@ -1228,22 +1228,22 @@ module SolidSolver
         open(unit=fileiD, file = filename )
             read(fileiD,*) buffer
             read(fileiD,*) this%nND, this%nEL, this%nMT
+            this%gEQ = this%nND * 6
+            allocate(this%vBC(1:this%gEQ))
+            ! load points data
+            allocate(xyz(1:8, 1:this%nND))
+            call Beam_ReadPoints()
+            ! load matieral data
+            ! property data will be overwritten if isKB = 0 or 1
+            allocate(material(1:8, 1:this%nMT))
+            call Beam_ReadMaterials()
+            ! load boundary condition
+            allocate(boundary(1:6, 1:this%nND))
+            call Beam_ReadBoundary()
+            ! load and build elements
+            allocate(this%m_elements(1:this%nEL))
+            call Beam_ReadBuildElements()
         close(fileiD)
-        this%gEQ = this%nND * 6
-        allocate(this%vBC(1:this%gEQ))
-        ! load points data
-        allocate(xyz(1:8, 1:this%nND))
-        call Beam_ReadPoints()
-        ! load matieral data
-        ! property data will be overwritten if isKB = 0 or 1
-        allocate(material(1:8, 1:this%nMT))
-        call Beam_ReadMaterials()
-        ! load boundary condition
-        allocate(boundary(1:6, 1:this%nND))
-        call Beam_ReadBoundary()
-        ! load and build elements
-        allocate(this%m_elements(1:this%nEL))
-        call Beam_ReadBuildElements()
         call Beam_cptAsfac()
         call Beam_adjustBC()
 
@@ -1251,74 +1251,69 @@ module SolidSolver
 
         subroutine Beam_ReadPoints()
             implicit none
-            integer :: tmpid, i
-
-            open(unit=fileiD, file = filename )
-                do i=1,10000
-                    read(fileiD,*) buffer
-                    buffer = trim(buffer)
-                    if(buffer(1:5) .eq. 'POINT') exit
-                enddo
-                read(fileiD,*) this%nND
-                do i = 1,this%nND
-                    read(fileiD,*) tmpid,xyz(1,i),xyz(2,i),xyz(3,i),xyz(4,i),xyz(5,i),xyz(6,i),xyz(7,i),xyz(8,i)
-                enddo
-            close(fileiD)
+            integer :: tmpid, i, nCheck
+            call FindSection('POINT')
+            read(fileiD,*) nCheck
+            if (nCheck /= this%nND) stop 'ERROR: POINT number inconsistent'
+            do i = 1,this%nND
+                read(fileiD,*) tmpid, xyz(1:8,i)
+            enddo
         end subroutine Beam_ReadPoints
 
         subroutine Beam_ReadMaterials()
             implicit none
-            integer :: tmpid, i
-
-            open(unit=fileiD, file = filename )
-                do i=1,10000
-                    read(fileiD,*) buffer
-                    buffer = trim(buffer)
-                    if(buffer(1:8) .eq. 'MATERIAL') exit
-                enddo
-                read(fileiD,*) this%nMT
-                do i = 1,this%nMT
-                    read(fileiD,*) tmpid, material(1:8,i)
-                enddo
-            close(fileiD)
+            integer :: tmpid, i, nCheck
+            call FindSection('MATERIAL')
+            read(fileiD,*) nCheck
+            if (nCheck /= this%nMT) stop 'ERROR: MATERIAL number inconsistent'
+            do i = 1,this%nMT
+                read(fileiD,*) tmpid, material(1:8,i)
+            enddo
         end subroutine Beam_ReadMaterials
 
         subroutine Beam_ReadBoundary()
             implicit none
-            integer :: tmpid, i
-
-            open(unit=fileiD, file = filename )
-                do i=1,10000
-                    read(fileiD,*) buffer
-                    buffer = trim(buffer)
-                    if(buffer(1:10) .eq. 'CONSTRAINT') exit
-                enddo
-                read(fileiD,*) this%nND
-                do i = 1,this%nND
-                    read(fileiD,*) tmpid, boundary(1:6,i)
-                enddo
-            close(fileiD)
+            integer :: tmpid, i, nCheck
+            call FindSection('CONSTRAINT')
+            read(fileiD,*) nCheck
+            if (nCheck /= this%nND) stop 'ERROR: CONSTRAINT number inconsistent'
+            do i = 1,this%nND
+                read(fileiD,*) tmpid, boundary(1:6,i)
+            enddo
         end subroutine Beam_ReadBoundary
 
         subroutine Beam_ReadBuildElements()
             implicit none
-            integer :: tmpid, n, i, j, k, imat, itype, Nspan
-
-            open(unit=fileiD, file = filename )
-                do n=1,10000
-                    read(fileiD,*) buffer
-                    buffer = trim(buffer)
-                    if(buffer(1:7).eq. 'ELEMENT') exit
-                enddo
-                read(fileiD,*) this%nEL
-                do n=1,this%nEL
-                    read(fileiD,*) tmpid, i, j, k, itype, imat, Nspan
-                    if(1.le.tmpid .and. tmpid.le.this%nEL) then
-                        call this%m_elements(tmpid)%Build(i, j, this%nND, itype, Nspan, xyz, material(1:8, imat), boundary)
-                    endif
-                enddo
-            close(fileiD)
+            integer :: tmpid, n, i, j, k, imat, itype, Nspan, nCheck
+            call FindSection('ELEMENT')
+            read(fileiD,*) nCheck
+            if (nCheck /= this%nEL) stop 'ERROR: ELEMENT number inconsistent'
+            do n=1,this%nEL
+                read(fileiD,*) tmpid, i, j, k, itype, imat, Nspan
+                if(1.le.tmpid .and. tmpid.le.this%nEL) then
+                    call this%m_elements(tmpid)%Build(i, j, this%nND, itype, Nspan, xyz, material(1:8, imat), boundary)
+                endif
+            enddo
         end subroutine Beam_ReadBuildElements
+
+        subroutine FindSection(sectionName)
+            implicit none
+            character(len=*), intent(in) :: sectionName
+            character(len=1000) :: line
+            integer :: ios
+        
+            rewind(fileiD)
+        
+            do
+                read(fileiD, *, iostat=ios) line
+                if (ios /= 0) exit
+        
+                if (trim(adjustl(line)) == trim(sectionName)) return
+            enddo
+        
+            write(*,*) 'ERROR: cannot find section ', trim(sectionName), ' in ', trim(filename)
+            stop
+        end subroutine FindSection
 
         subroutine Beam_cptAsfac()
             implicit none
@@ -1839,12 +1834,15 @@ module SolidSolver
     end subroutine Beam_UpdateNewmarkCoeffs
 
     subroutine Beam_Solver(this,iFish)
+        ! Nonlinear Algorithm: full Newton-Raphson method
+        ! ISBN 9781441929105 James F. Doyle. P354
         implicit none
         class(BeamSolver), intent(inout) :: this
         real(8) :: dspO(1:6, 1:this%nND), velO(1:6, 1:this%nND), accO(1:6, 1:this%nND)
         real(8) :: dspn(1:this%gEQ)
         integer :: iter, iFish
-        real(8) :: dnorm=1.0d0
+        real(8) :: dnorm
+        dnorm = 1.0d0
         ! solve the next dispalce, velocity and acceleration using CG method
         call this%InitDspVelAccATTimeT(dspO, velO, accO)
         do iter = 1, m_ntolFEM ! m_ntolFEM is maxNewtonRaphson
