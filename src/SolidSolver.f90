@@ -1896,39 +1896,61 @@ module SolidSolver
         ! https://www.detailedpedia.com/wiki-Conjugate_gradient_method
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8) :: x(1:this%gEQ), b(1:this%gEQ), r(1:this%gEQ), p(1:this%gEQ), Ap(1:this%gEQ),z(1:this%gEQ), M(1:this%gEQ)
-        integer :: iter, max_iter,i
-        double precision :: alpha, beta, rsold, rsnew, err
-        ! maximum iteration count.
+        real(8) :: x(1:this%gEQ), b(1:this%gEQ)
+        real(8) :: r(1:this%gEQ), p(1:this%gEQ), Ap(1:this%gEQ)
+        real(8) :: z(1:this%gEQ), M(1:this%gEQ)
+        integer :: iter, max_iter, i
+        real(8) :: alpha, beta, rsold, rsnew, err, pAp, residual_norm
+        ! maximum iteration count and tolerance
         max_iter = 10000
-        err = 1d-10
-        ! initialize the solution vector x to 0.
+        err = 1.0d-10
+        ! initial guess
         x(1:this%gEQ) = 0.0d0
-        ! initialize the residual vector. r = b - matmul(A, x)
+        ! initial residual: r = b - A*x
         call this%MatrixMultipy(x, Ap)
         r = b - Ap
+        ! diagonal preconditioner
         call this%preconditioned(M)
-        do i=1,this%gEQ
+        do i = 1, this%gEQ
             if (dabs(M(i)) .gt. 1.0d-30) then
                 M(i) = 1.0d0 / M(i)
             else
                 M(i) = 1.0d0
             endif
-            z(i)=M(i)*r(i)
+            z(i) = M(i) * r(i)
         enddo
+        residual_norm = dsqrt(dot_product(r, r))
+        if (residual_norm .le. err) return
         p = z
         rsold = dot_product(r, z)
+        if (dabs(rsold) .le. 1.0d-30) then
+            write(*,*) 'ERROR: CG solver breakdown: initial dot_product(r, z) is near zero.'
+            write(*,*) 'rsold = ', rsold, ' residual_norm = ', residual_norm
+            stop
+        endif
         do iter = 1, max_iter
             call this%MatrixMultipy(p, Ap)
-            alpha = rsold / dot_product(p, Ap)
+            pAp = dot_product(p, Ap)
+            if (dabs(pAp) .le. 1.0d-30) then
+                write(*,*) 'ERROR: CG solver breakdown: dot_product(p, Ap) is near zero.'
+                write(*,*) 'pAp = ', pAp, ' residual_norm = ', residual_norm
+                stop
+            endif
+            alpha = rsold / pAp
             x = x + alpha * p
             r = r - alpha * Ap
-            if(sqrt(dot_product(r, r)) < err) exit
-            do i=1,this%gEQ
-                z(i)=M(i)*r(i)
+            residual_norm = dsqrt(dot_product(r, r))
+            if (residual_norm .le. err) exit
+            do i = 1,this%gEQ
+                z(i) = M(i) * r(i)
             enddo
             rsnew = dot_product(r, z)
-            beta = rsnew/rsold
+            if (dabs(rsold) .le. 1.0d-30) then
+                write(*,*) 'ERROR: CG solver breakdown: rsold is near zero.'
+                write(*,*) 'rsold = ', rsold, ' residual_norm = ', residual_norm
+                stop
+            endif
+            beta = rsnew / rsold
             p = z + beta * p
             rsold = rsnew
         enddo
