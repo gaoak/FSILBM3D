@@ -13,19 +13,19 @@ PROGRAM main
     USE FluidDomain
     USE LBMBlockComm
     implicit none
-    character(LEN=40):: parameterFile='inFlow.dat',checkFile='check.dat'
+    character(LEN=40):: parameterFile='inFlow.dat',checkFile='Check.dat'
     integer:: step=0,start_ave
     real(8):: dt_fluid
-    real(8):: time=0.0d0,start_time=0.0d0,g(3)=[0,0,0]
+    real(8):: time=0.0d0,start_time=0.0d0,g(3)=[0.0d0,0.0d0,0.0d0]
     real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
     call read_flow_conditions(parameterFile)
-    call read_solid_files(parameterFile)
+    call read_solid_files(parameterFile,g)
     call read_fuild_blocks(parameterFile)
     call read_probe_params(parameterFile)
-    call bluid_block_tree()
+    call build_block_tree()
     !==================================================================================================
     ! Set parallel compute cores
     call omp_set_num_threads(flow%npsize)
@@ -40,7 +40,7 @@ PROGRAM main
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
     !==================================================================================================
     ! Initialization before simulation
-    call initialise_solid_bodies(0.d0, g)
+    call Initialise_solid_bodies(0.d0)
     call FindCarrierFluidBlock()
     call initialise_fuild_blocks(time)
     !==================================================================================================
@@ -78,6 +78,7 @@ PROGRAM main
     call write_flow_blocks(time)
     call write_solid_field(time)
     call Write_solid_v_bodies(time)
+    call Write_solid_v_forces(time)
     call get_now_time(time_end1)             !end time for the preparation before computing
     write(*,*)'Time for preparation before computing:', (time_end1 - time_begine1)
     write(*,'(A)') '========================================================='
@@ -107,24 +108,29 @@ PROGRAM main
         write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
-        if(DABS(time/flow%Tref-flow%timeContiDelta*NINT(time/flow%Tref/flow%timeContiDelta)) <= 0.5*dt_fluid/flow%Tref)then
+        if(DABS(time/flow%Tref-flow%timeContiDelta*dble(NINT(time/flow%Tref/flow%timeContiDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
             call write_continue_blocks(step,time / flow%Tref)   ! output dimensionless time
         endif
         ! write fluid and soild data
-        if((time/flow%Tref - flow%timeWriteBegin) >= -0.5*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5*dt_fluid/flow%Tref) then
-            if(DABS(time/flow%Tref-flow%timeBodyDelta*NINT(time/flow%Tref/flow%timeBodyDelta)) <= 0.5*dt_fluid/flow%Tref)then
+        if((time/flow%Tref - flow%timeWriteBegin) >= -0.5d0*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5d0*dt_fluid/flow%Tref) then
+            if(DABS(time/flow%Tref-flow%timeBodyDelta*dble(NINT(time/flow%Tref/flow%timeBodyDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
                 call write_solid_field(time)
                 call Write_solid_v_bodies(time)
+                call Write_solid_v_forces(time)
             endif
-            if(DABS(time/flow%Tref-flow%timeFlowDelta*NINT(time/flow%Tref/flow%timeFlowDelta)) <= 0.5*dt_fluid/flow%Tref)then
+            if(DABS(time/flow%Tref-flow%timeFlowDelta*dble(NINT(time/flow%Tref/flow%timeFlowDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
                 call write_flow_blocks(time)
             endif
         endif
         ! write processing informations
-        if(DABS(time/flow%Tref-flow%timeInfoDelta*NINT(time/flow%Tref/flow%timeInfoDelta)) <= 0.5*dt_fluid/flow%Tref)then
-            if(flow%inWhichBlock.le.0) write(*,*) 'Warning: The flow field where the probe is located (flow%inWhichBlock) must be greater than 0!'
-            call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
-                                              LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu,LBMblks(flow%inWhichBlock)%den)
+        if(DABS(time/flow%Tref-flow%timeInfoDelta*dble(NINT(time/flow%Tref/flow%timeInfoDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
+            call write_fluid_flux(blockTreeRoot,time)
+            if(flow%inWhichBlock.ge.1 .and. flow%inWhichBlock.le.m_nblocks) then
+                call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &
+                                                  LBMblks(flow%inWhichBlock)%xDim,LBMblks(flow%inWhichBlock)%yDim,LBMblks(flow%inWhichBlock)%zDim,LBMblks(flow%inWhichBlock)%uuu)
+            else
+                write(*,'(A,I0,A,I0,A)') 'Warning: invalid flow%inWhichBlock = ', flow%inWhichBlock, '; it must be in [1, ', m_nblocks, '].'
+            endif
             call write_solid_Information(time,flow%solidProbingNum,flow%solidProbingNode)
         endif
         call get_now_time(time_end2)

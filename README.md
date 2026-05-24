@@ -270,9 +270,11 @@ $PBS_WDIR/$PBS_ENAME
 
 - **SolidBody**
 
-  1. *IBPenaltyalpha* : Velocity correction parameter of the penalty function in the IBM method
+  1. *IBPenaltyAlpha* : Velocity correction parameter of the penalty function in the IBM method
 
-  2. *alphaf* : Parameter for correcting torsion in the mass matrix
+  2. *GeoGamma* $(\gamma)$ : Scaling factor for the geometric stiffness contribution in the tangent matrix,  
+   i.e., $K_T = K_E + \gamma K_G$. Setting *GeoGamma* $(\gamma)$ to 0 ignores geometric stiffness,  
+   while setting it to 1 includes the full geometric stiffness.
 
   3. *NewmarkGamma, NewmarkBeta*: Parameters of the Newmark method
 
@@ -284,10 +286,13 @@ $PBS_WDIR/$PBS_ENAME
 
   7. *nfishGroup* : Numbers of the solid bodies type
 
-  8. *isKB* :  Determining the kind of parameters of the flexible bodies 
+  8. *isKB* :  Determines the kind of parameters of the flexible bodies 
 
-     * 0 : *KB, KS*(Bending Stiffness, Stretching Stiffness)
-     * 1 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic Time Ratio)
+     * 0 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic thickness ratio)
+     * 1 : *KB, KS* (Bending Stiffness, Stretching Stiffness)
+     * other values : read the section properties directly from the solid information file ***.dat**.
+       For standard beam inputs, provide $E$, $G$, $A$, $\rho$, $\gamma$, $J_t$, $I_y$, and $I_z$, 
+       where $\gamma$ denotes the self-rotation angle in degrees and is currently unused.
 
   9. *fishnum  (fishGroup)* : The number of the solid bodies in the specific type
 
@@ -343,8 +348,8 @@ $PBS_WDIR/$PBS_ENAME
 2. *DatBodySpan*  : Folder of spanwise-extension body results
 3. *DatFlow*      : Floder of flow field results
 4. *DatInfo*      : Floder of force and power *et. al.* results
-5. *Check.dat*    : Parameters record file for checking
-6. *continue.dat* : Results record file for continue calculating
+5. *DatContinue*  : Floder of record file for continue calculating
+6. *check.dat*    : Parameters record file for checking
 
 - **Files in DatInfo description**
 
