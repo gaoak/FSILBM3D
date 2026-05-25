@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// FSILBM3D
+// Copyright (C) 2025-2026 Ankang Gao and contributors
+
 #include<unistd.h>
 #include<stdlib.h>
 #include<sys/wait.h>

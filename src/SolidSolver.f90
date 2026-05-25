@@ -1,3 +1,8 @@
+! SPDX-License-Identifier: GPL-3.0-or-later
+!
+! FSILBM3D
+! Copyright (C) 2025-2026 Ankang Gao and contributors
+
 ! program algorithm: ISBN 9781441929105 James F. Doyle. P354
 module SegmentStructure
     !use mkl
