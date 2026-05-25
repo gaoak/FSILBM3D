@@ -7,6 +7,7 @@
   * [Input file description](#input-file-description)
   * [Simulation control parameters](#simulation-control-parameters)
   * [Output file description](#Output-file-description)
+  * [Citation](#citation)
   * [License](#license)
 
 ## Installation
@@ -368,3 +369,23 @@ $PBS_WDIR/$PBS_ENAME
 6. *lastNode.dat* : The information of the last point of the bodies 
 7. *nodeAverage.dat* : The average information of the all points of the bodies 
 8. *FluidFlux.dat* : the flux at inlet and outlet
+
+## Citation
+
+If you use FSILBM3D in academic work, please cite the associated publication:
+
+```bibtex
+@article{gao_fsilibm3d_2026,
+  title = {TODO: replace with the associated paper title},
+  author = {Gao, Ankang and TODO},
+  journal = {TODO: replace with journal name},
+  year = {2026},
+  doi = {TODO: replace with DOI}
+}
+```
+
+FSILBM3D was originally developed by Ankang Gao and his students during his appointment at the University of Science and Technology of China for academic research on fluid-structure interaction simulations using the lattice Boltzmann method.
+
+## License
+
+FSILBM3D is distributed under the terms of the GNU General Public License v3.0 or later. See [LICENSE](LICENSE) for the full license text.

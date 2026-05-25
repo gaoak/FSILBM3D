@@ -1,3 +1,8 @@
+! SPDX-License-Identifier: GPL-3.0-or-later
+!
+! FSILBM3D
+! Copyright (C) 2025-2026 Ankang Gao and contributors
+
     SUBROUTINE cptArea(areaElem,nND,nEL,ele,xyzful)
     implicit none
     integer:: nND,nEL,ele(nEL,5)
