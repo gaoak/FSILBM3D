@@ -228,22 +228,25 @@ module SegmentStructure
         mq(10:12) = matmul(this%m_masMat(10:12,10:12), q(10:12))
     end subroutine Segment_MassMultiply
 
-    subroutine Segment_BoundaryCond(this, iter, gEQ, lodEffe, vBC)
-        ! The method of multiplying by large numbers
+    subroutine Segment_BoundaryCond(this, iter, gEQ, x, fixed, vBC)
+        ! Build fixed-DOF mask and prescribed displacement increment.
+        ! For Newton iteration 1, fixed DOFs take the non-homogeneous prescribed increment vBC. 
+        ! For later Newton iterations, the correction on fixed DOFs is homogeneous, i.e. zero.
         implicit none
-        class(Segment), intent(inout) :: this
-        integer, intent(in) :: gEQ
+        class(Segment), intent(in) :: this
+        integer, intent(in) :: iter, gEQ
         real(8), intent(in) :: vBC(1:gEQ)
-        real(8), intent(inout) :: lodEffe(1:gEQ)
-        integer :: i,iter
+        real(8), intent(inout) :: x(1:gEQ)
+        logical, intent(inout) :: fixed(1:gEQ)
+        integer :: i, gid
         do i=1,nElmtDofs
-            if (this%bc(i).gt.0)then
-                this%m_coefMat(i,i) = this%m_coefMat(i,i) * 1.0d20
-                if(iter.eq.1)then
-                    lodEffe(this%m_localToGlobal(i))=this%m_coefMat(i,i)*vBC(this%m_localToGlobal(i)) &
-                                                                    +lodEffe(this%m_localToGlobal(i))
+            if (this%bc(i) .gt. 0) then
+                gid = this%m_localToGlobal(i)
+                fixed(gid) = .true.
+                if (iter .eq. 1) then
+                    x(gid) = vBC(gid)
                 else
-                    lodEffe(this%m_localToGlobal(i))=0.0d0
+                    x(gid) = 0.0d0
                 endif
             endif
         enddo
@@ -1153,7 +1156,13 @@ module SolidSolver
         procedure :: UpdateMatrixANDLoad => Beam_UpdateMatrixANDLoad
         procedure :: CG_Solve => Beam_CG_Solve
         procedure :: MatrixMultipy => Beam_MatrixMultipy
+        procedure :: BoundaryCond => Beam_BoundaryCond
         procedure :: preconditioned => Beam_preconditioned
+        procedure :: ApplyFixedZero => Beam_ApplyFixedZero
+        procedure :: ApplyFixedValue => Beam_ApplyFixedValue
+        procedure :: InitJacobiPreconditioner => Beam_InitJacobiPreconditioner
+        procedure :: ApplyJacobiPreconditioner => Beam_ApplyJacobiPreconditioner
+        procedure :: CheckCGBreakdown => Beam_CheckCGBreakdown
         procedure :: UpdateDspANDTride => Beam_UpdateDspANDTride
         procedure :: UpdateVelAcc => Beam_UpdateVelAcc
         procedure :: UpdateIterInfo => Beam_UpdateIterInfo
@@ -1851,8 +1860,8 @@ module SolidSolver
         ! solve the next dispalce, velocity and acceleration using CG method
         call this%InitDspVelAccATTimeT(dspO, velO, accO)
         do iter = 1, m_ntolFEM ! m_ntolFEM is maxNewtonRaphson
-            call this%UpdateMatrixANDLoad(iter, dspO)
-            call this%CG_Solve(dspn, this%lodEffe)
+            call this%UpdateMatrixANDLoad(dspO)
+            call this%CG_Solve(dspn, this%lodEffe, iter)
             call this%UpdateDspANDTride(iter, dspn, dnorm)
             if (dnorm .le. m_dtolFEM) exit
         enddo
@@ -1876,12 +1885,11 @@ module SolidSolver
         accO(1:6, 1:this%nND) = this%acc(1:6, 1:this%nND)
     end subroutine Beam_InitDspVelAccATTimeT
 
-    subroutine Beam_UpdateMatrixANDLoad(this, iter, dspO)
+    subroutine Beam_UpdateMatrixANDLoad(this, dspO)
         implicit none
         class(BeamSolver), intent(inout) :: this
         real(8), intent(inout) :: dspO(1:6, 1:this%nND)
-        integer :: i,iter
-
+        integer :: i
         this%lodInte = 0.0d0
         do i = 1, this%nEL
             call this%m_elements(i)%FormStiffMatrix()
@@ -1891,86 +1899,104 @@ module SolidSolver
         this%lodEffe = this%lodExte - this%lodInte
         do i = 1, this%nEL
             call this%m_elements(i)%UpdateLoad(this%coeffs, m_dampM, m_dampK, this%nND, this%gEQ, dspO, this%dsp, this%vel, this%acc, this%lodEffe)
-            call this%m_elements(i)%BoundaryCond(iter, this%gEQ, this%lodEffe, this%vBC)
         enddo
     end subroutine Beam_UpdateMatrixANDLoad
 
-    subroutine Beam_CG_Solve(this, x, b)
-        ! Conjugate Gradient Method
+    subroutine Beam_CG_Solve(this, x, b, iterNR)
+        ! Matrix-free Jacobi-preconditioned CG solver.
         ! Iterative solution for displacement vector.
         ! https://www.detailedpedia.com/wiki-Conjugate_gradient_method
+        !
+        ! Non-homogeneous Dirichlet boundary conditions are handled by lifting:
+        !       x = xFixed + xFree,
+        ! where xFixed satisfies the prescribed displacement increments and xFree is zero on fixed DOFs. Therefore,
+        !       A*xFree = b - A*xFixed.
+        ! The CG iteration is projected onto the free-DOF subspace by enforcing
+        ! r(fixed)=0, z(fixed)=0, p(fixed)=0, and Ap(fixed)=0.
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8) :: x(1:this%gEQ), b(1:this%gEQ)
+        integer, intent(in) :: iterNR
+        real(8), intent(out) :: x(1:this%gEQ)
+        real(8), intent(in)  :: b(1:this%gEQ)
         real(8) :: r(1:this%gEQ), p(1:this%gEQ), Ap(1:this%gEQ)
         real(8) :: z(1:this%gEQ), M(1:this%gEQ)
-        integer :: iter, max_iter, i
+        real(8) :: xFixed(1:this%gEQ)
+        logical :: fixed(1:this%gEQ)
+        integer :: iter, max_iter
         real(8) :: alpha, beta, rsold, rsnew, err, pAp, residual_norm
         ! maximum iteration count and tolerance
         max_iter = 10000
-        err = 1.0d-10
+        err = 1.0d-6
+        ! lifting of non-homogeneous Dirichlet boundary conditions
+        call this%BoundaryCond(iterNR, xFixed, fixed)
         ! initial guess
-        x(1:this%gEQ) = 0.0d0
+        x(1:this%gEQ) = xFixed(1:this%gEQ)
         ! initial residual: r = b - A*x
         call this%MatrixMultipy(x, Ap)
         r = b - Ap
-        ! diagonal preconditioner
+        call this%ApplyFixedZero(r, fixed)
+        ! Build and apply Jacobi diagonal preconditioner.
         call this%preconditioned(M)
-        do i = 1, this%gEQ
-            if (dabs(M(i)) .gt. 1.0d-30) then
-                M(i) = 1.0d0 / M(i)
-            else
-                M(i) = 1.0d0
-            endif
-            z(i) = M(i) * r(i)
-        enddo
+        call this%InitJacobiPreconditioner(M, fixed)
+        call this%ApplyJacobiPreconditioner(r, z, M, fixed)
         residual_norm = dsqrt(dot_product(r, r))
         if (residual_norm .le. err) return
         p = z
         rsold = dot_product(r, z)
-        if (dabs(rsold) .le. 1.0d-30) then
-            write(*,*) 'ERROR: CG solver breakdown: initial dot_product(r, z) is near zero.'
-            write(*,*) 'rsold = ', rsold, ' residual_norm = ', residual_norm
-            stop
-        endif
+        call this%CheckCGBreakdown(rsold, residual_norm, 1.0d-30, 'rsold', 'initial dot_product(r,z)')
         do iter = 1, max_iter
             call this%MatrixMultipy(p, Ap)
+            call this%ApplyFixedZero(Ap, fixed)
             pAp = dot_product(p, Ap)
-            if (dabs(pAp) .le. 1.0d-30) then
-                write(*,*) 'ERROR: CG solver breakdown: dot_product(p, Ap) is near zero.'
-                write(*,*) 'pAp = ', pAp, ' residual_norm = ', residual_norm
-                stop
-            endif
+            call this%CheckCGBreakdown(pAp, residual_norm, 1.0d-30, 'pAp', 'dot_product(p,Ap) before alpha', iter)
             alpha = rsold / pAp
             x = x + alpha * p
+            ! In exact arithmetic, p(fixed)=0 keeps x(fixed)=xFixed(fixed).
+            ! This projection is kept as a safeguard against numerical drift or future code changes.
+            call this%ApplyFixedValue(x, xFixed, fixed)
             r = r - alpha * Ap
+            call this%ApplyFixedZero(r, fixed)
             residual_norm = dsqrt(dot_product(r, r))
             if (residual_norm .le. err) exit
-            do i = 1,this%gEQ
-                z(i) = M(i) * r(i)
-            enddo
+            call this%ApplyJacobiPreconditioner(r, z, M, fixed)
             rsnew = dot_product(r, z)
-            if (dabs(rsold) .le. 1.0d-30) then
-                write(*,*) 'ERROR: CG solver breakdown: rsold is near zero.'
-                write(*,*) 'rsold = ', rsold, ' residual_norm = ', residual_norm
-                stop
-            endif
+            call this%CheckCGBreakdown(rsold, residual_norm, 1.0d-30, 'rsold', 'rsold before beta=rsnew/rsold', iter)
             beta = rsnew / rsold
             p = z + beta * p
+            call this%ApplyFixedZero(p, fixed)
             rsold = rsnew
         enddo
+        if (residual_norm .gt. err) then
+            write(*,*) 'WARNING: CG did not fully converge.'
+            write(*,*) 'residual_norm = ', residual_norm, ' err = ', err
+            write(*,*) 'max_iter = ', max_iter
+        endif
         return
     end subroutine Beam_CG_Solve
 
+    subroutine Beam_BoundaryCond(this, iter, x, fixed)
+        class(BeamSolver), intent(in) :: this
+        integer, intent(in) :: iter
+        real(8), intent(out) :: x(1:this%gEQ)
+        logical, intent(out) :: fixed(1:this%gEQ)
+        integer :: i
+        fixed(:)  = .false.
+        x(:) = 0.0d0
+        do i=1,this%nEL
+            call this%m_elements(i)%BoundaryCond(iter, this%gEQ, x, fixed, this%vBC)
+        enddo
+    end subroutine Beam_BoundaryCond
+
     subroutine Beam_preconditioned(this, M)
-        class(BeamSolver), intent(inout) :: this
+        ! Jacobi-preconditioned
+        class(BeamSolver), intent(in) :: this
         real(8) :: M(1:this%gEQ)
         integer :: i
         M=0.0d0
         do i=1,this%nEL
             call this%m_elements(i)%Preconditioned(M, this%gEQ)
         enddo
-    end subroutine
+    end subroutine Beam_preconditioned
 
     subroutine Beam_MatrixMultipy(this, x, b)
         ! Matrix Free Method
@@ -1978,7 +2004,8 @@ module SolidSolver
         ! Element‐by‐Element(Hughes, Thomas J. R.(1983).doi:10.1061/(ASCE)0733-9399(1983)109:2(576))
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8) :: x(1:this%gEQ), b(1:this%gEQ)
+        real(8), intent(in)  :: x(1:this%gEQ)
+        real(8), intent(out) :: b(1:this%gEQ)
         integer :: i
         b(1:this%gEQ) = 0.0d0
         do i=1,this%nEL
@@ -1986,6 +2013,88 @@ module SolidSolver
         enddo
         return
     end subroutine Beam_MatrixMultipy
+
+    subroutine Beam_ApplyFixedZero(this, x, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: x(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) x(i) = 0.0d0
+        enddo
+    end subroutine Beam_ApplyFixedZero
+
+    subroutine Beam_ApplyFixedValue(this, x, xFixed, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: x(1:this%gEQ)
+        real(8), intent(in) :: xFixed(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) x(i) = xFixed(i)
+        enddo
+    end subroutine Beam_ApplyFixedValue
+
+    subroutine Beam_InitJacobiPreconditioner(this, M, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: M(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) then
+                M(i) = 0.0d0
+            else
+                if (dabs(M(i)) .gt. 1.0d-30) then
+                    M(i) = 1.0d0 / M(i)
+                else
+                    write(*,*) 'WARNING: near-zero Jacobi diagonal at DOF ', i
+                    M(i) = 1.0d0
+                endif
+            endif
+        enddo
+    end subroutine Beam_InitJacobiPreconditioner
+
+    subroutine Beam_ApplyJacobiPreconditioner(this, r, z, M, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(in) :: r(1:this%gEQ), M(1:this%gEQ)
+        real(8), intent(out) :: z(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) then
+                z(i) = 0.0d0
+            else
+                z(i) = M(i) * r(i)
+            endif
+        enddo
+    end subroutine Beam_ApplyJacobiPreconditioner
+
+    subroutine Beam_CheckCGBreakdown(this, value, residual_norm, threshold, valueName, locationName, iter)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(in) :: value, residual_norm, threshold
+        character(len=*), intent(in) :: valueName, locationName
+        integer, intent(in), optional :: iter
+    
+        if (dabs(value) .le. threshold) then
+            write(*,*) 'ERROR: CG solver breakdown.'
+            write(*,*) 'XYZo x y z    : ', this%XYZo(1:3)
+            write(*,*) 'Location      : ', trim(locationName)
+            write(*,*) 'Quantity      : ', trim(valueName)
+            write(*,*) 'Value         : ', value
+            write(*,*) 'Threshold     : ', threshold
+            write(*,*) 'residual_norm : ', residual_norm
+            if (present(iter)) then
+                write(*,*) 'CG iter       : ', iter
+            endif
+            stop
+        endif
+    
+    end subroutine Beam_CheckCGBreakdown
 
     subroutine Beam_UpdateDspANDTride(this, iter, dspn, dnorm)
         implicit none
