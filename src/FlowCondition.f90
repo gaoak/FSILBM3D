@@ -140,15 +140,15 @@ module FlowCondition
             enddo
             ! write the first point of the solid titles
             open(111,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat')
-            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "rx"  "ry"  "rz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write the last point of the solid titles
             open(111,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat')
-            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "rx"  "ry"  "rz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write the middle point of the solid titles
             open(111,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat')
-            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+            write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "rx"  "ry"  "rz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
             close(111)
             ! write solid average titles
             open(111,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat')
@@ -174,7 +174,7 @@ module FlowCondition
             do  j=1,flow%solidProbingNum
                 write(probeNum,'(I3.3)') j
                 open(111,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat')
-                write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
+                write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "rx"  "ry"  "rz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
                 close(111)
             enddo
         enddo

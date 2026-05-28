@@ -1699,15 +1699,15 @@ module SolidSolver
         
         ! write begin information
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,1)-XYZo(1:3))/Lref,this%vel(1:3,1)/Uref,this%acc(1:3,1)/Aref
+        write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,1)-XYZo(1:3))/Lref,this%pos(4:6,1),this%vel(1:3,1)/Uref,this%acc(1:3,1)/Aref
         close(idfile)
         ! write end information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,this%nND)-XYZo(1:3))/Lref,this%vel(1:3,this%nND)/Uref,this%acc(1:3,this%nND)/Aref
+        write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,this%nND)-XYZo(1:3))/Lref,this%pos(4:6,this%nND),this%vel(1:3,this%nND)/Uref,this%acc(1:3,this%nND)/Aref
         close(idfile)
         ! write center information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,(this%nND+1)/2)-XYZo(1:3))/Lref,this%vel(1:3,(this%nND+1)/2)/Uref,this%acc(1:3,(this%nND+1)/2)/Aref
+        write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,(this%nND+1)/2)-XYZo(1:3))/Lref,this%pos(4:6,(this%nND+1)/2),this%vel(1:3,(this%nND+1)/2)/Uref,this%acc(1:3,(this%nND+1)/2)/Aref
         close(idfile)
         ! write mean information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat',position='append')
@@ -1769,7 +1769,8 @@ module SolidSolver
         do  i=1,solidProbingNum
             write(probeNum,'(I3.3)') i
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
-            write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,solidProbingNode(i))-XYZo(1:3))/Lref, &
+            write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,solidProbingNode(i))-XYZo(1:3))/Lref, &
+                                                                              this%pos(4:6,solidProbingNode(i)), &
                                                                               this%vel(1:3,solidProbingNode(i))/Uref, &
                                                                               this%acc(1:3,solidProbingNode(i))/Aref
             close(idfile)
