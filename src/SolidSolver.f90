@@ -33,6 +33,7 @@ module SegmentStructure
         procedure :: Multiply => Segment_Multiply
         procedure :: UpdateMatrix => Segment_UpdateMatrix
         procedure :: Preconditioned => Segment_Preconditioned
+        procedure :: BlockPreconditioned => Segment_BlockPreconditioned
         procedure :: UpdateLoad => Segment_UpdateLoad
         procedure :: LocToGlobal => Segment_LocToGlobal
         procedure :: GlobalToLoc => Segment_GlobalToLoc
@@ -262,6 +263,15 @@ module SegmentStructure
         enddo
         call this%LocToGlobal(Melmts, M, gEQ)
     end subroutine
+
+    subroutine Segment_BlockPreconditioned(this, blockM, nND)
+        implicit none
+        class(Segment), intent(in) :: this
+        integer, intent(in) :: nND
+        real(8), intent(inout) :: blockM(6,6,nND)
+        blockM(1:6,1:6,this%node0) = blockM(1:6,1:6,this%node0) + this%m_coefMat(1:6,1:6)
+        blockM(1:6,1:6,this%node1) = blockM(1:6,1:6,this%node1) + this%m_coefMat(7:12,7:12)
+    end subroutine Segment_BlockPreconditioned
 
     subroutine Segment_Multiply(this, x, b, gEQ)
         class(Segment), intent(in) :: this
@@ -1157,11 +1167,16 @@ module SolidSolver
         procedure :: CG_Solve => Beam_CG_Solve
         procedure :: MatrixMultipy => Beam_MatrixMultipy
         procedure :: BoundaryCond => Beam_BoundaryCond
-        procedure :: preconditioned => Beam_preconditioned
         procedure :: ApplyFixedZero => Beam_ApplyFixedZero
         procedure :: ApplyFixedValue => Beam_ApplyFixedValue
+        procedure :: InitPreconditioner => Beam_InitPreconditioner
+        procedure :: ApplyPreconditioner => Beam_ApplyPreconditioner
+        procedure :: preconditioned => Beam_preconditioned
+        procedure :: BlockPreconditioned => Beam_BlockPreconditioned
         procedure :: InitJacobiPreconditioner => Beam_InitJacobiPreconditioner
         procedure :: ApplyJacobiPreconditioner => Beam_ApplyJacobiPreconditioner
+        procedure :: InitBlockJacobiPreconditioner => Beam_InitBlockJacobiPreconditioner
+        procedure :: ApplyBlockJacobiPreconditioner => Beam_ApplyBlockJacobiPreconditioner
         procedure :: CheckCGBreakdown => Beam_CheckCGBreakdown
         procedure :: UpdateDspANDTride => Beam_UpdateDspANDTride
         procedure :: UpdateVelAcc => Beam_UpdateVelAcc
@@ -1921,10 +1936,13 @@ module SolidSolver
         real(8), intent(in)  :: b(1:this%gEQ)
         real(8) :: r(1:this%gEQ), p(1:this%gEQ), Ap(1:this%gEQ)
         real(8) :: z(1:this%gEQ), M(1:this%gEQ)
+        real(8) :: blockM(6,6,this%nND)
         real(8) :: xFixed(1:this%gEQ)
         logical :: fixed(1:this%gEQ)
-        integer :: iter, max_iter
+        integer :: iter, max_iter, precondType
         real(8) :: alpha, beta, rsold, rsnew, err, pAp, residual_norm
+        ! select preconditioner
+        precondType = 2
         ! maximum iteration count and tolerance
         max_iter = 10000
         err = 1.0d-6
@@ -1936,10 +1954,8 @@ module SolidSolver
         call this%MatrixMultipy(x, Ap)
         r = b - Ap
         call this%ApplyFixedZero(r, fixed)
-        ! Build and apply Jacobi diagonal preconditioner.
-        call this%preconditioned(M)
-        call this%InitJacobiPreconditioner(M, fixed)
-        call this%ApplyJacobiPreconditioner(r, z, M, fixed)
+        call this%InitPreconditioner(precondType, M, blockM, fixed)
+        call this%ApplyPreconditioner(precondType, r, z, M, blockM, fixed)
         residual_norm = dsqrt(dot_product(r, r))
         if (residual_norm .le. err) return
         p = z
@@ -1959,7 +1975,7 @@ module SolidSolver
             call this%ApplyFixedZero(r, fixed)
             residual_norm = dsqrt(dot_product(r, r))
             if (residual_norm .le. err) exit
-            call this%ApplyJacobiPreconditioner(r, z, M, fixed)
+            call this%ApplyPreconditioner(precondType, r, z, M, blockM, fixed)
             rsnew = dot_product(r, z)
             call this%CheckCGBreakdown(rsold, residual_norm, 1.0d-30, 'rsold', 'rsold before beta=rsnew/rsold', iter)
             beta = rsnew / rsold
@@ -1987,17 +2003,6 @@ module SolidSolver
             call this%m_elements(i)%BoundaryCond(iter, this%gEQ, x, fixed, this%vBC)
         enddo
     end subroutine Beam_BoundaryCond
-
-    subroutine Beam_preconditioned(this, M)
-        ! Jacobi-preconditioned
-        class(BeamSolver), intent(in) :: this
-        real(8) :: M(1:this%gEQ)
-        integer :: i
-        M=0.0d0
-        do i=1,this%nEL
-            call this%m_elements(i)%Preconditioned(M, this%gEQ)
-        enddo
-    end subroutine Beam_preconditioned
 
     subroutine Beam_MatrixMultipy(this, x, b)
         ! Matrix Free Method
@@ -2038,6 +2043,70 @@ module SolidSolver
         enddo
     end subroutine Beam_ApplyFixedValue
 
+    subroutine Beam_InitPreconditioner(this, precondType, M, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        integer, intent(in) :: precondType
+        real(8), intent(inout) :: M(1:this%gEQ)
+        real(8), intent(inout) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        select case (precondType)
+        case (1)
+            ! Scalar Jacobi preconditioner.
+            call this%preconditioned(M)
+            call this%InitJacobiPreconditioner(M, fixed)
+        case (2)
+            ! Node-wise 6x6 block Jacobi preconditioner.
+            call this%BlockPreconditioned(blockM)
+            call this%InitBlockJacobiPreconditioner(blockM, fixed)
+        case default
+            write(*,*) 'ERROR: unknown preconditioner type: ', precondType
+            stop
+        end select
+    end subroutine Beam_InitPreconditioner
+
+    subroutine Beam_ApplyPreconditioner(this, precondType, r, z, M, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        integer, intent(in) :: precondType
+        real(8), intent(in) :: r(1:this%gEQ)
+        real(8), intent(out) :: z(1:this%gEQ)
+        real(8), intent(in) :: M(1:this%gEQ)
+        real(8), intent(in) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        select case (precondType)
+        case (1)
+            call this%ApplyJacobiPreconditioner(r, z, M, fixed)
+        case (2)
+            call this%ApplyBlockJacobiPreconditioner(r, z, blockM, fixed)
+        case default
+            write(*,*) 'ERROR: unknown preconditioner type: ', precondType
+            stop
+        end select
+    end subroutine Beam_ApplyPreconditioner
+
+    subroutine Beam_preconditioned(this, M)
+        ! Jacobi-preconditioned
+        class(BeamSolver), intent(in) :: this
+        real(8) :: M(1:this%gEQ)
+        integer :: i
+        M=0.0d0
+        do i=1,this%nEL
+            call this%m_elements(i)%Preconditioned(M, this%gEQ)
+        enddo
+    end subroutine Beam_preconditioned
+
+    subroutine Beam_BlockPreconditioned(this, blockM)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(out) :: blockM(6,6,this%nND)
+        integer :: i
+        blockM(:,:,:) = 0.0d0
+        do i = 1, this%nEL
+            call this%m_elements(i)%BlockPreconditioned(blockM, this%nND)
+        enddo
+    end subroutine Beam_BlockPreconditioned
+
     subroutine Beam_InitJacobiPreconditioner(this, M, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
@@ -2073,6 +2142,113 @@ module SolidSolver
             endif
         enddo
     end subroutine Beam_ApplyJacobiPreconditioner
+
+    subroutine Beam_InitBlockJacobiPreconditioner(this, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: node, i, gid
+        real(8) :: invB(6,6)
+        integer :: info
+        do node = 1, this%nND
+            ! For fixed DOFs, remove their coupling inside the local 6x6 block
+            ! and set unit diagonal. Since r(fixed)=0, this keeps z(fixed)=0.
+            do i = 1, 6
+                gid = (node-1)*6 + i
+                if (fixed(gid)) then
+                    blockM(i,1:6,node) = 0.0d0
+                    blockM(1:6,i,node) = 0.0d0
+                    blockM(i,i,node)   = 1.0d0
+                endif
+            enddo
+            call Invert6x6(blockM(1:6,1:6,node), invB, info)
+            if (info /= 0) then
+                write(*,*) 'WARNING: block Jacobi inverse failed at node ', node
+                write(*,*) 'Use identity block for this node.'
+                blockM(1:6,1:6,node) = 0.0d0
+                do i = 1, 6
+                    blockM(i,i,node) = 1.0d0
+                enddo
+            else
+                blockM(1:6,1:6,node) = invB(1:6,1:6)
+            endif
+        enddo
+    end subroutine Beam_InitBlockJacobiPreconditioner
+
+    subroutine Beam_ApplyBlockJacobiPreconditioner(this, r, z, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(in) :: r(1:this%gEQ)
+        real(8), intent(out) :: z(1:this%gEQ)
+        real(8), intent(in) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: node, i, gid
+        real(8) :: rnode(6), znode(6)
+        z(:) = 0.0d0
+        do node = 1, this%nND
+            do i = 1, 6
+                gid = (node-1)*6 + i
+                rnode(i) = r(gid)
+            enddo
+            znode = matmul(blockM(1:6,1:6,node), rnode)
+            do i = 1, 6
+                gid = (node-1)*6 + i
+                if (fixed(gid)) then
+                    z(gid) = 0.0d0
+                else
+                    z(gid) = znode(i)
+                endif
+            enddo
+        enddo
+    end subroutine Beam_ApplyBlockJacobiPreconditioner
+
+    subroutine Invert6x6(A, Ainv, info)
+        implicit none
+        real(8), intent(in) :: A(6,6)
+        real(8), intent(out) :: Ainv(6,6)
+        integer, intent(out) :: info
+        real(8) :: aug(6,12)
+        real(8) :: pivot, factor, tmp
+        integer :: i, j, k, p
+        info = 0
+        aug(:,1:6) = A(:,:)
+        aug(:,7:12) = 0.0d0
+        do i = 1, 6
+            aug(i,6+i) = 1.0d0
+        enddo
+        do i = 1, 6
+            p = i
+            pivot = dabs(aug(i,i))
+            do k = i+1, 6
+                if (dabs(aug(k,i)) .gt. pivot) then
+                    pivot = dabs(aug(k,i))
+                    p = k
+                endif
+            enddo
+            if (pivot .le. 1.0d-30) then
+                info = i
+                Ainv(:,:) = 0.0d0
+                return
+            endif
+            if (p /= i) then
+                do j = 1, 12
+                    tmp = aug(i,j)
+                    aug(i,j) = aug(p,j)
+                    aug(p,j) = tmp
+                enddo
+            endif
+            pivot = aug(i,i)
+            aug(i,1:12) = aug(i,1:12) / pivot
+            do k = 1, 6
+                if (k /= i) then
+                    factor = aug(k,i)
+                    aug(k,1:12) = aug(k,1:12) - factor * aug(i,1:12)
+                endif
+            enddo
+        enddo
+        Ainv(:,:) = aug(:,7:12)
+    end subroutine Invert6x6
 
     subroutine Beam_CheckCGBreakdown(this, value, residual_norm, threshold, valueName, locationName, iter)
         implicit none
