@@ -608,6 +608,7 @@ module SolidBody
         real(8) :: tmpxyz(3), tmpvel(3), dirc(3)
         real(8) :: dh, left, len, dl, ls, area, IBPenaltyBeta
         real(8) :: omega(3), rspan(3), wspin(3)
+        real(8) :: dir_norm
         IBPenaltyBeta = - m_IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
             i1 = this%rbm%m_elements(i)%node0
@@ -620,7 +621,15 @@ module SolidBody
             dl = len / dble(this%rbm%m_elements(i)%Nspan)
             dh = this%rbm%m_elements(i)%len1
             area = dl * dh * IBPenaltyBeta
-            dirc(1:3) = this%rbm%m_elements(i)%triad_ee(1:3,2)
+            ! Timoshenko-consistent spanwise/material extension direction
+            dirc(1:3) = 0.5d0 * (this%rbm%m_elements(i)%triad_n1(1:3,2) + &
+                                 this%rbm%m_elements(i)%triad_n2(1:3,2))
+            dir_norm = dsqrt(dot_product(dirc, dirc))
+            if (dir_norm .gt. 1.0d-12) then
+                dirc = dirc / dir_norm
+            else
+                dirc = this%rbm%m_elements(i)%triad_ee(1:3,2)
+            endif
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%m_elements(i)%Nspan
                 ls = dl * (0.5d0 + dble(s-1)) - left
