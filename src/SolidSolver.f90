@@ -1840,7 +1840,7 @@ module SolidSolver
                     call this%m_elements(i)%MapReferenceToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
                 enddo
                 !-----------------------------------------
-                call this%UpdateNewmarkCoeffs(deltat)
+                call this%UpdateNewmarkCoeffs(subdeltat)
                 CALL this%Solver(iFish)
             else
                 stop 'no define body model'
