@@ -1190,12 +1190,13 @@ module SolidBody
             Ls  = 1.5d0*this%rbm%m_elements(1)%Lspan - 0.5d0*this%rbm%m_elements(2)%Lspan
             Rs  = 1.5d0*(this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan) - &
                   0.5d0*(this%rbm%m_elements(2)%spanlen - this%rbm%m_elements(2)%Lspan)
-            dir = 1.5d0*this%rbm%m_elements(1)%triad_ee(1:3,2) - 0.5d0*this%rbm%m_elements(2)%triad_ee(1:3,2)
+            dir = 1.5d0*(0.5d0 * (this%rbm%m_elements(1)%triad_n1(1:3,2) +  this%rbm%m_elements(1)%triad_n2(1:3,2))) - &
+                  0.5d0*(0.5d0 * (this%rbm%m_elements(2)%triad_n1(1:3,2) +  this%rbm%m_elements(2)%triad_n2(1:3,2)))
         else
             xc  = this%rbm%m_elements(1)%x1(1:3)
             Ls  = this%rbm%m_elements(1)%Lspan
             Rs  = this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan
-            dir = this%rbm%m_elements(1)%triad_ee(1:3,2)
+            dir = this%rbm%m_elements(1)%triad_n1(1:3,2)
         endif
         call write_section()
         ! ------------------------------------------------------------
@@ -1205,7 +1206,8 @@ module SolidBody
             xc  = 0.5d0*(this%rbm%m_elements(i)%x1(1:3) + this%rbm%m_elements(i)%x1(7:9))
             Ls  = this%rbm%m_elements(i)%Lspan
             Rs  = this%rbm%m_elements(i)%spanlen - this%rbm%m_elements(i)%Lspan
-            dir = this%rbm%m_elements(i)%triad_ee(1:3,2)
+            dir = 0.5d0 * (this%rbm%m_elements(i)%triad_n1(1:3,2) + &
+                           this%rbm%m_elements(i)%triad_n2(1:3,2))
             call write_section()
         enddo
         ! ------------------------------------------------------------
@@ -1218,12 +1220,13 @@ module SolidBody
             Ls  = 1.5d0*this%rbm%m_elements(nEL)%Lspan - 0.5d0*this%rbm%m_elements(nEL-1)%Lspan
             Rs  = 1.5d0*(this%rbm%m_elements(nEL)%spanlen - this%rbm%m_elements(nEL)%Lspan) - &
                   0.5d0*(this%rbm%m_elements(nEL-1)%spanlen - this%rbm%m_elements(nEL-1)%Lspan)
-            dir = 1.5d0*this%rbm%m_elements(nEL)%triad_ee(1:3,2) - 0.5d0*this%rbm%m_elements(nEL-1)%triad_ee(1:3,2)
+            dir = 1.5d0*(0.5d0 * (this%rbm%m_elements(nEL)%triad_n1(1:3,2)   +  this%rbm%m_elements(nEL)%triad_n2(1:3,2))) - &
+                  0.5d0*(0.5d0 * (this%rbm%m_elements(nEL-1)%triad_n1(1:3,2) +  this%rbm%m_elements(nEL-1)%triad_n2(1:3,2)))
         else
             xc  = this%rbm%m_elements(1)%x1(7:9)
             Ls  = this%rbm%m_elements(1)%Lspan
             Rs  = this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan
-            dir = this%rbm%m_elements(1)%triad_ee(1:3,2)
+            dir = this%rbm%m_elements(1)%triad_n2(1:3,2)
         endif
         call write_section()
         ! ------------------------------------------------------------

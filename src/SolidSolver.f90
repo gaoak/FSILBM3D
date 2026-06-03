@@ -14,7 +14,7 @@ module SegmentStructure
         integer :: node0, node1, m_localToGlobal(1:nElmtDofs), itype, bc(1:nElmtDofs), Nspan
         real(8) :: x00(1:nElmtDofs),x0(1:nElmtDofs),x1(1:nElmtDofs),xnxt(1:nElmtDofs)
         real(8) :: dx0, dy0, dz0, dx1, dy1, dz1, xll0, xmm0, xnn0, xll1, xmm1, xnn1, len0, len1
-        real(8) :: Lspan, spanlen, dirc(3)
+        real(8) :: Lspan, spanlen, dirc00(3), dirc0(3), dirc1(3), dircnxt(3)
         real(8) :: geoFRM
         real(8) :: areaElem00
         real(8) :: strainEnergy(2)
@@ -47,10 +47,11 @@ module SegmentStructure
         procedure :: BodyStress_D => Segment_BodyStress_D
         procedure :: StrainEnergy_D => Segment_StrainEnergy_D
         procedure :: InitTriad_D => Segment_InitTriad_D
-        procedure :: BuildAxisDirTriad => Segment_BuildAxisDirTriad
+        procedure :: RigidUpdateTriad_D => Segment_RigidUpdateTriad_D
         procedure :: UpdateTriad_D => Segment_UpdateTriad_D
         procedure :: MakeTriad_ee => Segment_MakeTriad_ee
-        procedure :: MapReferenceToCurrent => Segment_MapReferenceToCurrent
+        procedure :: MapReferencePosToCurrent => Segment_MapReferencePosToCurrent
+        procedure :: MapReferenceDirToCurrent => Segment_MapReferenceDirToCurrent
     end type Segment
 
   contains
@@ -87,10 +88,10 @@ module SegmentStructure
         this%Nspan = Nspan_
         this%Lspan = 0.5d0 * (xyz(4,p0Id) + xyz(4,p1Id))
         this%spanlen = 0.5d0 * (xyz(5,p0Id) + xyz(5,p1Id)) + this%Lspan
-        this%dirc(1:3) = 0.5d0 * (xyz(6:8,p0Id) + xyz(6:8,p1Id))
-        dirc_norm = dsqrt(sum(this%dirc**2))
+        this%dirc00(1:3) = 0.5d0 * (xyz(6:8,p0Id) + xyz(6:8,p1Id))
+        dirc_norm = dsqrt(sum(this%dirc00**2))
         if (dirc_norm .gt. 1d-10) then
-            this%dirc = this%dirc / dirc_norm
+            this%dirc00 = this%dirc00 / dirc_norm
         else
             write(*,*) xyz(6:8,p0Id), "and", xyz(6:8,p1Id), "are opposite directions; no unique bisector exists."
             stop
@@ -102,6 +103,8 @@ module SegmentStructure
         class(Segment), intent(inout) :: this
         this%x1(1:12) = this%x0(1:12)
         this%xnxt(1:12) = this%x1(1:12)
+        this%dirc1(1:3) = this%dirc0(1:3)
+        this%dircnxt(1:3) = this%dirc1(1:3)
         this%dx0  = this%x0(7) - this%x0(1)
         this%dy0  = this%x0(8) - this%x0(2)
         this%dz0  = this%x0(9) - this%x0(3)
@@ -598,14 +601,26 @@ module SegmentStructure
     subroutine Segment_InitTriad_D(this)
         implicit none
         class(Segment), intent(inout) :: this
-        call this%BuildAxisDirTriad(this%xll0,this%xmm0,this%xnn0,this%triad_n1)
+        call Segment_BuildAxisDirTriad(this%xll0,this%xmm0,this%xnn0,this%dirc0,this%triad_n1)
         ! all element triads have same initial orientation
         this%triad_n2(1:3,1:3)=this%triad_n1(1:3,1:3)
         this%triad_ee(1:3,1:3)=this%triad_n1(1:3,1:3)
         return
     end subroutine Segment_InitTriad_D
 
-    subroutine Segment_BuildAxisDirTriad(this,l,m,n,triad)
+    subroutine Segment_RigidUpdateTriad_D(this)
+        ! Used for rigid-body triad updates.
+        ! Rebuild the full triad from the current beam axis and the current material direction.
+        implicit none
+        class(Segment), intent(inout) :: this
+        call Segment_BuildAxisDirTriad(this%xll1,this%xmm1,this%xnn1,this%dirc1,this%triad_n1)
+        ! In rigid-body motion, the two nodal triads and the element triad share the same current orientation.
+        this%triad_n2(1:3,1:3)=this%triad_n1(1:3,1:3)
+        this%triad_ee(1:3,1:3)=this%triad_n1(1:3,1:3)
+        return
+    end subroutine Segment_RigidUpdateTriad_D
+
+    subroutine Segment_BuildAxisDirTriad(l,m,n,d,triad)
         ! If span direction vector is not 0
         ! ex: beam axis direction
         ! ey: span direction
@@ -615,8 +630,7 @@ module SegmentStructure
         ! [triad] = [R]^T
         ! ISBN 9780792312086 James F. Doyle. P157,158
         implicit none
-        class(Segment), intent(in) :: this
-        real(8), intent(in) :: l,m,n
+        real(8), intent(in) :: l,m,n,d(3)
         real(8), intent(out) :: triad(3,3)
         real(8) :: ex(3), ey(3), ez(3), dir(3), dd, proj
 
@@ -630,7 +644,7 @@ module SegmentStructure
             ex = ex / dd
         endif
 
-        dir(1:3) = this%dirc(1:3)
+        dir(1:3) = d(1:3)
         ! Normalization
         dd = dsqrt(dot_product(dir, dir))
         if (dd .gt. 1.0d-14) then
@@ -1107,7 +1121,7 @@ module SegmentStructure
         return
     end subroutine Segment_FiniteRot
 
-    subroutine Segment_MapReferenceToCurrent(this, coordsOut, TTT, XYZ, AoA)
+    subroutine Segment_MapReferencePosToCurrent(this, coordsOut, TTT, XYZ, AoA)
         implicit none
         class(Segment), intent(in) :: this
         real(8), intent(out) :: coordsOut(12)
@@ -1118,7 +1132,15 @@ module SegmentStructure
         coordsOut(4:6) = AoA
         coordsOut(7:9) = matmul(TTT, this%x00(7:9)) + XYZ
         coordsOut(10:12) = AoA
-    end subroutine Segment_MapReferenceToCurrent
+    end subroutine Segment_MapReferencePosToCurrent
+
+    subroutine Segment_MapReferenceDirToCurrent(this, dirc, TTT)
+        implicit none
+        class(Segment), intent(in) :: this
+        real(8), intent(out) :: dirc(3)
+        real(8), intent(in) :: TTT(3,3)
+        dirc = matmul(TTT, this%dirc00)
+    end subroutine Segment_MapReferenceDirToCurrent
 
 end module SegmentStructure
 
@@ -1396,7 +1418,8 @@ module SolidSolver
         call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
 
         do n=1,this%nEL
-            call this%m_elements(n)%MapReferenceToCurrent(this%m_elements(n)%x0, this%TTT0, this%XYZ, this%AoAd)
+            call this%m_elements(n)%MapReferencePosToCurrent(this%m_elements(n)%x0, this%TTT0, this%XYZ, this%AoAd)
+            call this%m_elements(n)%MapReferenceDirToCurrent(this%m_elements(n)%dirc0, this%TTT0)
             call this%m_elements(n)%Init()
         enddo
 
@@ -1810,11 +1833,14 @@ module SolidSolver
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do i=1,this%nEL
-                    call this%m_elements(i)%MapReferenceToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferencePosToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferenceDirToCurrent(this%m_elements(i)%dircnxt, this%TTTnxt)
                     this%m_elements(i)%x1(:)=this%m_elements(i)%xnxt(:)
+                    this%m_elements(i)%dirc1(:)=this%m_elements(i)%dircnxt(:)
                     this%pos(1:6,this%m_elements(i)%node0)=this%m_elements(i)%x1(1:6)
                     this%pos(1:6,this%m_elements(i)%node1)=this%m_elements(i)%x1(7:12)
                     call this%m_elements(i)%cptdxyz1()
+                    call this%m_elements(i)%RigidUpdateTriad_D()
                 enddo
                 !------------------------------------------------------
                 !translational velocity
@@ -1837,7 +1863,7 @@ module SolidSolver
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do i=1,this%nEL
-                    call this%m_elements(i)%MapReferenceToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferencePosToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
                 enddo
                 !-----------------------------------------
                 call this%UpdateNewmarkCoeffs(subdeltat)
