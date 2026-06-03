@@ -32,7 +32,7 @@ module SegmentStructure
         procedure :: cptdxyz1 => Segment_cptdxyz1
         procedure :: Multiply => Segment_Multiply
         procedure :: UpdateMatrix => Segment_UpdateMatrix
-        procedure :: Preconditioned => Segment_Preconditioned
+        procedure :: ScalarPreconditioned => Segment_ScalarPreconditioned
         procedure :: BlockPreconditioned => Segment_BlockPreconditioned
         procedure :: UpdateLoad => Segment_UpdateLoad
         procedure :: LocToGlobal => Segment_LocToGlobal
@@ -256,7 +256,7 @@ module SegmentStructure
         enddo
     end subroutine Segment_BoundaryCond
 
-    subroutine Segment_Preconditioned(this, M, gEQ)
+    subroutine Segment_ScalarPreconditioned(this, M, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
         real(8) :: Melmts(1:nElmtDofs),M(1:gEQ)
@@ -265,7 +265,7 @@ module SegmentStructure
             Melmts(i)=this%m_coefMat(i,i)
         enddo
         call this%LocToGlobal(Melmts, M, gEQ)
-    end subroutine
+    end subroutine Segment_ScalarPreconditioned
 
     subroutine Segment_BlockPreconditioned(this, blockM, nND)
         implicit none
@@ -1193,10 +1193,10 @@ module SolidSolver
         procedure :: ApplyFixedValue => Beam_ApplyFixedValue
         procedure :: InitPreconditioner => Beam_InitPreconditioner
         procedure :: ApplyPreconditioner => Beam_ApplyPreconditioner
-        procedure :: preconditioned => Beam_preconditioned
+        procedure :: ScalarPreconditioned => Beam_ScalarPreconditioned
         procedure :: BlockPreconditioned => Beam_BlockPreconditioned
-        procedure :: InitJacobiPreconditioner => Beam_InitJacobiPreconditioner
-        procedure :: ApplyJacobiPreconditioner => Beam_ApplyJacobiPreconditioner
+        procedure :: InitScalarJacobiPreconditioner => Beam_InitScalarJacobiPreconditioner
+        procedure :: ApplyScalarJacobiPreconditioner => Beam_ApplyScalarJacobiPreconditioner
         procedure :: InitBlockJacobiPreconditioner => Beam_InitBlockJacobiPreconditioner
         procedure :: ApplyBlockJacobiPreconditioner => Beam_ApplyBlockJacobiPreconditioner
         procedure :: CheckCGBreakdown => Beam_CheckCGBreakdown
@@ -2079,8 +2079,8 @@ module SolidSolver
         select case (precondType)
         case (1)
             ! Scalar Jacobi preconditioner.
-            call this%preconditioned(M)
-            call this%InitJacobiPreconditioner(M, fixed)
+            call this%ScalarPreconditioned(M)
+            call this%InitScalarJacobiPreconditioner(M, fixed)
         case (2)
             ! Node-wise 6x6 block Jacobi preconditioner.
             call this%BlockPreconditioned(blockM)
@@ -2102,7 +2102,7 @@ module SolidSolver
         logical, intent(in) :: fixed(1:this%gEQ)
         select case (precondType)
         case (1)
-            call this%ApplyJacobiPreconditioner(r, z, M, fixed)
+            call this%ApplyScalarJacobiPreconditioner(r, z, M, fixed)
         case (2)
             call this%ApplyBlockJacobiPreconditioner(r, z, blockM, fixed)
         case default
@@ -2111,16 +2111,16 @@ module SolidSolver
         end select
     end subroutine Beam_ApplyPreconditioner
 
-    subroutine Beam_preconditioned(this, M)
-        ! Jacobi-preconditioned
+    subroutine Beam_ScalarPreconditioned(this, M)
+        ! Scalar Jacobi Preconditioned
         class(BeamSolver), intent(in) :: this
         real(8) :: M(1:this%gEQ)
         integer :: i
         M=0.0d0
         do i=1,this%nEL
-            call this%m_elements(i)%Preconditioned(M, this%gEQ)
+            call this%m_elements(i)%ScalarPreconditioned(M, this%gEQ)
         enddo
-    end subroutine Beam_preconditioned
+    end subroutine Beam_ScalarPreconditioned
 
     subroutine Beam_BlockPreconditioned(this, blockM)
         implicit none
@@ -2133,7 +2133,7 @@ module SolidSolver
         enddo
     end subroutine Beam_BlockPreconditioned
 
-    subroutine Beam_InitJacobiPreconditioner(this, M, fixed)
+    subroutine Beam_InitScalarJacobiPreconditioner(this, M, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
         real(8), intent(inout) :: M(1:this%gEQ)
@@ -2151,9 +2151,9 @@ module SolidSolver
                 endif
             endif
         enddo
-    end subroutine Beam_InitJacobiPreconditioner
+    end subroutine Beam_InitScalarJacobiPreconditioner
 
-    subroutine Beam_ApplyJacobiPreconditioner(this, r, z, M, fixed)
+    subroutine Beam_ApplyScalarJacobiPreconditioner(this, r, z, M, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
         real(8), intent(in) :: r(1:this%gEQ), M(1:this%gEQ)
@@ -2167,7 +2167,7 @@ module SolidSolver
                 z(i) = M(i) * r(i)
             endif
         enddo
-    end subroutine Beam_ApplyJacobiPreconditioner
+    end subroutine Beam_ApplyScalarJacobiPreconditioner
 
     subroutine Beam_InitBlockJacobiPreconditioner(this, blockM, fixed)
         implicit none
