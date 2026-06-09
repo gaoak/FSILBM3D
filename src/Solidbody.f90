@@ -928,7 +928,9 @@ module SolidBody
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: forceElemTemp(3),invh3
         !==================================================================================================
-        integer::x,y,z,iEL,iElem,id0(3),id1(3)
+        integer:: x,y,z,iEL,iElem,id0(3),id1(3),im0(3),im1(3)
+        real(8):: xc(3),xi(3),rr(3)
+        real(8):: momentElemTemp(3)
         !==================================================================================================
         invh3 = (1.d0/dh)**3
         ! compute the velocity of IB nodes at element center
@@ -940,12 +942,28 @@ module SolidBody
             ry = this%v_Ew(5:8,iEL)
             rz = this%v_Ew(9:12,iEL)
             forceElemTemp = this%v_Eforce(1:3,iEL)
-            ! update beam load, momentum is not included
+            ! update beam load, included momentum
+            ! corresponding structural element
             iElem = this%vtor_f(iEL)
+            ! translational DOFs
             id0 = this%rbm%m_elements(iElem)%m_localToGlobal(1:3)
             id1 = this%rbm%m_elements(iElem)%m_localToGlobal(7:9)
+            ! rotational DOFs
+            im0 = this%rbm%m_elements(iElem)%m_localToGlobal(4:6)
+            im1 = this%rbm%m_elements(iElem)%m_localToGlobal(10:12)
+            ! moment arm from beam axis center to IB force point
+            xc = 0.5d0 * (this%rbm%m_elements(iElem)%x1(1:3) + this%rbm%m_elements(iElem)%x1(7:9))
+            xi = this%v_Exyz(1:3,iEL)
+            rr = xi - xc
+            ! moment caused by the IB force
+            momentElemTemp(1) = rr(2)*forceElemTemp(3) - rr(3)*forceElemTemp(2)
+            momentElemTemp(2) = rr(3)*forceElemTemp(1) - rr(1)*forceElemTemp(3)
+            momentElemTemp(3) = rr(1)*forceElemTemp(2) - rr(2)*forceElemTemp(1)
+            ! distribute force and moment equally to the two nodes
             this%rbm%lodFlow(id0) = this%rbm%lodFlow(id0) + 0.5d0 * forceElemTemp(1:3)
             this%rbm%lodFlow(id1) = this%rbm%lodFlow(id1) + 0.5d0 * forceElemTemp(1:3)
+            this%rbm%lodFlow(im0) = this%rbm%lodFlow(im0) + 0.5d0 * momentElemTemp(1:3)
+            this%rbm%lodFlow(im1) = this%rbm%lodFlow(im1) + 0.5d0 * momentElemTemp(1:3)
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
