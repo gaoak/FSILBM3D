@@ -608,6 +608,7 @@ module SolidBody
         real(8) :: tmpxyz(3), tmpvel(3), dirc(3)
         real(8) :: dh, left, len, dl, ls, area, IBPenaltyBeta
         real(8) :: omega(3), rspan(3), wspin(3)
+        real(8) :: dir_norm
         IBPenaltyBeta = - m_IBPenaltyalpha* 2.0d0*m_denIn
         do i = 1,this%rbm%nEL
             i1 = this%rbm%m_elements(i)%node0
@@ -620,7 +621,15 @@ module SolidBody
             dl = len / dble(this%rbm%m_elements(i)%Nspan)
             dh = this%rbm%m_elements(i)%len1
             area = dl * dh * IBPenaltyBeta
-            dirc(1:3) = this%rbm%m_elements(i)%triad_ee(1:3,2)
+            ! Timoshenko-consistent spanwise/material extension direction
+            dirc(1:3) = 0.5d0 * (this%rbm%m_elements(i)%triad_n1(1:3,2) + &
+                                 this%rbm%m_elements(i)%triad_n2(1:3,2))
+            dir_norm = dsqrt(dot_product(dirc, dirc))
+            if (dir_norm .gt. 1.0d-12) then
+                dirc = dirc / dir_norm
+            else
+                dirc = this%rbm%m_elements(i)%triad_ee(1:3,2)
+            endif
             cnt = this%rtov(i) - 1
             do s=1,this%rbm%m_elements(i)%Nspan
                 ls = dl * (0.5d0 + dble(s-1)) - left
@@ -919,7 +928,9 @@ module SolidBody
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: forceElemTemp(3),invh3
         !==================================================================================================
-        integer::x,y,z,iEL,iElem,id0(3),id1(3)
+        integer:: x,y,z,iEL,iElem,id0(3),id1(3),im0(3),im1(3)
+        real(8):: xc(3),xi(3),rr(3)
+        real(8):: momentElemTemp(3)
         !==================================================================================================
         invh3 = (1.d0/dh)**3
         ! compute the velocity of IB nodes at element center
@@ -931,12 +942,28 @@ module SolidBody
             ry = this%v_Ew(5:8,iEL)
             rz = this%v_Ew(9:12,iEL)
             forceElemTemp = this%v_Eforce(1:3,iEL)
-            ! update beam load, momentum is not included
+            ! update beam load, included momentum
+            ! corresponding structural element
             iElem = this%vtor_f(iEL)
+            ! translational DOFs
             id0 = this%rbm%m_elements(iElem)%m_localToGlobal(1:3)
             id1 = this%rbm%m_elements(iElem)%m_localToGlobal(7:9)
+            ! rotational DOFs
+            im0 = this%rbm%m_elements(iElem)%m_localToGlobal(4:6)
+            im1 = this%rbm%m_elements(iElem)%m_localToGlobal(10:12)
+            ! moment arm from beam axis center to IB force point
+            xc = 0.5d0 * (this%rbm%m_elements(iElem)%x1(1:3) + this%rbm%m_elements(iElem)%x1(7:9))
+            xi = this%v_Exyz(1:3,iEL)
+            rr = xi - xc
+            ! moment caused by the IB force
+            momentElemTemp(1) = rr(2)*forceElemTemp(3) - rr(3)*forceElemTemp(2)
+            momentElemTemp(2) = rr(3)*forceElemTemp(1) - rr(1)*forceElemTemp(3)
+            momentElemTemp(3) = rr(1)*forceElemTemp(2) - rr(2)*forceElemTemp(1)
+            ! distribute force and moment equally to the two nodes
             this%rbm%lodFlow(id0) = this%rbm%lodFlow(id0) + 0.5d0 * forceElemTemp(1:3)
             this%rbm%lodFlow(id1) = this%rbm%lodFlow(id1) + 0.5d0 * forceElemTemp(1:3)
+            this%rbm%lodFlow(im0) = this%rbm%lodFlow(im0) + 0.5d0 * momentElemTemp(1:3)
+            this%rbm%lodFlow(im1) = this%rbm%lodFlow(im1) + 0.5d0 * momentElemTemp(1:3)
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
@@ -1181,12 +1208,13 @@ module SolidBody
             Ls  = 1.5d0*this%rbm%m_elements(1)%Lspan - 0.5d0*this%rbm%m_elements(2)%Lspan
             Rs  = 1.5d0*(this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan) - &
                   0.5d0*(this%rbm%m_elements(2)%spanlen - this%rbm%m_elements(2)%Lspan)
-            dir = 1.5d0*this%rbm%m_elements(1)%triad_ee(1:3,2) - 0.5d0*this%rbm%m_elements(2)%triad_ee(1:3,2)
+            dir = 1.5d0*(0.5d0 * (this%rbm%m_elements(1)%triad_n1(1:3,2) +  this%rbm%m_elements(1)%triad_n2(1:3,2))) - &
+                  0.5d0*(0.5d0 * (this%rbm%m_elements(2)%triad_n1(1:3,2) +  this%rbm%m_elements(2)%triad_n2(1:3,2)))
         else
             xc  = this%rbm%m_elements(1)%x1(1:3)
             Ls  = this%rbm%m_elements(1)%Lspan
             Rs  = this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan
-            dir = this%rbm%m_elements(1)%triad_ee(1:3,2)
+            dir = this%rbm%m_elements(1)%triad_n1(1:3,2)
         endif
         call write_section()
         ! ------------------------------------------------------------
@@ -1196,7 +1224,8 @@ module SolidBody
             xc  = 0.5d0*(this%rbm%m_elements(i)%x1(1:3) + this%rbm%m_elements(i)%x1(7:9))
             Ls  = this%rbm%m_elements(i)%Lspan
             Rs  = this%rbm%m_elements(i)%spanlen - this%rbm%m_elements(i)%Lspan
-            dir = this%rbm%m_elements(i)%triad_ee(1:3,2)
+            dir = 0.5d0 * (this%rbm%m_elements(i)%triad_n1(1:3,2) + &
+                           this%rbm%m_elements(i)%triad_n2(1:3,2))
             call write_section()
         enddo
         ! ------------------------------------------------------------
@@ -1209,12 +1238,13 @@ module SolidBody
             Ls  = 1.5d0*this%rbm%m_elements(nEL)%Lspan - 0.5d0*this%rbm%m_elements(nEL-1)%Lspan
             Rs  = 1.5d0*(this%rbm%m_elements(nEL)%spanlen - this%rbm%m_elements(nEL)%Lspan) - &
                   0.5d0*(this%rbm%m_elements(nEL-1)%spanlen - this%rbm%m_elements(nEL-1)%Lspan)
-            dir = 1.5d0*this%rbm%m_elements(nEL)%triad_ee(1:3,2) - 0.5d0*this%rbm%m_elements(nEL-1)%triad_ee(1:3,2)
+            dir = 1.5d0*(0.5d0 * (this%rbm%m_elements(nEL)%triad_n1(1:3,2)   +  this%rbm%m_elements(nEL)%triad_n2(1:3,2))) - &
+                  0.5d0*(0.5d0 * (this%rbm%m_elements(nEL-1)%triad_n1(1:3,2) +  this%rbm%m_elements(nEL-1)%triad_n2(1:3,2)))
         else
             xc  = this%rbm%m_elements(1)%x1(7:9)
             Ls  = this%rbm%m_elements(1)%Lspan
             Rs  = this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan
-            dir = this%rbm%m_elements(1)%triad_ee(1:3,2)
+            dir = this%rbm%m_elements(1)%triad_n2(1:3,2)
         endif
         call write_section()
         ! ------------------------------------------------------------

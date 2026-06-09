@@ -14,7 +14,7 @@ module SegmentStructure
         integer :: node0, node1, m_localToGlobal(1:nElmtDofs), itype, bc(1:nElmtDofs), Nspan
         real(8) :: x00(1:nElmtDofs),x0(1:nElmtDofs),x1(1:nElmtDofs),xnxt(1:nElmtDofs)
         real(8) :: dx0, dy0, dz0, dx1, dy1, dz1, xll0, xmm0, xnn0, xll1, xmm1, xnn1, len0, len1
-        real(8) :: Lspan, spanlen, dirc(3)
+        real(8) :: Lspan, spanlen, dirc00(3), dirc0(3), dirc1(3), dircnxt(3)
         real(8) :: geoFRM
         real(8) :: areaElem00
         real(8) :: strainEnergy(2)
@@ -32,7 +32,8 @@ module SegmentStructure
         procedure :: cptdxyz1 => Segment_cptdxyz1
         procedure :: Multiply => Segment_Multiply
         procedure :: UpdateMatrix => Segment_UpdateMatrix
-        procedure :: Preconditioned => Segment_Preconditioned
+        procedure :: ScalarPreconditioned => Segment_ScalarPreconditioned
+        procedure :: BlockPreconditioned => Segment_BlockPreconditioned
         procedure :: UpdateLoad => Segment_UpdateLoad
         procedure :: LocToGlobal => Segment_LocToGlobal
         procedure :: GlobalToLoc => Segment_GlobalToLoc
@@ -46,10 +47,11 @@ module SegmentStructure
         procedure :: BodyStress_D => Segment_BodyStress_D
         procedure :: StrainEnergy_D => Segment_StrainEnergy_D
         procedure :: InitTriad_D => Segment_InitTriad_D
-        procedure :: BuildAxisDirTriad => Segment_BuildAxisDirTriad
+        procedure :: RigidUpdateTriad_D => Segment_RigidUpdateTriad_D
         procedure :: UpdateTriad_D => Segment_UpdateTriad_D
         procedure :: MakeTriad_ee => Segment_MakeTriad_ee
-        procedure :: MapReferenceToCurrent => Segment_MapReferenceToCurrent
+        procedure :: MapReferencePosToCurrent => Segment_MapReferencePosToCurrent
+        procedure :: MapReferenceDirToCurrent => Segment_MapReferenceDirToCurrent
     end type Segment
 
   contains
@@ -86,10 +88,10 @@ module SegmentStructure
         this%Nspan = Nspan_
         this%Lspan = 0.5d0 * (xyz(4,p0Id) + xyz(4,p1Id))
         this%spanlen = 0.5d0 * (xyz(5,p0Id) + xyz(5,p1Id)) + this%Lspan
-        this%dirc(1:3) = 0.5d0 * (xyz(6:8,p0Id) + xyz(6:8,p1Id))
-        dirc_norm = dsqrt(sum(this%dirc**2))
+        this%dirc00(1:3) = 0.5d0 * (xyz(6:8,p0Id) + xyz(6:8,p1Id))
+        dirc_norm = dsqrt(sum(this%dirc00**2))
         if (dirc_norm .gt. 1d-10) then
-            this%dirc = this%dirc / dirc_norm
+            this%dirc00 = this%dirc00 / dirc_norm
         else
             write(*,*) xyz(6:8,p0Id), "and", xyz(6:8,p1Id), "are opposite directions; no unique bisector exists."
             stop
@@ -101,6 +103,8 @@ module SegmentStructure
         class(Segment), intent(inout) :: this
         this%x1(1:12) = this%x0(1:12)
         this%xnxt(1:12) = this%x1(1:12)
+        this%dirc1(1:3) = this%dirc0(1:3)
+        this%dircnxt(1:3) = this%dirc1(1:3)
         this%dx0  = this%x0(7) - this%x0(1)
         this%dy0  = this%x0(8) - this%x0(2)
         this%dz0  = this%x0(9) - this%x0(3)
@@ -228,28 +232,31 @@ module SegmentStructure
         mq(10:12) = matmul(this%m_masMat(10:12,10:12), q(10:12))
     end subroutine Segment_MassMultiply
 
-    subroutine Segment_BoundaryCond(this, iter, gEQ, lodEffe, vBC)
-        ! The method of multiplying by large numbers
+    subroutine Segment_BoundaryCond(this, iter, gEQ, x, fixed, vBC)
+        ! Build fixed-DOF mask and prescribed displacement increment.
+        ! For Newton iteration 1, fixed DOFs take the non-homogeneous prescribed increment vBC. 
+        ! For later Newton iterations, the correction on fixed DOFs is homogeneous, i.e. zero.
         implicit none
-        class(Segment), intent(inout) :: this
-        integer, intent(in) :: gEQ
+        class(Segment), intent(in) :: this
+        integer, intent(in) :: iter, gEQ
         real(8), intent(in) :: vBC(1:gEQ)
-        real(8), intent(inout) :: lodEffe(1:gEQ)
-        integer :: i,iter
+        real(8), intent(inout) :: x(1:gEQ)
+        logical, intent(inout) :: fixed(1:gEQ)
+        integer :: i, gid
         do i=1,nElmtDofs
-            if (this%bc(i).gt.0)then
-                this%m_coefMat(i,i) = this%m_coefMat(i,i) * 1.0d20
-                if(iter.eq.1)then
-                    lodEffe(this%m_localToGlobal(i))=this%m_coefMat(i,i)*vBC(this%m_localToGlobal(i)) &
-                                                                    +lodEffe(this%m_localToGlobal(i))
+            if (this%bc(i) .gt. 0) then
+                gid = this%m_localToGlobal(i)
+                fixed(gid) = .true.
+                if (iter .eq. 1) then
+                    x(gid) = vBC(gid)
                 else
-                    lodEffe(this%m_localToGlobal(i))=0.0d0
+                    x(gid) = 0.0d0
                 endif
             endif
         enddo
     end subroutine Segment_BoundaryCond
 
-    subroutine Segment_Preconditioned(this, M, gEQ)
+    subroutine Segment_ScalarPreconditioned(this, M, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
         real(8) :: Melmts(1:nElmtDofs),M(1:gEQ)
@@ -258,7 +265,16 @@ module SegmentStructure
             Melmts(i)=this%m_coefMat(i,i)
         enddo
         call this%LocToGlobal(Melmts, M, gEQ)
-    end subroutine
+    end subroutine Segment_ScalarPreconditioned
+
+    subroutine Segment_BlockPreconditioned(this, blockM, nND)
+        implicit none
+        class(Segment), intent(in) :: this
+        integer, intent(in) :: nND
+        real(8), intent(inout) :: blockM(6,6,nND)
+        blockM(1:6,1:6,this%node0) = blockM(1:6,1:6,this%node0) + this%m_coefMat(1:6,1:6)
+        blockM(1:6,1:6,this%node1) = blockM(1:6,1:6,this%node1) + this%m_coefMat(7:12,7:12)
+    end subroutine Segment_BlockPreconditioned
 
     subroutine Segment_Multiply(this, x, b, gEQ)
         class(Segment), intent(in) :: this
@@ -585,14 +601,26 @@ module SegmentStructure
     subroutine Segment_InitTriad_D(this)
         implicit none
         class(Segment), intent(inout) :: this
-        call this%BuildAxisDirTriad(this%xll0,this%xmm0,this%xnn0,this%triad_n1)
+        call Segment_BuildAxisDirTriad(this%xll0,this%xmm0,this%xnn0,this%dirc0,this%triad_n1)
         ! all element triads have same initial orientation
         this%triad_n2(1:3,1:3)=this%triad_n1(1:3,1:3)
         this%triad_ee(1:3,1:3)=this%triad_n1(1:3,1:3)
         return
     end subroutine Segment_InitTriad_D
 
-    subroutine Segment_BuildAxisDirTriad(this,l,m,n,triad)
+    subroutine Segment_RigidUpdateTriad_D(this)
+        ! Used for rigid-body triad updates.
+        ! Rebuild the full triad from the current beam axis and the current material direction.
+        implicit none
+        class(Segment), intent(inout) :: this
+        call Segment_BuildAxisDirTriad(this%xll1,this%xmm1,this%xnn1,this%dirc1,this%triad_n1)
+        ! In rigid-body motion, the two nodal triads and the element triad share the same current orientation.
+        this%triad_n2(1:3,1:3)=this%triad_n1(1:3,1:3)
+        this%triad_ee(1:3,1:3)=this%triad_n1(1:3,1:3)
+        return
+    end subroutine Segment_RigidUpdateTriad_D
+
+    subroutine Segment_BuildAxisDirTriad(l,m,n,d,triad)
         ! If span direction vector is not 0
         ! ex: beam axis direction
         ! ey: span direction
@@ -602,8 +630,7 @@ module SegmentStructure
         ! [triad] = [R]^T
         ! ISBN 9780792312086 James F. Doyle. P157,158
         implicit none
-        class(Segment), intent(in) :: this
-        real(8), intent(in) :: l,m,n
+        real(8), intent(in) :: l,m,n,d(3)
         real(8), intent(out) :: triad(3,3)
         real(8) :: ex(3), ey(3), ez(3), dir(3), dd, proj
 
@@ -617,7 +644,7 @@ module SegmentStructure
             ex = ex / dd
         endif
 
-        dir(1:3) = this%dirc(1:3)
+        dir(1:3) = d(1:3)
         ! Normalization
         dd = dsqrt(dot_product(dir, dir))
         if (dd .gt. 1.0d-14) then
@@ -1094,7 +1121,7 @@ module SegmentStructure
         return
     end subroutine Segment_FiniteRot
 
-    subroutine Segment_MapReferenceToCurrent(this, coordsOut, TTT, XYZ, AoA)
+    subroutine Segment_MapReferencePosToCurrent(this, coordsOut, TTT, XYZ, AoA)
         implicit none
         class(Segment), intent(in) :: this
         real(8), intent(out) :: coordsOut(12)
@@ -1105,7 +1132,15 @@ module SegmentStructure
         coordsOut(4:6) = AoA
         coordsOut(7:9) = matmul(TTT, this%x00(7:9)) + XYZ
         coordsOut(10:12) = AoA
-    end subroutine Segment_MapReferenceToCurrent
+    end subroutine Segment_MapReferencePosToCurrent
+
+    subroutine Segment_MapReferenceDirToCurrent(this, dirc, TTT)
+        implicit none
+        class(Segment), intent(in) :: this
+        real(8), intent(out) :: dirc(3)
+        real(8), intent(in) :: TTT(3,3)
+        dirc = matmul(TTT, this%dirc00)
+    end subroutine Segment_MapReferenceDirToCurrent
 
 end module SegmentStructure
 
@@ -1153,7 +1188,18 @@ module SolidSolver
         procedure :: UpdateMatrixANDLoad => Beam_UpdateMatrixANDLoad
         procedure :: CG_Solve => Beam_CG_Solve
         procedure :: MatrixMultipy => Beam_MatrixMultipy
-        procedure :: preconditioned => Beam_preconditioned
+        procedure :: BoundaryCond => Beam_BoundaryCond
+        procedure :: ApplyFixedZero => Beam_ApplyFixedZero
+        procedure :: ApplyFixedValue => Beam_ApplyFixedValue
+        procedure :: InitPreconditioner => Beam_InitPreconditioner
+        procedure :: ApplyPreconditioner => Beam_ApplyPreconditioner
+        procedure :: ScalarPreconditioned => Beam_ScalarPreconditioned
+        procedure :: BlockPreconditioned => Beam_BlockPreconditioned
+        procedure :: InitScalarJacobiPreconditioner => Beam_InitScalarJacobiPreconditioner
+        procedure :: ApplyScalarJacobiPreconditioner => Beam_ApplyScalarJacobiPreconditioner
+        procedure :: InitBlockJacobiPreconditioner => Beam_InitBlockJacobiPreconditioner
+        procedure :: ApplyBlockJacobiPreconditioner => Beam_ApplyBlockJacobiPreconditioner
+        procedure :: CheckCGBreakdown => Beam_CheckCGBreakdown
         procedure :: UpdateDspANDTride => Beam_UpdateDspANDTride
         procedure :: UpdateVelAcc => Beam_UpdateVelAcc
         procedure :: UpdateIterInfo => Beam_UpdateIterInfo
@@ -1372,7 +1418,8 @@ module SolidSolver
         call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
 
         do n=1,this%nEL
-            call this%m_elements(n)%MapReferenceToCurrent(this%m_elements(n)%x0, this%TTT0, this%XYZ, this%AoAd)
+            call this%m_elements(n)%MapReferencePosToCurrent(this%m_elements(n)%x0, this%TTT0, this%XYZ, this%AoAd)
+            call this%m_elements(n)%MapReferenceDirToCurrent(this%m_elements(n)%dirc0, this%TTT0)
             call this%m_elements(n)%Init()
         enddo
 
@@ -1690,15 +1737,15 @@ module SolidSolver
         
         ! write begin information
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,1)-XYZo(1:3))/Lref,this%vel(1:3,1)/Uref,this%acc(1:3,1)/Aref
+        write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,1)-XYZo(1:3))/Lref,this%pos(4:6,1),this%vel(1:3,1)/Uref,this%acc(1:3,1)/Aref
         close(idfile)
         ! write end information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_lastNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,this%nND)-XYZo(1:3))/Lref,this%vel(1:3,this%nND)/Uref,this%acc(1:3,this%nND)/Aref
+        write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,this%nND)-XYZo(1:3))/Lref,this%pos(4:6,this%nND),this%vel(1:3,this%nND)/Uref,this%acc(1:3,this%nND)/Aref
         close(idfile)
         ! write center information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_centerNode.dat',position='append')
-        write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,(this%nND+1)/2)-XYZo(1:3))/Lref,this%vel(1:3,(this%nND+1)/2)/Uref,this%acc(1:3,(this%nND+1)/2)/Aref
+        write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,(this%nND+1)/2)-XYZo(1:3))/Lref,this%pos(4:6,(this%nND+1)/2),this%vel(1:3,(this%nND+1)/2)/Uref,this%acc(1:3,(this%nND+1)/2)/Aref
         close(idfile)
         ! write mean information titles
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_nodeAverage.dat',position='append')
@@ -1760,7 +1807,8 @@ module SolidSolver
         do  i=1,solidProbingNum
             write(probeNum,'(I3.3)') i
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
-            write(idfile,'(12E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,solidProbingNode(i))-XYZo(1:3))/Lref, &
+            write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,solidProbingNode(i))-XYZo(1:3))/Lref, &
+                                                                              this%pos(4:6,solidProbingNode(i)), &
                                                                               this%vel(1:3,solidProbingNode(i))/Uref, &
                                                                               this%acc(1:3,solidProbingNode(i))/Aref
             close(idfile)
@@ -1785,11 +1833,14 @@ module SolidSolver
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do i=1,this%nEL
-                    call this%m_elements(i)%MapReferenceToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferencePosToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferenceDirToCurrent(this%m_elements(i)%dircnxt, this%TTTnxt)
                     this%m_elements(i)%x1(:)=this%m_elements(i)%xnxt(:)
+                    this%m_elements(i)%dirc1(:)=this%m_elements(i)%dircnxt(:)
                     this%pos(1:6,this%m_elements(i)%node0)=this%m_elements(i)%x1(1:6)
                     this%pos(1:6,this%m_elements(i)%node1)=this%m_elements(i)%x1(7:12)
                     call this%m_elements(i)%cptdxyz1()
+                    call this%m_elements(i)%RigidUpdateTriad_D()
                 enddo
                 !------------------------------------------------------
                 !translational velocity
@@ -1812,10 +1863,10 @@ module SolidSolver
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
                 do i=1,this%nEL
-                    call this%m_elements(i)%MapReferenceToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
+                    call this%m_elements(i)%MapReferencePosToCurrent(this%m_elements(i)%xnxt, this%TTTnxt, this%XYZ, this%AoAd)
                 enddo
                 !-----------------------------------------
-                call this%UpdateNewmarkCoeffs(deltat)
+                call this%UpdateNewmarkCoeffs(subdeltat)
                 CALL this%Solver(iFish)
             else
                 stop 'no define body model'
@@ -1851,8 +1902,8 @@ module SolidSolver
         ! solve the next dispalce, velocity and acceleration using CG method
         call this%InitDspVelAccATTimeT(dspO, velO, accO)
         do iter = 1, m_ntolFEM ! m_ntolFEM is maxNewtonRaphson
-            call this%UpdateMatrixANDLoad(iter, dspO)
-            call this%CG_Solve(dspn, this%lodEffe)
+            call this%UpdateMatrixANDLoad(dspO)
+            call this%CG_Solve(dspn, this%lodEffe, iter)
             call this%UpdateDspANDTride(iter, dspn, dnorm)
             if (dnorm .le. m_dtolFEM) exit
         enddo
@@ -1876,12 +1927,11 @@ module SolidSolver
         accO(1:6, 1:this%nND) = this%acc(1:6, 1:this%nND)
     end subroutine Beam_InitDspVelAccATTimeT
 
-    subroutine Beam_UpdateMatrixANDLoad(this, iter, dspO)
+    subroutine Beam_UpdateMatrixANDLoad(this, dspO)
         implicit none
         class(BeamSolver), intent(inout) :: this
         real(8), intent(inout) :: dspO(1:6, 1:this%nND)
-        integer :: i,iter
-
+        integer :: i
         this%lodInte = 0.0d0
         do i = 1, this%nEL
             call this%m_elements(i)%FormStiffMatrix()
@@ -1891,86 +1941,94 @@ module SolidSolver
         this%lodEffe = this%lodExte - this%lodInte
         do i = 1, this%nEL
             call this%m_elements(i)%UpdateLoad(this%coeffs, m_dampM, m_dampK, this%nND, this%gEQ, dspO, this%dsp, this%vel, this%acc, this%lodEffe)
-            call this%m_elements(i)%BoundaryCond(iter, this%gEQ, this%lodEffe, this%vBC)
         enddo
     end subroutine Beam_UpdateMatrixANDLoad
 
-    subroutine Beam_CG_Solve(this, x, b)
-        ! Conjugate Gradient Method
+    subroutine Beam_CG_Solve(this, x, b, iterNR)
+        ! Matrix-free Jacobi-preconditioned CG solver.
         ! Iterative solution for displacement vector.
         ! https://www.detailedpedia.com/wiki-Conjugate_gradient_method
+        !
+        ! Non-homogeneous Dirichlet boundary conditions are handled by lifting:
+        !       x = xFixed + xFree,
+        ! where xFixed satisfies the prescribed displacement increments and xFree is zero on fixed DOFs. Therefore,
+        !       A*xFree = b - A*xFixed.
+        ! The CG iteration is projected onto the free-DOF subspace by enforcing
+        ! r(fixed)=0, z(fixed)=0, p(fixed)=0, and Ap(fixed)=0.
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8) :: x(1:this%gEQ), b(1:this%gEQ)
+        integer, intent(in) :: iterNR
+        real(8), intent(out) :: x(1:this%gEQ)
+        real(8), intent(in)  :: b(1:this%gEQ)
         real(8) :: r(1:this%gEQ), p(1:this%gEQ), Ap(1:this%gEQ)
         real(8) :: z(1:this%gEQ), M(1:this%gEQ)
-        integer :: iter, max_iter, i
+        real(8) :: blockM(6,6,this%nND)
+        real(8) :: xFixed(1:this%gEQ)
+        logical :: fixed(1:this%gEQ)
+        integer :: iter, max_iter, precondType
         real(8) :: alpha, beta, rsold, rsnew, err, pAp, residual_norm
+        ! select preconditioner
+        precondType = 2
         ! maximum iteration count and tolerance
         max_iter = 10000
-        err = 1.0d-10
+        err = 1.0d-6
+        ! lifting of non-homogeneous Dirichlet boundary conditions
+        call this%BoundaryCond(iterNR, xFixed, fixed)
         ! initial guess
-        x(1:this%gEQ) = 0.0d0
+        x(1:this%gEQ) = xFixed(1:this%gEQ)
         ! initial residual: r = b - A*x
         call this%MatrixMultipy(x, Ap)
         r = b - Ap
-        ! diagonal preconditioner
-        call this%preconditioned(M)
-        do i = 1, this%gEQ
-            if (dabs(M(i)) .gt. 1.0d-30) then
-                M(i) = 1.0d0 / M(i)
-            else
-                M(i) = 1.0d0
-            endif
-            z(i) = M(i) * r(i)
-        enddo
+        call this%ApplyFixedZero(r, fixed)
+        call this%InitPreconditioner(precondType, M, blockM, fixed)
+        call this%ApplyPreconditioner(precondType, r, z, M, blockM, fixed)
         residual_norm = dsqrt(dot_product(r, r))
         if (residual_norm .le. err) return
         p = z
         rsold = dot_product(r, z)
-        if (dabs(rsold) .le. 1.0d-30) then
-            write(*,*) 'ERROR: CG solver breakdown: initial dot_product(r, z) is near zero.'
-            write(*,*) 'rsold = ', rsold, ' residual_norm = ', residual_norm
-            stop
-        endif
+        call this%CheckCGBreakdown(rsold, residual_norm, 1.0d-30, 'rsold', 'initial dot_product(r,z)')
         do iter = 1, max_iter
             call this%MatrixMultipy(p, Ap)
+            call this%ApplyFixedZero(Ap, fixed)
             pAp = dot_product(p, Ap)
-            if (dabs(pAp) .le. 1.0d-30) then
-                write(*,*) 'ERROR: CG solver breakdown: dot_product(p, Ap) is near zero.'
-                write(*,*) 'pAp = ', pAp, ' residual_norm = ', residual_norm
-                stop
-            endif
+            call this%CheckCGBreakdown(pAp, residual_norm, 1.0d-30, 'pAp', 'dot_product(p,Ap) before alpha', iter)
             alpha = rsold / pAp
             x = x + alpha * p
+            ! In exact arithmetic, p(fixed)=0 keeps x(fixed)=xFixed(fixed).
+            ! This projection is kept as a safeguard against numerical drift or future code changes.
+            call this%ApplyFixedValue(x, xFixed, fixed)
             r = r - alpha * Ap
+            call this%ApplyFixedZero(r, fixed)
             residual_norm = dsqrt(dot_product(r, r))
             if (residual_norm .le. err) exit
-            do i = 1,this%gEQ
-                z(i) = M(i) * r(i)
-            enddo
+            call this%ApplyPreconditioner(precondType, r, z, M, blockM, fixed)
             rsnew = dot_product(r, z)
-            if (dabs(rsold) .le. 1.0d-30) then
-                write(*,*) 'ERROR: CG solver breakdown: rsold is near zero.'
-                write(*,*) 'rsold = ', rsold, ' residual_norm = ', residual_norm
-                stop
-            endif
+            call this%CheckCGBreakdown(rsold, residual_norm, 1.0d-30, 'rsold', 'rsold before beta=rsnew/rsold', iter)
             beta = rsnew / rsold
             p = z + beta * p
+            call this%ApplyFixedZero(p, fixed)
             rsold = rsnew
         enddo
+        if (residual_norm .gt. err) then
+            write(*,*) 'WARNING: CG did not fully converge.'
+            write(*,*) 'residual_norm = ', residual_norm, ' err = ', err
+            write(*,*) 'max_iter = ', max_iter
+        endif
         return
     end subroutine Beam_CG_Solve
 
-    subroutine Beam_preconditioned(this, M)
-        class(BeamSolver), intent(inout) :: this
-        real(8) :: M(1:this%gEQ)
+    subroutine Beam_BoundaryCond(this, iter, x, fixed)
+        class(BeamSolver), intent(in) :: this
+        integer, intent(in) :: iter
+        real(8), intent(out) :: x(1:this%gEQ)
+        logical, intent(out) :: fixed(1:this%gEQ)
         integer :: i
-        M=0.0d0
+        fixed(:)  = .false.
+        x(:) = 0.0d0
         do i=1,this%nEL
-            call this%m_elements(i)%Preconditioned(M, this%gEQ)
+            call this%m_elements(i)%BoundaryCond(iter, this%gEQ, x, fixed, this%vBC)
         enddo
-    end subroutine
+    end subroutine Beam_BoundaryCond
 
     subroutine Beam_MatrixMultipy(this, x, b)
         ! Matrix Free Method
@@ -1978,7 +2036,8 @@ module SolidSolver
         ! Element‐by‐Element(Hughes, Thomas J. R.(1983).doi:10.1061/(ASCE)0733-9399(1983)109:2(576))
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8) :: x(1:this%gEQ), b(1:this%gEQ)
+        real(8), intent(in)  :: x(1:this%gEQ)
+        real(8), intent(out) :: b(1:this%gEQ)
         integer :: i
         b(1:this%gEQ) = 0.0d0
         do i=1,this%nEL
@@ -1986,6 +2045,259 @@ module SolidSolver
         enddo
         return
     end subroutine Beam_MatrixMultipy
+
+    subroutine Beam_ApplyFixedZero(this, x, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: x(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) x(i) = 0.0d0
+        enddo
+    end subroutine Beam_ApplyFixedZero
+
+    subroutine Beam_ApplyFixedValue(this, x, xFixed, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: x(1:this%gEQ)
+        real(8), intent(in) :: xFixed(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) x(i) = xFixed(i)
+        enddo
+    end subroutine Beam_ApplyFixedValue
+
+    subroutine Beam_InitPreconditioner(this, precondType, M, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(inout) :: this
+        integer, intent(in) :: precondType
+        real(8), intent(inout) :: M(1:this%gEQ)
+        real(8), intent(inout) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        select case (precondType)
+        case (1)
+            ! Scalar Jacobi preconditioner.
+            call this%ScalarPreconditioned(M)
+            call this%InitScalarJacobiPreconditioner(M, fixed)
+        case (2)
+            ! Node-wise 6x6 block Jacobi preconditioner.
+            call this%BlockPreconditioned(blockM)
+            call this%InitBlockJacobiPreconditioner(blockM, fixed)
+        case default
+            write(*,*) 'ERROR: unknown preconditioner type: ', precondType
+            stop
+        end select
+    end subroutine Beam_InitPreconditioner
+
+    subroutine Beam_ApplyPreconditioner(this, precondType, r, z, M, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        integer, intent(in) :: precondType
+        real(8), intent(in) :: r(1:this%gEQ)
+        real(8), intent(out) :: z(1:this%gEQ)
+        real(8), intent(in) :: M(1:this%gEQ)
+        real(8), intent(in) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        select case (precondType)
+        case (1)
+            call this%ApplyScalarJacobiPreconditioner(r, z, M, fixed)
+        case (2)
+            call this%ApplyBlockJacobiPreconditioner(r, z, blockM, fixed)
+        case default
+            write(*,*) 'ERROR: unknown preconditioner type: ', precondType
+            stop
+        end select
+    end subroutine Beam_ApplyPreconditioner
+
+    subroutine Beam_ScalarPreconditioned(this, M)
+        ! Scalar Jacobi Preconditioned
+        class(BeamSolver), intent(in) :: this
+        real(8) :: M(1:this%gEQ)
+        integer :: i
+        M=0.0d0
+        do i=1,this%nEL
+            call this%m_elements(i)%ScalarPreconditioned(M, this%gEQ)
+        enddo
+    end subroutine Beam_ScalarPreconditioned
+
+    subroutine Beam_BlockPreconditioned(this, blockM)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(out) :: blockM(6,6,this%nND)
+        integer :: i
+        blockM(:,:,:) = 0.0d0
+        do i = 1, this%nEL
+            call this%m_elements(i)%BlockPreconditioned(blockM, this%nND)
+        enddo
+    end subroutine Beam_BlockPreconditioned
+
+    subroutine Beam_InitScalarJacobiPreconditioner(this, M, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: M(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) then
+                M(i) = 0.0d0
+            else
+                if (dabs(M(i)) .gt. 1.0d-30) then
+                    M(i) = 1.0d0 / M(i)
+                else
+                    write(*,*) 'WARNING: near-zero Jacobi diagonal at DOF ', i
+                    M(i) = 1.0d0
+                endif
+            endif
+        enddo
+    end subroutine Beam_InitScalarJacobiPreconditioner
+
+    subroutine Beam_ApplyScalarJacobiPreconditioner(this, r, z, M, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(in) :: r(1:this%gEQ), M(1:this%gEQ)
+        real(8), intent(out) :: z(1:this%gEQ)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: i
+        do i = 1, this%gEQ
+            if (fixed(i)) then
+                z(i) = 0.0d0
+            else
+                z(i) = M(i) * r(i)
+            endif
+        enddo
+    end subroutine Beam_ApplyScalarJacobiPreconditioner
+
+    subroutine Beam_InitBlockJacobiPreconditioner(this, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(inout) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: node, i, gid
+        real(8) :: invB(6,6)
+        integer :: info
+        do node = 1, this%nND
+            ! For fixed DOFs, remove their coupling inside the local 6x6 block
+            ! and set unit diagonal. Since r(fixed)=0, this keeps z(fixed)=0.
+            do i = 1, 6
+                gid = (node-1)*6 + i
+                if (fixed(gid)) then
+                    blockM(i,1:6,node) = 0.0d0
+                    blockM(1:6,i,node) = 0.0d0
+                    blockM(i,i,node)   = 1.0d0
+                endif
+            enddo
+            call Invert6x6(blockM(1:6,1:6,node), invB, info)
+            if (info /= 0) then
+                write(*,*) 'WARNING: block Jacobi inverse failed at node ', node
+                write(*,*) 'Use identity block for this node.'
+                blockM(1:6,1:6,node) = 0.0d0
+                do i = 1, 6
+                    blockM(i,i,node) = 1.0d0
+                enddo
+            else
+                blockM(1:6,1:6,node) = invB(1:6,1:6)
+            endif
+        enddo
+    end subroutine Beam_InitBlockJacobiPreconditioner
+
+    subroutine Beam_ApplyBlockJacobiPreconditioner(this, r, z, blockM, fixed)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(in) :: r(1:this%gEQ)
+        real(8), intent(out) :: z(1:this%gEQ)
+        real(8), intent(in) :: blockM(6,6,this%nND)
+        logical, intent(in) :: fixed(1:this%gEQ)
+        integer :: node, i, gid
+        real(8) :: rnode(6), znode(6)
+        z(:) = 0.0d0
+        do node = 1, this%nND
+            do i = 1, 6
+                gid = (node-1)*6 + i
+                rnode(i) = r(gid)
+            enddo
+            znode = matmul(blockM(1:6,1:6,node), rnode)
+            do i = 1, 6
+                gid = (node-1)*6 + i
+                if (fixed(gid)) then
+                    z(gid) = 0.0d0
+                else
+                    z(gid) = znode(i)
+                endif
+            enddo
+        enddo
+    end subroutine Beam_ApplyBlockJacobiPreconditioner
+
+    subroutine Invert6x6(A, Ainv, info)
+        implicit none
+        real(8), intent(in) :: A(6,6)
+        real(8), intent(out) :: Ainv(6,6)
+        integer, intent(out) :: info
+        real(8) :: aug(6,12)
+        real(8) :: pivot, factor, tmp
+        integer :: i, j, k, p
+        info = 0
+        aug(:,1:6) = A(:,:)
+        aug(:,7:12) = 0.0d0
+        do i = 1, 6
+            aug(i,6+i) = 1.0d0
+        enddo
+        do i = 1, 6
+            p = i
+            pivot = dabs(aug(i,i))
+            do k = i+1, 6
+                if (dabs(aug(k,i)) .gt. pivot) then
+                    pivot = dabs(aug(k,i))
+                    p = k
+                endif
+            enddo
+            if (pivot .le. 1.0d-30) then
+                info = i
+                Ainv(:,:) = 0.0d0
+                return
+            endif
+            if (p /= i) then
+                do j = 1, 12
+                    tmp = aug(i,j)
+                    aug(i,j) = aug(p,j)
+                    aug(p,j) = tmp
+                enddo
+            endif
+            pivot = aug(i,i)
+            aug(i,1:12) = aug(i,1:12) / pivot
+            do k = 1, 6
+                if (k /= i) then
+                    factor = aug(k,i)
+                    aug(k,1:12) = aug(k,1:12) - factor * aug(i,1:12)
+                endif
+            enddo
+        enddo
+        Ainv(:,:) = aug(:,7:12)
+    end subroutine Invert6x6
+
+    subroutine Beam_CheckCGBreakdown(this, value, residual_norm, threshold, valueName, locationName, iter)
+        implicit none
+        class(BeamSolver), intent(in) :: this
+        real(8), intent(in) :: value, residual_norm, threshold
+        character(len=*), intent(in) :: valueName, locationName
+        integer, intent(in), optional :: iter
+    
+        if (dabs(value) .le. threshold) then
+            write(*,*) 'ERROR: CG solver breakdown.'
+            write(*,*) 'XYZo x y z    : ', this%XYZo(1:3)
+            write(*,*) 'Location      : ', trim(locationName)
+            write(*,*) 'Quantity      : ', trim(valueName)
+            write(*,*) 'Value         : ', value
+            write(*,*) 'Threshold     : ', threshold
+            write(*,*) 'residual_norm : ', residual_norm
+            if (present(iter)) then
+                write(*,*) 'CG iter       : ', iter
+            endif
+            stop
+        endif
+    
+    end subroutine Beam_CheckCGBreakdown
 
     subroutine Beam_UpdateDspANDTride(this, iter, dspn, dnorm)
         implicit none
