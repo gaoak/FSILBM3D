@@ -521,7 +521,7 @@ module SolidBody
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
             do  j=1,solidProbingNum
-                write(probeNum,'(I3.3)') j
+                write(probeNum,'(I4.4)') j
                 open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
                 write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
                 close(idfile)
@@ -1109,18 +1109,46 @@ module SolidBody
         implicit none
         class(VirtualBody), intent(inout) :: this
         integer,intent(in) :: iFish,idfile
-        real(8):: tmpxyz(3)
-        integer:: i, i1, i2
-        integer,parameter::nameLen=10
-        character (LEN=nameLen):: idstr
-        !write zone title
-        write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
-        write(idfile, '(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N = ',2*this%rbm%nND,', E = ',this%rbm%nEL,', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
-        !write data
-        do i = 1,this%rbm%nNd
-            tmpxyz = this%rbm%xyzful(i,1:3)
-            write(idfile, *) (tmpxyz - this%rbm%r_Lspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
-            write(idfile, *) (tmpxyz + this%rbm%r_Rspan(i) * this%rbm%r_dirc(i,1:3))/m_Lref
+        integer :: i, nEL, nSta
+        integer, parameter :: nameLen=10
+        character(LEN=nameLen) :: idstr
+        real(8) :: xc(3), xc1(3), xc2(3)
+        real(8) :: Ls, Rs
+        real(8) :: dir(3)
+        nEL  = this%rbm%nEL
+        nSta = nEL + 2
+        ! write zone title
+        write(idstr,'(I4.4)') iFish ! assume iFish < 10000
+        write(idfile,'(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N = ', 2*nSta, ', E = ', nSta-1, ', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
+        ! ------------------------------------------------------------
+        ! 1. First extrapolated section
+        ! ------------------------------------------------------------
+        if (nEL >= 2) then
+            xc1 = 0.5d0*(this%rbm%m_elements(1)%x1(1:3) + this%rbm%m_elements(1)%x1(7:9))
+            xc2 = 0.5d0*(this%rbm%m_elements(2)%x1(1:3) + this%rbm%m_elements(2)%x1(7:9))
+            xc  = xc1 - 0.5d0*(xc2 - xc1)
+            Ls  = 1.5d0*this%rbm%m_elements(1)%Lspan - 0.5d0*this%rbm%m_elements(2)%Lspan
+            Rs  = 1.5d0*(this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan) - &
+                  0.5d0*(this%rbm%m_elements(2)%spanlen - this%rbm%m_elements(2)%Lspan)
+            dir = 1.5d0*(0.5d0 * (this%rbm%m_elements(1)%triad_n1(1:3,2) +  this%rbm%m_elements(1)%triad_n2(1:3,2))) - &
+                  0.5d0*(0.5d0 * (this%rbm%m_elements(2)%triad_n1(1:3,2) +  this%rbm%m_elements(2)%triad_n2(1:3,2)))
+        else
+            xc  = this%rbm%m_elements(1)%x1(1:3)
+            Ls  = this%rbm%m_elements(1)%Lspan
+            Rs  = this%rbm%m_elements(1)%spanlen - this%rbm%m_elements(1)%Lspan
+            dir = this%rbm%m_elements(1)%triad_n1(1:3,2)
+        endif
+        call write_section()
+        ! ------------------------------------------------------------
+        ! 2. Element-center sections
+        ! ------------------------------------------------------------
+        do i = 1, nEL
+            xc  = 0.5d0*(this%rbm%m_elements(i)%x1(1:3) + this%rbm%m_elements(i)%x1(7:9))
+            Ls  = this%rbm%m_elements(i)%Lspan
+            Rs  = this%rbm%m_elements(i)%spanlen - this%rbm%m_elements(i)%Lspan
+            dir = 0.5d0 * (this%rbm%m_elements(i)%triad_n1(1:3,2) + &
+                           this%rbm%m_elements(i)%triad_n2(1:3,2))
+            call write_section()
         enddo
         do  i=1,this%rbm%nEL
             i1 = this%rbm%ele(i,1)
@@ -1129,6 +1157,59 @@ module SolidBody
         enddo
     end subroutine PlateWrite_body_
 
+        write(idstr,'(I4.4)') iFish ! assume iFish < 10000
+        ! One zone for each fish at the current output time.
+        write(idfile,'(A,A,A,I8,A)') 'ZONE    T = "fish', trim(idstr), '" I = ', this%v_nelmts, ', DATAPACKING=POINT'
+        invLFref = 1.0d0 / (m_Lref*m_Fref)
+    
+        ! Moment reference point: current rigid-body reference point.
+        xyz0 = this%rbm%pos(1:3,1)
+    
+        do i = 1, this%v_nelmts
+            xyz = this%v_Exyz(1:3,i)
+            rxyz = xyz - xyz0
+    
+            forceElem = this%v_Eforce(1:3,i)
+    
+            momentElem(1) = rxyz(2)*forceElem(3) - rxyz(3)*forceElem(2)
+            momentElem(2) = rxyz(3)*forceElem(1) - rxyz(1)*forceElem(3)
+            momentElem(3) = rxyz(1)*forceElem(2) - rxyz(2)*forceElem(1)
+    
+            write(idfile,'(9E20.10)') xyz/m_Lref, forceElem/m_Fref, momentElem*invLFref
+        enddo
+    
+    end subroutine Write_force_
+
+    subroutine Write_moment_(this, groupNum, XYZo, Lref, Fref)
+        implicit none
+        class(VirtualBody), intent(inout) :: this
+        character(LEN=3), intent(in) :: groupNum
+        real(8), intent(in) :: XYZo(3), Lref, Fref
+        integer :: iEL
+        integer, parameter :: idfile = 102
+        real(8) :: xyz(3), xyz0(3), rxyz(3)
+        real(8) :: forceElem(3), momentSum(3), invLFref
+    
+        momentSum = 0.0d0
+        xyz0 = this%rbm%pos(1:3,1)
+        invLFref = 1.0d0 / (Lref * Fref)
+    
+        do iEL = 1, this%v_nelmts
+            xyz = this%v_Exyz(1:3,iEL)
+            rxyz = xyz - xyz0
+            forceElem = this%v_Eforce(1:3,iEL)
+    
+            momentSum(1) = momentSum(1) + rxyz(2)*forceElem(3) - rxyz(3)*forceElem(2)
+            momentSum(2) = momentSum(2) + rxyz(3)*forceElem(1) - rxyz(1)*forceElem(3)
+            momentSum(3) = momentSum(3) + rxyz(1)*forceElem(2) - rxyz(2)*forceElem(1)
+        enddo
+    
+        open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_moment.dat',position='append')
+        write(idfile,'(6E20.10)') XYZo(1:3)/Lref, momentSum(1:3)*invLFref
+        close(idfile)
+    
+    end subroutine Write_moment_
+    
     subroutine SurfaceWrite_body_(this,iFish,time,idfile)
         ! to do: generate a temporary mesh
         implicit none
@@ -1141,8 +1222,8 @@ module SolidBody
         integer:: Surfacetmpnpts, Surfacetmpnelmts
         real(8),allocatable :: Surfacetmpxyz(:,:)
         integer,allocatable :: Surfacetmpele(:,:)
-        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
-        if (time .lt. 1e-5) then
+        write(idstr, '(I4.4)') iFish ! assume iFish < 10000
+        if (time .lt. 1d-5) then
             call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
             do  i=1,Surfacetmpnpts
                 Surfacetmpxyz(1:3,i)=matmul(this%rbm%TTTnxt(1:3,1:3),Surfacetmpxyz(1:3,i))+this%rbm%XYZ(1:3)
