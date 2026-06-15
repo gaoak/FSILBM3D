@@ -78,6 +78,7 @@ PROGRAM main
     endif
     write(*,*)'the start step for fluid averaging(if used):', start_ave
     write(*,'(A)') '========================================================='
+    flush(6) !Force the output of all contents of the UWP buffer to avoid duplicate logs when using parallel computing
     !==================================================================================================
     ! Write the initial fluid and solid data
     call write_flow_blocks(time)
