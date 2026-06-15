@@ -569,7 +569,7 @@ module SolidBody
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
             do  j=1,solidProbingNum
-                write(probeNum,'(I3.3)') j
+                write(probeNum,'(I4.4)') j
                 open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
                 write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
                 close(idfile)
@@ -1196,7 +1196,7 @@ module SolidBody
         nEL  = this%rbm%nEL
         nSta = nEL + 2
         ! write zone title
-        write(idstr,'(I3.3)') iFish ! assume iFish < 1000
+        write(idstr,'(I4.4)') iFish ! assume iFish < 10000
         write(idfile,'(A,A,A,I7,A,I7,A)') 'ZONE    T = "fish',trim(idstr), '" N = ', 2*nSta, ', E = ', nSta-1, ', DATAPACKING=POINT, ZONETYPE=FEQUADRILATERAL'
         ! ------------------------------------------------------------
         ! 1. First extrapolated section
@@ -1343,7 +1343,7 @@ module SolidBody
         integer:: Surfacetmpnpts, Surfacetmpnelmts
         real(8),allocatable :: Surfacetmpxyz(:,:)
         integer,allocatable :: Surfacetmpele(:,:)
-        write(idstr, '(I3.3)') iFish ! assume iFish < 1000
+        write(idstr, '(I4.4)') iFish ! assume iFish < 10000
         if (time .lt. 1d-5) then
             call Read_gmsh(this%rbm%FEmeshName,Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
             do  i=1,Surfacetmpnpts

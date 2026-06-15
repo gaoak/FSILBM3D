@@ -172,7 +172,7 @@ module FlowCondition
             close(111)
             ! write solid probing titles
             do  j=1,flow%solidProbingNum
-                write(probeNum,'(I3.3)') j
+                write(probeNum,'(I4.4)') j
                 open(111,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat')
                 write(111,*) 'VARIABLES = "x"  "y"  "z"  "dx"  "dy"  "dz"  "rx"  "ry"  "rz"  "u"  "v"  "w"  "ax"  "ay"  "az"'
                 close(111)
@@ -184,7 +184,7 @@ module FlowCondition
         close(111)
         ! write fluid probing title
         do  i=1,flow%fluidProbingNum
-            write(probeNum,'(I3.3)') i
+            write(probeNum,'(I4.4)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.dat')
             write(111,*) 'VARIABLES = "t"  "u"  "v"  "w" '
             close(111)
@@ -214,7 +214,7 @@ module FlowCondition
                 call grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,flow%fluidProbingCoords(i,1:3),velocityIn(1:zDim,1:yDim,1:xDim,j),velocityOut(j))
             enddo
             ! write file
-            write(probeNum,'(I3.3)') i
+            write(probeNum,'(I4.4)') i
             open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.dat',position='append')
             write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
             close(111)

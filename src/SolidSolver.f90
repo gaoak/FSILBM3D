@@ -1625,7 +1625,7 @@ module SolidSolver
     character(len=nameLen):: idstr
 
     !Write zone information
-    write(idstr,  '(I3.3)') iFish ! assume iFish < 1000
+    write(idstr,  '(I4.4)') iFish ! assume iFish < 10000
     write(idfile, '(A,A,A)') ' ZONE T = "fish',trim(idstr),'"'
     write(idfile, '(A)') ' STRANDID=0, SOLUTIONTIME=0'
     write(idfile, '(A,I8,A,I8,A)', advance='no') ' Nodes=',this%nND,', Elements=',this%nEL,', ZONETYPE='
@@ -1805,7 +1805,7 @@ module SolidSolver
         character (LEN=3):: probeNum
         integer:: i,idfile=100
         do  i=1,solidProbingNum
-            write(probeNum,'(I3.3)') i
+            write(probeNum,'(I4.4)') i
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_solidProbes_'//trim(probeNum)//'.dat',position='append')
             write(idfile,'(15E20.10)')XYZo(1:3)/Lref,(this%pos(1:3,solidProbingNode(i))-XYZo(1:3))/Lref, &
                                                                               this%pos(4:6,solidProbingNode(i)), &
