@@ -1,0 +1,12 @@
+FSILBM3D
+Copyright (C) 2025-2026 Ankang Gao and contributors
+
+FSILBM3D was originally developed by Ankang Gao and his students during
+his appointment at the University of Science and Technology of China for
+academic research on fluid-structure interaction simulations using the
+lattice Boltzmann method.
+
+Please preserve this notice in redistributed copies and derivative works.
+
+If you use FSILBM3D in academic work, please cite the associated publication.
+See CITATION.cff and the Citation section in README.md.

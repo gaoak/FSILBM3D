@@ -1,3 +1,8 @@
+! SPDX-License-Identifier: GPL-3.0-or-later
+!
+! FSILBM3D
+! Copyright (C) 2025-2026 Ankang Gao and contributors
+
 module FluidDomain
     use ConstParams
     use FlowCondition
@@ -7,7 +12,7 @@ module FluidDomain
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_turbulent_statistic_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
-             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block
+             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block,write_fluid_flux
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,outputtype
@@ -2010,4 +2015,44 @@ module FluidDomain
             enddo
         enddo
     end subroutine
+    
+    subroutine write_fluid_flux(root,time)
+        ! Flux diagnostic for a single selected root block.
+        ! Computes inlet, mid-plane, and outlet x-fluxes.
+        implicit none
+        integer, intent(in) :: root
+        real(8), intent(in) :: time
+        integer :: j, k, ixMid
+        real(8) :: dh, fluxIn, fluxMid, fluxOut
+        real(8) :: wy, wz, Yref, Zref
+        associate(b => LBMblks(root))
+            dh = b%dh
+            ixMid = (b%xDim + 1) / 2
+            fluxIn  = 0.0d0
+            fluxMid = 0.0d0
+            fluxOut = 0.0d0
+            do k = 1, b%zDim
+                wz = 1.0d0
+                if (k .eq. 1 .or. k .eq. b%zDim) wz = 0.5d0
+                do j = 1, b%yDim
+                    wy = 1.0d0
+                    if (j .eq. 1 .or. j .eq. b%yDim) wy = 0.5d0
+                    fluxIn  = fluxIn  + b%uuu(k,j,1,1)      * b%den(k,j,1)      * dh*dh * wy*wz
+                    fluxMid = fluxMid + b%uuu(k,j,ixMid,1)  * b%den(k,j,ixMid)  * dh*dh * wy*wz
+                    fluxOut = fluxOut + b%uuu(k,j,b%xDim,1) * b%den(k,j,b%xDim) * dh*dh * wy*wz
+                enddo
+            enddo
+            Yref = b%ymax - b%ymin
+            Zref = b%zmax - b%zmin
+        end associate
+
+        open(111,file='./DatInfo/FluidFlux.dat',position='append')
+        write(111,'(4E20.10)') time/flow%Tref, &
+                                fluxIn  /(flow%denIn*flow%Uref*Zref*Yref), &
+                                fluxMid /(flow%denIn*flow%Uref*Zref*Yref), &
+                                fluxOut /(flow%denIn*flow%Uref*Zref*Yref)
+        close(111)
+    
+    end subroutine
+    
 end module FluidDomain

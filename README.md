@@ -7,6 +7,7 @@
   * [Input file description](#input-file-description)
   * [Simulation control parameters](#simulation-control-parameters)
   * [Output file description](#Output-file-description)
+  * [Citation](#citation)
   * [License](#license)
 
 ## Installation
@@ -270,9 +271,11 @@ $PBS_WDIR/$PBS_ENAME
 
 - **SolidBody**
 
-  1. *IBPenaltyalpha* : Velocity correction parameter of the penalty function in the IBM method
+  1. *IBPenaltyAlpha* : Velocity correction parameter of the penalty function in the IBM method
 
-  2. *alphaf* : Parameter for correcting torsion in the mass matrix
+  2. *GeoGamma* $(\gamma)$ : Scaling factor for the geometric stiffness contribution in the tangent matrix,  
+   i.e., $K_T = K_E + \gamma K_G$. Setting *GeoGamma* $(\gamma)$ to 0 ignores geometric stiffness,  
+   while setting it to 1 includes the full geometric stiffness.
 
   3. *NewmarkGamma, NewmarkBeta*: Parameters of the Newmark method
 
@@ -284,10 +287,13 @@ $PBS_WDIR/$PBS_ENAME
 
   7. *nfishGroup* : Numbers of the solid bodies type
 
-  8. *isKB* :  Determining the kind of parameters of the flexible bodies 
+  8. *isKB* :  Determines the kind of parameters of the flexible bodies 
 
-     * 0 : *KB, KS*(Bending Stiffness, Stretching Stiffness)
-     * 1 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic Time Ratio)
+     * 0 : *EmR, TcR* (Elastic Modulus Ratio, Characteristic thickness ratio)
+     * 1 : *KB, KS* (Bending Stiffness, Stretching Stiffness)
+     * other values : read the section properties directly from the solid information file ***.dat**.
+       For standard beam inputs, provide $E$, $G$, $A$, $\rho$, $\gamma$, $J_t$, $I_y$, and $I_z$, 
+       where $\gamma$ denotes the self-rotation angle in degrees and is currently unused.
 
   9. *fishnum  (fishGroup)* : The number of the solid bodies in the specific type
 
@@ -343,8 +349,8 @@ $PBS_WDIR/$PBS_ENAME
 2. *DatBodySpan*  : Folder of spanwise-extension body results
 3. *DatFlow*      : Floder of flow field results
 4. *DatInfo*      : Floder of force and power *et. al.* results
-5. *Check.dat*    : Parameters record file for checking
-6. *continue.dat* : Results record file for continue calculating
+5. *DatContinue*  : Floder of record file for continue calculating
+6. *check.dat*    : Parameters record file for checking
 
 - **Files in DatInfo description**
 
@@ -363,3 +369,23 @@ $PBS_WDIR/$PBS_ENAME
 6. *lastNode.dat* : The information of the last point of the bodies 
 7. *nodeAverage.dat* : The average information of the all points of the bodies 
 8. *FluidFlux.dat* : the flux at inlet and outlet
+
+## Citation
+
+If you use FSILBM3D in academic work, please cite the associated publication:
+
+```bibtex
+@article{gao_fsilibm3d_2026,
+  title = {TODO: replace with the associated paper title},
+  author = {Gao, Ankang and TODO},
+  journal = {TODO: replace with journal name},
+  year = {2026},
+  doi = {TODO: replace with DOI}
+}
+```
+
+FSILBM3D was originally developed by Ankang Gao and his students during his appointment at the University of Science and Technology of China for academic research on fluid-structure interaction simulations using the lattice Boltzmann method.
+
+## License
+
+FSILBM3D is distributed under the terms of the GNU General Public License v3.0 or later. See [LICENSE](LICENSE) for the full license text.

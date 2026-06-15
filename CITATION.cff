@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: FSILBM3D
+message: "If you use FSILBM3D in academic work, please cite this software and the associated publication."
+authors:
+  - family-names: Gao
+    given-names: Ankang
+license: GPL-3.0-or-later
+repository-code: "https://github.com/gaoak/FSILBM3D"
+abstract: "A three-dimensional fluid-structure interaction solver based on the lattice Boltzmann method."
+preferred-citation:
+  type: article
+  title: "TODO: replace with the associated paper title"
+  authors:
+    - family-names: Gao
+      given-names: Ankang
+  journal: "TODO: replace with journal name"
+  year: 2026
+  doi: "TODO: replace with DOI"
