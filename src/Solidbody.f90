@@ -524,10 +524,11 @@ module SolidBody
         implicit none
         integer,intent(in):: solidProbingNum,solidProbingNode(solidProbingNum)
         real(rp),intent(in):: time
-        integer,parameter::nameLen1=10,nameLen2=3,idfile=100
+        integer,parameter::nameLen1=10,groupLen=3,probeLen=4,idfile=100
         integer:: i,j,iFish,iGroup,order1,order2
         character (LEN=nameLen1):: timeName
-        character (LEN=nameLen2):: groupNum,probeNum
+        character (LEN=groupLen):: groupNum
+        character (LEN=probeLen):: probeNum
         !write time titles
         write(timeName,'(I10)') nint(time/m_Tref*1e5_rp)
         timeName = adjustr(timeName)
@@ -540,7 +541,7 @@ module SolidBody
         do iGroup=1,m_nGroup
             write(groupNum,'(I3)') iGroup
             groupNum = adjustr(groupNum)
-            do  i=1,nameLen2
+            do  i=1,groupLen
                     if(groupNum(i:i)==' ') groupNum(i:i)='0'
             enddo
             ! write zone titles
@@ -1278,7 +1279,7 @@ module SolidBody
         real(rp) :: xyz(3), xyz0(3), rxyz(3)
         real(rp) :: forceElem(3), momentElem(3), invLFref
 
-        write(idstr,'(I3.3)') iFish ! assume iFish < 1000
+        write(idstr,'(I4.4)') iFish ! assume iFish < 10000
         ! One zone for each fish at the current output time.
         write(idfile,'(A,A,A,I8,A)') 'ZONE    T = "fish', trim(idstr), '" I = ', this%v_nelmts, ', DATAPACKING=POINT'
         invLFref = 1.0e0_rp / (m_Lref*m_Fref)
