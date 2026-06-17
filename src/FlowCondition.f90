@@ -129,13 +129,14 @@ module FlowCondition
     SUBROUTINE write_information_titles(nGroup)
         implicit none
         integer:: i,j,iGroup,nGroup
-        integer,parameter::nameLen=3
-        character (LEN=nameLen):: groupNum,probeNum
+        integer,parameter::groupLen=3,probeLen=4
+        character (LEN=groupLen):: groupNum
+        character (LEN=probeLen):: probeNum
         do iGroup=1,nGroup
             ! get fish group numbers
             write(groupNum,'(I3)') iGroup
             groupNum = adjustr(groupNum)
-            do  i=1,nameLen
+            do  i=1,groupLen
                     if(groupNum(i:i)==' ') groupNum(i:i)='0'
             enddo
             ! write the first point of the solid titles
@@ -196,8 +197,8 @@ module FlowCondition
         integer:: i,j,xDim,yDim,zDim
         real(8):: time,dh,xmin,ymin,zmin,xmax,ymax,zmax
         real(8):: velocityIn(zDim,yDim,xDim,1:3),velocityOut(1:3)
-        integer,parameter::nameLen=3
-        character (LEN=nameLen):: probeNum
+        integer,parameter::probeLen=4
+        character (LEN=probeLen):: probeNum
         ! write fluid probing information
         do  i=1,flow%fluidProbingNum
             xmax = xmin + dh * (xDim - 1)
