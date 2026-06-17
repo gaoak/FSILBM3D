@@ -1804,7 +1804,7 @@ module SolidSolver
         integer,intent(in):: solidProbingNum,solidProbingNode(solidProbingNum)
         real(8),intent(in):: XYZo(1:3),Lref,Uref,Aref
         character(LEN=3),intent(in):: groupNum
-        character (LEN=3):: probeNum
+        character (LEN=4):: probeNum
         integer:: i,idfile=100
         do  i=1,solidProbingNum
             write(probeNum,'(I4.4)') i
