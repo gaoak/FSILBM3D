@@ -49,6 +49,7 @@ module SegmentStructure
         procedure :: StrainEnergy_D => Segment_StrainEnergy_D
         procedure :: InitTriad_D => Segment_InitTriad_D
         procedure :: RigidUpdateTriad_D => Segment_RigidUpdateTriad_D
+        procedure :: BuildAxisDirTriad => Segment_BuildAxisDirTriad
         procedure :: UpdateTriad_D => Segment_UpdateTriad_D
         procedure :: MakeTriad_ee => Segment_MakeTriad_ee
         procedure :: MapReferencePosToCurrent => Segment_MapReferencePosToCurrent
@@ -602,7 +603,7 @@ module SegmentStructure
     subroutine Segment_InitTriad_D(this)
         implicit none
         class(Segment), intent(inout) :: this
-        call Segment_BuildAxisDirTriad(this%xll0,this%xmm0,this%xnn0,this%dirc0,this%triad_n1)
+        call this%BuildAxisDirTriad(this%xll0,this%xmm0,this%xnn0,this%dirc0,this%triad_n1)
         ! all element triads have same initial orientation
         this%triad_n2(1:3,1:3)=this%triad_n1(1:3,1:3)
         this%triad_ee(1:3,1:3)=this%triad_n1(1:3,1:3)
@@ -614,14 +615,14 @@ module SegmentStructure
         ! Rebuild the full triad from the current beam axis and the current material direction.
         implicit none
         class(Segment), intent(inout) :: this
-        call Segment_BuildAxisDirTriad(this%xll1,this%xmm1,this%xnn1,this%dirc1,this%triad_n1)
+        call this%BuildAxisDirTriad(this%xll1,this%xmm1,this%xnn1,this%dirc1,this%triad_n1)
         ! In rigid-body motion, the two nodal triads and the element triad share the same current orientation.
         this%triad_n2(1:3,1:3)=this%triad_n1(1:3,1:3)
         this%triad_ee(1:3,1:3)=this%triad_n1(1:3,1:3)
         return
     end subroutine Segment_RigidUpdateTriad_D
 
-    subroutine Segment_BuildAxisDirTriad(l,m,n,d,triad)
+    subroutine Segment_BuildAxisDirTriad(this,l,m,n,d,triad)
         ! If span direction vector is not 0
         ! ex: beam axis direction
         ! ey: span direction
@@ -631,6 +632,7 @@ module SegmentStructure
         ! [triad] = [R]^T
         ! ISBN 9780792312086 James F. Doyle. P157,158
         implicit none
+        class(Segment), intent(in) :: this
         real(rp), intent(in) :: l,m,n,d(3)
         real(rp), intent(out) :: triad(3,3)
         real(rp) :: ex(3), ey(3), ez(3), dir(3), dd, proj
