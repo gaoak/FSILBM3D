@@ -6,6 +6,7 @@
 CMP = gfortran# ifort,ifx,gfortran
 
 BUILD ?=
+PRECISION ?= single
 
 #######CMP settings###########
 ifeq ($(CMP),ifort)
@@ -14,9 +15,9 @@ FFLAGS = -diag-disable=10448 -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32
 else ifeq ($(CMP),ifx)
 FC = ifx
 FFLAGS = -diag-disable=10448 -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32 -double-size 64
-else ifeq ($(CMP),gfortran)
+else ifeq ($(filter $(CMP),gfortran gcc),$(CMP))
 FC = gfortran
-FFLAGS = -O3
+FFLAGS = -cpp -O3
 ifeq ($(BUILD),debug)
 FFLAGS = -cpp -g -O0
 FFLAGS += -ffpe-trap=invalid,zero -fbacktrace -Wall -Wextra -pedantic -Warray-bounds -fbacktrace  -fbounds-check
@@ -25,6 +26,12 @@ FFLAGS += -Wconversion -Wconversion-extra -ffree-form -ffree-line-length-none -f
 endif
 CC = cc
 CPP = c++
+
+ifeq ($(PRECISION),single)
+FFLAGS += -DFSILBM_SINGLE_PRECISION
+else ifneq ($(PRECISION),double)
+$(error PRECISION must be either single or double)
+endif
 
 SRCDIR = ./src
 

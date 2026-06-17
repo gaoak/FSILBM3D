@@ -20,9 +20,9 @@ PROGRAM main
     implicit none
     character(LEN=40):: parameterFile='inFlow.dat',checkFile='Check.dat'
     integer:: step=0,start_ave
-    real(8):: dt_fluid
-    real(8):: time=0.0d0,start_time=0.0d0,g(3)=[0.0d0,0.0d0,0.0d0]
-    real(8):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
+    real(rp):: dt_fluid
+    real(rp):: time=0.0e0_rp,start_time=0.0e0_rp,g(3)=[0.0e0_rp,0.0e0_rp,0.0e0_rp]
+    real(rp):: time_collision,time_streaming,time_IBM,time_FEM,time_begine1,time_begine2,time_end1,time_end2
     !==================================================================================================
     ! Read all parameters from input file
     call get_now_time(time_begine1) ! begine time for the preparation before computing
@@ -45,7 +45,7 @@ PROGRAM main
         flow%Aref,flow%Eref,flow%Fref,flow%Lref,flow%Pref,flow%Tref,flow%Uref,flow%ntolLBM,flow%dtolLBM)
     !==================================================================================================
     ! Initialization before simulation
-    call Initialise_solid_bodies(0.d0)
+    call Initialise_solid_bodies(0.e0_rp)
     call FindCarrierFluidBlock()
     call initialise_fuild_blocks(time)
     !==================================================================================================
@@ -68,7 +68,7 @@ PROGRAM main
     if(flow%isConCmpt .eq. 1) then
         time = start_time * flow%Tref        !calculate the computing start time
     else
-        start_time = 0.0d0
+        start_time = 0.0e0_rp
         step = 0
     endif
     if(flow%timeWriteBegin .ge. start_time) then
@@ -99,10 +99,10 @@ PROGRAM main
         write(*,'(A,I8,A,F14.8)')' Steps:',step,'  Time/Tref:',time/flow%Tref
         write(*,'(A)')' --------------------- fluid solver ---------------------'
         ! LBM solver
-        time_collision = 0.d0
-        time_streaming = 0.d0
-        time_IBM       = 0.d0
-        time_FEM       = 0.d0
+        time_collision = 0.e0_rp
+        time_streaming = 0.e0_rp
+        time_IBM       = 0.e0_rp
+        time_FEM       = 0.e0_rp
         call tree_collision_streaming_IBM_FEM(blockTreeRoot,time_collision,time_streaming,time_IBM,time_FEM)
         call calculate_macro_quantities_blocks()
         call calculate_turbulent_statistic_blocks(step,start_ave)
@@ -114,22 +114,22 @@ PROGRAM main
         write(*,'(A)')' ---------------------- write info ----------------------'
         call get_now_time(time_begine2)
         ! write data for continue computing
-        if(DABS(time/flow%Tref-flow%timeContiDelta*dble(NINT(time/flow%Tref/flow%timeContiDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
+        if(abs(time/flow%Tref-flow%timeContiDelta*real(NINT(time/flow%Tref/flow%timeContiDelta), rp)) <= 0.5e0_rp*dt_fluid/flow%Tref)then
             call write_continue_blocks(step,time / flow%Tref)   ! output dimensionless time
         endif
         ! write fluid and soild data
-        if((time/flow%Tref - flow%timeWriteBegin) >= -0.5d0*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5d0*dt_fluid/flow%Tref) then
-            if(DABS(time/flow%Tref-flow%timeBodyDelta*dble(NINT(time/flow%Tref/flow%timeBodyDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
+        if((time/flow%Tref - flow%timeWriteBegin) >= -0.5e0_rp*dt_fluid/flow%Tref .and. (time/flow%Tref - flow%timeWriteEnd) <= 0.5e0_rp*dt_fluid/flow%Tref) then
+            if(abs(time/flow%Tref-flow%timeBodyDelta*real(NINT(time/flow%Tref/flow%timeBodyDelta), rp)) <= 0.5e0_rp*dt_fluid/flow%Tref)then
                 call write_solid_field(time)
                 call Write_solid_v_bodies(time)
                 call Write_solid_v_forces(time)
             endif
-            if(DABS(time/flow%Tref-flow%timeFlowDelta*dble(NINT(time/flow%Tref/flow%timeFlowDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
+            if(abs(time/flow%Tref-flow%timeFlowDelta*real(NINT(time/flow%Tref/flow%timeFlowDelta), rp)) <= 0.5e0_rp*dt_fluid/flow%Tref)then
                 call write_flow_blocks(time)
             endif
         endif
         ! write processing informations
-        if(DABS(time/flow%Tref-flow%timeInfoDelta*dble(NINT(time/flow%Tref/flow%timeInfoDelta))) <= 0.5d0*dt_fluid/flow%Tref)then
+        if(abs(time/flow%Tref-flow%timeInfoDelta*real(NINT(time/flow%Tref/flow%timeInfoDelta), rp)) <= 0.5e0_rp*dt_fluid/flow%Tref)then
             call write_fluid_flux(blockTreeRoot,time)
             if(flow%inWhichBlock.ge.1 .and. flow%inWhichBlock.le.m_nblocks) then
                 call write_fluid_information(time,LBMblks(flow%inWhichBlock)%dh,LBMblks(flow%inWhichBlock)%xmin,LBMblks(flow%inWhichBlock)%ymin,LBMblks(flow%inWhichBlock)%zmin, &

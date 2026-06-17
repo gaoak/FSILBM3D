@@ -6,26 +6,27 @@
 ! program algorithm: ISBN 9781441929105 James F. Doyle. P354
 module SegmentStructure
     !use mkl
+    use ConstParams, only: rp
     implicit none
     private
     integer, parameter :: nElmtDofs = 12
     public :: Segment, Segment_get_angle_triad
     type :: Segment
         integer :: node0, node1, m_localToGlobal(1:nElmtDofs), itype, bc(1:nElmtDofs), Nspan
-        real(8) :: x00(1:nElmtDofs),x0(1:nElmtDofs),x1(1:nElmtDofs),xnxt(1:nElmtDofs)
-        real(8) :: dx0, dy0, dz0, dx1, dy1, dz1, xll0, xmm0, xnn0, xll1, xmm1, xnn1, len0, len1
-        real(8) :: Lspan, spanlen, dirc00(3), dirc0(3), dirc1(3), dircnxt(3)
-        real(8) :: geoFRM
-        real(8) :: areaElem00
-        real(8) :: strainEnergy(2)
-        real(8) :: triad_ee(3,3),triad_n1(3,3),triad_n2(3,3)
-        real(8) :: m_property(1:8)
-        real(8) :: m_coefMat(1:nElmtDofs, 1:nElmtDofs)
-        real(8) :: m_tanMat(1:nElmtDofs, 1:nElmtDofs)
-        real(8) :: m_stfMat(1:nElmtDofs, 1:nElmtDofs)
-        real(8) :: m_masMat(1:nElmtDofs, 1:nElmtDofs)
-        real(8) :: m_geoMat(1:nElmtDofs, 1:nElmtDofs)
-        real(8) :: m_rotMat(1:3, 1:3)
+        real(rp) :: x00(1:nElmtDofs),x0(1:nElmtDofs),x1(1:nElmtDofs),xnxt(1:nElmtDofs)
+        real(rp) :: dx0, dy0, dz0, dx1, dy1, dz1, xll0, xmm0, xnn0, xll1, xmm1, xnn1, len0, len1
+        real(rp) :: Lspan, spanlen, dirc00(3), dirc0(3), dirc1(3), dircnxt(3)
+        real(rp) :: geoFRM
+        real(rp) :: areaElem00
+        real(rp) :: strainEnergy(2)
+        real(rp) :: triad_ee(3,3),triad_n1(3,3),triad_n2(3,3)
+        real(rp) :: m_property(1:8)
+        real(rp) :: m_coefMat(1:nElmtDofs, 1:nElmtDofs)
+        real(rp) :: m_tanMat(1:nElmtDofs, 1:nElmtDofs)
+        real(rp) :: m_stfMat(1:nElmtDofs, 1:nElmtDofs)
+        real(rp) :: m_masMat(1:nElmtDofs, 1:nElmtDofs)
+        real(rp) :: m_geoMat(1:nElmtDofs, 1:nElmtDofs)
+        real(rp) :: m_rotMat(1:3, 1:3)
     contains
         procedure :: Build => Segment_Build
         procedure :: Init => Segment_Init
@@ -61,10 +62,10 @@ module SegmentStructure
         implicit none
         class(Segment), intent(inout) :: this
         integer, intent(in) :: p0Id, p1Id, nND
-        real(8), intent(in) :: xyz(1:8, 1:nND), material(1:8)
+        real(rp), intent(in) :: xyz(1:8, 1:nND), material(1:8)
         integer, intent(in) :: boundary(1:6, 1:nND), itype_, Nspan_
         integer :: i, offset0, offset1
-        real(8) :: dirc_norm
+        real(rp) :: dirc_norm
         this%node0 = p0Id
         this%node1 = p1Id
         ! material property
@@ -78,20 +79,20 @@ module SegmentStructure
         enddo
         this%x00(1:3) = xyz(1:3, p0Id)
         this%x00(7:9) = xyz(1:3, p1Id)
-        this%x00(4:6) = 0.0d0
-        this%x00(10:12) = 0.0d0
-        this%areaElem00 = dsqrt((this%x00(7)-this%x00(1))**2+&
+        this%x00(4:6) = 0.0e0_rp
+        this%x00(10:12) = 0.0e0_rp
+        this%areaElem00 = sqrt((this%x00(7)-this%x00(1))**2+&
                                 (this%x00(8)-this%x00(2))**2+&
                                 (this%x00(9)-this%x00(3))**2)
         this%bc(1:6) = boundary(1:6, p0Id)
         this%bc(7:12) = boundary(1:6, p1Id)
         this%itype = itype_
         this%Nspan = Nspan_
-        this%Lspan = 0.5d0 * (xyz(4,p0Id) + xyz(4,p1Id))
-        this%spanlen = 0.5d0 * (xyz(5,p0Id) + xyz(5,p1Id)) + this%Lspan
-        this%dirc00(1:3) = 0.5d0 * (xyz(6:8,p0Id) + xyz(6:8,p1Id))
-        dirc_norm = dsqrt(sum(this%dirc00**2))
-        if (dirc_norm .gt. 1d-10) then
+        this%Lspan = 0.5e0_rp * (xyz(4,p0Id) + xyz(4,p1Id))
+        this%spanlen = 0.5e0_rp * (xyz(5,p0Id) + xyz(5,p1Id)) + this%Lspan
+        this%dirc00(1:3) = 0.5e0_rp * (xyz(6:8,p0Id) + xyz(6:8,p1Id))
+        dirc_norm = sqrt(sum(this%dirc00**2))
+        if (dirc_norm .gt. 1e-10_rp) then
             this%dirc00 = this%dirc00 / dirc_norm
         else
             write(*,*) xyz(6:8,p0Id), "and", xyz(6:8,p1Id), "are opposite directions; no unique bisector exists."
@@ -109,7 +110,7 @@ module SegmentStructure
         this%dx0  = this%x0(7) - this%x0(1)
         this%dy0  = this%x0(8) - this%x0(2)
         this%dz0  = this%x0(9) - this%x0(3)
-        this%len0 = dsqrt(this%dx0*this%dx0+this%dy0*this%dy0+this%dz0*this%dz0)
+        this%len0 = sqrt(this%dx0*this%dx0+this%dy0*this%dy0+this%dz0*this%dz0)
         this%xll0 = this%dx0/this%len0
         this%xmm0 = this%dy0/this%len0
         this%xnn0 = this%dz0/this%len0
@@ -122,7 +123,7 @@ module SegmentStructure
         this%dx1  = this%x1(7) - this%x1(1)
         this%dy1  = this%x1(8) - this%x1(2)
         this%dz1  = this%x1(9) - this%x1(3)
-        this%len1 = dsqrt(this%dx1*this%dx1+this%dy1*this%dy1+this%dz1*this%dz1)
+        this%len1 = sqrt(this%dx1*this%dx1+this%dy1*this%dy1+this%dz1*this%dz1)
         this%xll1 = this%dx1/this%len1
         this%xmm1 = this%dy1/this%len1
         this%xnn1 = this%dz1/this%len1
@@ -138,7 +139,7 @@ module SegmentStructure
         ! K[T] = K[E] + K[G]
         ! K = K[T] + coeffs(1)*[C] + coeffs(0)*[M]
         class(Segment), intent(inout) :: this
-        real(8), intent(in) :: coeffs(0:7), gamma, dampM, dampK
+        real(rp), intent(in) :: coeffs(0:7), gamma, dampM, dampK
         !update m_coefMat
         call this%FormGeomMatrix
 
@@ -150,7 +151,7 @@ module SegmentStructure
         ! The RKR of this%m_stfMat and this%m_geoMat cannot be merged, calculate dampK use this%m_stfMat after RKR !
         this%m_tanMat = this%m_stfMat + gamma * this%m_geoMat
         this%m_coefMat = this%m_tanMat + coeffs(0) * this%m_masMat + coeffs(1) * dampM * this%m_masMat
-        if(dampK .gt. 0.0d0) then
+        if(dampK .gt. 0.0e0_rp) then
             this%m_coefMat = this%m_coefMat + coeffs(1) * dampK * this%m_stfMat
         endif
         return
@@ -167,12 +168,12 @@ module SegmentStructure
         implicit none
         class(Segment), intent(inout) :: this
         integer, intent(in) :: nND, gEQ
-        real(8), intent(in) :: coeffs(0:7), dampM, dampK
-        real(8), intent(in) :: dspO(1:6, 1:nND)
-        real(8), intent(in) :: dsp(1:6, 1:nND), vel(1:6, 1:nND), acc(1:6, 1:nND)
-        real(8), intent(inout) :: lodEffe(1:gEQ)
-        real(8) :: qM(1:nElmtDofs), qC(1:nElmtDofs), qMC(1:nElmtDofs)
-        real(8) :: massLoad(1:nElmtDofs),dampKLoad(1:nElmtDofs)
+        real(rp), intent(in) :: coeffs(0:7), dampM, dampK
+        real(rp), intent(in) :: dspO(1:6, 1:nND)
+        real(rp), intent(in) :: dsp(1:6, 1:nND), vel(1:6, 1:nND), acc(1:6, 1:nND)
+        real(rp), intent(inout) :: lodEffe(1:gEQ)
+        real(rp) :: qM(1:nElmtDofs), qC(1:nElmtDofs), qMC(1:nElmtDofs)
+        real(rp) :: massLoad(1:nElmtDofs),dampKLoad(1:nElmtDofs)
         integer :: i,node0,node1
         node0 = this%node0
         node1 = this%node1
@@ -185,7 +186,7 @@ module SegmentStructure
         qMC = qM + dampM*qC
         call this%MassMultiply(qMC, massLoad)
         call this%LocToGlobal(massLoad, lodEffe, gEQ)
-        if (dampK .gt. 0.0d0) then
+        if (dampK .gt. 0.0e0_rp) then
             dampKLoad = dampK * matmul(this%m_stfMat, qC)
             call this%LocToGlobal(dampKLoad, lodEffe, gEQ)
         endif
@@ -219,10 +220,10 @@ module SegmentStructure
         !           Mr2*q(10:12) ].
         implicit none
         class(Segment), intent(in) :: this
-        real(8), intent(in)  :: q(1:nElmtDofs)
-        real(8), intent(out) :: mq(1:nElmtDofs)
+        real(rp), intent(in)  :: q(1:nElmtDofs)
+        real(rp), intent(out) :: mq(1:nElmtDofs)
         integer :: i
-        mq(:) = 0.0d0
+        mq(:) = 0.0e0_rp
         ! translational lumped massLoad blocks: m I_3
         do i = 1, 3
             mq(i)   = this%m_masMat(i,i)     * q(i)
@@ -240,8 +241,8 @@ module SegmentStructure
         implicit none
         class(Segment), intent(in) :: this
         integer, intent(in) :: iter, gEQ
-        real(8), intent(in) :: vBC(1:gEQ)
-        real(8), intent(inout) :: x(1:gEQ)
+        real(rp), intent(in) :: vBC(1:gEQ)
+        real(rp), intent(inout) :: x(1:gEQ)
         logical, intent(inout) :: fixed(1:gEQ)
         integer :: i, gid
         do i=1,nElmtDofs
@@ -251,7 +252,7 @@ module SegmentStructure
                 if (iter .eq. 1) then
                     x(gid) = vBC(gid)
                 else
-                    x(gid) = 0.0d0
+                    x(gid) = 0.0e0_rp
                 endif
             endif
         enddo
@@ -260,7 +261,7 @@ module SegmentStructure
     subroutine Segment_ScalarPreconditioned(this, M, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
-        real(8) :: Melmts(1:nElmtDofs),M(1:gEQ)
+        real(rp) :: Melmts(1:nElmtDofs),M(1:gEQ)
         integer :: i
         do i=1,nElmtDofs
             Melmts(i)=this%m_coefMat(i,i)
@@ -272,7 +273,7 @@ module SegmentStructure
         implicit none
         class(Segment), intent(in) :: this
         integer, intent(in) :: nND
-        real(8), intent(inout) :: blockM(6,6,nND)
+        real(rp), intent(inout) :: blockM(6,6,nND)
         blockM(1:6,1:6,this%node0) = blockM(1:6,1:6,this%node0) + this%m_coefMat(1:6,1:6)
         blockM(1:6,1:6,this%node1) = blockM(1:6,1:6,this%node1) + this%m_coefMat(7:12,7:12)
     end subroutine Segment_BlockPreconditioned
@@ -280,11 +281,11 @@ module SegmentStructure
     subroutine Segment_Multiply(this, x, b, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
-        real(8), intent(in) :: x(1:gEQ)
-        real(8), intent(inout) :: b(1:gEQ)
-        real(8) :: lx(1:nElmtDofs), lb(1:nElmtDofs)
-        lx = 0.0d0
-        lb = 0.0d0
+        real(rp), intent(in) :: x(1:gEQ)
+        real(rp), intent(inout) :: b(1:gEQ)
+        real(rp) :: lx(1:nElmtDofs), lb(1:nElmtDofs)
+        lx = 0.0e0_rp
+        lb = 0.0e0_rp
         call this%GlobalToLoc(x, lx, gEQ)
         lb = matmul(this%m_coefMat, lx)
         call this%LocToGlobal(lb, b, gEQ)
@@ -294,8 +295,8 @@ module SegmentStructure
     subroutine Segment_GlobalToLoc(this, x, lx, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
-        real(8), intent(in) :: x(1:gEQ)
-        real(8), intent(out) :: lx(1:nElmtDofs)
+        real(rp), intent(in) :: x(1:gEQ)
+        real(rp), intent(out) :: lx(1:nElmtDofs)
         integer :: i
         do i=1,nElmtDofs
             lx(i) = x(this%m_localToGlobal(i))
@@ -306,8 +307,8 @@ module SegmentStructure
     subroutine Segment_LocToGlobal(this, lx, x, gEQ)
         class(Segment), intent(in) :: this
         integer, intent(in) :: gEQ
-        real(8), intent(in) :: lx(1:nElmtDofs)
-        real(8), intent(inout) :: x(1:gEQ)
+        real(rp), intent(in) :: lx(1:nElmtDofs)
+        real(rp), intent(inout) :: x(1:gEQ)
         integer :: i
         do i=1,nElmtDofs
             x(this%m_localToGlobal(i)) = x(this%m_localToGlobal(i)) + lx(i)
@@ -326,8 +327,8 @@ module SegmentStructure
         ! This is not generally equal to the St. Venant torsion constant Jt, except for circular sections.
         implicit none
         class(Segment), intent(inout) :: this
-        real(8):: area,rho,zix,ziy,ziz,length
-        real(8):: roal
+        real(rp):: area,rho,zix,ziy,ziz,length
+        real(rp):: roal
 
         area = this%m_property(3) ! A    : cross-sectional area 
         rho  = this%m_property(4) ! rho  : density
@@ -336,8 +337,8 @@ module SegmentStructure
         ziz  = this%m_property(8) ! Iz   : second moment of area about local z-axis
         length  = this%len0
 
-        this%m_masMat(1:12,1:12) = 0.0d0
-        roal = rho*area*length/2.0d0
+        this%m_masMat(1:12,1:12) = 0.0e0_rp
+        roal = rho*area*length/2.0e0_rp
         ! Translational lumped mass at node 0.
         this%m_masMat(1,1)     = roal
         this%m_masMat(2,2)     = roal
@@ -377,11 +378,11 @@ module SegmentStructure
         implicit none
         class(Segment), intent(inout) :: this
     
-        real(8):: emod,gmod,area,zix,ziy,ziz,length
-        real(8):: Invlength
-        real(8):: ksy,ksz,phiy,phiz
-        real(8):: ky1,ky2,ky3,ky4
-        real(8):: kz1,kz2,kz3,kz4
+        real(rp):: emod,gmod,area,zix,ziy,ziz,length
+        real(rp):: Invlength
+        real(rp):: ksy,ksz,phiy,phiz
+        real(rp):: ky1,ky2,ky3,ky4
+        real(rp):: kz1,kz2,kz3,kz4
     
         emod = this%m_property(1)   ! E   : Young's modulus
         gmod = this%m_property(2)   ! G   : Shear modulus
@@ -393,33 +394,33 @@ module SegmentStructure
 
         length = this%len0
     
-        this%m_stfMat(1:12,1:12)=0.0d0
+        this%m_stfMat(1:12,1:12)=0.0e0_rp
     
-        Invlength = 1.0d0/length
+        Invlength = 1.0e0_rp/length
     
         ! Shear correction factors; 5/6 is the rectangular-section default.
         ! Replace with section-specific values, e.g. 6/7 for circular sections.
-        ksy = 5.0d0/6.0d0
-        ksz = 5.0d0/6.0d0
+        ksy = 5.0e0_rp/6.0e0_rp
+        ksz = 5.0e0_rp/6.0e0_rp
     
         ! Timoshenko shear parameters
         ! v-theta_z plane: bending about local z, uses Iz and ksy.
         ! w-theta_y plane: bending about local y, uses Iy and ksz.
-        ! For an Euler-Bernoulli beam, set phiy = phiz = 0.0d0.
-        phiy = 12.0d0*emod*ziz/(ksy*gmod*area*length*length)
-        phiz = 12.0d0*emod*ziy/(ksz*gmod*area*length*length)
+        ! For an Euler-Bernoulli beam, set phiy = phiz = 0.0e0_rp.
+        phiy = 12.0e0_rp*emod*ziz/(ksy*gmod*area*length*length)
+        phiz = 12.0e0_rp*emod*ziy/(ksz*gmod*area*length*length)
     
         ! v-theta_z plane, bending about local z, use Iz
-        ky1 = 12.0d0*emod*ziz/(length**3*(1.0d0+phiy))
-        ky2 =  6.0d0*emod*ziz/(length**2*(1.0d0+phiy))
-        ky3 = (4.0d0+phiy)*emod*ziz/(length*(1.0d0+phiy))
-        ky4 = (2.0d0-phiy)*emod*ziz/(length*(1.0d0+phiy))
+        ky1 = 12.0e0_rp*emod*ziz/(length**3*(1.0e0_rp+phiy))
+        ky2 =  6.0e0_rp*emod*ziz/(length**2*(1.0e0_rp+phiy))
+        ky3 = (4.0e0_rp+phiy)*emod*ziz/(length*(1.0e0_rp+phiy))
+        ky4 = (2.0e0_rp-phiy)*emod*ziz/(length*(1.0e0_rp+phiy))
     
         ! w-theta_y plane, bending about local y, use Iy
-        kz1 = 12.0d0*emod*ziy/(length**3*(1.0d0+phiz))
-        kz2 =  6.0d0*emod*ziy/(length**2*(1.0d0+phiz))
-        kz3 = (4.0d0+phiz)*emod*ziy/(length*(1.0d0+phiz))
-        kz4 = (2.0d0-phiz)*emod*ziy/(length*(1.0d0+phiz))
+        kz1 = 12.0e0_rp*emod*ziy/(length**3*(1.0e0_rp+phiz))
+        kz2 =  6.0e0_rp*emod*ziy/(length**2*(1.0e0_rp+phiz))
+        kz3 = (4.0e0_rp+phiz)*emod*ziy/(length*(1.0e0_rp+phiz))
+        kz4 = (2.0e0_rp-phiz)*emod*ziy/(length*(1.0e0_rp+phiz))
     
         ! diagonal terms
         this%m_stfMat(1,1)   = area*emod*Invlength
@@ -492,12 +493,12 @@ module SegmentStructure
         implicit none
         class(Segment), intent(inout) :: this
     
-        real(8):: emod,gmod,area,zix,ziy,ziz,length
-        real(8):: s
-        real(8):: ksy,ksz,phiy,phiz
-        real(8):: gy1,gy2,gy3,gy4
-        real(8):: gz1,gz2,gz3,gz4
-        real(8):: gt
+        real(rp):: emod,gmod,area,zix,ziy,ziz,length
+        real(rp):: s
+        real(rp):: ksy,ksz,phiy,phiz
+        real(rp):: gy1,gy2,gy3,gy4
+        real(rp):: gz1,gz2,gz3,gz4
+        real(rp):: gt
     
         s = this%geoFRM
 
@@ -512,27 +513,27 @@ module SegmentStructure
         length = this%len0
     
         ! initialize all geometric stiffness terms to zero
-        this%m_geoMat(1:12,1:12) = 0.0d0
+        this%m_geoMat(1:12,1:12) = 0.0e0_rp
     
         ! Shear correction factors; 5/6 is the rectangular-section default.
         ! Replace with section-specific values, e.g. 6/7 for circular sections.
-        ksy = 5.0d0/6.0d0
-        ksz = 5.0d0/6.0d0
+        ksy = 5.0e0_rp/6.0e0_rp
+        ksz = 5.0e0_rp/6.0e0_rp
     
         ! Timoshenko shear parameters
         ! v-theta_z plane: bending about local z, uses Iz and ksy.
         ! w-theta_y plane: bending about local y, uses Iy and ksz.
-        ! For an Euler-Bernoulli beam, set phiy = phiz = 0.0d0.
-        phiy = 12.0d0*emod*ziz/(ksy*gmod*area*length*length)
-        phiz = 12.0d0*emod*ziy/(ksz*gmod*area*length*length)
+        ! For an Euler-Bernoulli beam, set phiy = phiz = 0.0e0_rp.
+        phiy = 12.0e0_rp*emod*ziz/(ksy*gmod*area*length*length)
+        phiz = 12.0e0_rp*emod*ziy/(ksz*gmod*area*length*length)
     
         ! ------------------------------------------------------------
         ! v-theta_z plane, DOFs 2,6,8,12
         ! ------------------------------------------------------------
-        gy1 = s/length * (6.0d0/5.0d0 + 2.0d0*phiy + phiy*phiy) / (1.0d0 + phiy)**2
-        gy2 = s/length * (length/10.0d0) / (1.0d0 + phiy)**2
-        gy3 = s/length * (2.0d0*length*length/15.0d0 + phiy*length*length/6.0d0 + phiy*phiy*length*length/12.0d0) / (1.0d0 + phiy)**2
-        gy4 = s/length * (-length*length/30.0d0 - phiy*length*length/6.0d0 - phiy*phiy*length*length/12.0d0) / (1.0d0 + phiy)**2
+        gy1 = s/length * (6.0e0_rp/5.0e0_rp + 2.0e0_rp*phiy + phiy*phiy) / (1.0e0_rp + phiy)**2
+        gy2 = s/length * (length/10.0e0_rp) / (1.0e0_rp + phiy)**2
+        gy3 = s/length * (2.0e0_rp*length*length/15.0e0_rp + phiy*length*length/6.0e0_rp + phiy*phiy*length*length/12.0e0_rp) / (1.0e0_rp + phiy)**2
+        gy4 = s/length * (-length*length/30.0e0_rp - phiy*length*length/6.0e0_rp - phiy*phiy*length*length/12.0e0_rp) / (1.0e0_rp + phiy)**2
     
         this%m_geoMat(2,2)   =  gy1
         this%m_geoMat(6,6)   =  gy3
@@ -550,10 +551,10 @@ module SegmentStructure
         ! w-theta_y plane, DOFs 3,5,9,11
         ! sign convention follows your elastic stiffness matrix
         ! ------------------------------------------------------------
-        gz1 = s/length * (6.0d0/5.0d0 + 2.0d0*phiz + phiz*phiz) / (1.0d0 + phiz)**2
-        gz2 = s/length * (length/10.0d0) / (1.0d0 + phiz)**2
-        gz3 = s/length * (2.0d0*length*length/15.0d0 + phiz*length*length/6.0d0 + phiz*phiz*length*length/12.0d0) / (1.0d0 + phiz)**2
-        gz4 = s/length * (-length*length/30.0d0 - phiz*length*length/6.0d0 - phiz*phiz*length*length/12.0d0) / (1.0d0 + phiz)**2
+        gz1 = s/length * (6.0e0_rp/5.0e0_rp + 2.0e0_rp*phiz + phiz*phiz) / (1.0e0_rp + phiz)**2
+        gz2 = s/length * (length/10.0e0_rp) / (1.0e0_rp + phiz)**2
+        gz3 = s/length * (2.0e0_rp*length*length/15.0e0_rp + phiz*length*length/6.0e0_rp + phiz*phiz*length*length/12.0e0_rp) / (1.0e0_rp + phiz)**2
+        gz4 = s/length * (-length*length/30.0e0_rp - phiz*length*length/6.0e0_rp - phiz*phiz*length*length/12.0e0_rp) / (1.0e0_rp + phiz)**2
     
         this%m_geoMat(3,3)   =  gz1
         this%m_geoMat(5,5)   =  gz3
@@ -632,46 +633,46 @@ module SegmentStructure
         ! ISBN 9780792312086 James F. Doyle. P157,158
         implicit none
         class(Segment), intent(in) :: this
-        real(8), intent(in) :: l,m,n,d(3)
-        real(8), intent(out) :: triad(3,3)
-        real(8) :: ex(3), ey(3), ez(3), dir(3), dd, proj
+        real(rp), intent(in) :: l,m,n,d(3)
+        real(rp), intent(out) :: triad(3,3)
+        real(rp) :: ex(3), ey(3), ez(3), dir(3), dd, proj
 
         ! ex: beam axis direction
         ex(1) = l
         ex(2) = m
         ex(3) = n
         ! Normalization
-        dd = dsqrt(dot_product(ex, ex))
-        if (dd .gt. 1.0d-14) then
+        dd = sqrt(dot_product(ex, ex))
+        if (dd .gt. 1.0e-14_rp) then
             ex = ex / dd
         endif
 
         dir(1:3) = d(1:3)
         ! Normalization
-        dd = dsqrt(dot_product(dir, dir))
-        if (dd .gt. 1.0d-14) then
+        dd = sqrt(dot_product(dir, dir))
+        if (dd .gt. 1.0e-14_rp) then
             dir = dir / dd
         endif
         proj = dot_product(dir, ex)
         ! ey: span direction
         ! Gram-Schmidt
         ey = dir - proj * ex
-        dd = dsqrt(dot_product(ey, ey))
+        dd = sqrt(dot_product(ey, ey))
 
         ! if no span direction, use 
-        if (dd .le. 1.0d-10) then
-            if (dabs(ex(3)) .gt. 0.995d0) then
-                ey(1) = 0.0d0
-                ey(2) = 1.0d0
-                ey(3) =  0.0d0
+        if (dd .le. 1.0e-10_rp) then
+            if (abs(ex(3)) .gt. 0.995e0_rp) then
+                ey(1) = 0.0e0_rp
+                ey(2) = 1.0e0_rp
+                ey(3) =  0.0e0_rp
                 ez(1) = -ex(3)
-                ez(2) = 0.0d0
-                ez(3) =  0.0d0
+                ez(2) = 0.0e0_rp
+                ez(3) =  0.0e0_rp
             else
-                dd = dsqrt(ex(1)*ex(1)+ex(2)*ex(2))
+                dd = sqrt(ex(1)*ex(1)+ex(2)*ex(2))
                 ey(1) = -ex(2)/dd
                 ey(2) =  ex(1)/dd
-                ey(3) =  0.0d0
+                ey(3) =  0.0e0_rp
                 ez(1) = -ex(1)*ex(3)/dd
                 ez(2) = -ex(2)*ex(3)/dd
                 ez(3) =  dd
@@ -684,8 +685,8 @@ module SegmentStructure
             ez(2) = ex(3)*ey(1) - ex(1)*ey(3)
             ez(3) = ex(1)*ey(2) - ex(2)*ey(1)
             ! Normalization
-            dd = dsqrt(dot_product(ez, ez))
-            if (dd .gt. 1.0d-14) then
+            dd = sqrt(dot_product(ez, ez))
+            if (dd .gt. 1.0e-14_rp) then
                 ez = ez / dd
             endif
         endif
@@ -709,10 +710,10 @@ module SegmentStructure
     subroutine Segment_RKR(this,ek)
         implicit none
         class(Segment), intent(inout) :: this
-        real(8), intent(inout) :: ek(12,12)
-        real(8):: r(3,3),rt(3,3),ktemp(12,12)
+        real(rp), intent(inout) :: ek(12,12)
+        real(rp):: r(3,3),rt(3,3),ktemp(12,12)
         integer:: i,j,k,j1,j2,ii,jj,in,jn
-        r = 0.0d0
+        r = 0.0e0_rp
         r = this%m_rotMat
         do  in=1,3
         do  jn=1,3
@@ -728,7 +729,7 @@ module SegmentStructure
             j2=j*3
             do    k=1,3
             do    ii=1,3
-                ktemp(j1+k,j2+ii)=0.0d0
+                ktemp(j1+k,j2+ii)=0.0e0_rp
                 do     jj=1,3
                 ktemp(j1+k,j2+ii)=ktemp(j1+k,j2+ii)+ek(j1+k,j2+jj)*r(jj,ii)
                 enddo
@@ -736,7 +737,7 @@ module SegmentStructure
             enddo
             do  k=1,3
             do  ii=1,3
-                ek(j1+k,j2+ii)=0.0d0
+                ek(j1+k,j2+ii)=0.0e0_rp
                 do  jj=1,3
                     ek(j1+k,j2+ii)=ek(j1+k,j2+ii)+rt(k,jj)*ktemp(j1+jj,j2+ii)
                 enddo
@@ -756,14 +757,14 @@ module SegmentStructure
         implicit none
         class(Segment), intent(inout) :: this
         integer, intent(in) :: gEQ
-        real(8), intent(inout) :: lodInte(1:gEQ)
-        real(8) :: triad_00(3,3),triad_11(3,3),triad_22(3,3)
-        real(8) :: ub(12),dl
-        real(8) :: rr(3,3)
-        real(8) :: force(12),forceb(12)
-        real(8) :: du,dv,dw
-        real(8) :: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
-        real(8) :: fxx,emod,area
+        real(rp), intent(inout) :: lodInte(1:gEQ)
+        real(rp) :: triad_00(3,3),triad_11(3,3),triad_22(3,3)
+        real(rp) :: ub(12),dl
+        real(rp) :: rr(3,3)
+        real(rp) :: force(12),forceb(12)
+        real(rp) :: du,dv,dw
+        real(rp) :: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
+        real(rp) :: fxx,emod,area
         integer :: i,j
 
         du = this%dx1 - this%dx0
@@ -793,16 +794,16 @@ module SegmentStructure
         call Segment_global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
 
         ! non-zero ty1 tz1 u2 tx2 ty2 tz2
-        ub(1)=0.0d0
-        ub(2)=0.0d0
-        ub(3)=0.0d0
+        ub(1)=0.0e0_rp
+        ub(2)=0.0e0_rp
+        ub(3)=0.0e0_rp
         ub(4)=tx1
         ub(5)=ty1
         ub(6)=tz1
         !
         ub(7)=dl
-        ub(8)=0.0d0
-        ub(9)=0.0d0
+        ub(8)=0.0e0_rp
+        ub(9)=0.0e0_rp
         ub(10)=tx2
         ub(11)=ty2
         ub(12)=tz2
@@ -824,7 +825,7 @@ module SegmentStructure
         enddo
         enddo
         do  i=1,nElmtDofs
-            force(i)=0.0d0
+            force(i)=0.0e0_rp
         enddo
         do    i=1,3
         do    j=1,3
@@ -841,11 +842,11 @@ module SegmentStructure
     subroutine Segment_StrainEnergy_D(this)
         implicit none
         class(Segment), intent(inout) :: this
-        real(8) :: Strech(nElmtDofs,nElmtDofs),BendTor(nElmtDofs,nElmtDofs)
-        real(8) :: triad_00(3,3),triad_11(3,3),triad_22(3,3)
-        real(8) :: ub(12),dl
-        real(8) :: du,dv,dw
-        real(8) :: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
+        real(rp) :: Strech(nElmtDofs,nElmtDofs),BendTor(nElmtDofs,nElmtDofs)
+        real(rp) :: triad_00(3,3),triad_11(3,3),triad_22(3,3)
+        real(rp) :: ub(12),dl
+        real(rp) :: du,dv,dw
+        real(rp) :: tx1,tx2,ty1,ty2,tz1,tz2,tx,ty,tz
         integer :: i,j
 
         du = this%dx1 - this%dx0
@@ -875,69 +876,69 @@ module SegmentStructure
         call Segment_global_to_local(triad_00,tx,ty,tz,tx2,ty2,tz2)
 
         ! non-zero ty1 tz1 u2 tx2 ty2 tz2
-        ub(1)=0.0d0
-        ub(2)=0.0d0
-        ub(3)=0.0d0
+        ub(1)=0.0e0_rp
+        ub(2)=0.0e0_rp
+        ub(3)=0.0e0_rp
         ub(4)=tx1
         ub(5)=ty1
         ub(6)=tz1
         !
         ub(7)=dl
-        ub(8)=0.0d0
-        ub(9)=0.0d0
+        ub(8)=0.0e0_rp
+        ub(9)=0.0e0_rp
         ub(10)=tx2
         ub(11)=ty2
         ub(12)=tz2
 
-        Strech(:,:)=0.0d0
+        Strech(:,:)=0.0e0_rp
         Strech(1,1)=this%m_stfMat(1,1)
         Strech(1,7)=this%m_stfMat(1,7)
         Strech(7,7)=this%m_stfMat(7,7)
         Strech(7,1)=this%m_stfMat(7,1)
 
         BendTor(:,:)=this%m_stfMat(:,:)
-        BendTor(1,1)=0.0d0
-        BendTor(1,7)=0.0d0
-        BendTor(7,7)=0.0d0
-        BendTor(7,1)=0.0d0
+        BendTor(1,1)=0.0e0_rp
+        BendTor(1,7)=0.0e0_rp
+        BendTor(7,7)=0.0e0_rp
+        BendTor(7,1)=0.0e0_rp
 
         ! nodal strain in local coords
-        this%strainEnergy(1)=0.5d0*sum(matmul(Strech,ub)*ub)
-        this%strainEnergy(2)=0.5d0*sum(matmul(BendTor,ub)*ub)
+        this%strainEnergy(1)=0.5e0_rp*sum(matmul(Strech,ub)*ub)
+        this%strainEnergy(2)=0.5e0_rp*sum(matmul(BendTor,ub)*ub)
     end subroutine Segment_StrainEnergy_D
 
     subroutine Segment_get_angle_triad(triad_11,triad_22,tx,ty,tz)
         ! GET ANGLE of between TRIADs
         ! ISBN 9781441929105 James F. Doyle. P186,187 Equ.(3.7) (3.8)
         implicit none
-        real(8):: triad_11(3,3),triad_22(3,3)
-        real(8):: rr(3,3)
-        real(8):: tx,ty,tz, dtx,dty,dtz,theta,sint,trace_rr,factor
+        real(rp):: triad_11(3,3),triad_22(3,3)
+        real(rp):: rr(3,3)
+        real(rp):: tx,ty,tz, dtx,dty,dtz,theta,sint,trace_rr,factor
         integer:: i,j,k
         !
         ! get angle between two triads
         do    i=1,3
             do    j=1,3
-                rr(i,j)=0.0d0
+                rr(i,j)=0.0e0_rp
                 do    k=1,3
                     rr(i,j)=rr(i,j) + triad_22(i,k)*triad_11(j,k)
                 enddo
             enddo
         enddo
 
-        dtx = (rr(3,2)-rr(2,3))/2.0d0
-        dty = (rr(1,3)-rr(3,1))/2.0d0
-        dtz = (rr(2,1)-rr(1,2))/2.0d0
+        dtx = (rr(3,2)-rr(2,3))/2.0e0_rp
+        dty = (rr(1,3)-rr(3,1))/2.0e0_rp
+        dtz = (rr(2,1)-rr(1,2))/2.0e0_rp
 
         trace_rr = rr(1,1) + rr(2,2) + rr(3,3)
-        trace_rr = (trace_rr - 1.0d0)/2.0d0
-        if (trace_rr .gt. 1.0d0) trace_rr = 1.0d0
-        if (trace_rr .lt. -1.0d0) trace_rr = -1.0d0
+        trace_rr = (trace_rr - 1.0e0_rp)/2.0e0_rp
+        if (trace_rr .gt. 1.0e0_rp) trace_rr = 1.0e0_rp
+        if (trace_rr .lt. -1.0e0_rp) trace_rr = -1.0e0_rp
 
-        sint = dsqrt(dtx*dtx+dty*dty+dtz*dtz)
-        theta = dacos(trace_rr)
+        sint = sqrt(dtx*dtx+dty*dty+dtz*dtz)
+        theta = acos(trace_rr)
 
-        if (sint .lt. 1.0d-10 .or. theta .lt. 1.0d-10) then
+        if (sint .lt. 1.0e-10_rp .or. theta .lt. 1.0e-10_rp) then
             tx = dtx
             ty = dty
             tz = dtz
@@ -953,8 +954,8 @@ module SegmentStructure
 
     subroutine Segment_global_to_local(triad,tx,ty,tz,tx2,ty2,tz2)
         implicit none
-        real(8):: triad(3,3)
-        real(8):: tx,ty,tz,tx2,ty2,tz2
+        real(rp):: triad(3,3)
+        real(rp):: tx,ty,tz,tx2,ty2,tz2
         ! [R] = [triad]^T
         ! [g_angle] = [R]*[l_angle]
         tx2 = triad(1,1)*tx+triad(2,1)*ty+triad(3,1)*tz
@@ -973,9 +974,9 @@ module SegmentStructure
         implicit none
         class(Segment), intent(inout) :: this
         integer, intent(in) :: nND
-        real(8):: dspnn(1:6,1:nND)
-        real(8):: rr(3,3)
-        real(8):: dtx1,dty1,dtz1
+        real(rp):: dspnn(1:6,1:nND)
+        real(rp):: rr(3,3)
+        real(rp):: dtx1,dty1,dtz1
         integer:: node0,node1
 
         node0 = this%node0
@@ -1004,19 +1005,19 @@ module SegmentStructure
         ! triad_ee: the triad of beam element(beam center)
         implicit none
         class(Segment), intent(inout) :: this
-        real(8):: triad_aa(3,3)
-        real(8):: rr(3,3),tx,ty,tz
-        real(8):: triad_11(3,3),triad_22(3,3)
-        real(8):: xll,xmm,xnn,dd,r2e1,r3e1
+        real(rp):: triad_aa(3,3)
+        real(rp):: rr(3,3),tx,ty,tz
+        real(rp):: triad_11(3,3),triad_22(3,3)
+        real(rp):: xll,xmm,xnn,dd,r2e1,r3e1
         integer:: i,j,k
 
         xll=this%xll1
         xmm=this%xmm1
         xnn=this%xnn1
-        dd =dsqrt(xll*xll+xmm*xmm)
+        dd =sqrt(xll*xll+xmm*xmm)
         do    i=1,3
             do    j=1,3
-                this%triad_ee(i,j)=0.0d0
+                this%triad_ee(i,j)=0.0e0_rp
             enddo
         enddo
         this%triad_ee(1,1)=xll
@@ -1033,28 +1034,28 @@ module SegmentStructure
         call Segment_get_angle_triad(triad_11,triad_22,tx,ty,tz)
         !
         ! rotate n1 to intermediate
-        tx=tx/2.0d0
-        ty=ty/2.0d0
-        tz=tz/2.0d0
+        tx=tx/2.0e0_rp
+        ty=ty/2.0e0_rp
+        tz=tz/2.0e0_rp
         call Segment_FiniteRot(tx,ty,tz,rr)
         triad_aa(1:3,1:3)=matmul(rr(1:3,1:3),this%triad_n1(1:3,1:3))
         !
         ! vectors e2 e3
-        r2e1 = 0.0d0
-        r3e1 = 0.0d0
+        r2e1 = 0.0e0_rp
+        r3e1 = 0.0e0_rp
         do    k=1,3
             r2e1 = r2e1 + triad_aa(k,2)*this%triad_ee(k,1)
             r3e1 = r3e1 + triad_aa(k,3)*this%triad_ee(k,1)
         enddo
         do    j=1,3
-            this%triad_ee(j,2)=triad_aa(j,2) - r2e1*(triad_aa(j,1)+this%triad_ee(j,1))/2.0d0
-            this%triad_ee(j,3)=triad_aa(j,3) - r3e1*(triad_aa(j,1)+this%triad_ee(j,1))/2.0d0
+            this%triad_ee(j,2)=triad_aa(j,2) - r2e1*(triad_aa(j,1)+this%triad_ee(j,1))/2.0e0_rp
+            this%triad_ee(j,3)=triad_aa(j,3) - r3e1*(triad_aa(j,1)+this%triad_ee(j,1))/2.0e0_rp
         enddo
         !
         ! Gram-Schmidt
         this%triad_ee(:,2) = this%triad_ee(:,2) - dot_product(this%triad_ee(:,2), this%triad_ee(:,1)) * this%triad_ee(:,1)
-        dd = dsqrt(dot_product(this%triad_ee(:,2), this%triad_ee(:,2)))
-        if (dd > 1.0d-14) this%triad_ee(:,2) = this%triad_ee(:,2) / dd
+        dd = sqrt(dot_product(this%triad_ee(:,2), this%triad_ee(:,2)))
+        if (dd > 1.0e-14_rp) this%triad_ee(:,2) = this%triad_ee(:,2) / dd
         !
         ! e3 = e1 × e2
         this%triad_ee(:,3) = (/ this%triad_ee(2,1)*this%triad_ee(3,2)-this%triad_ee(3,1)*this%triad_ee(2,2), &
@@ -1067,34 +1068,34 @@ module SegmentStructure
         ! Finite rotation(Rodrique's formula)
         ! ISBN 9781441929105 James F. Doyle. P184 Equ.(3.4)
         implicit none
-        real(8):: rr(3,3),rr1(3,3),rr2(3,3),rr3(3,3)
-        real(8):: t1,t2,t3,tt,ss,cc,c1,c2
+        real(rp):: rr(3,3),rr1(3,3),rr2(3,3),rr3(3,3)
+        real(rp):: t1,t2,t3,tt,ss,cc,c1,c2
         !
         integer:: i,j
         !
-        tt=dsqrt( t1**2 + t2**2 + t3**2 )
-        ss=dsin(tt)
-        cc=dcos(tt)
+        tt=sqrt( t1**2 + t2**2 + t3**2 )
+        ss=sin(tt)
+        cc=cos(tt)
         !
-        rr1(1,1)=1.0d0
-        rr1(1,2)=0.0d0
-        rr1(1,3)=0.0d0
-        rr1(2,1)=0.0d0
-        rr1(2,2)=1.0d0
-        rr1(2,3)=0.0d0
-        rr1(3,1)=0.0d0
-        rr1(3,2)=0.0d0
-        rr1(3,3)=1.0d0
+        rr1(1,1)=1.0e0_rp
+        rr1(1,2)=0.0e0_rp
+        rr1(1,3)=0.0e0_rp
+        rr1(2,1)=0.0e0_rp
+        rr1(2,2)=1.0e0_rp
+        rr1(2,3)=0.0e0_rp
+        rr1(3,1)=0.0e0_rp
+        rr1(3,2)=0.0e0_rp
+        rr1(3,3)=1.0e0_rp
         !
-        rr2(1,1)=0.0d0
+        rr2(1,1)=0.0e0_rp
         rr2(1,2)=-t3
         rr2(1,3)= t2
         rr2(2,1)= t3
-        rr2(2,2)=0.0d0
+        rr2(2,2)=0.0e0_rp
         rr2(2,3)=-t1
         rr2(3,1)=-t2
         rr2(3,2)= t1
-        rr2(3,3)=0d0
+        rr2(3,3)=0e0_rp
         !
         rr3(1,1)=-t3*t3-t2*t2
         rr3(1,2)= t2*t1
@@ -1108,13 +1109,13 @@ module SegmentStructure
         !
         do    i=1,3
         do    j=1,3
-            if    (tt .lt. 1.0d-10) then
-                c1=1.0d0
+            if    (tt .lt. 1.0e-10_rp) then
+                c1=1.0e0_rp
                 ! c2=1.0
-                c2=0.5d0
+                c2=0.5e0_rp
             else
                 c1 = ss/tt
-                c2 = (1.0d0-cc)/tt**2
+                c2 = (1.0e0_rp-cc)/tt**2
             endif
             rr(i,j) = rr1(i,j) + rr2(i,j)*c1 + rr3(i,j)*c2
         enddo
@@ -1126,10 +1127,10 @@ module SegmentStructure
     subroutine Segment_MapReferencePosToCurrent(this, coordsOut, TTT, XYZ, AoA)
         implicit none
         class(Segment), intent(in) :: this
-        real(8), intent(out) :: coordsOut(12)
-        real(8), intent(in) :: TTT(3,3)
-        real(8), intent(in) :: XYZ(3)
-        real(8), intent(in) :: AoA(3)
+        real(rp), intent(out) :: coordsOut(12)
+        real(rp), intent(in) :: TTT(3,3)
+        real(rp), intent(in) :: XYZ(3)
+        real(rp), intent(in) :: AoA(3)
         coordsOut(1:3) = matmul(TTT, this%x00(1:3)) + XYZ
         coordsOut(4:6) = AoA
         coordsOut(7:9) = matmul(TTT, this%x00(7:9)) + XYZ
@@ -1139,8 +1140,8 @@ module SegmentStructure
     subroutine Segment_MapReferenceDirToCurrent(this, dirc, TTT)
         implicit none
         class(Segment), intent(in) :: this
-        real(8), intent(out) :: dirc(3)
-        real(8), intent(in) :: TTT(3,3)
+        real(rp), intent(out) :: dirc(3)
+        real(rp), intent(in) :: TTT(3,3)
         dirc = matmul(TTT, this%dirc00)
     end subroutine Segment_MapReferenceDirToCurrent
 
@@ -1149,30 +1150,31 @@ end module SegmentStructure
 
 module SolidSolver
     use SegmentStructure
+    use ConstParams, only: rp
     implicit none
     private
     integer, parameter:: m_idat=12
-    real(8):: m_dampK,m_dampM,m_GeoGamma,m_NewmarkGamma,m_NewmarkBeta
-    real(8):: m_dtolFEM,m_pi
+    real(rp):: m_dampK,m_dampM,m_GeoGamma,m_NewmarkGamma,m_NewmarkBeta
+    real(rp):: m_dtolFEM,m_pi
     integer:: m_ntolFEM,m_isKB
-    real(8):: m_g(3)
+    real(rp):: m_g(3)
     public :: BeamSolver,Set_SolidSolver_Params
     type :: BeamSolver
         type(Segment), allocatable :: m_elements(:)
 
         integer :: nND,nEL,nMT,gEQ
-        real(8) :: FishInfo(3)
-        real(8), allocatable :: pos(:,:), dsp(:,:), vel(:,:), acc(:,:), mss(:,:)
-        real(8), allocatable :: lodInte(:), lodExte(:), lodEffe(:), lodFlow(:), lodRepl(:), lodGrav(:), vBC(:)
-        real(8) :: coeffs(0:7)
+        real(rp) :: FishInfo(3)
+        real(rp), allocatable :: pos(:,:), dsp(:,:), vel(:,:), acc(:,:), mss(:,:)
+        real(rp), allocatable :: lodInte(:), lodExte(:), lodEffe(:), lodFlow(:), lodRepl(:), lodGrav(:), vBC(:)
+        real(rp) :: coeffs(0:7)
 
         character (LEN=40):: FEmeshName
         integer:: iBodyModel
-        real(8):: Freq,denR,KB,KS,EmR,psR,tcR,St
-        real(8):: elmax,elmin
-        real(8):: XYZ(3),XYZo(3),initXYZVel(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
-        real(8):: AoA(3),AoAo(3),AoAAmpl(3),AoAPhi(3),AoAd(3),WWW1(3),WWW2(3),WWW3(3)
-        real(8):: TTT00(3,3),TTT0(3,3),TTTnxt(3,3)
+        real(rp):: Freq,denR,KB,KS,EmR,psR,tcR,St
+        real(rp):: elmax,elmin
+        real(rp):: XYZ(3),XYZo(3),initXYZVel(3),XYZAmpl(3),XYZPhi(3),XYZd(3),UVW(3)
+        real(rp):: AoA(3),AoAo(3),AoAAmpl(3),AoAPhi(3),AoAd(3),WWW1(3),WWW2(3),WWW3(3)
+        real(rp):: TTT00(3,3),TTT0(3,3),TTTnxt(3,3)
         integer:: isMotionGiven(6)
     contains
         procedure :: SetSolver => Beam_SetSolver
@@ -1222,10 +1224,10 @@ module SolidSolver
         class(BeamSolver), intent(inout) :: this
         character (LEN=40),intent(in):: FEmeshName_
         integer,intent(in):: iBodyModel_,isMotionGiven_(6)
-        real(8),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
-        real(8),intent(in):: Freq_
-        real(8),intent(in):: initXYZVel_(3),XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
-        real(8),intent(in):: AoAo_(3),AoAAmpl_(3),AoAPhi_(3)
+        real(rp),intent(in):: denR_,KB_,KS_,EmR_,psR_,tcR_,St_
+        real(rp),intent(in):: Freq_
+        real(rp),intent(in):: initXYZVel_(3),XYZo_(3),XYZAmpl_(3),XYZPhi_(3)
+        real(rp),intent(in):: AoAo_(3),AoAAmpl_(3),AoAPhi_(3)
         
         this%FEmeshName = FEmeshName_
         this%iBodyModel = iBodyModel_
@@ -1248,8 +1250,8 @@ module SolidSolver
     end subroutine Beam_SetSolver
     subroutine Set_SolidSolver_Params(dampK,dampM,GeoGamma,NewmarkGamma,NewmarkBeta,dtolFEM,ntolFEM,isKB,g)
         implicit none
-        real(8),intent(in):: dampK,dampM,GeoGamma,NewmarkGamma,NewmarkBeta
-        real(8),intent(in):: dtolFEM,g(3)
+        real(rp),intent(in):: dampK,dampM,GeoGamma,NewmarkGamma,NewmarkBeta
+        real(rp),intent(in):: dtolFEM,g(3)
         integer,intent(in):: ntolFEM,isKB
         m_dampK = dampK
         m_dampM = dampM
@@ -1258,7 +1260,7 @@ module SolidSolver
         m_NewmarkBeta = NewmarkBeta
         m_dtolFEM = dtolFEM
         m_ntolFEM = ntolFEM
-        m_pi = 3.141592653589793d0
+        m_pi = 3.141592653589793e0_rp
         m_isKB = isKB
         m_g = g
     end subroutine Set_SolidSolver_Params
@@ -1273,9 +1275,9 @@ module SolidSolver
         character (LEN=40):: filename
         integer :: fileiD = 996
         character (LEN=1000):: buffer
-        real(8), allocatable :: xyz(:, :), material(:, :)
+        real(rp), allocatable :: xyz(:, :), material(:, :)
         integer, allocatable :: boundary(:, :)
-        real(8), intent(out):: nAsfac,nLchod
+        real(rp), intent(out):: nAsfac,nLchod
         ! load mesh information
         filename = this%FEmeshName
         open(unit=fileiD, file = filename )
@@ -1370,7 +1372,7 @@ module SolidSolver
 
         subroutine Beam_cptAsfac()
             implicit none
-            real(8) :: lentemp
+            real(rp) :: lentemp
             integer :: i
             nAsfac = sum([(this%m_elements(i)%areaElem00, i=1,this%nEL)])
             this%elmax = maxval([(this%m_elements(i)%areaElem00, i=1,this%nEL)])
@@ -1401,19 +1403,19 @@ module SolidSolver
     subroutine Beam_Initialise(this,time)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(in):: time
+        real(rp), intent(in):: time
         integer:: n
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !   initialize solid field
     !   compute initial values
     !   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        this%TTT00(:,:)=0.0d0
-        this%TTT00(1,1)=1.0d0
-        this%TTT00(2,2)=1.0d0
-        this%TTT00(3,3)=1.0d0
+        this%TTT00(:,:)=0.0e0_rp
+        this%TTT00(1,1)=1.0e0_rp
+        this%TTT00(2,2)=1.0e0_rp
+        this%TTT00(3,3)=1.0e0_rp
 
-        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3)*time
-        this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*time+this%AoAPhi(1:3))
+        this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*cos(2.0e0_rp*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3)*time
+        this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*cos(2.0e0_rp*m_pi*this%Freq*time+this%AoAPhi(1:3))
 
         call AoAtoTTT(this%AoA(1:3),this%TTT0(1:3,1:3))
         call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
@@ -1429,12 +1431,12 @@ module SolidSolver
         call this%InitPosDspVelAcc()
         
         if(this%iBodyModel.eq.1)then
-            this%UVW(1:3) =-2.0d0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) !time=0
+            this%UVW(1:3) =-2.0e0_rp*m_pi*this%Freq*this%XYZAmpl(1:3)*sin(2.0e0_rp*m_pi*this%Freq*time+this%XYZPhi(1:3)) + this%initXYZVel(1:3) !time=0
             !rotational velocity
-            this%WWW1(1:3)=-2.0d0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*time+this%AoAPhi(1:3))
-            this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
-                            this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)),   &
-                            this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))    ]
+            this%WWW1(1:3)=-2.0e0_rp*m_pi*this%Freq*this%AoAAmpl(1:3)*sin(2.0e0_rp*m_pi*this%Freq*time+this%AoAPhi(1:3))
+            this%WWW2(1:3)=[this%WWW1(1)*cos(this%AoA(2))+this%WWW1(3),    &
+                            this%WWW1(1)*sin(this%AoA(2))*sin(this%AoA(3))+this%WWW1(2)*cos(this%AoA(3)),   &
+                            this%WWW1(1)*sin(this%AoA(2))*cos(this%AoA(3))-this%WWW1(2)*sin(this%AoA(3))    ]
             this%WWW3(1:3)=matmul(this%TTT0(1:3,1:3),this%WWW2(1:3))
 
             call this%UpdateVelFromPosAngular(this%WWW3, this%UVW)
@@ -1451,12 +1453,12 @@ module SolidSolver
         allocate(this%lodInte(1:this%gEQ),this%lodExte(1:this%gEQ))
         allocate(this%lodEffe(1:this%gEQ),this%lodFlow(1:this%gEQ))
         allocate(this%lodRepl(1:this%gEQ),this%lodGrav(1:this%gEQ))
-        this%lodInte(:) = 0.0d0
-        this%lodExte(:) = 0.0d0
-        this%lodEffe(:) = 0.0d0
-        this%lodFlow(:) = 0.0d0
-        this%lodRepl(:) = 0.0d0
-        this%lodGrav(:) = 0.0d0
+        this%lodInte(:) = 0.0e0_rp
+        this%lodExte(:) = 0.0e0_rp
+        this%lodEffe(:) = 0.0e0_rp
+        this%lodFlow(:) = 0.0e0_rp
+        this%lodRepl(:) = 0.0e0_rp
+        this%lodGrav(:) = 0.0e0_rp
     end subroutine Beam_InitLoad
 
     subroutine Beam_InitPosDspVelAcc(this)
@@ -1464,22 +1466,22 @@ module SolidSolver
         class(BeamSolver), intent(inout) :: this
         integer :: n
         allocate(this%pos(1:6, 1:this%nND),this%dsp(1:6, 1:this%nND),this%vel(1:6, 1:this%nND),this%acc(1:6, 1:this%nND),this%mss(1:3, 1:this%nND))
-        this%pos(:, :) = 0.0d0
+        this%pos(:, :) = 0.0e0_rp
         do n = 1,this%nEL
             this%pos(1:6,this%m_elements(n)%node0)=this%m_elements(n)%x1(1:6)
             this%pos(1:6,this%m_elements(n)%node1)=this%m_elements(n)%x1(7:12)
         enddo
-        this%dsp(:, :) = 0.0d0
-        this%vel(:, :) = 0.0d0
-        this%acc(:, :) = 0.0d0
-        this%mss(:, :) = 0.0d0
+        this%dsp(:, :) = 0.0e0_rp
+        this%vel(:, :) = 0.0e0_rp
+        this%acc(:, :) = 0.0e0_rp
+        this%mss(:, :) = 0.0e0_rp
     end subroutine Beam_InitPosDspVelAcc
 
     subroutine Beam_UpdateVelFromPosAngular(this, WWW, UVW)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(in) :: WWW(3), UVW(3)
-        real(8) :: rel(3)
+        real(rp), intent(in) :: WWW(3), UVW(3)
+        real(rp) :: rel(3)
         integer :: n
         do n = 1, this%nND
             ! Position relative to the reference point.
@@ -1514,8 +1516,8 @@ module SolidSolver
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer :: i, j, node0, node1
-        real(8) :: gvec(1:12), grav(1:12)
-        gvec(:) = 0.0d0
+        real(rp) :: gvec(1:12), grav(1:12)
+        gvec(:) = 0.0e0_rp
         gvec(1:3) = m_g(1:3)
         gvec(7:9) = m_g(1:3)
         do i = 1, this%nEL
@@ -1533,31 +1535,31 @@ module SolidSolver
     subroutine Beam_calculate_angle_material(this, Lref, Uref, denIn, uMax, uuuIn, nLthck)
     implicit none
     class(BeamSolver), intent(inout) :: this
-    real(8),intent(in) :: Lref, Uref, denIn, uuuIn(3)
-    real(8),intent(inout) :: uMax
-    real(8),intent(out) :: nLthck
-    real(8) :: xmax, ymax, zmax
-    real(8) :: rRot(3)
+    real(rp),intent(in) :: Lref, Uref, denIn, uuuIn(3)
+    real(rp),intent(inout) :: uMax
+    real(rp),intent(out) :: nLthck
+    real(rp) :: xmax, ymax, zmax
+    real(rp) :: rRot(3)
     integer :: i
-    real(8) :: len,ratio
+    real(rp) :: len,ratio
 
     this%St = Lref * this%Freq / Uref
     ! angle to radian
-    this%AoAo(1:3)=this%AoAo(1:3)/180.0d0*m_pi
-    this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0d0*m_pi
-    this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0d0*m_pi
-    this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0d0*m_pi
-    xmax = maxval([(dabs(this%m_elements(i)%x00(1)), dabs(this%m_elements(i)%x00(7)), i=1,this%nEL)])
-    ymax = maxval([(dabs(this%m_elements(i)%x00(2)), dabs(this%m_elements(i)%x00(8)), i=1,this%nEL)])
-    zmax = maxval([(dabs(this%m_elements(i)%x00(3)), dabs(this%m_elements(i)%x00(9)), i=1,this%nEL)])
+    this%AoAo(1:3)=this%AoAo(1:3)/180.0e0_rp*m_pi
+    this%AoAAmpl(1:3)=this%AoAAmpl(1:3)/180.0e0_rp*m_pi
+    this%AoAPhi(1:3)=this%AoAPhi(1:3)/180.0e0_rp*m_pi
+    this%XYZPhi(1:3)=this%XYZPhi(1:3)/180.0e0_rp*m_pi
+    xmax = maxval([(abs(this%m_elements(i)%x00(1)), abs(this%m_elements(i)%x00(7)), i=1,this%nEL)])
+    ymax = maxval([(abs(this%m_elements(i)%x00(2)), abs(this%m_elements(i)%x00(8)), i=1,this%nEL)])
+    zmax = maxval([(abs(this%m_elements(i)%x00(3)), abs(this%m_elements(i)%x00(9)), i=1,this%nEL)])
     ! effective rotation radius for rotations about x, y, z
     rRot(1) = max(ymax, zmax)   ! rotation about x
     rRot(2) = max(xmax, zmax)   ! rotation about y
     rRot(3) = max(xmax, ymax)   ! rotation about z
     uMax = maxval([ uMax, &
-                maxval(dabs(uuuIn(1:3))), &
-                2.0d0*m_pi*maxval(dabs(this%XYZAmpl(1:3)))*this%Freq, &
-                2.0d0*m_pi*maxval(dabs(this%AoAAmpl(1:3))*rRot(1:3))*this%Freq ])
+                maxval(abs(uuuIn(1:3))), &
+                2.0e0_rp*m_pi*maxval(abs(this%XYZAmpl(1:3)))*this%Freq, &
+                2.0e0_rp*m_pi*maxval(abs(this%AoAAmpl(1:3))*rRot(1:3))*this%Freq ])
 
     ! Standard section-property convention used by the beam element:
     ! len = b     : local y-axis spanwise width
@@ -1580,14 +1582,14 @@ module SolidSolver
         do i = 1, this%nEL
             len = this%m_elements(i)%spanlen
             this%m_elements(i)%m_property(1) = this%EmR * denIn * Uref**2
-            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1) / (2.0d0*(1.0d0+this%psR))
+            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1) / (2.0e0_rp*(1.0e0_rp+this%psR))
             nLthck = (this%tcR*len)*Lref
             this%m_elements(i)%m_property(3) = len * nLthck
             this%m_elements(i)%m_property(4) = this%denR*len*Lref*denIn / this%m_elements(i)%m_property(3)
             ratio = nLthck/len
-            this%m_elements(i)%m_property(6) = len * nLthck**3/3.0d0 * (1d0-0.63d0*ratio+0.052d0*(ratio)**5)
-            this%m_elements(i)%m_property(7) = len * nLthck**3/12.0d0
-            this%m_elements(i)%m_property(8) = nLthck * len**3/12.0d0
+            this%m_elements(i)%m_property(6) = len * nLthck**3/3.0e0_rp * (1e0_rp-0.63e0_rp*ratio+0.052e0_rp*(ratio)**5)
+            this%m_elements(i)%m_property(7) = len * nLthck**3/12.0e0_rp
+            this%m_elements(i)%m_property(8) = nLthck * len**3/12.0e0_rp
         enddo
         len = this%m_elements(1)%spanlen
         this%KB = this%m_elements(1)%m_property(1)*this%m_elements(1)%m_property(7) / (denIn*Uref**2*Lref**3*len)
@@ -1597,15 +1599,15 @@ module SolidSolver
     if(m_isKB==1)then
         do i = 1, this%nEL
             len = this%m_elements(i)%spanlen
-            nLthck =  dsqrt(this%KB/this%KS*12.0d0) * Lref
+            nLthck =  sqrt(this%KB/this%KS*12.0e0_rp) * Lref
             this%m_elements(i)%m_property(3) = len * nLthck
             this%m_elements(i)%m_property(1) = this%KS * denIn * Uref**2 * Lref * len / this%m_elements(i)%m_property(3)
-            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1) / (2.0d0*(1.0d0+this%psR))
+            this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1) / (2.0e0_rp*(1.0e0_rp+this%psR))
             this%m_elements(i)%m_property(4) = this%denR*len*Lref*denIn / this%m_elements(i)%m_property(3)
             ratio = nLthck / len
-            this%m_elements(i)%m_property(6) = len * nLthck**3/3.0d0 * (1.0d0 - 0.63d0*ratio + 0.052d0*ratio**5)
-            this%m_elements(i)%m_property(7) = len * nLthck**3/12.0d0
-            this%m_elements(i)%m_property(8) = nLthck * len**3/12.0d0
+            this%m_elements(i)%m_property(6) = len * nLthck**3/3.0e0_rp * (1.0e0_rp - 0.63e0_rp*ratio + 0.052e0_rp*ratio**5)
+            this%m_elements(i)%m_property(7) = len * nLthck**3/12.0e0_rp
+            this%m_elements(i)%m_property(8) = nLthck * len**3/12.0e0_rp
         enddo
         len = this%m_elements(1)%spanlen
         nLthck = this%m_elements(1)%m_property(3) / len
@@ -1621,7 +1623,7 @@ module SolidSolver
     subroutine Beam_write_solid(this,Lref,Uref,Aref,Fref,iFish,idfile)
     implicit none
     class(BeamSolver), intent(inout) :: this
-    real(8):: Lref,Uref,Aref,Fref
+    real(rp):: Lref,Uref,Aref,Fref
     integer:: i,iFish,ElmType,idfile
     integer,parameter::nameLen=10,numVar=15
     character(len=nameLen):: idstr
@@ -1729,13 +1731,13 @@ module SolidSolver
     subroutine Beam_write_solid_info(this,groupNum,XYZo,Lref,Uref,Aref,Fref,Pref,Eref)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8),intent(in):: XYZo(1:3),Lref,Uref,Aref,Fref,Pref,Eref
+        real(rp),intent(in):: XYZo(1:3),Lref,Uref,Aref,Fref,Pref,Eref
         character(LEN=3),intent(in):: groupNum
         integer:: idfile=100,i,node0,node1
-        real(8):: msum(3),xcm(3),vcm(3),acm(3)
-        real(8):: Ptot,Pax,Pay,Paz
-        real(8):: Etot,Ev,Ep,Es,Eb
-        real(8)::ve(12)
+        real(rp):: msum(3),xcm(3),vcm(3),acm(3)
+        real(rp):: Ptot,Pax,Pay,Paz
+        real(rp):: Etot,Ev,Ep,Es,Eb
+        real(rp)::ve(12)
         
         ! write begin information
         open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_firstNode.dat',position='append')
@@ -1773,8 +1775,8 @@ module SolidSolver
         close(idfile)
 
         call this%UpdateStrainEnergy()
-        Es=0.0d0
-        Eb=0.0d0
+        Es=0.0e0_rp
+        Eb=0.0e0_rp
         do i=1,this%nEL
             Es=Es+this%m_elements(i)%strainEnergy(1)
             Eb=Eb+this%m_elements(i)%strainEnergy(2)
@@ -1782,13 +1784,13 @@ module SolidSolver
         Es=Es/Eref
         Eb=Eb/Eref
         Ep=Es+Eb
-        Ev=0.0d0
+        Ev=0.0e0_rp
         do i=1, this%nEL
             node0=this%m_elements(i)%node0
             node1=this%m_elements(i)%node1
             ve(1:6) =this%vel(1:6,node0)
             ve(7:12)=this%vel(1:6,node1)
-            Ev=Ev+0.5d0*dot_product(ve, matmul(this%m_elements(i)%m_masMat, ve))
+            Ev=Ev+0.5e0_rp*dot_product(ve, matmul(this%m_elements(i)%m_masMat, ve))
         enddo
         Ev=Ev/Eref
         Etot=Ev+Ep
@@ -1802,7 +1804,7 @@ module SolidSolver
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer,intent(in):: solidProbingNum,solidProbingNode(solidProbingNum)
-        real(8),intent(in):: XYZo(1:3),Lref,Uref,Aref
+        real(rp),intent(in):: XYZo(1:3),Lref,Uref,Aref
         character(LEN=3),intent(in):: groupNum
         character (LEN=4):: probeNum
         integer:: i,idfile=100
@@ -1821,16 +1823,16 @@ module SolidSolver
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer:: iFish,isubstep,i
-        real(8):: deltat,subdeltat,time
+        real(rp):: deltat,subdeltat,time
         !!$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(iND)
             if(this%iBodyModel.eq.1)then     ! rigid body
                 !======================================================
                 !prescribed motion
                 !------------------------------------------------------
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+dble(isubstep)*subdeltat)
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*cos(2.0e0_rp*m_pi*this%Freq*(time-deltat+real(isubstep, rp)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+real(isubstep, rp)*subdeltat)
                 !rotational displacement
-                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%AoAPhi(1:3))
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*cos(2.0e0_rp*m_pi*this%Freq*(time-deltat+real(isubstep, rp)*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
@@ -1846,21 +1848,21 @@ module SolidSolver
                 enddo
                 !------------------------------------------------------
                 !translational velocity
-                this%UVW(1:3) =-2.0d0*m_pi*this%Freq*this%XYZAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3)
+                this%UVW(1:3) =-2.0e0_rp*m_pi*this%Freq*this%XYZAmpl(1:3)*sin(2.0e0_rp*m_pi*this%Freq*(time-deltat+real(isubstep, rp)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3)
                 !rotational velocity
-                this%WWW1(1:3)=-2.0d0*m_pi*this%Freq*this%AoAAmpl(1:3)*dsin(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%AoAPhi(1:3))
-                this%WWW2(1:3)=[this%WWW1(1)*dcos(this%AoA(2))+this%WWW1(3),    &
-                                this%WWW1(1)*dsin(this%AoA(2))*dsin(this%AoA(3))+this%WWW1(2)*dcos(this%AoA(3)), &
-                                this%WWW1(1)*dsin(this%AoA(2))*dcos(this%AoA(3))-this%WWW1(2)*dsin(this%AoA(3))]
+                this%WWW1(1:3)=-2.0e0_rp*m_pi*this%Freq*this%AoAAmpl(1:3)*sin(2.0e0_rp*m_pi*this%Freq*(time-deltat+real(isubstep, rp)*subdeltat)+this%AoAPhi(1:3))
+                this%WWW2(1:3)=[this%WWW1(1)*cos(this%AoA(2))+this%WWW1(3),    &
+                                this%WWW1(1)*sin(this%AoA(2))*sin(this%AoA(3))+this%WWW1(2)*cos(this%AoA(3)), &
+                                this%WWW1(1)*sin(this%AoA(2))*cos(this%AoA(3))-this%WWW1(2)*sin(this%AoA(3))]
                 this%WWW3(1:3)=matmul(this%TTTnxt(1:3,1:3),this%WWW2(1:3))
                 !given velocity
                 call this%UpdateVelFromPosAngular(this%WWW3, this%UVW)
                 !-------------------------------------------------------
             elseif(this%iBodyModel.eq.2)then !elastic model
                 !translational displacement
-                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+dble(isubstep)*subdeltat)
+                this%XYZ(1:3)=this%XYZo(1:3)+this%XYZAmpl(1:3)*cos(2.0e0_rp*m_pi*this%Freq*(time-deltat+real(isubstep, rp)*subdeltat)+this%XYZPhi(1:3)) + this%initXYZVel(1:3) * (time-deltat+real(isubstep, rp)*subdeltat)
                 !rotational displacement
-                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*dcos(2.0d0*m_pi*this%Freq*(time-deltat+dble(isubstep)*subdeltat)+this%AoAPhi(1:3))
+                this%AoA(1:3)=this%AoAo(1:3)+this%AoAAmpl(1:3)*cos(2.0e0_rp*m_pi*this%Freq*(time-deltat+real(isubstep, rp)*subdeltat)+this%AoAPhi(1:3))
                 call AoAtoTTT(this%AoA(1:3),this%TTTnxt(1:3,1:3))
                 call Segment_get_angle_triad(this%TTT0(1:3,1:3),this%TTTnxt(1:3,1:3),this%AoAd(1),this%AoAd(2),this%AoAd(3))
                 !given displacement
@@ -1879,15 +1881,15 @@ module SolidSolver
     subroutine Beam_UpdateNewmarkCoeffs(this,dt)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(in) :: dt
+        real(rp), intent(in) :: dt
         ! coefficients in the Newmark-beta method
-        this%coeffs(2) = 1.0d0 / (m_NewmarkBeta * dt)
+        this%coeffs(2) = 1.0e0_rp / (m_NewmarkBeta * dt)
         this%coeffs(1) = m_NewmarkGamma * this%coeffs(2)
         this%coeffs(0) = this%coeffs(2) / dt
-        this%coeffs(3) = 0.5d0 / m_NewmarkBeta - 1.0d0
-        this%coeffs(4) = m_NewmarkGamma / m_NewmarkBeta - 1.0d0
-        this%coeffs(5) = dt * (0.5d0 * m_NewmarkGamma / m_NewmarkBeta - 1.0d0)
-        this%coeffs(6) = dt * (1.0d0 - m_NewmarkGamma)
+        this%coeffs(3) = 0.5e0_rp / m_NewmarkBeta - 1.0e0_rp
+        this%coeffs(4) = m_NewmarkGamma / m_NewmarkBeta - 1.0e0_rp
+        this%coeffs(5) = dt * (0.5e0_rp * m_NewmarkGamma / m_NewmarkBeta - 1.0e0_rp)
+        this%coeffs(6) = dt * (1.0e0_rp - m_NewmarkGamma)
         this%coeffs(7) = dt * m_NewmarkGamma
     end subroutine Beam_UpdateNewmarkCoeffs
 
@@ -1896,11 +1898,11 @@ module SolidSolver
         ! ISBN 9781441929105 James F. Doyle. P354
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8) :: dspO(1:6, 1:this%nND), velO(1:6, 1:this%nND), accO(1:6, 1:this%nND)
-        real(8) :: dspn(1:this%gEQ)
+        real(rp) :: dspO(1:6, 1:this%nND), velO(1:6, 1:this%nND), accO(1:6, 1:this%nND)
+        real(rp) :: dspn(1:this%gEQ)
         integer :: iter, iFish
-        real(8) :: dnorm
-        dnorm = 1.0d0
+        real(rp) :: dnorm
+        dnorm = 1.0e0_rp
         ! solve the next dispalce, velocity and acceleration using CG method
         call this%InitDspVelAccATTimeT(dspO, velO, accO)
         do iter = 1, m_ntolFEM ! m_ntolFEM is maxNewtonRaphson
@@ -1916,9 +1918,9 @@ module SolidSolver
     subroutine Beam_InitDspVelAccATTimeT(this, dspO, velO, accO)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(out) :: dspO(1:6, 1:this%nND), velO(1:6, 1:this%nND), accO(1:6, 1:this%nND)
+        real(rp), intent(out) :: dspO(1:6, 1:this%nND), velO(1:6, 1:this%nND), accO(1:6, 1:this%nND)
         integer :: i
-        this%vBC(:) = 0.0d0
+        this%vBC(:) = 0.0e0_rp
         do i=1,this%nEL
             ! displacement condition
             this%vBC(this%m_elements(i)%m_localToGlobal(1:12))=this%m_elements(i)%xnxt(1:12)-this%m_elements(i)%x1(1:12)
@@ -1932,9 +1934,9 @@ module SolidSolver
     subroutine Beam_UpdateMatrixANDLoad(this, dspO)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(inout) :: dspO(1:6, 1:this%nND)
+        real(rp), intent(inout) :: dspO(1:6, 1:this%nND)
         integer :: i
-        this%lodInte = 0.0d0
+        this%lodInte = 0.0e0_rp
         do i = 1, this%nEL
             call this%m_elements(i)%FormStiffMatrix()
             call this%m_elements(i)%BodyStress_D(this%lodInte, this%gEQ)
@@ -1960,20 +1962,20 @@ module SolidSolver
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer, intent(in) :: iterNR
-        real(8), intent(out) :: x(1:this%gEQ)
-        real(8), intent(in)  :: b(1:this%gEQ)
-        real(8) :: r(1:this%gEQ), p(1:this%gEQ), Ap(1:this%gEQ)
-        real(8) :: z(1:this%gEQ), M(1:this%gEQ)
-        real(8) :: blockM(6,6,this%nND)
-        real(8) :: xFixed(1:this%gEQ)
+        real(rp), intent(out) :: x(1:this%gEQ)
+        real(rp), intent(in)  :: b(1:this%gEQ)
+        real(rp) :: r(1:this%gEQ), p(1:this%gEQ), Ap(1:this%gEQ)
+        real(rp) :: z(1:this%gEQ), M(1:this%gEQ)
+        real(rp) :: blockM(6,6,this%nND)
+        real(rp) :: xFixed(1:this%gEQ)
         logical :: fixed(1:this%gEQ)
         integer :: iter, max_iter, precondType
-        real(8) :: alpha, beta, rsold, rsnew, err, pAp, residual_norm
+        real(rp) :: alpha, beta, rsold, rsnew, err, pAp, residual_norm
         ! select preconditioner
         precondType = 2
         ! maximum iteration count and tolerance
         max_iter = 10000
-        err = 1.0d-6
+        err = 1.0e-6_rp
         ! lifting of non-homogeneous Dirichlet boundary conditions
         call this%BoundaryCond(iterNR, xFixed, fixed)
         ! initial guess
@@ -1984,16 +1986,16 @@ module SolidSolver
         call this%ApplyFixedZero(r, fixed)
         call this%InitPreconditioner(precondType, M, blockM, fixed)
         call this%ApplyPreconditioner(precondType, r, z, M, blockM, fixed)
-        residual_norm = dsqrt(dot_product(r, r))
+        residual_norm = sqrt(dot_product(r, r))
         if (residual_norm .le. err) return
         p = z
         rsold = dot_product(r, z)
-        call this%CheckCGBreakdown(rsold, residual_norm, 1.0d-30, 'rsold', 'initial dot_product(r,z)')
+        call this%CheckCGBreakdown(rsold, residual_norm, 1.0e-30_rp, 'rsold', 'initial dot_product(r,z)')
         do iter = 1, max_iter
             call this%MatrixMultipy(p, Ap)
             call this%ApplyFixedZero(Ap, fixed)
             pAp = dot_product(p, Ap)
-            call this%CheckCGBreakdown(pAp, residual_norm, 1.0d-30, 'pAp', 'dot_product(p,Ap) before alpha', iter)
+            call this%CheckCGBreakdown(pAp, residual_norm, 1.0e-30_rp, 'pAp', 'dot_product(p,Ap) before alpha', iter)
             alpha = rsold / pAp
             x = x + alpha * p
             ! In exact arithmetic, p(fixed)=0 keeps x(fixed)=xFixed(fixed).
@@ -2001,11 +2003,11 @@ module SolidSolver
             call this%ApplyFixedValue(x, xFixed, fixed)
             r = r - alpha * Ap
             call this%ApplyFixedZero(r, fixed)
-            residual_norm = dsqrt(dot_product(r, r))
+            residual_norm = sqrt(dot_product(r, r))
             if (residual_norm .le. err) exit
             call this%ApplyPreconditioner(precondType, r, z, M, blockM, fixed)
             rsnew = dot_product(r, z)
-            call this%CheckCGBreakdown(rsold, residual_norm, 1.0d-30, 'rsold', 'rsold before beta=rsnew/rsold', iter)
+            call this%CheckCGBreakdown(rsold, residual_norm, 1.0e-30_rp, 'rsold', 'rsold before beta=rsnew/rsold', iter)
             beta = rsnew / rsold
             p = z + beta * p
             call this%ApplyFixedZero(p, fixed)
@@ -2022,11 +2024,11 @@ module SolidSolver
     subroutine Beam_BoundaryCond(this, iter, x, fixed)
         class(BeamSolver), intent(in) :: this
         integer, intent(in) :: iter
-        real(8), intent(out) :: x(1:this%gEQ)
+        real(rp), intent(out) :: x(1:this%gEQ)
         logical, intent(out) :: fixed(1:this%gEQ)
         integer :: i
         fixed(:)  = .false.
-        x(:) = 0.0d0
+        x(:) = 0.0e0_rp
         do i=1,this%nEL
             call this%m_elements(i)%BoundaryCond(iter, this%gEQ, x, fixed, this%vBC)
         enddo
@@ -2038,10 +2040,10 @@ module SolidSolver
         ! Element‐by‐Element(Hughes, Thomas J. R.(1983).doi:10.1061/(ASCE)0733-9399(1983)109:2(576))
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(in)  :: x(1:this%gEQ)
-        real(8), intent(out) :: b(1:this%gEQ)
+        real(rp), intent(in)  :: x(1:this%gEQ)
+        real(rp), intent(out) :: b(1:this%gEQ)
         integer :: i
-        b(1:this%gEQ) = 0.0d0
+        b(1:this%gEQ) = 0.0e0_rp
         do i=1,this%nEL
             call this%m_elements(i)%Multiply(x, b, this%gEQ)
         enddo
@@ -2051,19 +2053,19 @@ module SolidSolver
     subroutine Beam_ApplyFixedZero(this, x, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(inout) :: x(1:this%gEQ)
+        real(rp), intent(inout) :: x(1:this%gEQ)
         logical, intent(in) :: fixed(1:this%gEQ)
         integer :: i
         do i = 1, this%gEQ
-            if (fixed(i)) x(i) = 0.0d0
+            if (fixed(i)) x(i) = 0.0e0_rp
         enddo
     end subroutine Beam_ApplyFixedZero
 
     subroutine Beam_ApplyFixedValue(this, x, xFixed, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(inout) :: x(1:this%gEQ)
-        real(8), intent(in) :: xFixed(1:this%gEQ)
+        real(rp), intent(inout) :: x(1:this%gEQ)
+        real(rp), intent(in) :: xFixed(1:this%gEQ)
         logical, intent(in) :: fixed(1:this%gEQ)
         integer :: i
         do i = 1, this%gEQ
@@ -2075,8 +2077,8 @@ module SolidSolver
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer, intent(in) :: precondType
-        real(8), intent(inout) :: M(1:this%gEQ)
-        real(8), intent(inout) :: blockM(6,6,this%nND)
+        real(rp), intent(inout) :: M(1:this%gEQ)
+        real(rp), intent(inout) :: blockM(6,6,this%nND)
         logical, intent(in) :: fixed(1:this%gEQ)
         select case (precondType)
         case (1)
@@ -2097,10 +2099,10 @@ module SolidSolver
         implicit none
         class(BeamSolver), intent(in) :: this
         integer, intent(in) :: precondType
-        real(8), intent(in) :: r(1:this%gEQ)
-        real(8), intent(out) :: z(1:this%gEQ)
-        real(8), intent(in) :: M(1:this%gEQ)
-        real(8), intent(in) :: blockM(6,6,this%nND)
+        real(rp), intent(in) :: r(1:this%gEQ)
+        real(rp), intent(out) :: z(1:this%gEQ)
+        real(rp), intent(in) :: M(1:this%gEQ)
+        real(rp), intent(in) :: blockM(6,6,this%nND)
         logical, intent(in) :: fixed(1:this%gEQ)
         select case (precondType)
         case (1)
@@ -2116,9 +2118,9 @@ module SolidSolver
     subroutine Beam_ScalarPreconditioned(this, M)
         ! Scalar Jacobi Preconditioned
         class(BeamSolver), intent(in) :: this
-        real(8) :: M(1:this%gEQ)
+        real(rp) :: M(1:this%gEQ)
         integer :: i
-        M=0.0d0
+        M=0.0e0_rp
         do i=1,this%nEL
             call this%m_elements(i)%ScalarPreconditioned(M, this%gEQ)
         enddo
@@ -2127,9 +2129,9 @@ module SolidSolver
     subroutine Beam_BlockPreconditioned(this, blockM)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(out) :: blockM(6,6,this%nND)
+        real(rp), intent(out) :: blockM(6,6,this%nND)
         integer :: i
-        blockM(:,:,:) = 0.0d0
+        blockM(:,:,:) = 0.0e0_rp
         do i = 1, this%nEL
             call this%m_elements(i)%BlockPreconditioned(blockM, this%nND)
         enddo
@@ -2138,18 +2140,18 @@ module SolidSolver
     subroutine Beam_InitScalarJacobiPreconditioner(this, M, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(inout) :: M(1:this%gEQ)
+        real(rp), intent(inout) :: M(1:this%gEQ)
         logical, intent(in) :: fixed(1:this%gEQ)
         integer :: i
         do i = 1, this%gEQ
             if (fixed(i)) then
-                M(i) = 0.0d0
+                M(i) = 0.0e0_rp
             else
-                if (dabs(M(i)) .gt. 1.0d-30) then
-                    M(i) = 1.0d0 / M(i)
+                if (abs(M(i)) .gt. 1.0e-30_rp) then
+                    M(i) = 1.0e0_rp / M(i)
                 else
                     write(*,*) 'WARNING: near-zero Jacobi diagonal at DOF ', i
-                    M(i) = 1.0d0
+                    M(i) = 1.0e0_rp
                 endif
             endif
         enddo
@@ -2158,13 +2160,13 @@ module SolidSolver
     subroutine Beam_ApplyScalarJacobiPreconditioner(this, r, z, M, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(in) :: r(1:this%gEQ), M(1:this%gEQ)
-        real(8), intent(out) :: z(1:this%gEQ)
+        real(rp), intent(in) :: r(1:this%gEQ), M(1:this%gEQ)
+        real(rp), intent(out) :: z(1:this%gEQ)
         logical, intent(in) :: fixed(1:this%gEQ)
         integer :: i
         do i = 1, this%gEQ
             if (fixed(i)) then
-                z(i) = 0.0d0
+                z(i) = 0.0e0_rp
             else
                 z(i) = M(i) * r(i)
             endif
@@ -2174,10 +2176,10 @@ module SolidSolver
     subroutine Beam_InitBlockJacobiPreconditioner(this, blockM, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(inout) :: blockM(6,6,this%nND)
+        real(rp), intent(inout) :: blockM(6,6,this%nND)
         logical, intent(in) :: fixed(1:this%gEQ)
         integer :: node, i, gid
-        real(8) :: invB(6,6)
+        real(rp) :: invB(6,6)
         integer :: info
         do node = 1, this%nND
             ! For fixed DOFs, remove their coupling inside the local 6x6 block
@@ -2185,18 +2187,18 @@ module SolidSolver
             do i = 1, 6
                 gid = (node-1)*6 + i
                 if (fixed(gid)) then
-                    blockM(i,1:6,node) = 0.0d0
-                    blockM(1:6,i,node) = 0.0d0
-                    blockM(i,i,node)   = 1.0d0
+                    blockM(i,1:6,node) = 0.0e0_rp
+                    blockM(1:6,i,node) = 0.0e0_rp
+                    blockM(i,i,node)   = 1.0e0_rp
                 endif
             enddo
             call Invert6x6(blockM(1:6,1:6,node), invB, info)
             if (info /= 0) then
                 write(*,*) 'WARNING: block Jacobi inverse failed at node ', node
                 write(*,*) 'Use identity block for this node.'
-                blockM(1:6,1:6,node) = 0.0d0
+                blockM(1:6,1:6,node) = 0.0e0_rp
                 do i = 1, 6
-                    blockM(i,i,node) = 1.0d0
+                    blockM(i,i,node) = 1.0e0_rp
                 enddo
             else
                 blockM(1:6,1:6,node) = invB(1:6,1:6)
@@ -2207,13 +2209,13 @@ module SolidSolver
     subroutine Beam_ApplyBlockJacobiPreconditioner(this, r, z, blockM, fixed)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(in) :: r(1:this%gEQ)
-        real(8), intent(out) :: z(1:this%gEQ)
-        real(8), intent(in) :: blockM(6,6,this%nND)
+        real(rp), intent(in) :: r(1:this%gEQ)
+        real(rp), intent(out) :: z(1:this%gEQ)
+        real(rp), intent(in) :: blockM(6,6,this%nND)
         logical, intent(in) :: fixed(1:this%gEQ)
         integer :: node, i, gid
-        real(8) :: rnode(6), znode(6)
-        z(:) = 0.0d0
+        real(rp) :: rnode(6), znode(6)
+        z(:) = 0.0e0_rp
         do node = 1, this%nND
             do i = 1, 6
                 gid = (node-1)*6 + i
@@ -2223,7 +2225,7 @@ module SolidSolver
             do i = 1, 6
                 gid = (node-1)*6 + i
                 if (fixed(gid)) then
-                    z(gid) = 0.0d0
+                    z(gid) = 0.0e0_rp
                 else
                     z(gid) = znode(i)
                 endif
@@ -2233,30 +2235,30 @@ module SolidSolver
 
     subroutine Invert6x6(A, Ainv, info)
         implicit none
-        real(8), intent(in) :: A(6,6)
-        real(8), intent(out) :: Ainv(6,6)
+        real(rp), intent(in) :: A(6,6)
+        real(rp), intent(out) :: Ainv(6,6)
         integer, intent(out) :: info
-        real(8) :: aug(6,12)
-        real(8) :: pivot, factor, tmp
+        real(rp) :: aug(6,12)
+        real(rp) :: pivot, factor, tmp
         integer :: i, j, k, p
         info = 0
         aug(:,1:6) = A(:,:)
-        aug(:,7:12) = 0.0d0
+        aug(:,7:12) = 0.0e0_rp
         do i = 1, 6
-            aug(i,6+i) = 1.0d0
+            aug(i,6+i) = 1.0e0_rp
         enddo
         do i = 1, 6
             p = i
-            pivot = dabs(aug(i,i))
+            pivot = abs(aug(i,i))
             do k = i+1, 6
-                if (dabs(aug(k,i)) .gt. pivot) then
-                    pivot = dabs(aug(k,i))
+                if (abs(aug(k,i)) .gt. pivot) then
+                    pivot = abs(aug(k,i))
                     p = k
                 endif
             enddo
-            if (pivot .le. 1.0d-30) then
+            if (pivot .le. 1.0e-30_rp) then
                 info = i
-                Ainv(:,:) = 0.0d0
+                Ainv(:,:) = 0.0e0_rp
                 return
             endif
             if (p /= i) then
@@ -2281,11 +2283,11 @@ module SolidSolver
     subroutine Beam_CheckCGBreakdown(this, value, residual_norm, threshold, valueName, locationName, iter)
         implicit none
         class(BeamSolver), intent(in) :: this
-        real(8), intent(in) :: value, residual_norm, threshold
+        real(rp), intent(in) :: value, residual_norm, threshold
         character(len=*), intent(in) :: valueName, locationName
         integer, intent(in), optional :: iter
     
-        if (dabs(value) .le. threshold) then
+        if (abs(value) .le. threshold) then
             write(*,*) 'ERROR: CG solver breakdown.'
             write(*,*) 'XYZo x y z    : ', this%XYZo(1:3)
             write(*,*) 'Location      : ', trim(locationName)
@@ -2304,18 +2306,18 @@ module SolidSolver
     subroutine Beam_UpdateDspANDTride(this, iter, dspn, dnorm)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(out) :: dnorm
-        real(8) :: dspn(1:this%gEQ), dspnn(1:6, 1:this%nND)
-        real(8) :: beta0,beta,zi,z0
+        real(rp), intent(out) :: dnorm
+        real(rp) :: dspn(1:this%gEQ), dspnn(1:6, 1:this%nND)
+        real(rp) :: beta0,beta,zi,z0
         integer :: iter,i,maxramp
-        beta0 = 1.0d0
+        beta0 = 1.0e0_rp
         maxramp = 1
         if    (iter <= maxramp) then
-            zi=2.0d0**(iter)
-            z0=2.0d0**(maxramp)
+            zi=2.0e0_rp**(iter)
+            z0=2.0e0_rp**(maxramp)
             beta=zi/z0*beta0
         else
-            beta=1.0d0*beta0
+            beta=1.0e0_rp*beta0
         endif
         do i = 1, this%nND
             dspnn(1:6,i)= beta*dspn((i-1)*6+1:(i-1)*6+6)
@@ -2333,7 +2335,7 @@ module SolidSolver
             ! MakeElementTriad
             call this%m_elements(i)%MakeTriad_ee
         enddo
-        dnorm=dabs(maxval((beta*dspn(1:this%gEQ))**2))
+        dnorm=abs(maxval((beta*dspn(1:this%gEQ))**2))
         return
     end subroutine Beam_UpdateDspANDTride
 
@@ -2350,7 +2352,7 @@ module SolidSolver
     subroutine Beam_UpdateVelAcc(this, dspO, velO, accO)
         implicit none
         class(BeamSolver), intent(inout) :: this
-        real(8), intent(inout) :: dspO(1:6, 1:this%nND), velO(1:6, 1:this%nND), accO(1:6, 1:this%nND)
+        real(rp), intent(inout) :: dspO(1:6, 1:this%nND), velO(1:6, 1:this%nND), accO(1:6, 1:this%nND)
         integer :: nND
         nND=this%nND
         this%acc(1:6, 1:nND)  = this%coeffs(0)*(this%dsp(1:6, 1:nND) - dspO(1:6, 1:nND)) -this%coeffs(2)*velO(1:6, 1:nND) - this%coeffs(3)*accO(1:6, 1:nND)
@@ -2362,16 +2364,16 @@ module SolidSolver
         implicit none
         class(BeamSolver), intent(inout) :: this
         integer :: iFish, iter
-        real(8) :: dnorm
-        this%FishInfo(1)=dble(iFish)
-        this%FishInfo(2)=dble(iter)
+        real(rp) :: dnorm
+        this%FishInfo(1)=real(iFish, rp)
+        this%FishInfo(2)=real(iter, rp)
         this%FishInfo(3)=dnorm
     end subroutine Beam_UpdateIterInfo
 
     subroutine Beam_ReportDispFieldStat(nND, field, fileName)
         implicit none
         integer, intent(in) :: nND
-        real(8), intent(in) :: field(1:6, 1:nND)
+        real(rp), intent(in) :: field(1:6, 1:nND)
         character(LEN=*), intent(in) :: fileName
         integer, parameter :: statUnit = 112
 
@@ -2385,15 +2387,15 @@ module SolidSolver
         implicit none
         integer, intent(in) :: nND
         integer, intent(in) :: fileUnit
-        real(8), intent(in) :: fieldGroup(1:3, 1:nND)
+        real(rp), intent(in) :: fieldGroup(1:3, 1:nND)
         character(LEN=*), intent(in) :: groupName
         character(LEN=2), intent(in) :: dofName(3)
-        real(8) :: l2(3), linfty(3)
+        real(rp) :: l2(3), linfty(3)
         integer :: i
 
         do i = 1, 3
-            l2(i) = dsqrt(sum(fieldGroup(i,1:nND) * fieldGroup(i,1:nND)) / dble(nND))
-            linfty(i) = maxval(dabs(fieldGroup(i,1:nND)))
+            l2(i) = sqrt(sum(fieldGroup(i,1:nND) * fieldGroup(i,1:nND)) / real(nND, rp))
+            linfty(i) = maxval(abs(fieldGroup(i,1:nND)))
             write(fileUnit,'(A,1X,A,1X,A,1X,ES24.16)') 'FIELDSTAT', trim(groupName), 'L2 ' // trim(dofName(i)), l2(i)
         enddo
         do i = 1, 3
@@ -2403,68 +2405,68 @@ module SolidSolver
 
     subroutine AoAtoTTT(AoA,TTT)
         implicit none
-        real(8), parameter:: pi=3.141562653589793d0,eps=1.0d-5
-        real(8)::AoA(3),TTT(3,3),rrx(3,3),rry(3,3),rrz(3,3),vcos,vsin
-        TTT(:,:)=0.0d0
-        TTT(1,1)=1.0d0
-        TTT(2,2)=1.0d0
-        TTT(3,3)=1.0d0
+        real(rp), parameter:: pi=3.141562653589793e0_rp,eps=1.0e-5_rp
+        real(rp)::AoA(3),TTT(3,3),rrx(3,3),rry(3,3),rrz(3,3),vcos,vsin
+        TTT(:,:)=0.0e0_rp
+        TTT(1,1)=1.0e0_rp
+        TTT(2,2)=1.0e0_rp
+        TTT(3,3)=1.0e0_rp
     
-        vcos=dcos(AoA(1))
-        vsin=dsin(AoA(1))
-        if(dabs(AoA(1))<eps)then
-        vcos=1.0d0
-        vsin=0.0d0
+        vcos=cos(AoA(1))
+        vsin=sin(AoA(1))
+        if(abs(AoA(1))<eps)then
+        vcos=1.0e0_rp
+        vsin=0.0e0_rp
         endif
-        if(dabs(AoA(1)-0.5d0*pi)<eps)then
-        vcos=0.0d0
-        vsin=1.0d0
+        if(abs(AoA(1)-0.5e0_rp*pi)<eps)then
+        vcos=0.0e0_rp
+        vsin=1.0e0_rp
         endif
-        if(dabs(AoA(1)+0.5d0*pi)<eps)then
-        vcos=0.0d0
-        vsin=-1.0d0
-        endif
-    
-        rrx(1:3,1:3)=reshape([  1.0d0,0.0d0,0.0d0,  &
-                                0.0d0,vcos,vsin, &
-                                0.0d0,-vsin,vcos],[3,3])
-        vcos=dcos(AoA(2))
-        vsin=dsin(AoA(2))
-        if(dabs(AoA(2))<eps)then
-        vcos=1.0d0
-        vsin=0.0d0
-        endif
-        if(dabs(AoA(2)-0.5d0*pi)<eps)then
-        vcos=0.0d0
-        vsin=1.0d0
-        endif
-        if(dabs(AoA(2)+0.5d0*pi)<eps)then
-        vcos=0.0d0
-        vsin=-1.0d0
+        if(abs(AoA(1)+0.5e0_rp*pi)<eps)then
+        vcos=0.0e0_rp
+        vsin=-1.0e0_rp
         endif
     
-        rry(1:3,1:3)=reshape([  vcos,0.0d0,-vsin,  &
-                                0.0d0,1.0d0,0.0d0, &
-                               vsin,0.0d0,vcos],[3,3])
+        rrx(1:3,1:3)=reshape([  1.0e0_rp,0.0e0_rp,0.0e0_rp,  &
+                                0.0e0_rp,vcos,vsin, &
+                                0.0e0_rp,-vsin,vcos],[3,3])
+        vcos=cos(AoA(2))
+        vsin=sin(AoA(2))
+        if(abs(AoA(2))<eps)then
+        vcos=1.0e0_rp
+        vsin=0.0e0_rp
+        endif
+        if(abs(AoA(2)-0.5e0_rp*pi)<eps)then
+        vcos=0.0e0_rp
+        vsin=1.0e0_rp
+        endif
+        if(abs(AoA(2)+0.5e0_rp*pi)<eps)then
+        vcos=0.0e0_rp
+        vsin=-1.0e0_rp
+        endif
     
-        vcos=dcos(AoA(3))
-        vsin=dsin(AoA(3))
-        if(dabs(AoA(3))<eps)then
-        vcos=1.0d0
-        vsin=0.0d0
+        rry(1:3,1:3)=reshape([  vcos,0.0e0_rp,-vsin,  &
+                                0.0e0_rp,1.0e0_rp,0.0e0_rp, &
+                               vsin,0.0e0_rp,vcos],[3,3])
+    
+        vcos=cos(AoA(3))
+        vsin=sin(AoA(3))
+        if(abs(AoA(3))<eps)then
+        vcos=1.0e0_rp
+        vsin=0.0e0_rp
         endif
-        if(dabs(AoA(3)-0.5d0*pi)<eps)then
-        vcos=0.0d0
-        vsin=1.0d0
+        if(abs(AoA(3)-0.5e0_rp*pi)<eps)then
+        vcos=0.0e0_rp
+        vsin=1.0e0_rp
         endif
-        if(dabs(AoA(3)+0.5d0*pi)<eps)then
-        vcos=0.0d0
-        vsin=-1.0d0
+        if(abs(AoA(3)+0.5e0_rp*pi)<eps)then
+        vcos=0.0e0_rp
+        vsin=-1.0e0_rp
         endif
     
-        rrz(1:3,1:3)=reshape([ vcos,vsin,0.0d0, &
-                              -vsin,vcos,0.0d0, &
-                               0.0d0,0.0d0,1.0d0],[3,3])
+        rrz(1:3,1:3)=reshape([ vcos,vsin,0.0e0_rp, &
+                              -vsin,vcos,0.0e0_rp, &
+                               0.0e0_rp,0.0e0_rp,1.0e0_rp],[3,3])
         TTT=matmul(rrz,TTT)
         TTT=matmul(rry,TTT)
         TTT=matmul(rrx,TTT)
