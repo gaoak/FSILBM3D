@@ -43,7 +43,7 @@ module SolidBody
         real(rp), allocatable :: v_Evel(:, :)
         real(rp), allocatable :: v_Eforce(:, :) ! element center (x, y, z)
         integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
-        real(sp), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+        real(sp), allocatable :: v_Ew(:, :) ! element stential weight [wx-1,wx,wx1, wy-1,wy,wy1, wz-1,wz,wz1]; wx2/wy2/wz2 are reconstructed
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)! of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
@@ -764,7 +764,7 @@ module SolidBody
         real(rp),intent(in):: dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
-        real(rp):: rx(-1:2),ry(-1:2),rz(-1:2)
+        real(rp):: rx(-1:1),ry(-1:1),rz(-1:1)
         real(rp)::x0,y0,z0,detx,dety,detz,invdh
         integer::i0,j0,k0,iEL,x,y,z,i,j,k
         !==================================================================================================
@@ -790,18 +790,18 @@ module SolidBody
             this%v_Ei(1:4,iEL) = int(ix, kind=2)
             this%v_Ei(5:8,iEL) = int(jy, kind=2)
             this%v_Ei(9:12,iEL) = int(kz, kind=2)
-            do x=-1,2
+            do x=-1,1
                 rx(x)=Phi(real(x, rp)-detx)
             enddo
-            do y=-1,2
+            do y=-1,1
                 ry(y)=Phi(real(y, rp)-dety)
             enddo
-            do z=-1,2
+            do z=-1,1
                 rz(z)=Phi(real(z, rp)-detz)
             enddo
-            this%v_Ew(1:4,iEL) = real(rx, kind=sp)
-            this%v_Ew(5:8,iEL) = real(ry, kind=sp)
-            this%v_Ew(9:12,iEL) = real(rz, kind=sp)
+            this%v_Ew(1:3,iEL) = real(rx(-1:1), sp)
+            this%v_Ew(4:6,iEL) = real(ry(-1:1), sp)
+            this%v_Ew(7:9,iEL) = real(rz(-1:1), sp)
         enddo
         !$OMP END PARALLEL DO
 
@@ -939,9 +939,12 @@ module SolidBody
             ix = this%v_Ei(1:4,iEL)
             jy = this%v_Ei(5:8,iEL)
             kz = this%v_Ei(9:12,iEL)
-            rx = this%v_Ew(1:4,iEL)
-            ry = this%v_Ew(5:8,iEL)
-            rz = this%v_Ew(9:12,iEL)
+            rx(-1:1) = real(this%v_Ew(1:3,iEL), rp)
+            ry(-1:1) = real(this%v_Ew(4:6,iEL), rp)
+            rz(-1:1) = real(this%v_Ew(7:9,iEL), rp)
+            rx(2) = 1.0e0_rp - rx(-1) - rx(0) - rx(1)
+            ry(2) = 1.0e0_rp - ry(-1) - ry(0) - ry(1)
+            rz(2) = 1.0e0_rp - rz(-1) - rz(0) - rz(1)
             forceElemTemp = this%v_Eforce(1:3,iEL)
             ! update beam load, included momentum
             ! corresponding structural element
@@ -1002,9 +1005,12 @@ module SolidBody
             ix = this%v_Ei(1:4,iEL)
             jy = this%v_Ei(5:8,iEL)
             kz = this%v_Ei(9:12,iEL)
-            rx = this%v_Ew(1:4,iEL)
-            ry = this%v_Ew(5:8,iEL)
-            rz = this%v_Ew(9:12,iEL)
+            rx(-1:1) = real(this%v_Ew(1:3,iEL), rp)
+            ry(-1:1) = real(this%v_Ew(4:6,iEL), rp)
+            rz(-1:1) = real(this%v_Ew(7:9,iEL), rp)
+            rx(2) = 1.0e0_rp - rx(-1) - rx(0) - rx(1)
+            ry(2) = 1.0e0_rp - ry(-1) - ry(0) - ry(1)
+            rz(2) = 1.0e0_rp - rz(-1) - rz(0) - rz(1)
             velElemIB(1:3)=0.0e0_rp
             do x=-1,2
                 do y=-1,2
@@ -1035,9 +1041,12 @@ module SolidBody
             ix = this%v_Ei(1:4,iEL)
             jy = this%v_Ei(5:8,iEL)
             kz = this%v_Ei(9:12,iEL)
-            rx = this%v_Ew(1:4,iEL)
-            ry = this%v_Ew(5:8,iEL)
-            rz = this%v_Ew(9:12,iEL)
+            rx(-1:1) = real(this%v_Ew(1:3,iEL), rp)
+            ry(-1:1) = real(this%v_Ew(4:6,iEL), rp)
+            rz(-1:1) = real(this%v_Ew(7:9,iEL), rp)
+            rx(2) = 1.0e0_rp - rx(-1) - rx(0) - rx(1)
+            ry(2) = 1.0e0_rp - ry(-1) - ry(0) - ry(1)
+            rz(2) = 1.0e0_rp - rz(-1) - rz(0) - rz(1)
             do x=-1,2
                 do y=-1,2
                     do z=-1,2
@@ -1066,7 +1075,7 @@ module SolidBody
             enddo
         enddo
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
-        allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+        allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(9,this%v_nelmts))
         call this%PlateUpdatePosVelArea()
     end subroutine PlateBuild_
 
@@ -1080,7 +1089,7 @@ module SolidBody
         this%v_nelmts = Surfacetmpnelmts
         allocate(this%v_Exyz0(3,this%v_nelmts))
         allocate(this%v_Exyz(3,this%v_nelmts), this%v_Ea(this%v_nelmts), this%v_Eforce(3,this%v_nelmts))
-        allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(12,this%v_nelmts))
+        allocate(this%v_Evel(3,this%v_nelmts), this%v_Ei(12,this%v_nelmts), this%v_Ew(9,this%v_nelmts))
         call this%SurfaceBuildPosVelArea(Surfacetmpnpts,Surfacetmpnelmts,Surfacetmpxyz,Surfacetmpele)
         deallocate(Surfacetmpxyz,Surfacetmpele)
     end subroutine SurfaceBuild_
