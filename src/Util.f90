@@ -4,11 +4,12 @@
 ! Copyright (C) 2025-2026 Ankang Gao and contributors
 
     SUBROUTINE cptArea(areaElem,nND,nEL,ele,xyzful)
+    use ConstParams, only: rp
     implicit none
     integer:: nND,nEL,ele(nEL,5)
-    real(8):: areaElem(nEL),xyzful(nND,6)
+    real(rp):: areaElem(nEL),xyzful(nND,6)
     integer:: i,j,k,nt,iEL
-    real(8):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
+    real(rp):: x1,x2,x3,y1,y2,y3,z1,z2,z3,ax,ay,az
         do  iEL=1,nEL
         i =ele(iEL,1)
         j =ele(iEL,2)
@@ -29,14 +30,14 @@
         ax = x2-x1
         ay = y2-y1
         az = z2-z1
-        areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az)
+        areaElem(iEL)=sqrt( ax*ax + ay*ay + az*az)
         endif
 
         if(nt==3)then
         ax =(z1-z2)*(y3-y2) + (y2-y1)*(z3-z2)
         ay =(x1-x2)*(z3-z2) + (z2-z1)*(x3-x2)
         az =(y1-y2)*(x3-x2) + (x2-x1)*(y3-y2)
-        areaElem(iEL)=dsqrt( ax*ax + ay*ay + az*az) * 0.5d0
+        areaElem(iEL)=sqrt( ax*ax + ay*ay + az*az) * 0.5e0_rp
         endif
 
     enddo
@@ -44,11 +45,12 @@
 
     ! get the time right now
     SUBROUTINE get_now_time(now_time) 
+        use ConstParams, only: rp
         IMPLICIT NONE
-        real(8)::now_time
+        real(rp)::now_time
         integer,dimension(8) :: cpu_time
         call date_and_time(VALUES=cpu_time)
-        now_time = cpu_time(6)*60.d0 + cpu_time(7)*1.d0 + cpu_time(8)*0.001d0
+        now_time = cpu_time(6)*60.e0_rp + cpu_time(7)*1.e0_rp + cpu_time(8)*0.001e0_rp
     END SUBROUTINE
 
     ! Found keyword in inflow.dat for next parameters read
@@ -121,14 +123,15 @@
     END SUBROUTINE
     
     SUBROUTINE grid_value_interpolation(dh,xmin,ymin,zmin,xDim,yDim,zDim,Coord,valueIn,valueOut)
+        use ConstParams, only: rp
         implicit none
         integer:: xDim,yDim,zDim
         integer:: x1,y1,z1,x2,y2,z2
-        real(8):: dh,xmin,ymin,zmin,Coord(3)
-        real(8):: dx1,dy1,dz1,dx2,dy2,dz2
-        real(8):: coffe,c1,c2,c3,c4,c5,c6,c7,c8
-        real(8):: valueIn(zDim,yDim,xDim),valueOut
-        !real(8):: interCoord(3)
+        real(rp):: dh,xmin,ymin,zmin,Coord(3)
+        real(rp):: dx1,dy1,dz1,dx2,dy2,dz2
+        real(rp):: coffe,c1,c2,c3,c4,c5,c6,c7,c8
+        real(rp):: valueIn(zDim,yDim,xDim),valueOut
+        !real(rp):: interCoord(3)
         ! coordinate number of the surrounding grid points
         x1 = FLOOR((Coord(1)-xmin)/dh + 1)
         y1 = FLOOR((Coord(2)-ymin)/dh + 1)
@@ -144,7 +147,7 @@
         dy2 = dh - dy1
         dz2 = dh - dz1
         ! interpolation coefficient
-        coffe = 1.0d0/(dh*dh*dh)
+        coffe = 1.0e0_rp/(dh*dh*dh)
         c1 = dx2*dy2*dz2*coffe
         c2 = dx2*dy2*dz1*coffe
         c3 = dx2*dy1*dz2*coffe

@@ -4,25 +4,26 @@
 ! Copyright (C) 2025-2026 Ankang Gao and contributors
 
 module FlowCondition
+    use ConstParams, only: rp
     implicit none
     private
     public :: FlowCondType,flow
     public :: read_flow_conditions,read_probe_params,write_information_titles,write_fluid_information
     type :: FlowCondType
         integer :: isConCmpt,numsubstep,npsize
-        real(8) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
-        real(8) :: Re,denIn,nu,Mu,dtolLBM
+        real(rp) :: timeSimTotal,timeContiDelta,timeWriteBegin,timeWriteEnd,timeFlowDelta,timeBodyDelta,timeInfoDelta
+        real(rp) :: Re,denIn,nu,Mu,dtolLBM
         integer :: LrefType,TrefType,UrefType,ntolLBM
         integer :: velocityKind,interpolateScheme
-        real(8) :: uvwIn(1:3),shearRateIn(1:3)
-        real(8) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
-        real(8) :: Uref,Lref,Tref
-        real(8) :: Aref,Fref,Eref,Pref
-        real(8) :: Asfac,Lchod,Lspan,AR 
+        real(rp) :: uvwIn(1:3),shearRateIn(1:3)
+        real(rp) :: volumeForceIn(1:3),volumeForceAmp,volumeForceFreq,volumeForcePhi
+        real(rp) :: Uref,Lref,Tref
+        real(rp) :: Aref,Fref,Eref,Pref
+        real(rp) :: Asfac,Lchod,Lspan,AR 
         integer :: fluidProbingNum,inWhichBlock,solidProbingNum
         integer, allocatable :: solidProbingNode(:)
-        real(8), allocatable :: fluidProbingCoords(:,:)
-        real(8) :: AmplInitDist(1:3),waveInitDist
+        real(rp), allocatable :: fluidProbingCoords(:,:)
+        real(rp) :: AmplInitDist(1:3),waveInitDist
     end type FlowCondType
     type(FlowCondType) :: flow
 
@@ -71,7 +72,7 @@ module FlowCondition
         read(buffer,*)    flow%interpolateScheme
         close(111)
         ! flow%denIn is not 1
-        if(abs(flow%denIn-1.d0).gt.1e-6) then
+        if(abs(flow%denIn-1.e0_rp).gt.1e-6_rp) then
             write(*,*) 'Warning, denIn is not 1, ', flow%denIn
         endif
     END SUBROUTINE
@@ -194,8 +195,8 @@ module FlowCondition
     SUBROUTINE write_fluid_information(time,dh,xmin,ymin,zmin,xDim,yDim,zDim,velocityIn)
         implicit none
         integer:: i,j,xDim,yDim,zDim
-        real(8):: time,dh,xmin,ymin,zmin,xmax,ymax,zmax
-        real(8):: velocityIn(zDim,yDim,xDim,1:3),velocityOut(1:3)
+        real(rp):: time,dh,xmin,ymin,zmin,xmax,ymax,zmax
+        real(rp):: velocityIn(zDim,yDim,xDim,1:3),velocityOut(1:3)
         integer,parameter::nameLen=3
         character (LEN=nameLen):: probeNum
         ! write fluid probing information

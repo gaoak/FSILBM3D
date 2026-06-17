@@ -17,24 +17,24 @@ module FluidDomain
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,outputtype
         integer :: xDim,yDim,zDim
-        real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
+        real(rp) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
         integer :: BndConds(1:6),periodic_bc(3)
-        real(8) :: params(1:10),tau,Omega,Omega2 ! single time, two time relaxation
-        real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
+        real(rp) :: params(1:10),tau,Omega,Omega2 ! single time, two time relaxation
+        real(rp) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
-        real(8), allocatable :: OMPedge(:,:,:)
-        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:)
-        real(4), allocatable :: OUTtmp(:,:,:,:)
-        real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
-        real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
-        real(8), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
-        real(8), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
-        real(8), allocatable :: tau_Fx1t1(:,:),tau_Fx1t2(:,:),tau_Fx2t1(:,:),tau_Fx2t2(:,:)
-        real(8), allocatable :: tau_Fy1t1(:,:),tau_Fy1t2(:,:),tau_Fy2t1(:,:),tau_Fy2t2(:,:)
-        real(8), allocatable :: tau_Fz1t1(:,:),tau_Fz1t2(:,:),tau_Fz2t1(:,:),tau_Fz2t2(:,:)
-        real(8), allocatable :: tau_all(:,:,:)
-        real(8) :: offsetMoveGrid(1:3),volumeForce(3)
-        real(8) :: blktime
+        real(rp), allocatable :: OMPedge(:,:,:)
+        real(rp), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:)
+        real(sp), allocatable :: OUTtmp(:,:,:,:)
+        real(rp), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
+        real(rp), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
+        real(rp), allocatable :: fIn_Fy1t1(:,:,:),fIn_Fy1t2(:,:,:),fIn_Fy2t1(:,:,:),fIn_Fy2t2(:,:,:)
+        real(rp), allocatable :: fIn_Fz1t1(:,:,:),fIn_Fz1t2(:,:,:),fIn_Fz2t1(:,:,:),fIn_Fz2t2(:,:,:)
+        real(rp), allocatable :: tau_Fx1t1(:,:),tau_Fx1t2(:,:),tau_Fx2t1(:,:),tau_Fx2t2(:,:)
+        real(rp), allocatable :: tau_Fy1t1(:,:),tau_Fy1t2(:,:),tau_Fy2t1(:,:),tau_Fy2t2(:,:)
+        real(rp), allocatable :: tau_Fz1t1(:,:),tau_Fz1t2(:,:),tau_Fz2t1(:,:),tau_Fz2t2(:,:)
+        real(rp), allocatable :: tau_all(:,:,:)
+        real(rp) :: offsetMoveGrid(1:3),volumeForce(3)
+        real(rp) :: blktime
         integer, allocatable :: carriedBodies(:) ! 0 is the number of carried bodies
     contains
         procedure :: allocate_fluid => allocate_fluid_
@@ -128,13 +128,13 @@ module FluidDomain
     SUBROUTINE check_is_continue(step,time,isContinue)
         implicit none
         integer,intent(out):: step
-        real(8),intent(out):: time
+        real(rp),intent(out):: time
         integer:: i,j,j2,x,y,z,iblock,indexs(1:6)
         integer:: isContinue,nblocks,index_tmp,idfile=13
-        real(8):: xCoord,yCoord,zCoord,coeffs(1:3)
+        real(rp):: xCoord,yCoord,zCoord,coeffs(1:3)
         type(LBMBlock), allocatable :: LBMblks_tmp(:)
         integer, allocatable :: sortdh(:)
-        real(8), allocatable :: coor_max(:,:)
+        real(rp), allocatable :: coor_max(:,:)
         logical:: alive
         inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue .ge. 1 .and. alive) then
@@ -193,9 +193,9 @@ module FluidDomain
                             if(indexs(1).eq.(LBMblks_tmp(j2)%xDim-1)) indexs(1) = indexs(1) - 1  ! x
                             if(indexs(3).eq.(LBMblks_tmp(j2)%yDim-1)) indexs(3) = indexs(3) - 1  ! y
                             if(indexs(5).eq.(LBMblks_tmp(j2)%zDim-1)) indexs(5) = indexs(5) - 1  ! z
-                            coeffs(1) = coeffs(1) - dble(indexs(1))
-                            coeffs(2) = coeffs(2) - dble(indexs(3))
-                            coeffs(3) = coeffs(3) - dble(indexs(5))
+                            coeffs(1) = coeffs(1) - real(indexs(1), rp)
+                            coeffs(2) = coeffs(2) - real(indexs(3), rp)
+                            coeffs(3) = coeffs(3) - real(indexs(5), rp)
                             ! calculate the indexs of the 8 around points
                             indexs(1) = indexs(1) + 1  ! x-1
                             indexs(2) = indexs(1) + 1  ! x
@@ -258,7 +258,7 @@ module FluidDomain
 
     SUBROUTINE initialise_fuild_blocks(time)
         implicit none
-        real(8),intent(in):: time
+        real(rp),intent(in):: time
         integer:: iblock
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%initialise(time)
@@ -267,11 +267,11 @@ module FluidDomain
 
     SUBROUTINE write_continue_blocks(step,time)
         implicit none
-        real(8):: time
+        real(rp):: time
         integer:: step,i,iblock
         integer,parameter::nameLen=10,idfile=13
         character(len=nameLen):: fileName
-        write(filename,'(I10)') nint(time*1d5)
+        write(filename,'(I10)') nint(time*1e5_rp)
         fileName = adjustr(fileName)
         do  i=1,nameLen
             if(fileName(i:i)==' ') fileName(i:i)='0'
@@ -348,16 +348,16 @@ module FluidDomain
 
     SUBROUTINE write_flow_blocks(time)
         implicit none
-        real(8),intent(in):: time
+        real(rp),intent(in):: time
         integer:: iblock
-        real(8):: waittime,time_begine,time_end
+        real(rp):: waittime,time_begine,time_end
         call get_now_time(time_begine)
         do iblock = 1,m_nblocks
             call mywait()
         enddo
         call get_now_time(time_end)
         waittime = time_end - time_begine
-        if(waittime.gt.1.d-1) then
+        if(waittime.gt.1.e-1_rp) then
             write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
         endif
         do iblock = 1,m_nblocks
@@ -433,7 +433,7 @@ module FluidDomain
     SUBROUTINE initialise_(this,time)
         implicit none
         class(LBMBlock),intent(inout) :: this
-        real(8),intent(in):: time
+        real(rp),intent(in):: time
         ! select the collision model
         call calculate_SRT_params()
         if(this%iCollidModel.eq.2) then
@@ -449,8 +449,8 @@ module FluidDomain
 
         SUBROUTINE calculate_SRT_params()
             implicit none
-            this%tau = flow%nu/(this%dh*Cs2)+0.5d0
-            this%Omega =  1.0d0 / this%tau
+            this%tau = flow%nu/(this%dh*Cs2)+0.5e0_rp
+            this%Omega =  1.0e0_rp / this%tau
             allocate(this%tau_all(this%zDim,this%yDim,this%xDim))
             this%tau_all = this%tau
         END SUBROUTINE calculate_SRT_params
@@ -458,35 +458,35 @@ module FluidDomain
         SUBROUTINE calculate_TRT_params(lambda)
             ! lambda = (1/omegap - 0.5) (1/omegam - 0.5)
             implicit none
-            real(8):: tmp, lambda
-            tmp = (lambda * 4.d0 -1.d0) * this%Omega + 2.D0
-            this%Omega2 = 2.d0*(2.d0 - this%Omega) / tmp
+            real(rp):: tmp, lambda
+            tmp = (lambda * 4.e0_rp -1.e0_rp) * this%Omega + 2.e0_rp
+            this%Omega2 = 2.e0_rp*(2.e0_rp - this%Omega) / tmp
         END SUBROUTINE calculate_TRT_params
 
         SUBROUTINE calculate_MRT_params()
             implicit none
             integer:: I
-            real(8):: M_MRT(0:lbmDim,0:lbmDim),M_MRTI(0:lbmDim,0:lbmDim),M(0:lbmDim,0:lbmDim)
-            real(8):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)
+            real(rp):: M_MRT(0:lbmDim,0:lbmDim),M_MRTI(0:lbmDim,0:lbmDim),M(0:lbmDim,0:lbmDim)
+            real(rp):: S_D(0:lbmDim,0:lbmDim),S(0:lbmDim)
             ! calculate MRTM transformation matrix
             DO  I=0,lbmDim
-                M_MRT(0,I)=1.0d0
-                M_MRT(1,I)=19.0d0*SUM(ee(I,1:3)**2)-30.0d0
-                M_MRT(2,I)=(21.0d0*SUM(ee(I,1:3)**2)**2-53.0d0*SUM(ee(I,1:3)**2)+24.0d0)/2.0d0
+                M_MRT(0,I)=1.0e0_rp
+                M_MRT(1,I)=19.0e0_rp*SUM(ee(I,1:3)**2)-30.0e0_rp
+                M_MRT(2,I)=(21.0e0_rp*SUM(ee(I,1:3)**2)**2-53.0e0_rp*SUM(ee(I,1:3)**2)+24.0e0_rp)/2.0e0_rp
 
                 M_MRT(3,I)=ee(I,1)
                 M_MRT(5,I)=ee(I,2)
                 M_MRT(7,I)=ee(I,3)
 
-                M_MRT(4,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,1)
-                M_MRT(6,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,2)
-                M_MRT(8,I)=(5.0d0*SUM(ee(I,1:3)**2)-9.0d0)*ee(I,3)
+                M_MRT(4,I)=(5.0e0_rp*SUM(ee(I,1:3)**2)-9.0e0_rp)*ee(I,1)
+                M_MRT(6,I)=(5.0e0_rp*SUM(ee(I,1:3)**2)-9.0e0_rp)*ee(I,2)
+                M_MRT(8,I)=(5.0e0_rp*SUM(ee(I,1:3)**2)-9.0e0_rp)*ee(I,3)
 
-                M_MRT(9,I)=3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2)
-                M_MRT(10,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(3.0d0*ee(I,1)**2-SUM(ee(I,1:3)**2))
+                M_MRT(9,I)=3.0e0_rp*ee(I,1)**2-SUM(ee(I,1:3)**2)
+                M_MRT(10,I)=(3.0e0_rp*SUM(ee(I,1:3)**2)-5.0e0_rp)*(3.0e0_rp*ee(I,1)**2-SUM(ee(I,1:3)**2))
 
                 M_MRT(11,I)=ee(I,2)**2-ee(I,3)**2
-                M_MRT(12,I)=(3.0d0*SUM(ee(I,1:3)**2)-5.0d0)*(ee(I,2)**2-ee(I,3)**2)
+                M_MRT(12,I)=(3.0e0_rp*SUM(ee(I,1:3)**2)-5.0e0_rp)*(ee(I,2)**2-ee(I,3)**2)
 
                 M_MRT(13,I)=ee(I,1)*ee(I,2)
                 M_MRT(14,I)=ee(I,2)*ee(I,3)
@@ -507,23 +507,23 @@ module FluidDomain
             S(0:lbmDim)=[  s0,s1,s2,s0,s4,s0,s4,s0,s4,this%Omega,s10,this%Omega,s10,this%Omega,this%Omega,this%Omega,s16,s16,s16]
             ! calculate MRTM collision matrix
             ! IM*S*M
-            S_D(0:lbmDim,0:lbmDim)=0.0D0
+            S_D(0:lbmDim,0:lbmDim)=0.0e0_rp
             DO    i=0,lbmDim
                 S_D(i,i)=S(i)
             ENDDO
             this%M_COLLID=MATMUL(MATMUL(M_MRTI,S_D),M_MRT)
             ! calculate MRTM body-force matrix
-            ! IM*(I-0.5D0*S)*M=I-0.5*IM*S*M
-            S_D(0:lbmDim,0:lbmDim)=0.0D0
+            ! IM*(I-0.5e0_rp*S)*M=I-0.5*IM*S*M
+            S_D(0:lbmDim,0:lbmDim)=0.0e0_rp
             DO    i=0,lbmDim
-                S_D(i,i)=1.0d0
+                S_D(i,i)=1.0e0_rp
             ENDDO
-            this%M_FORCE=S_D-0.5*this%M_COLLID
+            this%M_FORCE=S_D-0.5e0_rp*this%M_COLLID
         END SUBROUTINE calculate_MRT_params
 
         SUBROUTINE initialise_flow()
             implicit none
-            real(8):: xCoord,yCoord,zCoord
+            real(rp):: xCoord,yCoord,zCoord
             integer:: x, y, z
             ! calculating initial flow velocity and the distribution function
             do  x = 1, this%xDim
@@ -536,7 +536,7 @@ module FluidDomain
                 call evaluate_velocity(this%blktime,zCoord,yCoord,xCoord,flow%uvwIn(1:SpaceDim),this%uuu(z,y,x,1:SpaceDim),flow%shearRateIn(1:3))
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
                 if(this%outputtype .ge. 2) then
-                    this%uuu_ave(z,y,x,:) = 0.0D0
+                    this%uuu_ave(z,y,x,:) = 0.0e0_rp
                 endif
             enddo
             enddo
@@ -547,7 +547,7 @@ module FluidDomain
     ! subroutine  initDisturb_(this)
     !    implicit none
     !    class(LBMBlock), intent(inout) :: this
-    !    real(8):: xCoord,yCoord,zCoord
+    !    real(rp):: xCoord,yCoord,zCoord
     !    integer:: x, y, z
     !    do  x = 1, this%xDim
     !        xCoord = this%xmin + this%dh * (x - 1);
@@ -555,9 +555,9 @@ module FluidDomain
     !        yCoord = this%ymin + this%dh * (y - 1);
     !    do  z = 1, this%zDim
     !        zCoord = this%zmin + this%dh * (z - 1);
-    !        this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+flow%AmplInitDist(1)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*xCoord)
-    !        this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+flow%AmplInitDist(2)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*yCoord)
-    !        this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+flow%AmplInitDist(3)*flow%Uref*dsin(2.d0*pi*flow%waveInitDist*zCoord)
+    !        this%uuu(z,y,x,1)=this%uuu(z,y,x,1)+flow%AmplInitDist(1)*flow%Uref*sin(2.e0_rp*pi*flow%waveInitDist*xCoord)
+    !        this%uuu(z,y,x,2)=this%uuu(z,y,x,2)+flow%AmplInitDist(2)*flow%Uref*sin(2.e0_rp*pi*flow%waveInitDist*yCoord)
+    !        this%uuu(z,y,x,3)=this%uuu(z,y,x,3)+flow%AmplInitDist(3)*flow%Uref*sin(2.e0_rp*pi*flow%waveInitDist*zCoord)
     !    enddo
     !    enddo
     !    enddo
@@ -617,8 +617,8 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x, y, z
-        real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
-        real(8):: fEq(0:lbmDim),fEqi(0:lbmDim),fTmp(0:lbmDim)
+        real(rp):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
+        real(rp):: fEq(0:lbmDim),fEqi(0:lbmDim),fTmp(0:lbmDim)
         ! set the x direction (inlet) --------------------------------------------------------------------
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
@@ -648,7 +648,7 @@ module FluidDomain
         elseif(this%BndConds(1) .eq. BCorder1_Extrapolate)then
             this%fIn(:,:,1,[1,7,9,11,13]) = this%fIn(:,:,2,[1,7,9,11,13])
         elseif(this%BndConds(1) .eq. BCorder2_Extrapolate)then
-            this%fIn(:,:,1,[1,7,9,11,13]) = 2.0*this%fIn(:,:,2,[1,7,9,11,13]) - this%fIn(:,:,3,[1,7,9,11,13])
+            this%fIn(:,:,1,[1,7,9,11,13]) = 2.0e0_rp*this%fIn(:,:,2,[1,7,9,11,13]) - this%fIn(:,:,3,[1,7,9,11,13])
         elseif(this%BndConds(1) .eq. BCstationary_Wall)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
@@ -685,7 +685,7 @@ module FluidDomain
                     yCoord = this%ymin + this%dh * (y - 1);
                 do  z = 1,this%zDim
                     zCoord = this%zmin + this%dh * (z - 1);
-                    call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin-this%dh*0.5d0,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmin-this%dh*0.5e0_rp,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                     call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwx1(0:lbmDim,z,y),fTmp(0:lbmDim))
                     this%fIn(z,y,1,[1,7,9,11,13]) = fTmp([1,7,9,11,13])
                 enddo
@@ -732,7 +732,7 @@ module FluidDomain
         elseif(this%BndConds(2) .eq. BCorder1_Extrapolate)then
             this%fIn(:,:,this%xDim,[2,8,10,12,14]) = this%fIn(:,:,this%xDim-1,[2,8,10,12,14])
         elseif(this%BndConds(2) .eq. BCorder2_Extrapolate)then
-            this%fIn(:,:,this%xDim,[2,8,10,12,14]) = 2.0*this%fIn(:,:,this%xDim-1,[2,8,10,12,14])-this%fIn(:,:,this%xDim-2,[2,8,10,12,14])
+            this%fIn(:,:,this%xDim,[2,8,10,12,14]) = 2.0e0_rp*this%fIn(:,:,this%xDim-1,[2,8,10,12,14])-this%fIn(:,:,this%xDim-2,[2,8,10,12,14])
         elseif(this%BndConds(2) .eq. BCstationary_Wall)then
             do  y = 1,this%yDim
             do  z = 1,this%zDim
@@ -769,7 +769,7 @@ module FluidDomain
                     yCoord = this%ymin + this%dh * (y - 1);
                 do  z = 1,this%zDim
                     zCoord = this%zmin + this%dh * (z - 1);
-                    call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmax+this%dh*0.5d0,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_velocity(this%blktime,zCoord,yCoord,this%xmax+this%dh*0.5e0_rp,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                     call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwx2(0:lbmDim,z,y),fTmp(0:lbmDim))
                     this%fIn(z,y,this%xDim,[2,8,10,12,14]) = fTmp([2,8,10,12,14])
                 enddo
@@ -816,7 +816,7 @@ module FluidDomain
         elseif(this%BndConds(3) .eq. BCorder1_Extrapolate)then
             this%fIn(:,1,:,[3,7,8,15,17]) = this%fIn(:,2,:,[3,7,8,15,17])
         elseif(this%BndConds(3) .eq. BCorder2_Extrapolate)then
-            this%fIn(:,1,:,[3,7,8,15,17]) = 2.0*this%fIn(:,2,:,[3,7,8,15,17]) - this%fIn(:,3,:,[3,7,8,15,17])
+            this%fIn(:,1,:,[3,7,8,15,17]) = 2.0e0_rp*this%fIn(:,2,:,[3,7,8,15,17]) - this%fIn(:,3,:,[3,7,8,15,17])
         elseif(this%BndConds(3) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
@@ -853,7 +853,7 @@ module FluidDomain
                     xCoord = this%xmin + this%dh * (x - 1);
                 do  z = 1,this%zDim
                     zCoord = this%zmin + this%dh * (z - 1);
-                    call evaluate_velocity(this%blktime,zCoord,this%ymin-this%dh*0.5d0,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_velocity(this%blktime,zCoord,this%ymin-this%dh*0.5e0_rp,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                     call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwy1(0:lbmDim,z,x),fTmp(0:lbmDim))
                     this%fIn(z,1,x,[3,7,8,15,17]) = fTmp([3,7,8,15,17])
                 enddo
@@ -900,7 +900,7 @@ module FluidDomain
         elseif(this%BndConds(4) .eq. BCorder1_Extrapolate)then
             this%fIn(:,this%yDim,:,[4,9,10,16,18]) = this%fIn(:,this%yDim-1,:,[4,9,10,16,18])
         elseif(this%BndConds(4) .eq. BCorder2_Extrapolate)then
-            this%fIn(:,this%yDim,:,[4,9,10,16,18]) = 2.0*this%fIn(:,this%yDim-1,:,[4,9,10,16,18]) - this%fIn(:,this%yDim-2,:,[4,9,10,16,18])
+            this%fIn(:,this%yDim,:,[4,9,10,16,18]) = 2.0e0_rp*this%fIn(:,this%yDim-1,:,[4,9,10,16,18]) - this%fIn(:,this%yDim-2,:,[4,9,10,16,18])
         elseif(this%BndConds(4) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  z = 1,this%zDim
@@ -937,7 +937,7 @@ module FluidDomain
                     xCoord = this%xmin + this%dh * (x - 1);
                 do  z = 1,this%zDim
                     zCoord = this%zmin + this%dh * (z - 1);
-                    call evaluate_velocity(this%blktime,zCoord,this%ymax+this%dh*0.5d0,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_velocity(this%blktime,zCoord,this%ymax+this%dh*0.5e0_rp,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                     call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwy2(0:lbmDim,z,x),fTmp(0:lbmDim))
                     this%fIn(z,this%yDim,x,[4,9,10,16,18]) = fTmp([4,9,10,16,18])
                 enddo
@@ -984,7 +984,7 @@ module FluidDomain
         elseif(this%BndConds(5) .eq. BCorder1_Extrapolate)then
             this%fIn(1,:,:,[5,11,12,15,16]) = this%fIn(2,:,:,[5,11,12,15,16])
         elseif(this%BndConds(5) .eq. BCorder2_Extrapolate)then
-            this%fIn(1,:,:,[5,11,12,15,16]) = 2.0*this%fIn(2,:,:,[5,11,12,15,16]) - this%fIn(3,:,:,[5,11,12,15,16])
+            this%fIn(1,:,:,[5,11,12,15,16]) = 2.0e0_rp*this%fIn(2,:,:,[5,11,12,15,16]) - this%fIn(3,:,:,[5,11,12,15,16])
         elseif(this%BndConds(5) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
@@ -1021,7 +1021,7 @@ module FluidDomain
                     xCoord = this%xmin + this%dh * (x - 1);
                 do  y = 1,this%yDim
                     yCoord = this%ymin + this%dh * (y - 1);
-                    call evaluate_velocity(this%blktime,this%zmin-this%dh*0.5d0,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_velocity(this%blktime,this%zmin-this%dh*0.5e0_rp,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                     call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwz1(0:lbmDim,y,x),fTmp(0:lbmDim))
                     this%fIn(1,y,x,[5,11,12,15,16]) = fTmp([5,11,12,15,16])
                 enddo
@@ -1068,7 +1068,7 @@ module FluidDomain
         elseif(this%BndConds(6) .eq. BCorder1_Extrapolate)then
             this%fIn(this%zDim,:,:,[6,13,14,17,18]) = this%fIn(this%zDim-1,:,:,[6,13,14,17,18])
         elseif(this%BndConds(6) .eq. BCorder2_Extrapolate)then
-            this%fIn(this%zDim,:,:,[6,13,14,17,18]) = 2.0*this%fIn(this%zDim-1,:,:,[6,13,14,17,18])-this%fIn(this%zDim-2,:,:,[6,13,14,17,18])
+            this%fIn(this%zDim,:,:,[6,13,14,17,18]) = 2.0e0_rp*this%fIn(this%zDim-1,:,:,[6,13,14,17,18])-this%fIn(this%zDim-2,:,:,[6,13,14,17,18])
         elseif(this%BndConds(6) .eq. BCstationary_Wall)then
             do  x = 1,this%xDim
             do  y = 1,this%yDim
@@ -1105,7 +1105,7 @@ module FluidDomain
                     xCoord = this%xmin + this%dh * (x - 1);
                 do  y = 1,this%yDim
                     yCoord = this%ymin + this%dh * (y - 1);
-                    call evaluate_velocity(this%blktime,this%zmax+this%dh*0.5d0,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
+                    call evaluate_velocity(this%blktime,this%zmax+this%dh*0.5e0_rp,yCoord,xCoord,flow%uvwIn(1:SpaceDim),velocity(1:SpaceDim),flow%shearRateIn(1:3))
                     call evaluate_moving_wall(flow%denIn,velocity(1:SpaceDim),this%fIn_hwz2(0:lbmDim,y,x),fTmp(0:lbmDim))
                     this%fIn(this%zDim,y,x,[6,13,14,17,18]) = fTmp([6,13,14,17,18])
                 enddo
@@ -1134,9 +1134,9 @@ module FluidDomain
         do  y = 1, this%yDim
         do  z = 1, this%zDim
             this%den(z,y,x  )  = (SUM(this%fIn(z,y,x,0:lbmDim)))
-            this%uuu(z,y,x,1)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5d0*this%volumeForce(1)*this%dh)/this%den(z,y,x)
-            this%uuu(z,y,x,2)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5d0*this%volumeForce(2)*this%dh)/this%den(z,y,x)
-            this%uuu(z,y,x,3)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5d0*this%volumeForce(3)*this%dh)/this%den(z,y,x)
+            this%uuu(z,y,x,1)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,1))+0.5e0_rp*this%volumeForce(1)*this%dh)/this%den(z,y,x)
+            this%uuu(z,y,x,2)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,2))+0.5e0_rp*this%volumeForce(2)*this%dh)/this%den(z,y,x)
+            this%uuu(z,y,x,3)  = (SUM(this%fIn(z,y,x,0:lbmDim)*ee(0:lbmDim,3))+0.5e0_rp*this%volumeForce(3)*this%dh)/this%den(z,y,x)
             !prs(z,y,x)   = Cs2*(den(z,y,x)-denIn)
         enddo
         enddo
@@ -1148,22 +1148,22 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z,step,step_s
-        real(8)::invStep
+        real(rp)::invStep
         if(step .ge. step_s .and. this%outputtype .ge. 2) then
-            invStep = 1 / real(step - step_s + 1)
+            invStep = 1.e0_rp / real(step - step_s + 1, rp)
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do  x = 1, this%xDim
             do  y = 1, this%yDim
             do  z = 1, this%zDim
-                this%uuu_ave(z,y,x,1) = this%uuu_ave(z,y,x,1) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,1)
-                this%uuu_ave(z,y,x,2) = this%uuu_ave(z,y,x,2) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,2)
-                this%uuu_ave(z,y,x,3) = this%uuu_ave(z,y,x,3) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,3)
-                this%uuu_ave(z,y,x,4) = this%uuu_ave(z,y,x,4) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1))
-                this%uuu_ave(z,y,x,5) = this%uuu_ave(z,y,x,5) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
-                this%uuu_ave(z,y,x,6) = this%uuu_ave(z,y,x,6) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
-                this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
-                this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
-                this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,1) = this%uuu_ave(z,y,x,1) * (1.e0_rp - invStep) + invStep * this%uuu(z,y,x,1)
+                this%uuu_ave(z,y,x,2) = this%uuu_ave(z,y,x,2) * (1.e0_rp - invStep) + invStep * this%uuu(z,y,x,2)
+                this%uuu_ave(z,y,x,3) = this%uuu_ave(z,y,x,3) * (1.e0_rp - invStep) + invStep * this%uuu(z,y,x,3)
+                this%uuu_ave(z,y,x,4) = this%uuu_ave(z,y,x,4) * (1.e0_rp - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1))
+                this%uuu_ave(z,y,x,5) = this%uuu_ave(z,y,x,5) * (1.e0_rp - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,6) = this%uuu_ave(z,y,x,6) * (1.e0_rp - invStep) + invStep * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7) * (1.e0_rp - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8) * (1.e0_rp - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9) * (1.e0_rp - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
             enddo
             enddo
             enddo
@@ -1174,7 +1174,7 @@ module FluidDomain
     SUBROUTINE update_volume_force_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        this%volumeForce(1) = flow%volumeForceIn(1) + flow%volumeForceAmp * dsin(2.d0*pi*flow%volumeForceFreq*this%blktime + flow%volumeForcePhi/180.0d0*pi)
+        this%volumeForce(1) = flow%volumeForceIn(1) + flow%volumeForceAmp * sin(2.e0_rp*pi*flow%volumeForceFreq*this%blktime + flow%volumeForcePhi/180.0e0_rp*pi)
         this%volumeForce(2) = flow%volumeForceIn(2)
         this%volumeForce(3) = flow%volumeForceIn(3)
     END SUBROUTINE
@@ -1198,9 +1198,9 @@ module FluidDomain
         integer:: x
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
         do x=1,this%xDim
-            this%force(:,:,x,1) = 0.d0
-            this%force(:,:,x,2) = 0.d0
-            this%force(:,:,x,3) = 0.d0
+            this%force(:,:,x,1) = 0.e0_rp
+            this%force(:,:,x,2) = 0.e0_rp
+            this%force(:,:,x,3) = 0.e0_rp
         enddo
         !$OMP END PARALLEL DO
     END SUBROUTINE
@@ -1208,28 +1208,28 @@ module FluidDomain
     SUBROUTINE collision_(this)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega,f_1
+        real(rp):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega,f_1
         integer:: x,y,z
-        dt3 = 3.d0*this%dh
+        dt3 = 3.e0_rp*this%dh
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
             uSqr           = sum(this%uuu(z,y,x,1:3)*this%uuu(z,y,x,1:3))
             uxyz(0:lbmDim) = this%uuu(z,y,x,1) * ee(0:lbmDim,1) + this%uuu(z,y,x,2) * ee(0:lbmDim,2)+this%uuu(z,y,x,3) * ee(0:lbmDim,3)
-            fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0d0 - 1.5d0 * uSqr) + uxyz(0:lbmDim) * (3.0d0  + 4.5d0 * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
+            fEq(0:lbmDim)  = wt(0:lbmDim) * this%den(z,y,x) * ( (1.0e0_rp - 1.5e0_rp * uSqr) + uxyz(0:lbmDim) * (3.0e0_rp  + 4.5e0_rp * uxyz(0:lbmDim)) ) - this%fIn(z,y,x,0:lbmDim)
             Flb(0:lbmDim)  = dt3*wt(0:lbmDim)*( &
-                 (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
-                +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
-                +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.d0*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
+                 (ee(0:lbmDim,1)-this%uuu(z,y,x,1)+3.e0_rp*uxyz(0:lbmDim)*ee(0:lbmDim,1))*this%force(z,y,x,1) &
+                +(ee(0:lbmDim,2)-this%uuu(z,y,x,2)+3.e0_rp*uxyz(0:lbmDim)*ee(0:lbmDim,2))*this%force(z,y,x,2) &
+                +(ee(0:lbmDim,3)-this%uuu(z,y,x,3)+3.e0_rp*uxyz(0:lbmDim)*ee(0:lbmDim,3))*this%force(z,y,x,3))
             if(this%iCollidModel==1)then
                 ! SRT collision
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*fEq(0:lbmDim) + (1.d0-0.5d0*this%Omega)*Flb(0:lbmDim)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*fEq(0:lbmDim) + (1.e0_rp-0.5e0_rp*this%Omega)*Flb(0:lbmDim)
             elseif(this%iCollidModel==2)then
                 ! TRT collision
-                fEq(0) = this%Omega*fEq(0) + (1.d0-0.5d0*this%Omega)*Flb(0)
-                uxyz(positivedirs) = 0.5d0*this%Omega *(fEq(positivedirs)+fEq(negativedirs)) + (0.5d0-0.25d0* this%Omega)*(Flb(positivedirs)+Flb(negativedirs))
-                uxyz(negativedirs) = 0.5d0*this%Omega2*(fEq(positivedirs)-fEq(negativedirs)) + (0.5d0-0.25d0*this%Omega2)*(Flb(positivedirs)-Flb(negativedirs))
+                fEq(0) = this%Omega*fEq(0) + (1.e0_rp-0.5e0_rp*this%Omega)*Flb(0)
+                uxyz(positivedirs) = 0.5e0_rp*this%Omega *(fEq(positivedirs)+fEq(negativedirs)) + (0.5e0_rp-0.25e0_rp* this%Omega)*(Flb(positivedirs)+Flb(negativedirs))
+                uxyz(negativedirs) = 0.5e0_rp*this%Omega2*(fEq(positivedirs)-fEq(negativedirs)) + (0.5e0_rp-0.25e0_rp*this%Omega2)*(Flb(positivedirs)-Flb(negativedirs))
                 fEq(positivedirs) = uxyz(positivedirs) + uxyz(negativedirs)
                 fEq(negativedirs) = uxyz(positivedirs) - uxyz(negativedirs)
                 this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + fEq
@@ -1239,23 +1239,23 @@ module FluidDomain
             elseif(this%iCollidModel==11)then
                 ! SRT collision with LES
                 call smag(-fEq(0:lbmDim),this%den(z,y,x),x,y,z,omega)
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.e0_rp-0.5e0_rp*omega)*Flb(0:lbmDim)
             elseif(this%iCollidModel==12)then
                 ! Regularised SRT collision
                 call RBGK(-fEq(0:lbmDim),f_1)
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*f_1 + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + this%Omega*f_1 + (1.e0_rp-0.5e0_rp*omega)*Flb(0:lbmDim)
             elseif(this%iCollidModel==13)then
                 ! SRT collision in ELBM
                 call ELBM(fEq(0:lbmDim),this%fIn(z,y,x,0:lbmDim),omega)
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.e0_rp-0.5e0_rp*omega)*Flb(0:lbmDim)
             elseif(this%iCollidModel==14)then
                 ! WALE SRT collision
                 call WALE(-fEq(0:lbmDim),this%den(z,y,x),x,y,z,omega)
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.e0_rp-0.5e0_rp*omega)*Flb(0:lbmDim)
             elseif(this%iCollidModel==15)then
                 ! Vremann SRT collision
                 call vrem(x,y,z,omega)
-                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.d0-0.5d0*omega)*Flb(0:lbmDim)
+                this%fIn(z,y,x,0:lbmDim) = this%fIn(z,y,x,0:lbmDim) + omega*fEq(0:lbmDim) + (1.e0_rp-0.5e0_rp*omega)*Flb(0:lbmDim)
             endif
         enddo
         enddo
@@ -1264,9 +1264,9 @@ module FluidDomain
         contains
         SUBROUTINE smag(fneq,rho,x0,y0,z0,omega0)
             implicit none
-            real(8):: fneq(0:lbmDim),rho,omega0,tau_t
-            real(8):: Q11,Q12,Q13,Q22,Q23,Q33
-            real(8):: Q
+            real(rp):: fneq(0:lbmDim),rho,omega0,tau_t
+            real(rp):: Q11,Q12,Q13,Q22,Q23,Q33
+            real(rp):: Q
             integer:: x0,y0,z0
             Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
             Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
@@ -1274,50 +1274,50 @@ module FluidDomain
             Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
             Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
             Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
-            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
-            tau_t = dsqrt(this%tau*this%tau + CsmagConst*dsqrt(Q)/rho)
-            this%tau_all(z0,y0,x0) = 0.5d0 * (this%tau+tau_t)
-            omega0 = 2.0d0 / (this%tau+tau_t)
+            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.e0_rp*(Q12*Q12 + Q13*Q13 + Q23*Q23)
+            tau_t = sqrt(this%tau*this%tau + CsmagConst*sqrt(Q)/rho)
+            this%tau_all(z0,y0,x0) = 0.5e0_rp * (this%tau+tau_t)
+            omega0 = 2.0e0_rp / (this%tau+tau_t)
         END SUBROUTINE
         SUBROUTINE RBGK(fneq,f_10)
             implicit none
-            real(8):: fneq(0:lbmDim)
-            real(8):: Q11,Q12,Q13,Q22,Q23,Q33,f_10
+            real(rp):: fneq(0:lbmDim)
+            real(rp):: Q11,Q12,Q13,Q22,Q23,Q33,f_10
             Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
             Q22 = fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
             Q33 = fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
             Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
             Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
             Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
-            f_10= 4.5d0*(10.0d0-Cs2)*(Q11+Q22+Q33)
+            f_10= 4.5e0_rp*(10.0e0_rp-Cs2)*(Q11+Q22+Q33)
         END SUBROUTINE
         SUBROUTINE ELBM(fneq,fnin,omega0)
             implicit none
-            real(8):: fneq(0:lbmDim),fnin(0:lbmDim),omega0
-            real(8):: x1(0:lbmDim),x2(0:lbmDim),x3(0:lbmDim)
-            real(8):: a,b,c,alpha,beta
+            real(rp):: fneq(0:lbmDim),fnin(0:lbmDim),omega0
+            real(rp):: x1(0:lbmDim),x2(0:lbmDim),x3(0:lbmDim)
+            real(rp):: a,b,c,alpha,beta
             x1(0:lbmDim) = fneq(0:lbmDim) / fnin(0:lbmDim)
             x2(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim)
             ! x3(0:lbmDim) = x1(0:lbmDim) * x1(0:lbmDim) * x1(0:lbmDim) * (x1 < 0.0)
 
             a = sum(fnin(0:lbmDim) * x2(0:lbmDim))
             b = sum(fnin(0:lbmDim) * x3(0:lbmDim))
-            c = sum(fnin(0:lbmDim) * (2.0d0 * x2(0:lbmDim) / (2.0d0 + x1(0:lbmDim))))
+            c = sum(fnin(0:lbmDim) * (2.0e0_rp * x2(0:lbmDim) / (2.0e0_rp + x1(0:lbmDim))))
 
-            alpha = (a - sqrt(a*a - 8.0d0*b*c)) / b / 2.0d0
-            beta = flow%timeFlowDelta / (2.0d0 * this%tau + flow%timeFlowDelta)
+            alpha = (a - sqrt(a*a - 8.0e0_rp*b*c)) / b / 2.0e0_rp
+            beta = flow%timeFlowDelta / (2.0e0_rp * this%tau + flow%timeFlowDelta)
             omega0 = alpha * beta
         END SUBROUTINE
         SUBROUTINE WALE(fneq,rho,x0,y0,z0,omega0)
             USE, INTRINSIC :: IEEE_ARITHMETIC
             implicit none
-            real(8):: fneq(0:lbmDim),rho,omega0
-            real(8):: Q11,Q12,Q13,Q22,Q23,Q33
-            real(8):: S11,S12,S13,S22,S23,S33
-            real(8):: O12,O13,O23,ox,oy,oz
-            real(8):: SO11,SO12,SO13,SO22,SO23,SO33
-            real(8):: Q,S,O,SO,OP,SdSd
-            real(8):: invdh,tau__
+            real(rp):: fneq(0:lbmDim),rho,omega0
+            real(rp):: Q11,Q12,Q13,Q22,Q23,Q33
+            real(rp):: S11,S12,S13,S22,S23,S33
+            real(rp):: O12,O13,O23,ox,oy,oz
+            real(rp):: SO11,SO12,SO13,SO22,SO23,SO33
+            real(rp):: Q,S,O,SO,OP,SdSd
+            real(rp):: invdh,tau__
             integer:: x0,y0,z0
             invdh = this%dh
             Q11 = fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
@@ -1326,20 +1326,20 @@ module FluidDomain
             Q12 = fneq(7)-fneq(8)-fneq(9)+fneq(10)
             Q13 = fneq(11)-fneq(12)-fneq(13)+fneq(14)
             Q23 = fneq(15)-fneq(16)-fneq(17)+fneq(18)
-            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.d0*(Q12*Q12 + Q13*Q13 + Q23*Q23)
+            Q = Q11*Q11 + Q22*Q22 + Q33*Q33 + 2.e0_rp*(Q12*Q12 + Q13*Q13 + Q23*Q23)
 
             tau__ = this%tau_all(z0,y0,x0)
-            S11 = -1.5d0*invdh*Q11/(rho*tau__)
-            S22 = -1.5d0*invdh*Q22/(rho*tau__)
-            S33 = -1.5d0*invdh*Q33/(rho*tau__)
-            S12 = -1.5d0*invdh*Q12/(rho*tau__)
-            S13 = -1.5d0*invdh*Q13/(rho*tau__)
-            S23 = -1.5d0*invdh*Q23/(rho*tau__)
-            S = S11*S11 + S22*S22 + S33*S33 + 2.d0*(S12*S12 + S13*S13 + S23*S23)
+            S11 = -1.5e0_rp*invdh*Q11/(rho*tau__)
+            S22 = -1.5e0_rp*invdh*Q22/(rho*tau__)
+            S33 = -1.5e0_rp*invdh*Q33/(rho*tau__)
+            S12 = -1.5e0_rp*invdh*Q12/(rho*tau__)
+            S13 = -1.5e0_rp*invdh*Q13/(rho*tau__)
+            S23 = -1.5e0_rp*invdh*Q23/(rho*tau__)
+            S = S11*S11 + S22*S22 + S33*S33 + 2.e0_rp*(S12*S12 + S13*S13 + S23*S23)
 
-            ox=0.0d0
-            oy=0.0d0
-            oz=0.0d0
+            ox=0.0e0_rp
+            oy=0.0e0_rp
+            oz=0.0e0_rp
             ! compute omega_x
             if (y0.gt.1.and.y0.lt.this%yDim) then
                 ox = center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh)
@@ -1349,11 +1349,11 @@ module FluidDomain
                 ox = onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh)
             endif
             if (z0.gt.1.and.z0.lt.this%zDim) then
-                ox = 0.5d0*(ox - center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh))
+                ox = 0.5e0_rp*(ox - center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh))
             elseif (z0.eq.1) then
-                ox = 0.5d0*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh))
+                ox = 0.5e0_rp*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh))
             else
-                ox = 0.5d0*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh))
+                ox = 0.5e0_rp*(ox - onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh))
             endif
             ! compute omega_y
             if (z0.gt.1.and.z0.lt.this%zDim) then
@@ -1364,11 +1364,11 @@ module FluidDomain
                 oy = onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
             endif
             if (x0.gt.1.and.x0.lt.this%xDim) then
-                oy = 0.5d0*(oy - center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
+                oy = 0.5e0_rp*(oy - center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
             elseif (x0.eq.1) then
-                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh))
+                oy = 0.5e0_rp*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh))
             else
-                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh))
+                oy = 0.5e0_rp*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh))
             endif
             ! compute omega_y
             if (x0.gt.1.and.x0.lt.this%xDim) then
@@ -1379,107 +1379,107 @@ module FluidDomain
                 oz = onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
             endif
             if (y0.gt.1.and.y0.lt.this%yDim) then
-                oz = 0.5d0*(oz - center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh))
+                oz = 0.5e0_rp*(oz - center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh))
             elseif (y0.eq.1) then
-                oz = 0.5d0*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh))
+                oz = 0.5e0_rp*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh))
             else
-                oz = 0.5d0*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh))
+                oz = 0.5e0_rp*(oz - onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh))
             endif
-            O12 = -0.5d0*oz
-            O13 =  0.5d0*oy
-            O23 = -0.5d0*ox
+            O12 = -0.5e0_rp*oz
+            O13 =  0.5e0_rp*oy
+            O23 = -0.5e0_rp*ox
             ! the boundary need unilateral interpolation
 
-            O = 2.0d0*(O12*O12+O23*O23+O13*O13)
+            O = 2.0e0_rp*(O12*O12+O23*O23+O13*O13)
 
-            SO11 =-(0.0d0           + S11*S11*O12*O12 + S11*S11*O13*O13 + &
-                    0.0d0           + S12*S12*O12*O12 + S12*S12*O13*O13 + &
-                    0.0d0           + S13*S13*O12*O12 + S13*S13*O13*O13)
-            SO22 =-(S12*S12*O12*O12 + 0.0d0           + S12*S12*O23*O23 + &
-                    S22*S22*O12*O12 + 0.0d0           + S22*S22*O23*O23 + &
-                    S23*S23*O12*O12 + 0.0d0           + S23*S23*O23*O23)
-            SO33 =-(S13*S13*O13*O13 + S13*S13*O23*O23 + 0.0d0           + &
-                    S23*S23*O13*O13 + S23*S23*O23*O23 + 0.0d0           + &
-                    S33*S33*O13*O13 + S33*S33*O23*O23 + 0.0d0          )
-            SO12 =-(0.0d0           + 0.0d0           + S11*S12*O13*O23 + &
-                    0.0d0           + 0.0d0           + S12*S22*O13*O23 + &
-                    0.0d0           + 0.0d0           + S13*S23*O13*O23)
-            SO13 = (0.0d0           + S11*S13*O12*O23 + 0.0d0           + &
-                    0.0d0           + S12*S23*O12*O23 + 0.0d0           + &
-                    0.0d0           + S13*S33*O12*O23 + 0.0d0          )
-            SO23 =-(S12*S13*O12*O13 + 0.0d0           + 0.0d0           + &
-                    S22*S23*O12*O13 + 0.0d0           + 0.0d0           + &
-                    S23*S33*O12*O13 + 0.0d0           + 0.0d0          )
-            SO = SO11 + SO22 + SO33 + 2.0d0*(SO12 + SO13 + SO23)
+            SO11 =-(0.0e0_rp           + S11*S11*O12*O12 + S11*S11*O13*O13 + &
+                    0.0e0_rp           + S12*S12*O12*O12 + S12*S12*O13*O13 + &
+                    0.0e0_rp           + S13*S13*O12*O12 + S13*S13*O13*O13)
+            SO22 =-(S12*S12*O12*O12 + 0.0e0_rp           + S12*S12*O23*O23 + &
+                    S22*S22*O12*O12 + 0.0e0_rp           + S22*S22*O23*O23 + &
+                    S23*S23*O12*O12 + 0.0e0_rp           + S23*S23*O23*O23)
+            SO33 =-(S13*S13*O13*O13 + S13*S13*O23*O23 + 0.0e0_rp           + &
+                    S23*S23*O13*O13 + S23*S23*O23*O23 + 0.0e0_rp           + &
+                    S33*S33*O13*O13 + S33*S33*O23*O23 + 0.0e0_rp          )
+            SO12 =-(0.0e0_rp           + 0.0e0_rp           + S11*S12*O13*O23 + &
+                    0.0e0_rp           + 0.0e0_rp           + S12*S22*O13*O23 + &
+                    0.0e0_rp           + 0.0e0_rp           + S13*S23*O13*O23)
+            SO13 = (0.0e0_rp           + S11*S13*O12*O23 + 0.0e0_rp           + &
+                    0.0e0_rp           + S12*S23*O12*O23 + 0.0e0_rp           + &
+                    0.0e0_rp           + S13*S33*O12*O23 + 0.0e0_rp          )
+            SO23 =-(S12*S13*O12*O13 + 0.0e0_rp           + 0.0e0_rp           + &
+                    S22*S23*O12*O13 + 0.0e0_rp           + 0.0e0_rp           + &
+                    S23*S33*O12*O13 + 0.0e0_rp           + 0.0e0_rp          )
+            SO = SO11 + SO22 + SO33 + 2.0e0_rp*(SO12 + SO13 + SO23)
 
-            SdSd = (S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2.0d0*SO
-            OP = SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
-            if ((.not. IEEE_IS_FINITE(OP)).or.(OP.lt.0.0d0)) then
-                OP = 0.0d0
+            SdSd = (S*S+O*O)/6.0e0_rp+2.0e0_rp*S*O/3.0e0_rp+2.0e0_rp*SO
+            OP = SdSd**1.5e0_rp/(S**2.5e0_rp+SdSd**1.25e0_rp)
+            if ((.not. IEEE_IS_FINITE(OP)).or.(OP.lt.0.0e0_rp)) then
+                OP = 0.0e0_rp
             endif
 
-            tau__ = (flow%nu+CWALEConst*OP*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
+            tau__ = (flow%nu+CWALEConst*OP*this%dh*this%dh)/(this%dh*Cs2)+0.5e0_rp
             this%tau_all(z0,y0,x0) = tau__
-            omega0 = 1.0d0 / (tau__)
+            omega0 = 1.0e0_rp / (tau__)
         END SUBROUTINE
         FUNCTION center_diff(g1,g2,invdx)
             implicit none
-            real(8):: center_diff,g1,g2,invdx
+            real(rp):: center_diff,g1,g2,invdx
             center_diff = (g1 - g2)*invdx
         END FUNCTION
         FUNCTION onesid_diff(g1,g2,g3,invdx)
             implicit none
-            real(8):: onesid_diff,g1,g2,g3,invdx
-            onesid_diff = (-3.0d0*g1 + 4.0d0*g2 - g3)*invdx
+            real(rp):: onesid_diff,g1,g2,g3,invdx
+            onesid_diff = (-3.0e0_rp*g1 + 4.0e0_rp*g2 - g3)*invdx
         END FUNCTION
         SUBROUTINE vrem(x0,y0,z0,omega0)
             USE, INTRINSIC :: IEEE_ARITHMETIC
             implicit none
-            real(8):: omega0
-            real(8):: a11,a12,a13,a21,a22,a23,a31,a32,a33
-            real(8):: b11,b12,b13,b21,b22,b23,b31,b32,b33
-            real(8):: aa,bb,OP
-            real(8):: invdh,tau__
+            real(rp):: omega0
+            real(rp):: a11,a12,a13,a21,a22,a23,a31,a32,a33
+            real(rp):: b11,b12,b13,b21,b22,b23,b31,b32,b33
+            real(rp):: aa,bb,OP
+            real(rp):: invdh,tau__
             integer:: x0,y0,z0
             invdh = this%dh
             if (x0.gt.1.and.x0.lt.this%xDim) then
-                a11 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0-1,1),invdh)
-                a21 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
-                a31 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh)
+                a11 = 0.5e0_rp*center_diff(this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0-1,1),invdh)
+                a21 = 0.5e0_rp*center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
+                a31 = 0.5e0_rp*center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh)
             elseif (x0.eq.1) then
-                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0+2,1),invdh)
-                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
-                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh)
+                a11 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0+2,1),invdh)
+                a21 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
+                a31 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh)
             else
-                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0-1,1),this%uuu(z0,y0,x0-2,1),invdh)
-                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
-                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh)
+                a11 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0-1,1),this%uuu(z0,y0,x0-2,1),invdh)
+                a21 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
+                a31 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh)
             endif
             if (y0.gt.1.and.y0.lt.this%yDim) then
-                a12 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)
-                a22 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0-1,x0,2),invdh)
-                a32 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh)
+                a12 = 0.5e0_rp*center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)
+                a22 = 0.5e0_rp*center_diff(this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0-1,x0,2),invdh)
+                a32 = 0.5e0_rp*center_diff(this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0-1,x0,3),invdh)
             elseif (y0.eq.1) then
-                a12 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh)
-                a22 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0+2,x0,2),invdh)
-                a32 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh)
+                a12 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0+2,x0,1),invdh)
+                a22 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0+2,x0,2),invdh)
+                a32 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0+1,x0,3),this%uuu(z0,y0+2,x0,3),invdh)
             else
-                a12 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh)
-                a22 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0-1,x0,2),this%uuu(z0,y0-2,x0,2),invdh)
-                a32 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh)
+                a12 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0-1,x0,1),this%uuu(z0,y0-2,x0,1),invdh)
+                a22 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0-1,x0,2),this%uuu(z0,y0-2,x0,2),invdh)
+                a32 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0-1,x0,3),this%uuu(z0,y0-2,x0,3),invdh)
             endif
             if (z0.gt.1.and.z0.lt.this%zDim) then
-                a13 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)
-                a23 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)
-                a33 = 0.5d0*center_diff(this%uuu(z0+1,y0,x0,3),this%uuu(z0-1,y0,x0,3),invdh)
+                a13 = 0.5e0_rp*center_diff(this%uuu(z0+1,y0,x0,1),this%uuu(z0-1,y0,x0,1),invdh)
+                a23 = 0.5e0_rp*center_diff(this%uuu(z0+1,y0,x0,2),this%uuu(z0-1,y0,x0,2),invdh)
+                a33 = 0.5e0_rp*center_diff(this%uuu(z0+1,y0,x0,3),this%uuu(z0-1,y0,x0,3),invdh)
             elseif (z0.eq.1) then
-                a13 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)
-                a23 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh)
-                a33 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0+1,y0,x0,3),this%uuu(z0+2,y0,x0,3),invdh)
+                a13 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0+1,y0,x0,1),this%uuu(z0+2,y0,x0,1),invdh)
+                a23 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0+1,y0,x0,2),this%uuu(z0+2,y0,x0,2),invdh)
+                a33 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0+1,y0,x0,3),this%uuu(z0+2,y0,x0,3),invdh)
             else
-                a13 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
-                a23 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh)
-                a33 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0-1,y0,x0,3),this%uuu(z0-2,y0,x0,3),invdh)
+                a13 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
+                a23 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0-1,y0,x0,2),this%uuu(z0-2,y0,x0,2),invdh)
+                a33 = 0.5e0_rp*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0-1,y0,x0,3),this%uuu(z0-2,y0,x0,3),invdh)
             endif
             b11 = a11*a11
             b12 = a12*a12
@@ -1497,13 +1497,13 @@ module FluidDomain
                  (a11*a31+a12*a32+a13*a33)*(a11*a31+a12*a32+a13*a33)+ &
                  (b21+b22+b23)*(b31+b32+b33)- &
                  (a21*a31+a22*a32+a23*a33)*(a21*a31+a22*a32+a23*a33)
-            OP = dsqrt(bb/aa)
+            OP = sqrt(bb/aa)
             if (.not. IEEE_IS_FINITE(OP)) then
-                OP = 0.0d0
+                OP = 0.0e0_rp
             endif
-            tau__ = (flow%nu+CvremConst*OP*this%dh*this%dh)/(this%dh*Cs2)+0.5d0
+            tau__ = (flow%nu+CvremConst*OP*this%dh*this%dh)/(this%dh*Cs2)+0.5e0_rp
             this%tau_all(z0,y0,x0) = tau__
-            omega0 = 1.0d0 / (tau__)
+            omega0 = 1.0e0_rp / (tau__)
         END SUBROUTINE
     END SUBROUTINE collision_
 
@@ -1525,9 +1525,9 @@ module FluidDomain
         SUBROUTINE swapzy(f, dz, dy, i, zDim, yDim, xDim, lbmDim)
             implicit none
             integer, intent(in):: dz, dy, i, zDim, yDim, xDim, lbmDim
-            real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+            real(rp), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
             integer:: z, y, x
-            real(8):: temp, tmpz(1:zDim)
+            real(rp):: temp, tmpz(1:zDim)
 
             if(dz.eq.0 .and. dy.eq.0) return
 
@@ -1571,8 +1571,8 @@ module FluidDomain
             implicit none
             integer, intent(in):: dx, i, zDim, yDim, xDim, lbmDim, parindex(:)
             integer, intent(out):: eid(:)
-            real(8), intent(out):: edge(:,:,:)
-            real(8), intent(inout):: f(1:zDim, 1:yDim,1:xDim,0:lbmDim)
+            real(rp), intent(out):: edge(:,:,:)
+            real(rp), intent(inout):: f(1:zDim, 1:yDim,1:xDim,0:lbmDim)
             integer:: p
 
             if(dx.eq.0) return
@@ -1596,8 +1596,8 @@ module FluidDomain
         SUBROUTINE swapxeAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
             implicit none
             integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
-            real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
-            real(8), intent(out):: edge(1:zDim,1:yDim)
+            real(rp), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+            real(rp), intent(out):: edge(1:zDim,1:yDim)
             integer, intent(out):: eid
             integer:: x
             eid = xend+1
@@ -1611,8 +1611,8 @@ module FluidDomain
         SUBROUTINE swapxwAtom(f, edge, eid, i, zDim, yDim, xDim, lbmDim, xbgn, xend)
             implicit none
             integer, intent(in):: i, zDim, yDim, xDim, lbmDim, xbgn, xend
-            real(8), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
-            real(8), intent(out):: edge(1:zDim,1:yDim)
+            real(rp), intent(inout):: f(1:zDim,1:yDim,1:xDim,0:lbmDim)
+            real(rp), intent(out):: edge(1:zDim,1:yDim)
             integer, intent(out):: eid
             integer:: x
             eid = xbgn-1
@@ -1628,14 +1628,14 @@ module FluidDomain
     SUBROUTINE write_flow_(this,time)
         implicit none
         class(LBMBlock), intent(inout) :: this
-        real(8), intent(in):: time
+        real(rp), intent(in):: time
         integer:: x,y,z,pid,i
-        real(8)::xmin,ymin,zmin
+        real(rp)::xmin,ymin,zmin
         integer::nxs,nxe,nys,nye,nzs,nze
         integer,parameter::nameLen=10,blockLen=3,idfile=100
         character (LEN=nameLen):: fileName
         character (LEN=blockLen):: blockName
-        real(8):: invUref,invUrefs
+        real(rp):: invUref,invUrefs
         if(this%outputtype .lt. 1) return
         nxs  = 1 + this%offsetOutput
         nys  = 1 + this%offsetOutput
@@ -1647,8 +1647,8 @@ module FluidDomain
         ymin = this%ymin + this%offsetOutput * this%dh
         zmin = this%zmin + this%offsetOutput * this%dh
 
-        invUref  = 1.d0/flow%Uref
-        invUrefs = 1.d0/flow%Uref/flow%Uref
+        invUref  = 1.e0_rp/flow%Uref
+        invUrefs = 1.e0_rp/flow%Uref/flow%Uref
 
         if(this%outputtype .ne. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
@@ -1702,7 +1702,7 @@ module FluidDomain
         call myfork(pid)
         if(pid.eq.0) then
             if(this%outputtype .ne. 2) then
-                write(fileName,'(I10)') nint(time/flow%Tref*1d5)
+                write(fileName,'(I10)') nint(time/flow%Tref*1e5_rp)
                 fileName = adjustr(fileName)
                 do  i=1,nameLen
                     if(fileName(i:i)==' ')fileName(i:i)='0'
@@ -1740,24 +1740,24 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x,y,z,i
-        real(8):: invUref, uLinfty(1:3), uL2(1:3), temp
-        invUref = 1.d0/flow%Uref
-        uLinfty = -1.d0
-        uL2 = 0.d0
+        real(rp):: invUref, uLinfty(1:3), uL2(1:3), temp
+        invUref = 1.e0_rp/flow%Uref
+        uLinfty = -1.e0_rp
+        uL2 = 0.e0_rp
         do i=1,3
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,temp) &
             !$OMP reduction (+: uL2) reduction(max: uLinfty)
             do x=1, this%xDim
                 do y=1, this%yDim
                     do z=1, this%zDim
-                        temp = dabs(this%uuu(z,y,x,i)*invUref)
+                        temp = abs(this%uuu(z,y,x,i)*invUref)
                         uL2(i) = uL2(i) + temp * temp
                         if(temp.gt.uLinfty(i)) uLinfty(i) = temp
                     enddo
                 enddo
             enddo
             !$OMP END PARALLEL DO
-            uL2(i) = dsqrt(uL2(i) / (dble(this%xDim) * dble(this%yDim) * dble(this%zDim)))
+            uL2(i) = sqrt(uL2(i) / (real(this%xDim, rp) * real(this%yDim, rp) * real(this%zDim, rp)))
         enddo
         write(*,'(A,F18.12)')' FIELDSTAT L2 u ', uL2(1)
         write(*,'(A,F18.12)')' FIELDSTAT L2 v ', uL2(2)
@@ -1790,8 +1790,8 @@ module FluidDomain
 
     SUBROUTINE evaluate_velocity(time,zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)
         implicit none
-        real(8):: time,xCoord,yCoord,zCoord
-        real(8):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:3)
+        real(rp):: time,xCoord,yCoord,zCoord
+        real(rp):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:3)
         if (flow%velocityKind .eq. 0) then
             call evaluate_shear_velocity(zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)
         elseif (flow%velocityKind .eq. 2) then
@@ -1802,8 +1802,8 @@ module FluidDomain
     ! set the shear velocity
     SUBROUTINE evaluate_shear_velocity(zCoord,yCoord,xCoord,velocityIn,velocityOut,shearRate)
         implicit none
-        real(8):: zCoord,yCoord,xCoord
-        real(8):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:3)
+        real(rp):: zCoord,yCoord,xCoord
+        real(rp):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:3)
         velocityOut(1) = velocityIn(1) + 0*shearRate(1) + yCoord*shearRate(2) + zCoord*shearRate(3);
         velocityOut(2) = velocityIn(2) + xCoord*shearRate(1) + 0*shearRate(2) + zCoord*shearRate(3);
         velocityOut(3) = velocityIn(3) + xCoord*shearRate(1) + yCoord*shearRate(2) + 0*shearRate(3);
@@ -1812,13 +1812,13 @@ module FluidDomain
     ! set the oscillatory velocity
     SUBROUTINE evaluate_oscillatory_velocity(time,velocityIn,velocityOut,shearRate)
        implicit none
-       real(8):: time
-       real(8):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:3)
-       real(8):: velocityAmp,velocityFreq,velocityPhi
+       real(rp):: time
+       real(rp):: velocityIn(1:SpaceDim),velocityOut(1:SpaceDim),shearRate(1:3)
+       real(rp):: velocityAmp,velocityFreq,velocityPhi
        velocityAmp = shearRate(1)
        velocityFreq = shearRate(2)
        velocityPhi = shearRate(3)
-       velocityOut(1) = velocityIn(1) + velocityAmp * dcos(2*pi*velocityFreq*time + velocityPhi/180.0d0*pi)
+       velocityOut(1) = velocityIn(1) + velocityAmp * cos(2*pi*velocityFreq*time + velocityPhi/180.0e0_rp*pi)
        velocityOut(2) = velocityIn(2)
        velocityOut(3) = velocityIn(3)
     END SUBROUTINE
@@ -1826,20 +1826,20 @@ module FluidDomain
     ! calcualte distribution Function
     SUBROUTINE calculate_distribution_funcion(density,velocity,distribution)
         implicit none
-        real(8):: distribution(0:lbmDim)
-        real(8):: uSqr,uxyz(0:lbmDim),density,velocity(1:SpaceDim)
+        real(rp):: distribution(0:lbmDim)
+        real(rp):: uSqr,uxyz(0:lbmDim),density,velocity(1:SpaceDim)
         uSqr           = sum(velocity(1:3)**2)
         uxyz(0:lbmDim) = velocity(1) * ee(0:lbmDim,1) + velocity(2) * ee(0:lbmDim,2) + velocity(3) * ee(0:lbmDim,3)
-        distribution(0:lbmDim)  = wt(0:lbmDim) * density * (1.0d0 + 3.0d0 * uxyz(0:lbmDim) + 4.5d0 * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5d0 * uSqr)
+        distribution(0:lbmDim)  = wt(0:lbmDim) * density * (1.0e0_rp + 3.0e0_rp * uxyz(0:lbmDim) + 4.5e0_rp * uxyz(0:lbmDim) * uxyz(0:lbmDim) - 1.5e0_rp * uSqr)
     END SUBROUTINE
 
     ! set moving wall boundary distribution Function
     SUBROUTINE evaluate_moving_wall(density,velocity,distributionIn,distributionOut)
         implicit none
-        real(8):: distributionIn(0:lbmDim),distributionOut(0:lbmDim)
-        real(8):: uxyz(0:lbmDim),density,velocity(1:SpaceDim)
+        real(rp):: distributionIn(0:lbmDim),distributionOut(0:lbmDim)
+        real(rp):: uxyz(0:lbmDim),density,velocity(1:SpaceDim)
         uxyz(0:lbmDim) = velocity(1) * ee(0:lbmDim,1) + velocity(2) * ee(0:lbmDim,2) + velocity(3) * ee(0:lbmDim,3)
-        distributionOut(0:lbmDim) = distributionIn(oppo(0:lbmDim)) + 2.0*wt(0:lbmDim)*density*uxyz(0:lbmDim)*3.0
+        distributionOut(0:lbmDim) = distributionIn(oppo(0:lbmDim)) + 2.0e0_rp*wt(0:lbmDim)*density*uxyz(0:lbmDim)*3.0e0_rp
     ENDSUBROUTINE
 
     function CompareBlocks(i, j)
@@ -1850,7 +1850,7 @@ module FluidDomain
         implicit none
         integer:: i, j, CompareBlocks, cnt, align
         integer:: p, num_BC_fluid
-        real(8):: i_vxyzminmax(6), j_vxyzminmax(6)
+        real(rp):: i_vxyzminmax(6), j_vxyzminmax(6)
         logical:: d(6), if_fluid_pos(6)
         i_vxyzminmax(1) = LBMblks(i)%xmin
         i_vxyzminmax(2) = LBMblks(i)%xmax
@@ -1973,11 +1973,11 @@ module FluidDomain
 
     subroutine find_carrier_fluidblock(x, n)
         implicit none
-        real(8)::x(1:SpaceDim)
+        real(rp)::x(1:SpaceDim)
         integer,intent(out):: n
         integer::i
-        real(8)::dh
-        dh = 1.d10
+        real(rp)::dh
+        dh = 1.e10_rp
         n = -1
         do i=1,m_nblocks
             if( LBMblks(i)%xmin.le.x(1) .and. x(1).le.LBMblks(i)%xmax .and. &
@@ -2021,22 +2021,22 @@ module FluidDomain
         ! Computes inlet, mid-plane, and outlet x-fluxes.
         implicit none
         integer, intent(in) :: root
-        real(8), intent(in) :: time
+        real(rp), intent(in) :: time
         integer :: j, k, ixMid
-        real(8) :: dh, fluxIn, fluxMid, fluxOut
-        real(8) :: wy, wz, Yref, Zref
+        real(rp) :: dh, fluxIn, fluxMid, fluxOut
+        real(rp) :: wy, wz, Yref, Zref
         associate(b => LBMblks(root))
             dh = b%dh
             ixMid = (b%xDim + 1) / 2
-            fluxIn  = 0.0d0
-            fluxMid = 0.0d0
-            fluxOut = 0.0d0
+            fluxIn  = 0.0e0_rp
+            fluxMid = 0.0e0_rp
+            fluxOut = 0.0e0_rp
             do k = 1, b%zDim
-                wz = 1.0d0
-                if (k .eq. 1 .or. k .eq. b%zDim) wz = 0.5d0
+                wz = 1.0e0_rp
+                if (k .eq. 1 .or. k .eq. b%zDim) wz = 0.5e0_rp
                 do j = 1, b%yDim
-                    wy = 1.0d0
-                    if (j .eq. 1 .or. j .eq. b%yDim) wy = 0.5d0
+                    wy = 1.0e0_rp
+                    if (j .eq. 1 .or. j .eq. b%yDim) wy = 0.5e0_rp
                     fluxIn  = fluxIn  + b%uuu(k,j,1,1)      * b%den(k,j,1)      * dh*dh * wy*wz
                     fluxMid = fluxMid + b%uuu(k,j,ixMid,1)  * b%den(k,j,ixMid)  * dh*dh * wy*wz
                     fluxOut = fluxOut + b%uuu(k,j,b%xDim,1) * b%den(k,j,b%xDim) * dh*dh * wy*wz

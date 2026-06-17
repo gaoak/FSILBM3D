@@ -4,6 +4,12 @@
 ! Copyright (C) 2025-2026 Ankang Gao and contributors
 
 module ConstParams
+    integer, parameter :: sp = selected_real_kind(6, 37)
+#ifdef FSILBM_SINGLE_PRECISION
+    integer, parameter :: rp = sp
+#else
+    integer, parameter :: rp = selected_real_kind(15, 307)
+#endif
     !   LBM module
     !   D3Q19model
     integer, parameter:: SpaceDim = 3, lbmDim = 18
@@ -19,13 +25,13 @@ module ConstParams
     integer, parameter:: positivedirs(1:lbmDim/2) = [1, 3, 5, 7, 8, 11, 12, 15, 16]
     integer, parameter:: negativedirs(1:lbmDim/2) = [2, 4, 6,10, 9, 14, 13, 18, 17]
     !   Weights
-    real(8), parameter:: wt(0:lbmDim) = [&
-       1.0d0/3.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0,1.0d0/18.0d0, &
-                   1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0, &
-                   1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0,1.0d0/36.0d0  ]
+    real(rp), parameter:: wt(0:lbmDim) = [&
+       1.0e0_rp/3.0e0_rp,1.0e0_rp/18.0e0_rp,1.0e0_rp/18.0e0_rp,1.0e0_rp/18.0e0_rp,1.0e0_rp/18.0e0_rp,1.0e0_rp/18.0e0_rp,1.0e0_rp/18.0e0_rp, &
+                   1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp, &
+                   1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp,1.0e0_rp/36.0e0_rp  ]
     !   MRT model Matrix
-    !real(8),parameter::s0=1.0d0,s1=1.0d0,s2=1.0d0,s4=1.0d0,s10=1.0d0,s16=1.0d0
-    real(8), parameter::s0=0.0d0,s1=1.19d0,s2=1.4d0,s4=1.2d0,s10=1.4d0,s16=1.98d0
+    !real(rp),parameter::s0=1.0e0_rp,s1=1.0e0_rp,s2=1.0e0_rp,s4=1.0e0_rp,s10=1.0e0_rp,s16=1.0e0_rp
+    real(rp), parameter::s0=0.0e0_rp,s1=1.19e0_rp,s2=1.4e0_rp,s4=1.2e0_rp,s10=1.4e0_rp,s16=1.98e0_rp
 
     !   MODULE BoundCondParams
     integer, parameter:: BCEq_DirecletU = 101,BCnEq_DirecletU = 102,BCorder1_Extrapolate = 103,BCorder2_Extrapolate = 104
@@ -33,14 +39,14 @@ module ConstParams
     integer, parameter:: BCstationary_Wall = 201, BCmoving_Wall = 202, BCstationary_Wall_halfway = 203, BCmoving_Wall_halfway = 204
     integer, parameter:: BCPeriodic = 301,BCSymmetric = 302,BCfluid = 0,BCfluid_father = 1
 
-    real(8), parameter:: Pi = 3.141592653589793d0,eps = 1.0d-5,MachineTolerace = 1.0d-12
+    real(rp), parameter:: Pi = 3.141592653589793e0_rp,eps = 1.0e-5_rp,MachineTolerace = 1.0e-12_rp
     integer, parameter:: DOFDim = 6
 
-    real(8), parameter:: Cs2 = 1.d0/3.0d0
-    real(8), parameter:: Csmag = 0.17d0
-    ! real(8), parameter:: CsmagConst = 16.d0 * dsqrt(2.d0) / (3.d0 * Pi * Pi)
-    real(8), parameter:: CsmagConst = 2.0d0 * Csmag * Csmag * dsqrt(2.d0) * 9.d0
-    real(8), parameter:: CWALE = 0.50d0
-    real(8), parameter:: CWALEConst = CWALE*CWALE
-    real(8), parameter:: CvremConst = 2.5d0*Csmag*Csmag
+    real(rp), parameter:: Cs2 = 1.e0_rp/3.0e0_rp
+    real(rp), parameter:: Csmag = 0.17e0_rp
+    ! real(rp), parameter:: CsmagConst = 16.e0_rp * sqrt(2.e0_rp) / (3.e0_rp * Pi * Pi)
+    real(rp), parameter:: CsmagConst = 2.0e0_rp * Csmag * Csmag * sqrt(2.e0_rp) * 9.e0_rp
+    real(rp), parameter:: CWALE = 0.50e0_rp
+    real(rp), parameter:: CWALEConst = CWALE*CWALE
+    real(rp), parameter:: CvremConst = 2.5e0_rp*Csmag*Csmag
 end module ConstParams
