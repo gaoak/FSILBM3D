@@ -3,7 +3,7 @@
 # FSILBM3D
 # Copyright (C) 2025-2026 Ankang Gao and contributors
 
-CMP = gcc# intel,gcc
+CMP = gfortran# ifort,ifx,gfortran
 
 BUILD ?=
 
