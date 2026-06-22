@@ -1581,7 +1581,7 @@ module SolidSolver
             len = this%m_elements(i)%spanlen
             this%m_elements(i)%m_property(1) = this%EmR * denIn * Uref**2
             this%m_elements(i)%m_property(2) = this%m_elements(i)%m_property(1) / (2.0d0*(1.0d0+this%psR))
-            nLthck = (this%tcR*len)*Lref
+            nLthck = this%tcR*Lref
             this%m_elements(i)%m_property(3) = len * nLthck
             this%m_elements(i)%m_property(4) = this%denR*len*Lref*denIn / this%m_elements(i)%m_property(3)
             ratio = nLthck/len
@@ -1610,7 +1610,7 @@ module SolidSolver
         len = this%m_elements(1)%spanlen
         nLthck = this%m_elements(1)%m_property(3) / len
         this%EmR = this%m_elements(1)%m_property(1)/(denIn*Uref**2)
-        this%tcR = nLthck/(Lref*len)
+        this%tcR = nLthck/Lref
     endif
 
     end subroutine Beam_calculate_angle_material
