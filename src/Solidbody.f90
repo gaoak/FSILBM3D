@@ -945,7 +945,7 @@ module SolidBody
             ry = this%v_Ew(5:8,iEL)
             rz = this%v_Ew(9:12,iEL)
             forceElemTemp = this%v_Eforce(1:3,iEL)
-            ! update beam load, included momentum
+            ! update the beam loads, including the moment induced by the eccentric IB force.
             ! corresponding structural element
             iElem = this%vtor_f(iEL)
             ! translational DOFs
