@@ -363,12 +363,14 @@ $PBS_WDIR/$PBS_ENAME
    - *E_p* : Total strain energy calculated by (*E_s* + *E_b*)
    - *E_v* : Kinetic energy
    - *E_tot* : total energy calculated by (*E_p* + *E_w*)
-3. *forces.dat* :The forces exerted on the bodies
+3. *forces.dat* : The hydrodynamic forces exerted on the bodies
 4. *firstNode.dat* : The information of the first point of the bodies 
 5. *centerNode.dat.dat* : The information of the center point of the bodies 
 6. *lastNode.dat* : The information of the last point of the bodies 
 7. *nodeAverage.dat* : The average information of the all points of the bodies 
 8. *FluidFlux.dat* : the flux at inlet and outlet
+9. *moment.dat* : The total moment of the virtual-element forces about the first node of the bodies
+                  This output is disabled by default; uncomment the corresponding code to enable this output.
 
 ## Citation
 

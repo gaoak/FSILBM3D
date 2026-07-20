@@ -548,6 +548,7 @@ module SolidBody
             open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat',position='append')
             write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             close(idfile)
+            ! (Remove the "!" if moment calculation is required)
             ! open(idfile,file='./DatInfo/Group'//trim(groupNum)//'_moment.dat',position='append')
             ! write(idfile, '(A,A,A,A,I0,A,I0,A,I0,A)') ' ZONE T = "time',trim(timeName),'"',', I = ',m_numX(iGroup),', J = ',m_numY(iGroup),', K = ',m_numZ(iGroup),', f = point'
             ! close(idfile)
@@ -581,6 +582,7 @@ module SolidBody
             do iFish=order1,order2
                 call VBodies(iFish)%rbm%write_solid_info(groupNum,m_XYZo(1:3,iFish),m_Lref,m_Uref,m_Aref,m_Fref,m_Pref,m_Eref)
                 call VBodies(iFish)%rbm%write_solid_probes(groupNum,m_XYZo(1:3,iFish),solidProbingNum,solidProbingNode(1:solidProbingNum),m_Lref,m_Uref,m_Aref)
+                ! (Remove the "!" if moment calculation is required)
                 ! call VBodies(iFish)%Write_moment(groupNum, m_XYZo(1:3,iFish), m_Lref, m_Fref)
             enddo
         enddo

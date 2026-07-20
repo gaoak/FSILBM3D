@@ -126,6 +126,7 @@ module FluidDomain
 
     ! Check whether the calculation is continued
     SUBROUTINE check_is_continue(step,time,isContinue)
+        use SolidBody, only: Read_solid_cont
         implicit none
         integer,intent(out):: step
         real(8),intent(out):: time
@@ -148,6 +149,7 @@ module FluidDomain
             do iblock = 1,nblocks
                 call LBMblks_tmp(iblock)%read_continue(idfile)
             enddo
+            call Read_solid_cont(idfile)
             close(idfile)
             ! sort the blocks according to dh
             do iblock = 1,nblocks
@@ -266,6 +268,7 @@ module FluidDomain
     END SUBROUTINE
 
     SUBROUTINE write_continue_blocks(step,time)
+        use SolidBody, only: Write_solid_cont
         implicit none
         real(8):: time
         integer:: step,i,iblock
@@ -281,6 +284,7 @@ module FluidDomain
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%write_continue(idfile)
         enddo
+        call Write_solid_cont(idfile)
         close(idfile)
     END SUBROUTINE
 
