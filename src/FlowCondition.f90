@@ -159,7 +159,7 @@ module FlowCondition
             open(111,file='./DatInfo/Group'//trim(groupNum)//'_forces.dat')
             write(111,*) 'VARIABLES = "x"  "y"  "z"  "Fx"  "Fy"  "Fz"'
             close(111)
-            ! write solid moment title
+            ! write solid moment title (Remove the "!" if moment calculation is required)
             ! open(111,file='./DatInfo/Group'//trim(groupNum)//'_moment.dat')
             ! write(111,*) 'VARIABLES = "x"  "y"  "z"  "Mx"  "My"  "Mz"'
             ! close(111)
