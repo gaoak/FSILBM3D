@@ -136,6 +136,7 @@ module FluidDomain
         type(LBMBlock), allocatable :: LBMblks_tmp(:)
         integer, allocatable :: sortdh(:)
         real(8), allocatable :: coor_max(:,:)
+        integer(8) :: filePos,fileSize
         logical:: alive
         inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue .ge. 1 .and. alive) then
@@ -149,7 +150,13 @@ module FluidDomain
             do iblock = 1,nblocks
                 call LBMblks_tmp(iblock)%read_continue(idfile)
             enddo
-            call Read_solid_cont(idfile)
+            inquire(unit=idfile,pos=filePos,size=fileSize)
+            if (filePos <= fileSize) then
+                call Read_solid_cont(idfile)
+            else
+                write(*,*) 'No solid continue data found; only fluid is continued.'
+                write(*,'(A)') '========================================================='
+            endif
             close(idfile)
             ! sort the blocks according to dh
             do iblock = 1,nblocks
@@ -157,7 +164,7 @@ module FluidDomain
             enddo
             do i = 1, nblocks-1
             do j = i+1, nblocks
-                if (LBMblks_tmp(i)%dh > LBMblks_tmp(j)%dh) then
+                if (LBMblks_tmp(sortdh(i))%dh > LBMblks_tmp(sortdh(j))%dh) then
                     index_tmp = sortdh(i)
                     sortdh(i) = sortdh(j)
                     sortdh(j) = index_tmp
@@ -228,6 +235,8 @@ module FluidDomain
             enddo
             deallocate(LBMblks_tmp,sortdh,coor_max)
         else
+            step = 0
+            time = 0.0d0
             if(isContinue .ge. 1) then
                 write(*,'(A)') '========================================================='
                 write(*,*) 'Warning: the continue file is not found in DatContinue!'
