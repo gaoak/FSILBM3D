@@ -154,7 +154,7 @@ module FluidDomain
             if (filePos <= fileSize) then
                 call Read_solid_cont(idfile)
             else
-                write(*,*) 'No solid continue data found; only fluid is continued.'
+                write(*,*) 'No solid continue data found; only fluid is continued!'
                 write(*,'(A)') '========================================================='
             endif
             close(idfile)
