@@ -151,7 +151,7 @@ module FluidDomain
                 call LBMblks_tmp(iblock)%read_continue(idfile)
             enddo
             inquire(unit=idfile,pos=filePos,size=fileSize)
-            if (filePos <= fileSize) then
+            if (filePos < fileSize) then
                 call Read_solid_cont(idfile)
             else
                 write(*,*) 'No solid continue data found; only fluid is continued!'
