@@ -15,7 +15,9 @@ else ifeq ($(CMP),ifx)
 FC = ifx
 FFLAGS = -diag-disable=10448 -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32 -double-size 64
 else ifeq ($(CMP),gfortran)
-FC = gfortran
+# Site-provided libraries (notably zlib) can corrupt gfortran .mod output.
+# Use the compiler's default runtime libraries; override FC for custom toolchains.
+FC = env -u LD_LIBRARY_PATH gfortran
 FFLAGS = -O3
 ifeq ($(BUILD),debug)
 FFLAGS = -cpp -g -O0
@@ -50,6 +52,14 @@ all: FSILBM3D
 FSILBM3D : $(OBJ) $(COBJ) #$(CPPOBJ)
 	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(COBJ)
 #$(CPPOBJ)  -lstdc++
+
+# Fortran USE dependencies: source list order does not serialize make -j.
+# SolidSolver.f90 defines both SegmentStructure and SolidSolver.
+$(SRCDIR)/Solidbody.o: $(SRCDIR)/ConstParams.o $(SRCDIR)/FlowCondition.o $(SRCDIR)/SolidSolver.o
+$(SRCDIR)/FluidDomain.o: $(SRCDIR)/ConstParams.o $(SRCDIR)/FlowCondition.o $(SRCDIR)/Solidbody.o
+$(SRCDIR)/LBMBlockComm.o: $(SRCDIR)/ConstParams.o $(SRCDIR)/FlowCondition.o $(SRCDIR)/Solidbody.o $(SRCDIR)/FluidDomain.o
+$(SRCDIR)/Util.o: $(SRCDIR)/FlowCondition.o $(SRCDIR)/FluidDomain.o $(SRCDIR)/LBMBlockComm.o
+$(SRCDIR)/main.o: $(SRCDIR)/ConstParams.o $(SRCDIR)/FlowCondition.o $(SRCDIR)/Solidbody.o $(SRCDIR)/FluidDomain.o $(SRCDIR)/LBMBlockComm.o
 
 
 $(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
