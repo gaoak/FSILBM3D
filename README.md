@@ -21,15 +21,40 @@ git clone git@github.com:gaoak/FSILBM3D.git
 cd FSILBM3D
 ```
 
+The default build is the CUDA version which requires NVHPC (the version must be compatible with the CUDA version) and an NVIDIA GPU with the nvfortran compiler,the bash to install NVHPC_26.5 version (for CUDA_13.2):
+
+```bash
+# 1.download NVHPC installer
+wget https://developer.download.nvidia.com/hpc-sdk/26.5/nvhpc_2026_265_Linux_x86_64_cuda_13.2.tar.gz
+# 2.extract
+tar xpzf nvhpc_2026_265_Linux_x86_64_cuda_13.2.tar.gz
+# 3.run the installtion script
+cd nvhpc_2026_265_Linux_x86_64_cuda_13.2
+sudo ./install
+```
 To compile FSILBM3D in linux system, run
 
-```
-make
+```bash
+make                # CUDA build (GPU=1, default, -gpu=cc80)
 ```
 
-The executable file is **FSILBM3D**
+This produces the executable `FSILBM3D` in the repository root. Useful build
+variants are:
 
-The default compiler is **intel fortran**. To use a GNU gfortran compiler **gcc**, you need to change the first line in the Makefile
+```bash
+make GPU=0          # CPU-only build (gfortran + OpenMP)
+make STRICT=1  # FMA disabled, results closing to CPU-only but running slowly for comparisons
+make BUILD=debug GPU=0        # CPU debug build: bounds checks, FP traps, backtraces
+make CMP=intel GPU=0          # use ifort instead of gfortran
+make clean
+```
+
+Run `make clean` before switching between CUDA/CPU or STRICT modes (the
+Makefile does not track option changes). See `CUDA_MIGRATION_CN.md` for the
+implementation, validation results and known limitations. The Intel option
+expects the classic `ifort` compiler and its OpenMP runtime (CPU build only).
+
+To use a GNU gfortran compiler **gcc**, you need to change the first line in the Makefile
 
 ```
 CMP = intel# intel,gcc
@@ -127,7 +152,8 @@ $PBS_WDIR/$PBS_ENAME
 
 - **Parallel**
 
-  1. *npsize* : The core number used in the simulaion
+  1. *npsize* : The core number used in the simulaion.The CUDA version also need OpenMP thread.The optimal CPU core count depende on the fluid meshes (usually set at 4/2/8). 
+
 
 - **FlowCondition**
 

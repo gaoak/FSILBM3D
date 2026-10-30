@@ -1,0 +1,1882 @@
+! SPDX-License-Identifier: GPL-3.0-or-later
+! FSILBM3D CUDA Fortran backend. Double precision and column-major layout.
+! Device buffers are allocated once and reused across time steps.
+module cuda_lbm_backend
+    use cudafor
+    use ConstParams, only: lbmDim, ee, wt, positivedirs, negativedirs, oppo, Cs2, CsmagConst, CWALEConst, CvremConst
+    implicit none
+    integer, parameter, public :: BLOCK_SIZE = 128
+
+    ! Direction that mirrors direction q across the face normal. BCSymmetric
+    ! reflects only the normal component of the velocity, it is not the
+    ! bounce-back (opposite) direction. mirror_x is used on the x faces,
+    ! mirror_y on the y faces and mirror_z on the z faces.
+    integer, parameter :: mirror_x(0:lbmDim) = [0,2,1,3,4,5,6,8,7,10,9,12,11,14,13,15,16,17,18]
+    integer, parameter :: mirror_y(0:lbmDim) = [0,1,2,4,3,5,6,9,10,7,8,11,12,13,14,16,15,18,17]
+    integer, parameter :: mirror_z(0:lbmDim) = [0,1,2,3,4,6,5,7,8,9,10,13,14,11,12,17,18,15,16]
+
+    ! Device resident data of one immersed body. A carrier block may carry
+    ! several bodies, each body owns one slot of the block state.
+    type, public :: cuda_ibm_slot
+        integer(2), allocatable, device :: elem_index(:,:)
+        real(4), allocatable, device :: elem_weight(:,:)
+        real(8), allocatable, device :: elem_area(:)
+        real(8), allocatable, device :: elem_velocity(:,:)
+        real(8), allocatable, device :: elem_force(:,:)
+        real(8), allocatable, device :: elem_dforce(:,:)
+        integer :: nElem=0
+        logical :: loaded=.false.
+        logical :: area_loaded=.false.
+    end type cuda_ibm_slot
+
+    ! Device resident boundary data of one face of a son block. The father is
+    ! sampled twice per time step; the first snapshot is averaged with the
+    ! second one before the father-to-son interpolation reads it.
+    type, public :: cuda_face_source
+        real(8), allocatable, device :: f1(:,:,:), f2(:,:,:)
+        real(8), allocatable, device :: tau1(:,:), tau2(:,:)
+        integer :: bF=0, aF=0
+    end type cuda_face_source
+
+    type, public :: cuda_lbm_state
+        real(8), device, pointer :: f(:,:,:,:), f_next(:,:,:,:)
+        real(8), allocatable, device :: rho(:,:,:), u(:,:,:,:), force(:,:,:,:), uuu_ave(:,:,:,:), tau_all(:,:,:)
+        real(8), allocatable, device :: hwx1(:,:,:),hwx2(:,:,:),hwy1(:,:,:),hwy2(:,:,:),hwz1(:,:,:),hwz2(:,:,:)
+        type(cuda_ibm_slot), allocatable :: ibm(:)
+        type(cuda_face_source), allocatable :: facesrc(:)
+        real(8), allocatable, device :: d_tol(:), probebuf(:,:,:), fluxbuf(:,:,:)
+        real(8), allocatable, device :: mrt_collid(:,:), mrt_force(:,:)
+        integer, allocatable, device :: probe_idx(:,:)
+        real(4), allocatable, device :: flowbuf(:,:,:,:)
+        integer(kind=cuda_stream_kind) :: compute_stream, transfer_stream, upload_stream
+        type(cudaEvent) :: compute_event, transfer_event, comm_event, ibm_event, upload_event
+        integer :: zdim=0, ydim=0, xdim=0
+        logical :: ready=.false., statistic_ready=.false., macro_valid=.false.
+    end type cuda_lbm_state
+
+    ! Global event that keeps the IBM penalty/spread sequence of the blocks in
+    ! a fixed order even when their streams overlap. This restores the old
+    ! deterministic atomicAdd ordering without blocking the host.
+    type(cudaEvent) :: ibm_serial_event
+    logical :: ibm_serial_created = .false.
+contains
+
+    attributes(global) subroutine reset_force_kernel(force,zdim,ydim,xdim)
+        real(8), device :: force(1:zdim,1:ydim,1:xdim,1:3)
+        integer, value :: zdim,ydim,xdim
+        integer :: tid,npoints,z,y,x
+        npoints=zdim*ydim*xdim
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+        force(z,y,x,1)=0.0d0; force(z,y,x,2)=0.0d0; force(z,y,x,3)=0.0d0
+    end subroutine reset_force_kernel
+
+    attributes(global) subroutine halfway_boundary_kernel(f,cache,zdim,ydim,xdim,face,mode,cb,ca)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),cache(0:lbmDim,1:cb,1:ca)
+        integer, value :: zdim,ydim,xdim,face,mode,cb,ca
+        integer :: tid,npoints,z,y,x,q,source
+        integer :: dirs(1:5)
+        if(face==1 .or. face==2) then
+            npoints=zdim*ydim
+            if(face==1) then; dirs=[1,7,9,11,13]; else; dirs=[2,8,10,12,14]; endif
+            tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+            if(tid>npoints) return
+            z=mod(tid-1,zdim)+1; y=(tid-1)/zdim+1
+            if(face==1) then; x=1; else; x=xdim; endif
+            if(mode==0) then
+                do source=0,lbmDim; cache(source,z,y)=f(z,y,x,source); enddo
+            else
+                do q=1,5; source=dirs(q); f(z,y,x,source)=cache(oppo(source),z,y); enddo
+            endif
+        elseif(face==3 .or. face==4) then
+            npoints=zdim*xdim
+            if(face==3) then; dirs=[3,7,8,15,17]; else; dirs=[4,9,10,16,18]; endif
+            tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+            if(tid>npoints) return
+            z=mod(tid-1,zdim)+1; x=(tid-1)/zdim+1
+            if(face==3) then; y=1; else; y=ydim; endif
+            if(mode==0) then
+                do source=0,lbmDim; cache(source,z,x)=f(z,y,x,source); enddo
+            else
+                do q=1,5; source=dirs(q); f(z,y,x,source)=cache(oppo(source),z,x); enddo
+            endif
+        else
+            npoints=ydim*xdim
+            if(face==5) then; dirs=[5,11,12,15,16]; else; dirs=[6,13,14,17,18]; endif
+            tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+            if(tid>npoints) return
+            y=mod(tid-1,ydim)+1; x=(tid-1)/ydim+1
+            if(face==5) then; z=1; else; z=zdim; endif
+            if(mode==0) then
+                do source=0,lbmDim; cache(source,y,x)=f(z,y,x,source); enddo
+            else
+                do q=1,5; source=dirs(q); f(z,y,x,source)=cache(oppo(source),y,x); enddo
+            endif
+        endif
+    end subroutine halfway_boundary_kernel
+
+    attributes(global) subroutine general_boundary_kernel(f,rho,u,zdim,ydim,xdim,face,bc,den_in,vin1,vin2,vin3,shear1,shear2,shear3,velocity_kind,time,xmin,ymin,zmin,dh)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),rho(1:zdim,1:ydim,1:xdim),u(1:zdim,1:ydim,1:xdim,1:3)
+        integer, value :: zdim,ydim,xdim,face,bc,velocity_kind
+        real(8), value :: den_in,vin1,vin2,vin3,shear1,shear2,shear3,time,xmin,ymin,zmin,dh
+        integer :: tid,npoints,z,y,x,q,source,inner_x,inner_y,inner_z
+        logical :: incoming
+        real(8) :: wall(1:3),coord_x,coord_y,coord_z,uxy,uu2,eu,feq(0:lbmDim),finner(0:lbmDim),den0
+        if(face==1 .or. face==2) then; npoints=zdim*ydim
+        elseif(face==3 .or. face==4) then; npoints=zdim*xdim
+        else; npoints=ydim*xdim
+        endif
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        if(face==1 .or. face==2) then
+            z=mod(tid-1,zdim)+1; y=(tid-1)/zdim+1; if(face==1) then; x=1; else; x=xdim; endif
+        elseif(face==3 .or. face==4) then
+            z=mod(tid-1,zdim)+1; x=(tid-1)/zdim+1; if(face==3) then; y=1; else; y=ydim; endif
+        else
+            y=mod(tid-1,ydim)+1; x=(tid-1)/ydim+1; if(face==5) then; z=1; else; z=zdim; endif
+        endif
+        inner_x=x; inner_y=y; inner_z=z
+        if(face==1) inner_x=2; if(face==2) inner_x=xdim-1
+        if(face==3) inner_y=2; if(face==4) inner_y=ydim-1
+        if(face==5) inner_z=2; if(face==6) inner_z=zdim-1
+        coord_x=xmin+dh*dble(x-1); coord_y=ymin+dh*dble(y-1); coord_z=zmin+dh*dble(z-1)
+        wall(1)=vin1; wall(2)=vin2; wall(3)=vin3
+        if(velocity_kind==0) then
+            wall(1)=vin1+coord_y*shear2+coord_z*shear3
+            wall(2)=vin2+coord_x*shear1+coord_z*shear3
+            wall(3)=vin3+coord_x*shear1+coord_y*shear2
+        elseif(velocity_kind==2) then
+            wall(1)=vin1+shear1*dcos(2.0d0*3.141592653589793d0*shear2*time+shear3/180.0d0*3.141592653589793d0)
+        endif
+        do q=0,lbmDim
+            incoming=.false.
+            if(face==1 .and. ee(q,1)>0) incoming=.true.; if(face==2 .and. ee(q,1)<0) incoming=.true.
+            if(face==3 .and. ee(q,2)>0) incoming=.true.; if(face==4 .and. ee(q,2)<0) incoming=.true.
+            if(face==5 .and. ee(q,3)>0) incoming=.true.; if(face==6 .and. ee(q,3)<0) incoming=.true.
+            if(bc/=101 .and. .not.incoming) cycle
+            if(bc==102) then
+                den0=rho(inner_z,inner_y,inner_x); uxy=u(inner_z,inner_y,inner_x,1)**2+u(inner_z,inner_y,inner_x,2)**2+u(inner_z,inner_y,inner_x,3)**2
+                feq(q)=wt(q)*den_in*(1.0d0+3.0d0*(wall(1)*ee(q,1)+wall(2)*ee(q,2)+wall(3)*ee(q,3))+4.5d0*(wall(1)*ee(q,1)+wall(2)*ee(q,2)+wall(3)*ee(q,3))**2-1.5d0*(wall(1)**2+wall(2)**2+wall(3)**2))
+                eu=u(inner_z,inner_y,inner_x,1)*dble(ee(q,1))+u(inner_z,inner_y,inner_x,2)*dble(ee(q,2))+u(inner_z,inner_y,inner_x,3)*dble(ee(q,3))
+                finner(q)=wt(q)*den0*(1.0d0+3.0d0*eu+4.5d0*eu*eu-1.5d0*uxy)
+                f(z,y,x,q)=feq(q)+(f(inner_z,inner_y,inner_x,q)-finner(q))
+            elseif(bc==101) then
+                eu=wall(1)*dble(ee(q,1))+wall(2)*dble(ee(q,2))+wall(3)*dble(ee(q,3))
+                f(z,y,x,q)=wt(q)*den_in*(1.0d0+3.0d0*eu+4.5d0*eu*eu-1.5d0*(wall(1)**2+wall(2)**2+wall(3)**2))
+            elseif(bc==202) then
+                eu=wall(1)*dble(ee(q,1))+wall(2)*dble(ee(q,2))+wall(3)*dble(ee(q,3))
+                f(z,y,x,q)=f(z,y,x,oppo(q))+6.0d0*wt(q)*den_in*eu
+            endif
+        enddo
+    end subroutine general_boundary_kernel
+
+    attributes(global) subroutine moving_halfway_apply_kernel(f,cache,zdim,ydim,xdim,face,den_in,vin1,vin2,vin3,shear1,shear2,shear3,velocity_kind,time,xmin,ymin,zmin,dh,cb,ca)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),cache(0:lbmDim,1:cb,1:ca)
+        integer, value :: zdim,ydim,xdim,face,velocity_kind,cb,ca
+        real(8), value :: den_in,vin1,vin2,vin3,shear1,shear2,shear3,time,xmin,ymin,zmin,dh
+        integer :: tid,npoints,z,y,x,q,source
+        integer :: dirs(1:5)
+        real(8) :: wall(1:3),cx,cy,cz,eu
+        if(face==1 .or. face==2) then; npoints=zdim*ydim; if(face==1) then; dirs=[1,7,9,11,13]; else; dirs=[2,8,10,12,14]; endif
+        elseif(face==3 .or. face==4) then; npoints=zdim*xdim; if(face==3) then; dirs=[3,7,8,15,17]; else; dirs=[4,9,10,16,18]; endif
+        else; npoints=ydim*xdim; if(face==5) then; dirs=[5,11,12,15,16]; else; dirs=[6,13,14,17,18]; endif
+        endif
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        if(face==1 .or. face==2) then; z=mod(tid-1,zdim)+1; y=(tid-1)/zdim+1; if(face==1) then; x=1; else; x=xdim; endif
+        elseif(face==3 .or. face==4) then; z=mod(tid-1,zdim)+1; x=(tid-1)/zdim+1; if(face==3) then; y=1; else; y=ydim; endif
+        else; y=mod(tid-1,ydim)+1; x=(tid-1)/ydim+1; if(face==5) then; z=1; else; z=zdim; endif
+        endif
+        cx=xmin+dh*dble(x-1); cy=ymin+dh*dble(y-1); cz=zmin+dh*dble(z-1)
+        if(face==1) cx=cx-dh*0.5d0; if(face==2) cx=cx+dh*0.5d0
+        if(face==3) cy=cy-dh*0.5d0; if(face==4) cy=cy+dh*0.5d0
+        if(face==5) cz=cz-dh*0.5d0; if(face==6) cz=cz+dh*0.5d0
+        wall(1)=vin1; wall(2)=vin2; wall(3)=vin3
+        if(velocity_kind==0) then
+            wall(1)=vin1+cy*shear2+cz*shear3; wall(2)=vin2+cx*shear1+cz*shear3; wall(3)=vin3+cx*shear1+cy*shear2
+        elseif(velocity_kind==2) then
+            wall(1)=vin1+shear1*dcos(2.0d0*3.141592653589793d0*shear2*time+shear3/180.0d0*3.141592653589793d0)
+        endif
+        if(face==1 .or. face==2) then
+            do q=1,5; source=dirs(q); eu=wall(1)*dble(ee(source,1))+wall(2)*dble(ee(source,2))+wall(3)*dble(ee(source,3)); f(z,y,x,source)=cache(oppo(source),z,y)+6.0d0*wt(source)*den_in*eu; enddo
+        elseif(face==3 .or. face==4) then
+            do q=1,5; source=dirs(q); eu=wall(1)*dble(ee(source,1))+wall(2)*dble(ee(source,2))+wall(3)*dble(ee(source,3)); f(z,y,x,source)=cache(oppo(source),z,x)+6.0d0*wt(source)*den_in*eu; enddo
+        else
+            do q=1,5; source=dirs(q); eu=wall(1)*dble(ee(source,1))+wall(2)*dble(ee(source,2))+wall(3)*dble(ee(source,3)); f(z,y,x,source)=cache(oppo(source),y,x)+6.0d0*wt(source)*den_in*eu; enddo
+        endif
+    end subroutine moving_halfway_apply_kernel
+
+    ! Copy the region of a father face that lies under one son into a compact
+    ! device buffer. Both arrays are device arrays of the same GPU, so this is
+    ! a pure device-to-device transfer; nothing goes through the host.
+    !   face 1/2: b = z, a = y, fixed x
+    !   face 3/4: b = z, a = x, fixed y
+    !   face 5/6: b = y, a = x, fixed z
+    attributes(global) subroutine extract_face_kernel(fsrc,dst_f,dst_tau,tau_src,zdim,ydim,xdim,face,fixed,off_b,off_a,bF,aF)
+        real(8), device :: fsrc(1:zdim,1:ydim,1:xdim,0:lbmDim),dst_f(0:lbmDim,1:bF,1:aF)
+        real(8), device :: dst_tau(1:bF,1:aF),tau_src(1:zdim,1:ydim,1:xdim)
+        integer, value :: zdim,ydim,xdim,face,fixed,off_b,off_a,bF,aF
+        integer :: tid,b,a,z,y,x,q
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>bF*aF) return
+        b=mod(tid-1,bF)+1; a=(tid-1)/bF+1
+        if(face==1 .or. face==2) then
+            z=b+off_b; y=a+off_a; x=fixed
+        elseif(face==3 .or. face==4) then
+            z=b+off_b; x=a+off_a; y=fixed
+        else
+            y=b+off_b; x=a+off_a; z=fixed
+        endif
+        do q=0,lbmDim; dst_f(q,b,a)=fsrc(z,y,x,q); enddo
+        dst_tau(b,a)=tau_src(z,y,x)
+    end subroutine extract_face_kernel
+
+    ! dst = 0.5*(dst+src), used for the time interpolation between the two
+    ! father snapshots of a time step.
+    attributes(global) subroutine average_face_f_kernel(a,b,bF,aF)
+        real(8), device :: a(0:lbmDim,1:bF,1:aF),b(0:lbmDim,1:bF,1:aF)
+        integer, value :: bF,aF
+        integer :: tid,npoints,q,bb,aa
+        npoints=(lbmDim+1)*bF*aF
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        q=mod(tid-1,lbmDim+1)
+        bb=mod((tid-1)/(lbmDim+1),bF)+1
+        aa=(tid-1)/((lbmDim+1)*bF)+1
+        a(q,bb,aa)=0.5d0*(a(q,bb,aa)+b(q,bb,aa))
+    end subroutine average_face_f_kernel
+
+    attributes(global) subroutine average_face_tau_kernel(a,b,bF,aF)
+        real(8), device :: a(1:bF,1:aF),b(1:bF,1:aF)
+        integer, value :: bF,aF
+        integer :: tid,bb,aa
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>bF*aF) return
+        bb=mod(tid-1,bF)+1; aa=(tid-1)/bF+1
+        a(bb,aa)=0.5d0*(a(bb,aa)+b(bb,aa))
+    end subroutine average_face_tau_kernel
+
+    ! Dupuis-Chopard transformation of the distribution function, same
+    ! operation as fIn_GridTransform on the host.
+    attributes(device) subroutine transform_f_lbm(f,coeff,volumeForce,dh)
+        real(8), intent(inout) :: f(0:lbmDim)
+        real(8), intent(in) :: coeff,volumeForce(3),dh
+        integer :: q
+        real(8) :: den,ux,uy,uz,uSqr,uxyz,feq
+        den=0.0d0; ux=0.0d0; uy=0.0d0; uz=0.0d0
+        do q=0,lbmDim
+            den=den+f(q)
+            ux=ux+f(q)*dble(ee(q,1))
+            uy=uy+f(q)*dble(ee(q,2))
+            uz=uz+f(q)*dble(ee(q,3))
+        enddo
+        ux=(ux+0.5d0*volumeForce(1)*dh)/den
+        uy=(uy+0.5d0*volumeForce(2)*dh)/den
+        uz=(uz+0.5d0*volumeForce(3)*dh)/den
+        uSqr=ux*ux+uy*uy+uz*uz
+        do q=0,lbmDim
+            uxyz=ux*dble(ee(q,1))+uy*dble(ee(q,2))+uz*dble(ee(q,3))
+            feq=wt(q)*den*(1.0d0-1.5d0*uSqr+uxyz*(3.0d0+4.5d0*uxyz))
+            f(q)=feq+coeff*(f(q)-feq)
+        enddo
+    end subroutine transform_f_lbm
+
+    ! Copy one coarse point of the son boundary layer into the father grid
+    ! (fine-to-coarse step). Every ratio-th son node is used.
+    attributes(global) subroutine deliver_face_kernel(fS,tauS,fF,tauF,zdimS,ydimS,xdimS,zdimF,ydimF,xdimF, &
+                                                      face,ib0,jb0,ia0,ja0,iS,iF,nb,na,ratio,vfx,vfy,vfz,dh)
+        real(8), device :: fS(1:zdimS,1:ydimS,1:xdimS,0:lbmDim),fF(1:zdimF,1:ydimF,1:xdimF,0:lbmDim)
+        real(8), device :: tauS(1:zdimS,1:ydimS,1:xdimS),tauF(1:zdimF,1:ydimF,1:xdimF)
+        integer, value :: zdimS,ydimS,xdimS,zdimF,ydimF,xdimF,face,ib0,jb0,ia0,ja0,iS,iF,nb,na,ratio
+        real(8), value :: vfx,vfy,vfz,dh
+        integer :: tid,ib,ia,zS,yS,xS,zF,yF,xF,q
+        real(8) :: tmp(0:lbmDim),coeff,vf(3)
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>nb*na) return
+        ib=mod(tid-1,nb)+1; ia=(tid-1)/nb+1
+        if(face==1 .or. face==2) then
+            zS=ib0+(ib-1)*ratio; yS=ia0+(ia-1)*ratio; xS=iS
+            zF=jb0+(ib-1);       yF=ja0+(ia-1);       xF=iF
+        elseif(face==3 .or. face==4) then
+            zS=ib0+(ib-1)*ratio; xS=ia0+(ia-1)*ratio; yS=iS
+            zF=jb0+(ib-1);       xF=ja0+(ia-1);       yF=iF
+        else
+            yS=ib0+(ib-1)*ratio; xS=ia0+(ia-1)*ratio; zS=iS
+            yF=jb0+(ib-1);       xF=ja0+(ia-1);       zF=iF
+        endif
+        vf(1)=vfx; vf(2)=vfy; vf(3)=vfz
+        do q=0,lbmDim; tmp(q)=fS(zS,yS,xS,q); enddo
+        coeff=(tauF(zF,yF,xF)/tauS(zS,yS,xS))*dble(ratio)
+        call transform_f_lbm(tmp,coeff,vf,dh)
+        do q=0,lbmDim; fF(zF,yF,xF,q)=tmp(q); enddo
+    end subroutine deliver_face_kernel
+
+    attributes(global) subroutine zero_scalar_kernel(x)
+        real(8), device :: x(1)
+        if(blockIdx%x==1 .and. threadIdx%x==1) x(1)=0.0d0
+    end subroutine zero_scalar_kernel
+
+    ! Pack the three x planes needed by the flux diagnostic. u and rho are
+    ! contiguous in (z,y) for a fixed x, so the host only receives 6 planes
+    ! instead of the whole macroscopic field.
+    attributes(global) subroutine pack_flux_planes_kernel(u,rho,buf,zdim,ydim,xdim,ixmid)
+        real(8), device :: u(1:zdim,1:ydim,1:xdim,1:3),rho(1:zdim,1:ydim,1:xdim),buf(1:6,1:zdim,1:ydim)
+        integer, value :: zdim,ydim,xdim,ixmid
+        integer :: tid,k,j
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>zdim*ydim) return
+        k=mod(tid-1,zdim)+1
+        j=(tid-1)/zdim+1
+        buf(1,k,j)=u(k,j,1,1)
+        buf(2,k,j)=rho(k,j,1)
+        buf(3,k,j)=u(k,j,ixmid,1)
+        buf(4,k,j)=rho(k,j,ixmid)
+        buf(5,k,j)=u(k,j,xdim,1)
+        buf(6,k,j)=rho(k,j,xdim)
+    end subroutine pack_flux_planes_kernel
+
+    ! Clear the element-force accumulator on the device. This is equivalent
+    ! to cudaMemsetAsync, which this NVHPC build cannot resolve for a device
+    ! array, and applies to rigid and deformable bodies alike.
+    attributes(global) subroutine zero_ibm_force_kernel(force,nElem)
+        real(8), device :: force(1:3,1:nElem)
+        integer, value :: nElem
+        integer :: i
+        i=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(i>nElem) return
+        force(1,i)=0.0d0
+        force(2,i)=0.0d0
+        force(3,i)=0.0d0
+    end subroutine zero_ibm_force_kernel
+
+    ! Pack the 2x2x2 velocity stencils of all probes in one launch.
+    ! The position order matches grid_value_interpolation exactly.
+    attributes(global) subroutine pack_probes_kernel(u,idx,buf,nprobe,zdim,ydim,xdim)
+        real(8), device :: u(1:zdim,1:ydim,1:xdim,1:3),buf(1:8,1:3,1:nprobe)
+        integer, device :: idx(1:3,1:nprobe)
+        integer, value :: nprobe,zdim,ydim,xdim
+        integer :: t,ip,c,pos,x1,y1,z1,x2,y2,z2
+        t=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(t>24*nprobe) return
+        ip=(t-1)/24+1
+        pos=mod(t-1,8)+1
+        c=(t-1)/8-3*(ip-1)+1
+        x1=idx(1,ip); y1=idx(2,ip); z1=idx(3,ip)
+        x2=x1+1; y2=y1+1; z2=z1+1
+        select case(pos)
+        case(1); buf(pos,c,ip)=u(z1,y1,x1,c)
+        case(2); buf(pos,c,ip)=u(z2,y1,x1,c)
+        case(3); buf(pos,c,ip)=u(z1,y2,x1,c)
+        case(4); buf(pos,c,ip)=u(z1,y1,x2,c)
+        case(5); buf(pos,c,ip)=u(z2,y2,x1,c)
+        case(6); buf(pos,c,ip)=u(z2,y1,x2,c)
+        case(7); buf(pos,c,ip)=u(z1,y2,x2,c)
+        case(8); buf(pos,c,ip)=u(z2,y2,x2,c)
+        end select
+    end subroutine pack_probes_kernel
+
+    attributes(global) subroutine add_uniform_force_kernel(force,zdim,ydim,xdim,fx,fy,fz)
+        real(8), device :: force(1:zdim,1:ydim,1:xdim,1:3)
+        integer, value :: zdim,ydim,xdim
+        real(8), value :: fx,fy,fz
+        integer :: tid,npoints,z,y,x
+        npoints=zdim*ydim*xdim
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        z=mod(tid-1,zdim)+1
+        y=mod((tid-1)/zdim,ydim)+1
+        x=(tid-1)/(zdim*ydim)+1
+        force(z,y,x,1)=force(z,y,x,1)+fx
+        force(z,y,x,2)=force(z,y,x,2)+fy
+        force(z,y,x,3)=force(z,y,x,3)+fz
+    end subroutine add_uniform_force_kernel
+
+    ! First pass of one penalty iteration: compute every element force from
+    ! the current (pre-correction) velocity. This matches the CPU two-loop
+    ! structure, so no element sees a neighbour's correction.
+    attributes(global) subroutine ibm_penalty_force_kernel(u,elem_index,elem_weight,elem_velocity,elem_area,elem_force,elem_dforce,nElem,zdim,ydim,xdim,tolerance)
+        real(8), device :: u(1:zdim,1:ydim,1:xdim,1:3)
+        integer(2), device :: elem_index(1:12,1:nElem)
+        real(4), device :: elem_weight(1:12,1:nElem)
+        real(8), device :: elem_velocity(1:3,1:nElem),elem_area(1:nElem),elem_force(1:3,1:nElem),elem_dforce(1:3,1:nElem)
+        real(8), device :: tolerance(1)
+        integer, value :: nElem,zdim,ydim,xdim
+        integer :: tid,iEL,ix,iy,iz,wx,wy,wz
+        real(8) :: vel_ib(1:3),delta(1:3),local_force(1:3),weight,atomic_old
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>nElem) return
+        iEL=tid
+        vel_ib=0.0d0
+        do wx=1,4
+            ix=elem_index(wx,iEL)
+            do wy=1,4
+                iy=elem_index(wy+4,iEL)
+                do wz=1,4
+                    iz=elem_index(wz+8,iEL)
+                    weight=dble(elem_weight(wx,iEL))*dble(elem_weight(wy+4,iEL))*dble(elem_weight(wz+8,iEL))
+                    vel_ib(1)=vel_ib(1)+u(iz,iy,ix,1)*weight
+                    vel_ib(2)=vel_ib(2)+u(iz,iy,ix,2)*weight
+                    vel_ib(3)=vel_ib(3)+u(iz,iy,ix,3)*weight
+                enddo
+            enddo
+        enddo
+        delta(1)=elem_velocity(1,iEL)-vel_ib(1)
+        delta(2)=elem_velocity(2,iEL)-vel_ib(2)
+        delta(3)=elem_velocity(3,iEL)-vel_ib(3)
+        local_force(1)=delta(1)*elem_area(iEL)
+        local_force(2)=delta(2)*elem_area(iEL)
+        local_force(3)=delta(3)*elem_area(iEL)
+        elem_force(1,iEL)=elem_force(1,iEL)+local_force(1)
+        elem_force(2,iEL)=elem_force(2,iEL)+local_force(2)
+        elem_force(3,iEL)=elem_force(3,iEL)+local_force(3)
+        elem_dforce(1,iEL)=local_force(1)
+        elem_dforce(2,iEL)=local_force(2)
+        elem_dforce(3,iEL)=local_force(3)
+        atomic_old=atomicadd(tolerance(1),dabs(delta(1))+dabs(delta(2))+dabs(delta(3)))
+    end subroutine ibm_penalty_force_kernel
+
+    ! Second pass: apply the corrections computed above. Only writes u.
+    attributes(global) subroutine ibm_penalty_apply_kernel(u,elem_index,elem_weight,elem_dforce,nElem,zdim,ydim,xdim,invh3)
+        real(8), device :: u(1:zdim,1:ydim,1:xdim,1:3)
+        integer(2), device :: elem_index(1:12,1:nElem)
+        real(4), device :: elem_weight(1:12,1:nElem)
+        real(8), device :: elem_dforce(1:3,1:nElem)
+        integer, value :: nElem,zdim,ydim,xdim
+        real(8), value :: invh3
+        integer :: tid,iEL,ix,iy,iz,wx,wy,wz
+        real(8) :: weight,atomic_old
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>nElem) return
+        iEL=tid
+        do wx=1,4
+            ix=elem_index(wx,iEL)
+            do wy=1,4
+                iy=elem_index(wy+4,iEL)
+                do wz=1,4
+                    iz=elem_index(wz+8,iEL)
+                    weight=dble(elem_weight(wx,iEL))*dble(elem_weight(wy+4,iEL))*dble(elem_weight(wz+8,iEL))*invh3
+                    atomic_old=atomicadd(u(iz,iy,ix,1),-elem_dforce(1,iEL)*weight)
+                    atomic_old=atomicadd(u(iz,iy,ix,2),-elem_dforce(2,iEL)*weight)
+                    atomic_old=atomicadd(u(iz,iy,ix,3),-elem_dforce(3,iEL)*weight)
+                enddo
+            enddo
+        enddo
+    end subroutine ibm_penalty_apply_kernel
+
+    attributes(global) subroutine ibm_spread_force_kernel(force,elem_index,elem_weight,elem_force,nElem,zdim,ydim,xdim,invh3)
+        real(8), device :: force(1:zdim,1:ydim,1:xdim,1:3),elem_force(1:3,1:nElem)
+        integer(2), device :: elem_index(1:12,1:nElem)
+        real(4), device :: elem_weight(1:12,1:nElem)
+        integer, value :: nElem,zdim,ydim,xdim
+        real(8), value :: invh3
+        integer :: tid,iEL,ix,iy,iz,wx,wy,wz
+        real(8) :: weight,atomic_old
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>nElem) return
+        iEL=tid
+        do wx=1,4
+            ix=elem_index(wx,iEL)
+            do wy=1,4
+                iy=elem_index(wy+4,iEL)
+                do wz=1,4
+                    iz=elem_index(wz+8,iEL)
+                    weight=dble(elem_weight(wx,iEL))*dble(elem_weight(wy+4,iEL))*dble(elem_weight(wz+8,iEL))*invh3
+                    atomic_old=atomicadd(force(iz,iy,ix,1),-elem_force(1,iEL)*weight)
+                    atomic_old=atomicadd(force(iz,iy,ix,2),-elem_force(2,iEL)*weight)
+                    atomic_old=atomicadd(force(iz,iy,ix,3),-elem_force(3,iEL)*weight)
+                enddo
+            enddo
+        enddo
+    end subroutine ibm_spread_force_kernel
+
+    attributes(device) integer function wrap_index(index_value,n)
+        integer, value :: index_value,n
+        wrap_index=mod(index_value-1,n)+1
+    end function wrap_index
+
+    attributes(device) real(8) function interp4_line(values,target,nTarget,nSource)
+        real(8), device :: values(:)
+        integer, value :: target,nTarget,nSource
+        integer :: bStmp,b,b1
+        bStmp=nTarget
+        if(mod(nTarget,2)==0) bStmp=nTarget-1
+        if(mod(target,2)==1) then
+            b=(target+1)/2
+            interp4_line=values(wrap_index(b,nSource))
+        elseif(target==nTarget .and. mod(nTarget,2)==0) then
+            interp4_line=-0.0625d0*values(wrap_index((bStmp-2+1)/2,nSource))+0.5625d0*values(wrap_index((bStmp+1)/2,nSource))+0.5625d0*values(1)-0.0625d0*values(2)
+        else
+            b=(target-1)/2+1
+            b1=b
+            if(target==2) then
+                interp4_line=0.375d0*values(wrap_index(b1,nSource))+0.75d0*values(wrap_index(b1+1,nSource))-0.125d0*values(wrap_index(b1+2,nSource))
+            elseif(target==bStmp-1) then
+                interp4_line=0.375d0*values(wrap_index(b1+1,nSource))+0.75d0*values(wrap_index(b1,nSource))-0.125d0*values(wrap_index(b1-1,nSource))
+            else
+                interp4_line=-0.0625d0*values(wrap_index(b1-1,nSource))+0.5625d0*values(wrap_index(b1,nSource))+0.5625d0*values(wrap_index(b1+1,nSource))-0.0625d0*values(wrap_index(b1+2,nSource))
+            endif
+        endif
+    end function interp4_line
+
+    ! Same weights as interp4_line, but the 1D line is the second dimension of
+    ! the 3D face buffer. nvfortran cannot pass the strided section
+    ! source_f(q,:,ia) to a device subprogram, so the two fixed indices are
+    ! passed separately.
+    attributes(device) real(8) function interp4_face(values,iq,ia,target,nTarget,nSource,nA)
+        real(8), device :: values(0:lbmDim,1:nSource,1:nA)
+        integer, value :: iq,ia,target,nTarget,nSource,nA
+        integer :: bStmp,b,b1
+        bStmp=nTarget
+        if(mod(nTarget,2)==0) bStmp=nTarget-1
+        if(mod(target,2)==1) then
+            b=(target+1)/2
+            interp4_face=values(iq,wrap_index(b,nSource),ia)
+        elseif(target==nTarget .and. mod(nTarget,2)==0) then
+            interp4_face=-0.0625d0*values(iq,wrap_index((bStmp-2+1)/2,nSource),ia)+0.5625d0*values(iq,wrap_index((bStmp+1)/2,nSource),ia)+0.5625d0*values(iq,1,ia)-0.0625d0*values(iq,2,ia)
+        else
+            b=(target-1)/2+1
+            b1=b
+            if(target==2) then
+                interp4_face=0.375d0*values(iq,wrap_index(b1,nSource),ia)+0.75d0*values(iq,wrap_index(b1+1,nSource),ia)-0.125d0*values(iq,wrap_index(b1+2,nSource),ia)
+            elseif(target==bStmp-1) then
+                interp4_face=0.375d0*values(iq,wrap_index(b1+1,nSource),ia)+0.75d0*values(iq,wrap_index(b1,nSource),ia)-0.125d0*values(iq,wrap_index(b1-1,nSource),ia)
+            else
+                interp4_face=-0.0625d0*values(iq,wrap_index(b1-1,nSource),ia)+0.5625d0*values(iq,wrap_index(b1,nSource),ia)+0.5625d0*values(iq,wrap_index(b1+1,nSource),ia)-0.0625d0*values(iq,wrap_index(b1+2,nSource),ia)
+            endif
+        endif
+    end function interp4_face
+
+    attributes(global) subroutine interpolate_face_kernel(f,target_tau,source_f,source_tau,zdim,ydim,xdim,bF,aF,bS,aS,face,fixed,ratio,scheme,fx,fy,fz,dh)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),target_tau(1:zdim,1:ydim,1:xdim)
+        real(8), device :: source_f(0:lbmDim,1:bF,1:aF),source_tau(1:bF,1:aF)
+        integer, value :: zdim,ydim,xdim,bF,aF,bS,aS,face,fixed,ratio,scheme
+        real(8), value :: fx,fy,fz,dh
+        integer :: tid,a,b,q,z,y,x,bc,ac,bcn,acn
+        real(8) :: dist(0:lbmDim),den,ux,uy,uz,u2,eu,feq,source_value,source_tau_value,coeff
+        real(8) :: line(-1:2),tau_line(-1:2)
+        if(face==1 .or. face==2) then
+            tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+            if(tid>bS*aS) return
+            b=mod(tid-1,bS)+1; a=(tid-1)/bS+1; z=b; y=a; x=fixed
+        else if(face==3 .or. face==4) then
+            tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+            if(tid>bS*aS) return
+            b=mod(tid-1,bS)+1; a=(tid-1)/bS+1; z=b; y=fixed; x=a
+        else
+            tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+            if(tid>bS*aS) return
+            b=mod(tid-1,bS)+1; a=(tid-1)/bS+1; z=fixed; y=b; x=a
+        endif
+        bc=(b+1)/2; ac=(a+1)/2
+        bcn=bc+1; acn=ac+1
+        if(bcn>bF) bcn=1
+        if(acn>aF) acn=1
+        do q=0,lbmDim
+            if(scheme==2) then
+                if(mod(a,2)==1) then
+                    source_value=interp4_face(source_f,q,ac,b,bS,bF,aF)
+                else
+                    line(-1)=interp4_face(source_f,q,wrap_index(ac-1,aF),b,bS,bF,aF)
+                    line(0)=interp4_face(source_f,q,wrap_index(ac,aF),b,bS,bF,aF)
+                    line(1)=interp4_face(source_f,q,wrap_index(ac+1,aF),b,bS,bF,aF)
+                    line(2)=interp4_face(source_f,q,wrap_index(ac+2,aF),b,bS,bF,aF)
+                    if(a==aS .and. mod(aS,2)==0) then
+                        source_value=-0.0625d0*line(-1)+0.5625d0*line(0)+0.5625d0*line(1)-0.0625d0*line(2)
+                    elseif(a==2) then
+                        source_value=0.375d0*line(0)+0.75d0*line(1)-0.125d0*line(2)
+                    elseif(a==aS-1) then
+                        source_value=0.375d0*line(1)+0.75d0*line(0)-0.125d0*line(-1)
+                    else
+                        source_value=-0.0625d0*line(-1)+0.5625d0*line(0)+0.5625d0*line(1)-0.0625d0*line(2)
+                    endif
+                endif
+            elseif(mod(b,2)==1 .and. mod(a,2)==1) then
+                source_value=source_f(q,bc,ac)
+            elseif(mod(b,2)==0 .and. mod(a,2)==1) then
+                source_value=0.5d0*(source_f(q,bc,ac)+source_f(q,bcn,ac))
+            elseif(mod(b,2)==1 .and. mod(a,2)==0) then
+                source_value=0.5d0*(source_f(q,bc,ac)+source_f(q,bc,acn))
+            else
+                source_value=0.25d0*(source_f(q,bc,ac)+source_f(q,bcn,ac)+source_f(q,bc,acn)+source_f(q,bcn,acn))
+            endif
+            dist(q)=source_value
+        enddo
+        if(scheme==2) then
+            if(mod(a,2)==1) then
+                source_tau_value=interp4_line(source_tau(:,ac),b,bS,bF)
+            else
+                tau_line(-1)=interp4_line(source_tau(:,wrap_index(ac-1,aF)),b,bS,bF)
+                tau_line(0)=interp4_line(source_tau(:,wrap_index(ac,aF)),b,bS,bF)
+                tau_line(1)=interp4_line(source_tau(:,wrap_index(ac+1,aF)),b,bS,bF)
+                tau_line(2)=interp4_line(source_tau(:,wrap_index(ac+2,aF)),b,bS,bF)
+                if(a==aS .and. mod(aS,2)==0) then
+                    source_tau_value=-0.0625d0*tau_line(-1)+0.5625d0*tau_line(0)+0.5625d0*tau_line(1)-0.0625d0*tau_line(2)
+                elseif(a==2) then
+                    source_tau_value=0.375d0*tau_line(0)+0.75d0*tau_line(1)-0.125d0*tau_line(2)
+                elseif(a==aS-1) then
+                    source_tau_value=0.375d0*tau_line(1)+0.75d0*tau_line(0)-0.125d0*tau_line(-1)
+                else
+                    source_tau_value=-0.0625d0*tau_line(-1)+0.5625d0*tau_line(0)+0.5625d0*tau_line(1)-0.0625d0*tau_line(2)
+                endif
+            endif
+        elseif(mod(b,2)==1 .and. mod(a,2)==1) then
+            source_tau_value=source_tau(bc,ac)
+        elseif(mod(b,2)==0 .and. mod(a,2)==1) then
+            source_tau_value=0.5d0*(source_tau(bc,ac)+source_tau(bcn,ac))
+        elseif(mod(b,2)==1 .and. mod(a,2)==0) then
+            source_tau_value=0.5d0*(source_tau(bc,ac)+source_tau(bc,acn))
+        else
+            source_tau_value=0.25d0*(source_tau(bc,ac)+source_tau(bcn,ac)+source_tau(bc,acn)+source_tau(bcn,acn))
+        endif
+        den=0.0d0
+        ux=0.0d0
+        uy=0.0d0
+        uz=0.0d0
+        do q=0,lbmDim
+            den=den+dist(q)
+            ux=ux+dist(q)*dble(ee(q,1))
+            uy=uy+dist(q)*dble(ee(q,2))
+            uz=uz+dist(q)*dble(ee(q,3))
+        enddo
+        ux=(ux+0.5d0*fx*dh)/den; uy=(uy+0.5d0*fy*dh)/den; uz=(uz+0.5d0*fz*dh)/den
+        u2=ux*ux+uy*uy+uz*uz
+        coeff=(target_tau(z,y,x)/source_tau_value)/dble(ratio)
+        do q=0,lbmDim
+            eu=ux*dble(ee(q,1))+uy*dble(ee(q,2))+uz*dble(ee(q,3))
+            feq=wt(q)*den*(1.0d0-1.5d0*u2+eu*(3.0d0+4.5d0*eu))
+            f(z,y,x,q)=feq+coeff*(dist(q)-feq)
+        enddo
+    end subroutine interpolate_face_kernel
+
+    attributes(global) subroutine static_boundary_kernel(f,zdim,ydim,xdim,face,bc)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim)
+        integer, value :: zdim,ydim,xdim,face,bc
+        integer :: tid,npoints,z,y,x,q,source_x,source_y,source_z
+        logical :: incoming
+        if(face==1 .or. face==2) then
+            npoints=zdim*ydim
+        elseif(face==3 .or. face==4) then
+            npoints=zdim*xdim
+        else
+            npoints=ydim*xdim
+        endif
+        tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        if(face==1 .or. face==2) then
+            z=mod(tid-1,zdim)+1
+            y=(tid-1)/zdim+1
+            if(face==1) then; x=1; else; x=xdim; endif
+        elseif(face==3 .or. face==4) then
+            z=mod(tid-1,zdim)+1
+            x=(tid-1)/zdim+1
+            if(face==3) then; y=1; else; y=ydim; endif
+        else
+            y=mod(tid-1,ydim)+1
+            x=(tid-1)/ydim+1
+            if(face==5) then; z=1; else; z=zdim; endif
+        endif
+        do q=1,lbmDim
+            incoming=.false.
+            if(face==1 .and. ee(q,1)>0) incoming=.true.
+            if(face==2 .and. ee(q,1)<0) incoming=.true.
+            if(face==3 .and. ee(q,2)>0) incoming=.true.
+            if(face==4 .and. ee(q,2)<0) incoming=.true.
+            if(face==5 .and. ee(q,3)>0) incoming=.true.
+            if(face==6 .and. ee(q,3)<0) incoming=.true.
+            if(.not.incoming) cycle
+            source_x=x
+            source_y=y
+            source_z=z
+            if(bc==201 .or. bc==203) then
+                f(z,y,x,q)=f(source_z,source_y,source_x,oppo(q))
+            elseif(bc==302) then
+                if(face==1 .or. face==2) then
+                    f(z,y,x,q)=f(source_z,source_y,source_x,mirror_x(q))
+                elseif(face==3 .or. face==4) then
+                    f(z,y,x,q)=f(source_z,source_y,source_x,mirror_y(q))
+                else
+                    f(z,y,x,q)=f(source_z,source_y,source_x,mirror_z(q))
+                endif
+            elseif(bc==103) then
+                if(face==1) source_x=2
+                if(face==2) source_x=xdim-1
+                if(face==3) source_y=2
+                if(face==4) source_y=ydim-1
+                if(face==5) source_z=2
+                if(face==6) source_z=zdim-1
+                f(z,y,x,q)=f(source_z,source_y,source_x,q)
+            elseif(bc==104) then
+                if(face==1) f(z,y,x,q)=2.0d0*f(z,y,2,q)-f(z,y,3,q)
+                if(face==2) f(z,y,x,q)=2.0d0*f(z,y,xdim-1,q)-f(z,y,xdim-2,q)
+                if(face==3) f(z,y,x,q)=2.0d0*f(z,2,x,q)-f(z,3,x,q)
+                if(face==4) f(z,y,x,q)=2.0d0*f(z,ydim-1,x,q)-f(z,ydim-2,x,q)
+                if(face==5) f(z,y,x,q)=2.0d0*f(2,y,x,q)-f(3,y,x,q)
+                if(face==6) f(z,y,x,q)=2.0d0*f(zdim-1,y,x,q)-f(zdim-2,y,x,q)
+            endif
+        enddo
+    end subroutine static_boundary_kernel
+    attributes(global) subroutine macro_kernel(f,rho,u,zdim,ydim,xdim,fx,fy,fz,dh)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),rho(1:zdim,1:ydim,1:xdim),u(1:zdim,1:ydim,1:xdim,1:3)
+        integer, value :: zdim,ydim,xdim
+        real(8), value :: fx,fy,fz,dh
+        integer :: z,y,x,q,tid,npoints
+        real(8) :: den,ux,uy,uz
+        npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+        den=0.0d0; ux=0.0d0; uy=0.0d0; uz=0.0d0
+        do q=0,lbmDim
+            den=den+f(z,y,x,q)
+            ux=ux+f(z,y,x,q)*dble(ee(q,1)); uy=uy+f(z,y,x,q)*dble(ee(q,2)); uz=uz+f(z,y,x,q)*dble(ee(q,3))
+        enddo
+        rho(z,y,x)=den; u(z,y,x,1)=(ux+0.5d0*fx*dh)/den; u(z,y,x,2)=(uy+0.5d0*fy*dh)/den; u(z,y,x,3)=(uz+0.5d0*fz*dh)/den
+    end subroutine macro_kernel
+
+    attributes(global) subroutine turbulent_statistic_kernel(u,uuu_ave,zdim,ydim,xdim,invStep)
+        real(8), device :: u(1:zdim,1:ydim,1:xdim,1:3),uuu_ave(1:zdim,1:ydim,1:xdim,1:9)
+        integer, value :: zdim,ydim,xdim
+        real(8), value :: invStep
+        integer :: tid,npoints,z,y,x
+        real(8) :: ux,uy,uz,du, dv, dw
+        npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+        ux=u(z,y,x,1); uy=u(z,y,x,2); uz=u(z,y,x,3)
+        uuu_ave(z,y,x,1)=uuu_ave(z,y,x,1)*(1.0d0-invStep)+invStep*ux
+        uuu_ave(z,y,x,2)=uuu_ave(z,y,x,2)*(1.0d0-invStep)+invStep*uy
+        uuu_ave(z,y,x,3)=uuu_ave(z,y,x,3)*(1.0d0-invStep)+invStep*uz
+        du=ux-uuu_ave(z,y,x,1); dv=uy-uuu_ave(z,y,x,2); dw=uz-uuu_ave(z,y,x,3)
+        uuu_ave(z,y,x,4)=uuu_ave(z,y,x,4)*(1.0d0-invStep)+invStep*du*du
+        uuu_ave(z,y,x,5)=uuu_ave(z,y,x,5)*(1.0d0-invStep)+invStep*dv*dv
+        uuu_ave(z,y,x,6)=uuu_ave(z,y,x,6)*(1.0d0-invStep)+invStep*dw*dw
+        uuu_ave(z,y,x,7)=uuu_ave(z,y,x,7)*(1.0d0-invStep)+invStep*du*dv
+        uuu_ave(z,y,x,8)=uuu_ave(z,y,x,8)*(1.0d0-invStep)+invStep*du*dw
+        uuu_ave(z,y,x,9)=uuu_ave(z,y,x,9)*(1.0d0-invStep)+invStep*dv*dw
+    end subroutine turbulent_statistic_kernel
+
+    attributes(global) subroutine collision_kernel(f,rho,u,force,zdim,ydim,xdim,model,omega,omega2,dh)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),rho(1:zdim,1:ydim,1:xdim),u(1:zdim,1:ydim,1:xdim,1:3),force(1:zdim,1:ydim,1:xdim,1:3)
+        integer, value :: zdim,ydim,xdim,model
+        real(8), value :: omega,omega2,dh
+        integer :: z,y,x,q,k,p,n,tid,npoints,local_tid
+        real(8), shared :: block_rho(BLOCK_SIZE),block_u(BLOCK_SIZE,1:3),block_force(BLOCK_SIZE,1:3)
+        real(8) :: eu,u2,feq(0:lbmDim),flb(0:lbmDim),old(0:lbmDim),even,odd
+        npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        local_tid=threadIdx%x
+        if(tid<=npoints) then
+            z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+            block_rho(local_tid)=rho(z,y,x)
+            block_u(local_tid,1)=u(z,y,x,1); block_u(local_tid,2)=u(z,y,x,2); block_u(local_tid,3)=u(z,y,x,3)
+            block_force(local_tid,1)=force(z,y,x,1); block_force(local_tid,2)=force(z,y,x,2); block_force(local_tid,3)=force(z,y,x,3)
+        else
+            block_rho(local_tid)=0.0d0; block_u(local_tid,1:3)=0.0d0; block_force(local_tid,1:3)=0.0d0
+        endif
+        call syncthreads()
+        if(tid>npoints) return
+        u2=block_u(local_tid,1)**2+block_u(local_tid,2)**2+block_u(local_tid,3)**2
+        do q=0,lbmDim
+            old(q)=f(z,y,x,q); eu=block_u(local_tid,1)*dble(ee(q,1))+block_u(local_tid,2)*dble(ee(q,2))+block_u(local_tid,3)*dble(ee(q,3))
+            feq(q)=wt(q)*block_rho(local_tid)*(1.0d0-1.5d0*u2+eu*(3.0d0+4.5d0*eu))-old(q)
+            flb(q)=3.0d0*dh*wt(q)*((dble(ee(q,1))-block_u(local_tid,1)+3.0d0*eu*dble(ee(q,1)))*block_force(local_tid,1)+(dble(ee(q,2))-block_u(local_tid,2)+3.0d0*eu*dble(ee(q,2)))*block_force(local_tid,2)+(dble(ee(q,3))-block_u(local_tid,3)+3.0d0*eu*dble(ee(q,3)))*block_force(local_tid,3))
+        enddo
+        if(model==1) then
+            do q=0,lbmDim; f(z,y,x,q)=old(q)+omega*feq(q)+(1.0d0-0.5d0*omega)*flb(q); enddo
+        elseif(model==2) then
+            f(z,y,x,0)=old(0)+omega*feq(0)+(1.0d0-0.5d0*omega)*flb(0)
+            do k=1,lbmDim/2
+                p=positivedirs(k); n=negativedirs(k); even=0.5d0*omega*(feq(p)+feq(n))+(0.5d0-0.25d0*omega)*(flb(p)+flb(n)); odd=0.5d0*omega2*(feq(p)-feq(n))+(0.5d0-0.25d0*omega2)*(flb(p)-flb(n)); f(z,y,x,p)=old(p)+even+odd; f(z,y,x,n)=old(n)+even-odd
+            enddo
+        endif
+    end subroutine collision_kernel
+
+    attributes(device) function center_diff(g1,g2,invdx)
+        real(8) :: center_diff,g1,g2,invdx
+        center_diff=(g1-g2)*invdx
+    end function center_diff
+
+    attributes(device) function onesid_diff(g1,g2,g3,invdx)
+        real(8) :: onesid_diff,g1,g2,g3,invdx
+        onesid_diff=(-3.0d0*g1+4.0d0*g2-g3)*invdx
+    end function onesid_diff
+
+    ! MRT collision. The two 19x19 matrices are computed on the host by
+    ! calculate_MRT_params and uploaded once per block (cuda_backend_set_mrt).
+    attributes(global) subroutine collision_mrt_kernel(f,rho,u,force,mcollid,mforce,zdim,ydim,xdim,dh)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),rho(1:zdim,1:ydim,1:xdim),u(1:zdim,1:ydim,1:xdim,1:3),force(1:zdim,1:ydim,1:xdim,1:3)
+        real(8), device :: mcollid(0:lbmDim,0:lbmDim),mforce(0:lbmDim,0:lbmDim)
+        integer, value :: zdim,ydim,xdim
+        real(8), value :: dh
+        integer :: z,y,x,q,k,tid,npoints,local_tid
+        real(8), shared :: block_rho(BLOCK_SIZE),block_u(BLOCK_SIZE,1:3),block_force(BLOCK_SIZE,1:3)
+        real(8) :: eu,u2,old(0:lbmDim),feq(0:lbmDim),flb(0:lbmDim),tmp1,tmp2
+        npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        local_tid=threadIdx%x
+        if(tid<=npoints) then
+            z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+            block_rho(local_tid)=rho(z,y,x)
+            block_u(local_tid,1)=u(z,y,x,1); block_u(local_tid,2)=u(z,y,x,2); block_u(local_tid,3)=u(z,y,x,3)
+            block_force(local_tid,1)=force(z,y,x,1); block_force(local_tid,2)=force(z,y,x,2); block_force(local_tid,3)=force(z,y,x,3)
+        else
+            block_rho(local_tid)=0.0d0; block_u(local_tid,1:3)=0.0d0; block_force(local_tid,1:3)=0.0d0
+        endif
+        call syncthreads()
+        if(tid>npoints) return
+        u2=block_u(local_tid,1)**2+block_u(local_tid,2)**2+block_u(local_tid,3)**2
+        do q=0,lbmDim
+            old(q)=f(z,y,x,q)
+            eu=block_u(local_tid,1)*dble(ee(q,1))+block_u(local_tid,2)*dble(ee(q,2))+block_u(local_tid,3)*dble(ee(q,3))
+            feq(q)=wt(q)*block_rho(local_tid)*(1.0d0-1.5d0*u2+eu*(3.0d0+4.5d0*eu))-old(q)
+            flb(q)=3.0d0*dh*wt(q)*((dble(ee(q,1))-block_u(local_tid,1)+3.0d0*eu*dble(ee(q,1)))*block_force(local_tid,1)+(dble(ee(q,2))-block_u(local_tid,2)+3.0d0*eu*dble(ee(q,2)))*block_force(local_tid,2)+(dble(ee(q,3))-block_u(local_tid,3)+3.0d0*eu*dble(ee(q,3)))*block_force(local_tid,3))
+        enddo
+        do q=0,lbmDim
+            tmp1=0.0d0; tmp2=0.0d0
+            do k=0,lbmDim
+                tmp1=tmp1+mcollid(q,k)*feq(k)
+                tmp2=tmp2+mforce(q,k)*flb(k)
+            enddo
+            f(z,y,x,q)=old(q)+tmp1+tmp2
+        enddo
+    end subroutine collision_mrt_kernel
+
+    ! LES collision models 11 (Smagorinsky), 12 (regularised BGK),
+    ! 14 (WALE), 15 (Vreman). These follow the CPU collision_ branch
+    ! exactly, including the CPU's invdh=dh in WALE/Vreman and the
+    ! zero-initialised Flb coefficient in model 12.
+    attributes(global) subroutine collision_les_kernel(f,rho,u,force,tau_all,model,omega,dh,tau_base,nu,zdim,ydim,xdim)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),rho(1:zdim,1:ydim,1:xdim),u(1:zdim,1:ydim,1:xdim,1:3),force(1:zdim,1:ydim,1:xdim,1:3)
+        real(8), device :: tau_all(1:zdim,1:ydim,1:xdim)
+        integer, value :: model,zdim,ydim,xdim
+        real(8), value :: omega,dh,tau_base,nu
+        integer :: z,y,x,q,tid,npoints,local_tid
+        real(8), shared :: block_rho(BLOCK_SIZE),block_u(BLOCK_SIZE,1:3),block_force(BLOCK_SIZE,1:3)
+        real(8) :: eu,u2,old(0:lbmDim),feq(0:lbmDim),flb(0:lbmDim),fneq(0:lbmDim)
+        real(8) :: Q11,Q12,Q13,Q22,Q23,Q33,Qn,tau_t,tau_old,tau_new,omega_eff
+        real(8) :: S11,S12,S13,S22,S23,S33,S
+        real(8) :: ox,oy,oz,O12,O13,O23,O,SO11,SO12,SO13,SO22,SO23,SO33,SO,SdSd,OP
+        real(8) :: a11,a12,a13,a21,a22,a23,a31,a32,a33
+        real(8) :: b11,b12,b13,b21,b22,b23,b31,b32,b33,aa,bb
+        real(8) :: invdh
+        npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        local_tid=threadIdx%x
+        if(tid<=npoints) then
+            z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+            block_rho(local_tid)=rho(z,y,x)
+            block_u(local_tid,1)=u(z,y,x,1); block_u(local_tid,2)=u(z,y,x,2); block_u(local_tid,3)=u(z,y,x,3)
+            block_force(local_tid,1)=force(z,y,x,1); block_force(local_tid,2)=force(z,y,x,2); block_force(local_tid,3)=force(z,y,x,3)
+        else
+            block_rho(local_tid)=0.0d0; block_u(local_tid,1:3)=0.0d0; block_force(local_tid,1:3)=0.0d0
+        endif
+        call syncthreads()
+        if(tid>npoints) return
+        u2=block_u(local_tid,1)**2+block_u(local_tid,2)**2+block_u(local_tid,3)**2
+        do q=0,lbmDim
+            old(q)=f(z,y,x,q)
+            eu=block_u(local_tid,1)*dble(ee(q,1))+block_u(local_tid,2)*dble(ee(q,2))+block_u(local_tid,3)*dble(ee(q,3))
+            feq(q)=wt(q)*block_rho(local_tid)*(1.0d0-1.5d0*u2+eu*(3.0d0+4.5d0*eu))-old(q)
+            flb(q)=3.0d0*dh*wt(q)*((dble(ee(q,1))-block_u(local_tid,1)+3.0d0*eu*dble(ee(q,1)))*block_force(local_tid,1)+(dble(ee(q,2))-block_u(local_tid,2)+3.0d0*eu*dble(ee(q,2)))*block_force(local_tid,2)+(dble(ee(q,3))-block_u(local_tid,3)+3.0d0*eu*dble(ee(q,3)))*block_force(local_tid,3))
+            fneq(q)=-feq(q)
+        enddo
+        if(model==11) then
+            Q11=fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22=fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33=fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q12=fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13=fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23=fneq(15)-fneq(16)-fneq(17)+fneq(18)
+            Qn=Q11*Q11+Q22*Q22+Q33*Q33+2.0d0*(Q12*Q12+Q13*Q13+Q23*Q23)
+            tau_t=dsqrt(tau_base*tau_base+CsmagConst*dsqrt(Qn)/block_rho(local_tid))
+            tau_all(z,y,x)=0.5d0*(tau_base+tau_t)
+            omega_eff=2.0d0/(tau_base+tau_t)
+        elseif(model==14) then
+            Q11=fneq(1)+fneq(2)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(11)+fneq(12)+fneq(13)+fneq(14)
+            Q22=fneq(3)+fneq(4)+fneq(7)+fneq(8)+fneq(9)+fneq(10)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q33=fneq(5)+fneq(6)+fneq(11)+fneq(12)+fneq(13)+fneq(14)+fneq(15)+fneq(16)+fneq(17)+fneq(18)
+            Q12=fneq(7)-fneq(8)-fneq(9)+fneq(10)
+            Q13=fneq(11)-fneq(12)-fneq(13)+fneq(14)
+            Q23=fneq(15)-fneq(16)-fneq(17)+fneq(18)
+            invdh=dh
+            tau_old=tau_all(z,y,x)
+            S11=-1.5d0*invdh*Q11/(block_rho(local_tid)*tau_old)
+            S22=-1.5d0*invdh*Q22/(block_rho(local_tid)*tau_old)
+            S33=-1.5d0*invdh*Q33/(block_rho(local_tid)*tau_old)
+            S12=-1.5d0*invdh*Q12/(block_rho(local_tid)*tau_old)
+            S13=-1.5d0*invdh*Q13/(block_rho(local_tid)*tau_old)
+            S23=-1.5d0*invdh*Q23/(block_rho(local_tid)*tau_old)
+            S=S11*S11+S22*S22+S33*S33+2.0d0*(S12*S12+S13*S13+S23*S23)
+            ox=0.0d0; oy=0.0d0; oz=0.0d0
+            if(y>1 .and. y<ydim) then
+                ox=center_diff(u(z,y+1,x,3),u(z,y-1,x,3),invdh)
+            elseif(y==1) then
+                ox=onesid_diff(u(z,y,x,3),u(z,y+1,x,3),u(z,y+2,x,3),invdh)
+            else
+                ox=onesid_diff(u(z,y,x,3),u(z,y-1,x,3),u(z,y-2,x,3),invdh)
+            endif
+            if(z>1 .and. z<zdim) then
+                ox=0.5d0*(ox-center_diff(u(z+1,y,x,2),u(z-1,y,x,2),invdh))
+            elseif(z==1) then
+                ox=0.5d0*(ox-onesid_diff(u(z,y,x,2),u(z+1,y,x,2),u(z+2,y,x,2),invdh))
+            else
+                ox=0.5d0*(ox-onesid_diff(u(z,y,x,2),u(z-1,y,x,2),u(z-2,y,x,2),invdh))
+            endif
+            if(z>1 .and. z<zdim) then
+                oy=center_diff(u(z+1,y,x,1),u(z-1,y,x,1),invdh)
+            elseif(z==1) then
+                oy=onesid_diff(u(z,y,x,1),u(z+1,y,x,1),u(z+2,y,x,1),invdh)
+            else
+                oy=onesid_diff(u(z,y,x,1),u(z-1,y,x,1),u(z-2,y,x,1),invdh)
+            endif
+            if(x>1 .and. x<xdim) then
+                oy=0.5d0*(oy-center_diff(u(z,y,x+1,3),u(z,y,x-1,3),invdh))
+            elseif(x==1) then
+                oy=0.5d0*(oy-onesid_diff(u(z,y,x,3),u(z,y,x+1,3),u(z,y,x+2,3),invdh))
+            else
+                oy=0.5d0*(oy-onesid_diff(u(z,y,x,3),u(z,y,x-1,3),u(z,y,x-2,3),invdh))
+            endif
+            if(x>1 .and. x<xdim) then
+                oz=center_diff(u(z,y,x+1,2),u(z,y,x-1,2),invdh)
+            elseif(x==1) then
+                oz=onesid_diff(u(z,y,x,2),u(z,y,x+1,2),u(z,y,x+2,2),invdh)
+            else
+                oz=onesid_diff(u(z,y,x,2),u(z,y,x-1,2),u(z,y,x-2,2),invdh)
+            endif
+            if(y>1 .and. y<ydim) then
+                oz=0.5d0*(oz-center_diff(u(z,y+1,x,1),u(z,y-1,x,1),invdh))
+            elseif(y==1) then
+                oz=0.5d0*(oz-onesid_diff(u(z,y,x,1),u(z,y+1,x,1),u(z,y+2,x,1),invdh))
+            else
+                oz=0.5d0*(oz-onesid_diff(u(z,y,x,1),u(z,y-1,x,1),u(z,y-2,x,1),invdh))
+            endif
+            O12=-0.5d0*oz; O13=0.5d0*oy; O23=-0.5d0*ox
+            O=2.0d0*(O12*O12+O23*O23+O13*O13)
+            SO11=-(0.0d0+S11*S11*O12*O12+S11*S11*O13*O13+ &
+                   0.0d0+S12*S12*O12*O12+S12*S12*O13*O13+ &
+                   0.0d0+S13*S13*O12*O12+S13*S13*O13*O13)
+            SO22=-(S12*S12*O12*O12+0.0d0+S12*S12*O23*O23+ &
+                   S22*S22*O12*O12+0.0d0+S22*S22*O23*O23+ &
+                   S23*S23*O12*O12+0.0d0+S23*S23*O23*O23)
+            SO33=-(S13*S13*O13*O13+S13*S13*O23*O23+0.0d0+ &
+                   S23*S23*O13*O13+S23*S23*O23*O23+0.0d0+ &
+                   S33*S33*O13*O13+S33*S33*O23*O23+0.0d0)
+            SO12=-(0.0d0+0.0d0+S11*S12*O13*O23+ &
+                   0.0d0+0.0d0+S12*S22*O13*O23+ &
+                   0.0d0+0.0d0+S13*S23*O13*O23)
+            SO13=(0.0d0+S11*S13*O12*O23+0.0d0+ &
+                  0.0d0+S12*S23*O12*O23+0.0d0+ &
+                  0.0d0+S13*S33*O12*O23+0.0d0)
+            SO23=-(S12*S13*O12*O13+0.0d0+0.0d0+ &
+                   S22*S23*O12*O13+0.0d0+0.0d0+ &
+                   S23*S33*O12*O13+0.0d0+0.0d0)
+            SO=SO11+SO22+SO33+2.0d0*(SO12+SO13+SO23)
+            SdSd=(S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2.0d0*SO
+            OP=SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
+            if(OP/=OP .or. OP<0.0d0 .or. OP>1.0d300) OP=0.0d0
+            tau_new=(nu+CWALEConst*OP*dh*dh)/(dh*Cs2)+0.5d0
+            tau_all(z,y,x)=tau_new
+            omega_eff=1.0d0/tau_new
+        elseif(model==15) then
+            invdh=dh
+            if(x>1 .and. x<xdim) then
+                a11=0.5d0*center_diff(u(z,y,x+1,1),u(z,y,x-1,1),invdh)
+                a21=0.5d0*center_diff(u(z,y,x+1,2),u(z,y,x-1,2),invdh)
+                a31=0.5d0*center_diff(u(z,y,x+1,3),u(z,y,x-1,3),invdh)
+            elseif(x==1) then
+                a11=0.5d0*onesid_diff(u(z,y,x,1),u(z,y,x+1,1),u(z,y,x+2,1),invdh)
+                a21=0.5d0*onesid_diff(u(z,y,x,2),u(z,y,x+1,2),u(z,y,x+2,2),invdh)
+                a31=0.5d0*onesid_diff(u(z,y,x,3),u(z,y,x+1,3),u(z,y,x+2,3),invdh)
+            else
+                a11=0.5d0*onesid_diff(u(z,y,x,1),u(z,y,x-1,1),u(z,y,x-2,1),invdh)
+                a21=0.5d0*onesid_diff(u(z,y,x,2),u(z,y,x-1,2),u(z,y,x-2,2),invdh)
+                a31=0.5d0*onesid_diff(u(z,y,x,3),u(z,y,x-1,3),u(z,y,x-2,3),invdh)
+            endif
+            if(y>1 .and. y<ydim) then
+                a12=0.5d0*center_diff(u(z,y+1,x,1),u(z,y-1,x,1),invdh)
+                a22=0.5d0*center_diff(u(z,y+1,x,2),u(z,y-1,x,2),invdh)
+                a32=0.5d0*center_diff(u(z,y+1,x,3),u(z,y-1,x,3),invdh)
+            elseif(y==1) then
+                a12=0.5d0*onesid_diff(u(z,y,x,1),u(z,y+1,x,1),u(z,y+2,x,1),invdh)
+                a22=0.5d0*onesid_diff(u(z,y,x,2),u(z,y+1,x,2),u(z,y+2,x,2),invdh)
+                a32=0.5d0*onesid_diff(u(z,y,x,3),u(z,y+1,x,3),u(z,y+2,x,3),invdh)
+            else
+                a12=0.5d0*onesid_diff(u(z,y,x,1),u(z,y-1,x,1),u(z,y-2,x,1),invdh)
+                a22=0.5d0*onesid_diff(u(z,y,x,2),u(z,y-1,x,2),u(z,y-2,x,2),invdh)
+                a32=0.5d0*onesid_diff(u(z,y,x,3),u(z,y-1,x,3),u(z,y-2,x,3),invdh)
+            endif
+            if(z>1 .and. z<zdim) then
+                a13=0.5d0*center_diff(u(z+1,y,x,1),u(z-1,y,x,1),invdh)
+                a23=0.5d0*center_diff(u(z+1,y,x,2),u(z-1,y,x,2),invdh)
+                a33=0.5d0*center_diff(u(z+1,y,x,3),u(z-1,y,x,3),invdh)
+            elseif(z==1) then
+                a13=0.5d0*onesid_diff(u(z,y,x,1),u(z+1,y,x,1),u(z+2,y,x,1),invdh)
+                a23=0.5d0*onesid_diff(u(z,y,x,2),u(z+1,y,x,2),u(z+2,y,x,2),invdh)
+                a33=0.5d0*onesid_diff(u(z,y,x,3),u(z+1,y,x,3),u(z+2,y,x,3),invdh)
+            else
+                a13=0.5d0*onesid_diff(u(z,y,x,1),u(z-1,y,x,1),u(z-2,y,x,1),invdh)
+                a23=0.5d0*onesid_diff(u(z,y,x,2),u(z-1,y,x,2),u(z-2,y,x,2),invdh)
+                a33=0.5d0*onesid_diff(u(z,y,x,3),u(z-1,y,x,3),u(z-2,y,x,3),invdh)
+            endif
+            b11=a11*a11; b12=a12*a12; b13=a13*a13
+            b21=a21*a21; b22=a22*a22; b23=a23*a23
+            b31=a31*a31; b32=a32*a32; b33=a33*a33
+            aa=b11+b12+b13+b21+b22+b23+b31+b32+b33
+            bb=(b11+b12+b13)*(b21+b22+b23)-(a11*a21+a12*a22+a13*a23)*(a11*a21+a12*a22+a13*a23)+ &
+               (b11+b12+b13)*(b31+b32+b33)-(a11*a31+a12*a32+a13*a33)*(a11*a31+a12*a32+a13*a33)+ &
+               (b21+b22+b23)*(b31+b32+b33)-(a21*a31+a22*a32+a23*a33)*(a21*a31+a22*a32+a23*a33)
+            OP=dsqrt(bb/aa)
+            if(OP/=OP .or. OP>1.0d300) OP=0.0d0
+            tau_new=(nu+CvremConst*OP*dh*dh)/(dh*Cs2)+0.5d0
+            tau_all(z,y,x)=tau_new
+            omega_eff=1.0d0/tau_new
+        endif
+        do q=0,lbmDim
+            f(z,y,x,q)=old(q)+omega_eff*feq(q)+(1.0d0-0.5d0*omega_eff)*flb(q)
+        enddo
+    end subroutine collision_les_kernel
+
+    ! SRT collision in a single pass. The generic kernel above keeps
+    ! old/feq/flb arrays which the compiler places in local memory because the
+    ! direction index is dynamic; for model 1 each direction is independent,
+    ! so the same arithmetic can be done with scalars as the direction is
+    ! visited. This removes the local-memory traffic of the dominant kernel.
+    attributes(global) subroutine collision_srt_kernel(f,rho,u,force,zdim,ydim,xdim,omega,dh)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),rho(1:zdim,1:ydim,1:xdim),u(1:zdim,1:ydim,1:xdim,1:3),force(1:zdim,1:ydim,1:xdim,1:3)
+        integer, value :: zdim,ydim,xdim
+        real(8), value :: omega,dh
+        integer :: z,y,x,q,tid,npoints,local_tid
+        real(8), shared :: block_rho(BLOCK_SIZE),block_u(BLOCK_SIZE,1:3),block_force(BLOCK_SIZE,1:3)
+        real(8) :: eu,u2,oldq,feq,flb
+        npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        local_tid=threadIdx%x
+        if(tid<=npoints) then
+            z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+            block_rho(local_tid)=rho(z,y,x)
+            block_u(local_tid,1)=u(z,y,x,1); block_u(local_tid,2)=u(z,y,x,2); block_u(local_tid,3)=u(z,y,x,3)
+            block_force(local_tid,1)=force(z,y,x,1); block_force(local_tid,2)=force(z,y,x,2); block_force(local_tid,3)=force(z,y,x,3)
+        else
+            block_rho(local_tid)=0.0d0; block_u(local_tid,1:3)=0.0d0; block_force(local_tid,1:3)=0.0d0
+        endif
+        call syncthreads()
+        if(tid>npoints) return
+        u2=block_u(local_tid,1)**2+block_u(local_tid,2)**2+block_u(local_tid,3)**2
+        do q=0,lbmDim
+            oldq=f(z,y,x,q)
+            eu=block_u(local_tid,1)*dble(ee(q,1))+block_u(local_tid,2)*dble(ee(q,2))+block_u(local_tid,3)*dble(ee(q,3))
+            feq=wt(q)*block_rho(local_tid)*(1.0d0-1.5d0*u2+eu*(3.0d0+4.5d0*eu))-oldq
+            flb=3.0d0*dh*wt(q)*((dble(ee(q,1))-block_u(local_tid,1)+3.0d0*eu*dble(ee(q,1)))*block_force(local_tid,1)+(dble(ee(q,2))-block_u(local_tid,2)+3.0d0*eu*dble(ee(q,2)))*block_force(local_tid,2)+(dble(ee(q,3))-block_u(local_tid,3)+3.0d0*eu*dble(ee(q,3)))*block_force(local_tid,3))
+            f(z,y,x,q)=oldq+omega*feq+(1.0d0-0.5d0*omega)*flb
+        enddo
+    end subroutine collision_srt_kernel
+
+    ! Streaming pulls every distribution function from its upwind neighbour.
+    ! Threads are mapped to a contiguous run of the flattened (z,y,x) grid, so
+    ! consecutive threads read consecutive z values and the z-direction
+    ! neighbours are naturally coalesced. No shared-memory halo is used: the
+    ! flattened thread index does not stay inside one (y,x) line when the
+    ! block spans several lines or when zdim is not a multiple of BLOCK_SIZE,
+    ! so a shared halo would mix rows.
+    attributes(global) subroutine stream_kernel(f,f_next,zdim,ydim,xdim)
+        real(8), device :: f(1:zdim,1:ydim,1:xdim,0:lbmDim),f_next(1:zdim,1:ydim,1:xdim,0:lbmDim)
+        integer, value :: zdim,ydim,xdim
+        integer :: z,y,x,q,zn,yn,xn,tid,npoints
+        npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
+        do q=0,lbmDim
+            zn=mod(z-1-ee(q,3)+zdim,zdim)+1
+            yn=mod(y-1-ee(q,2)+ydim,ydim)+1
+            xn=mod(x-1-ee(q,1)+xdim,xdim)+1
+            f_next(z,y,x,q)=f(zn,yn,xn,q)
+        enddo
+    end subroutine stream_kernel
+
+    subroutine check_cuda(ierr,where)
+        integer, intent(in) :: ierr
+        character(*), intent(in) :: where
+        if(ierr/=0) then; write(*,*) 'CUDA error in ',trim(where),':',ierr; stop; endif
+    end subroutine check_cuda
+
+    subroutine cuda_backend_init(state,zdim,ydim,xdim,f,rho,u,force,tau_host)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: zdim,ydim,xdim
+        real(8), intent(in) :: f(zdim,ydim,xdim,0:lbmDim),rho(zdim,ydim,xdim),u(zdim,ydim,xdim,1:3),force(zdim,ydim,xdim,1:3),tau_host(zdim,ydim,xdim)
+        integer :: ierr
+        if(state%ready) return
+        state%zdim=zdim; state%ydim=ydim; state%xdim=xdim
+        state%statistic_ready=.false.
+        allocate(state%f(zdim,ydim,xdim,0:lbmDim),state%f_next(zdim,ydim,xdim,0:lbmDim),state%rho(zdim,ydim,xdim),state%u(zdim,ydim,xdim,1:3),state%force(zdim,ydim,xdim,1:3),state%uuu_ave(zdim,ydim,xdim,1:9),state%tau_all(zdim,ydim,xdim))
+        allocate(state%d_tol(1),state%fluxbuf(6,zdim,ydim)); state%d_tol=0.0d0
+        allocate(state%mrt_collid(0:lbmDim,0:lbmDim),state%mrt_force(0:lbmDim,0:lbmDim))
+        ierr=cudaStreamCreate(state%compute_stream); call check_cuda(ierr,'compute stream'); ierr=cudaStreamCreate(state%transfer_stream); call check_cuda(ierr,'transfer stream')
+        ierr=cudaStreamCreate(state%upload_stream); call check_cuda(ierr,'upload stream')
+        ierr=cudaEventCreate(state%compute_event); call check_cuda(ierr,'compute event')
+        ierr=cudaEventCreate(state%transfer_event); call check_cuda(ierr,'transfer event')
+        ierr=cudaEventCreate(state%comm_event); call check_cuda(ierr,'comm event')
+        ierr=cudaEventCreate(state%ibm_event); call check_cuda(ierr,'IBM event')
+        ierr=cudaEventCreate(state%upload_event); call check_cuda(ierr,'upload event')
+        if(.not.ibm_serial_created) then
+            ierr=cudaEventCreate(ibm_serial_event); call check_cuda(ierr,'IBM serial event')
+            ibm_serial_created=.true.
+        endif
+        ierr=cudaMemcpyAsync(state%f,f,size(f,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'initial f')
+        ierr=cudaMemcpyAsync(state%rho,rho,size(rho,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'initial rho')
+        ierr=cudaMemcpyAsync(state%u,u,size(u,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'initial u')
+        ierr=cudaMemcpyAsync(state%force,force,size(force,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'initial force')
+        ierr=cudaMemcpyAsync(state%tau_all,tau_host,size(tau_host,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'initial tau')
+        state%uuu_ave=0.0d0
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'initial event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'initial sync'); state%ready=.true.
+    end subroutine cuda_backend_init
+
+    subroutine cuda_backend_finalize(state)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer :: ierr,i
+        if(.not.state%ready) return
+        ierr=cudaDeviceSynchronize(); ierr=cudaEventDestroy(state%compute_event); ierr=cudaEventDestroy(state%transfer_event); ierr=cudaEventDestroy(state%comm_event)
+        ierr=cudaStreamDestroy(state%compute_stream); ierr=cudaStreamDestroy(state%transfer_stream); ierr=cudaStreamDestroy(state%upload_stream)
+        ierr=cudaEventDestroy(state%ibm_event); ierr=cudaEventDestroy(state%upload_event)
+        deallocate(state%f,state%f_next,state%rho,state%u,state%force,state%uuu_ave,state%tau_all)
+        if(allocated(state%d_tol)) deallocate(state%d_tol)
+        if(allocated(state%probebuf)) deallocate(state%probebuf)
+        if(allocated(state%probe_idx)) deallocate(state%probe_idx)
+        if(allocated(state%flowbuf)) deallocate(state%flowbuf)
+        if(allocated(state%fluxbuf)) deallocate(state%fluxbuf)
+        if(allocated(state%mrt_collid)) deallocate(state%mrt_collid,state%mrt_force)
+        call cuda_backend_ibm_clear(state)
+        if(allocated(state%ibm)) deallocate(state%ibm)
+        if(allocated(state%facesrc)) then
+            do i=1,size(state%facesrc)
+                call cuda_backend_clear_facesrc(state%facesrc(i))
+            enddo
+            deallocate(state%facesrc)
+        endif
+        if(allocated(state%hwx1)) deallocate(state%hwx1)
+        if(allocated(state%hwx2)) deallocate(state%hwx2)
+        if(allocated(state%hwy1)) deallocate(state%hwy1)
+        if(allocated(state%hwy2)) deallocate(state%hwy2)
+        if(allocated(state%hwz1)) deallocate(state%hwz1)
+        if(allocated(state%hwz2)) deallocate(state%hwz2)
+        state%ready=.false.; state%statistic_ready=.false.
+    end subroutine cuda_backend_finalize
+
+    subroutine cuda_backend_macro(state,fx,fy,fz,dh)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(in) :: fx,fy,fz,dh
+        type(dim3) :: grid,threads
+        integer :: ierr
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((state%zdim*state%ydim*state%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call macro_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%rho,state%u,state%zdim,state%ydim,state%xdim,fx,fy,fz,dh)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'macro kernel')
+        state%macro_valid=.true.
+    end subroutine cuda_backend_macro
+
+    ! Recompute rho/u only if the stored fields no longer correspond to f.
+    ! Every kernel that modifies f or u clears macro_valid.
+    subroutine cuda_backend_macro_if_needed(state,fx,fy,fz,dh)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(in) :: fx,fy,fz,dh
+        if(.not.state%macro_valid) call cuda_backend_macro(state,fx,fy,fz,dh)
+    end subroutine cuda_backend_macro_if_needed
+
+    subroutine cuda_backend_set_mrt(state,mcollid,mforce)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(in) :: mcollid(0:lbmDim,0:lbmDim),mforce(0:lbmDim,0:lbmDim)
+        if(.not.allocated(state%mrt_collid)) then
+            allocate(state%mrt_collid(0:lbmDim,0:lbmDim),state%mrt_force(0:lbmDim,0:lbmDim))
+        endif
+        state%mrt_collid=mcollid
+        state%mrt_force=mforce
+    end subroutine cuda_backend_set_mrt
+
+    subroutine cuda_backend_macro_batch(states,nstates,fx,fy,fz,dh)
+        type(cuda_lbm_state), intent(in) :: states(:)
+        integer, intent(in) :: nstates
+        real(8), intent(in) :: fx(:),fy(:),fz(:),dh(:)
+        integer :: i
+        type(dim3) :: grid,threads
+        do i=1,nstates
+            threads=dim3(BLOCK_SIZE,1,1)
+            grid=dim3((states(i)%zdim*states(i)%ydim*states(i)%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+            call macro_kernel<<<grid,threads,0,states(i)%compute_stream>>>(states(i)%f,states(i)%rho,states(i)%u,states(i)%zdim,states(i)%ydim,states(i)%xdim,fx(i),fy(i),fz(i),dh(i))
+            call check_cuda(cudaGetLastError(),'macro batch kernel')
+        enddo
+    end subroutine cuda_backend_macro_batch
+
+    subroutine cuda_backend_turbulent_statistic(state,uuu_ave,step,step_s,download,update)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(inout) :: uuu_ave(state%zdim,state%ydim,state%xdim,1:9)
+        integer, intent(in) :: step,step_s
+        logical, intent(in) :: download,update
+        type(dim3) :: grid,threads
+        integer :: ierr
+        real(8) :: invStep
+        if(.not.state%statistic_ready) then
+            state%uuu_ave=uuu_ave
+            state%statistic_ready=.true.
+        endif
+        if(update) then
+            invStep=1.0d0/real(step-step_s+1,8)
+            threads=dim3(BLOCK_SIZE,1,1); grid=dim3((state%zdim*state%ydim*state%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+            call turbulent_statistic_kernel<<<grid,threads,0,state%compute_stream>>>(state%u,state%uuu_ave,state%zdim,state%ydim,state%xdim,invStep)
+            ierr=cudaGetLastError(); call check_cuda(ierr,'turbulent statistic kernel')
+        endif
+        if(download) then
+            ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'turbulent statistic event')
+            ierr=cudaEventSynchronize(state%compute_event); call check_cuda(ierr,'turbulent statistic dependency')
+            uuu_ave=state%uuu_ave
+        endif
+    end subroutine cuda_backend_turbulent_statistic
+
+    subroutine cuda_backend_collision(state,model,omega,omega2,dh,tau_base,nu)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: model
+        real(8), intent(in) :: omega,omega2,dh
+        real(8), intent(in), optional :: tau_base,nu
+        real(8) :: tau_b,nu_v
+        type(dim3) :: grid,threads
+        integer :: ierr
+        tau_b=0.0d0; nu_v=0.0d0
+        if(present(tau_base)) tau_b=tau_base
+        if(present(nu)) nu_v=nu
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((state%zdim*state%ydim*state%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        select case(model)
+        case(1)
+            call collision_srt_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%rho,state%u,state%force, &
+                 state%zdim,state%ydim,state%xdim,omega,dh)
+        case(2)
+            call collision_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%rho,state%u,state%force,state%zdim,state%ydim,state%xdim,model,omega,omega2,dh)
+        case(3)
+            call collision_mrt_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%rho,state%u,state%force, &
+                 state%mrt_collid,state%mrt_force,state%zdim,state%ydim,state%xdim,dh)
+        case(11,14,15)
+            call collision_les_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%rho,state%u,state%force, &
+                 state%tau_all,model,omega,dh,tau_b,nu_v,state%zdim,state%ydim,state%xdim)
+        case default
+            write(*,'(A,I0)') 'CUDA collision model not supported: ',model
+            stop
+        end select
+        ierr=cudaGetLastError(); call check_cuda(ierr,'collision kernel')
+        state%macro_valid=.false.
+    end subroutine cuda_backend_collision
+
+    subroutine cuda_backend_add_uniform_force(state,fx,fy,fz)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(in) :: fx,fy,fz
+        type(dim3) :: grid,threads
+        integer :: ierr
+        threads=dim3(BLOCK_SIZE,1,1)
+        grid=dim3((state%zdim*state%ydim*state%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call add_uniform_force_kernel<<<grid,threads,0,state%compute_stream>>>(state%force,state%zdim,state%ydim,state%xdim,fx,fy,fz)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'uniform force kernel')
+    end subroutine cuda_backend_add_uniform_force
+
+    subroutine cuda_backend_reset_force(state)
+        type(cuda_lbm_state), intent(inout) :: state
+        type(dim3) :: grid,threads
+        integer :: ierr
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((state%zdim*state%ydim*state%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call reset_force_kernel<<<grid,threads,0,state%compute_stream>>>(state%force,state%zdim,state%ydim,state%xdim)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'force reset kernel')
+    end subroutine cuda_backend_reset_force
+
+    ! Drop every device buffer of the immersed body slots. The buffers are
+    ! re-created lazily by cuda_backend_ibm_prepare.
+    subroutine cuda_backend_ibm_clear(state)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer :: i
+        if(.not.allocated(state%ibm)) return
+        do i=1,size(state%ibm)
+            if(allocated(state%ibm(i)%elem_index)) deallocate(state%ibm(i)%elem_index)
+            if(allocated(state%ibm(i)%elem_weight)) deallocate(state%ibm(i)%elem_weight)
+            if(allocated(state%ibm(i)%elem_area)) deallocate(state%ibm(i)%elem_area)
+            if(allocated(state%ibm(i)%elem_velocity)) deallocate(state%ibm(i)%elem_velocity)
+            if(allocated(state%ibm(i)%elem_force)) deallocate(state%ibm(i)%elem_force)
+            if(allocated(state%ibm(i)%elem_dforce)) deallocate(state%ibm(i)%elem_dforce)
+            state%ibm(i)%nElem=0
+            state%ibm(i)%loaded=.false.
+            state%ibm(i)%area_loaded=.false.
+        enddo
+    end subroutine cuda_backend_ibm_clear
+
+    ! Start a new immersed-boundary solve: size the slots to the number of
+    ! bodies carried by this block and force the next preparation to upload
+    ! the body velocity and the (zeroed) element force again.
+    subroutine cuda_backend_ibm_setup(state,nslot)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: nslot
+        integer :: i,n,ierr
+        n=max(nslot,1)
+        if(.not.allocated(state%ibm)) then
+            allocate(state%ibm(n))
+        elseif(size(state%ibm)/=n) then
+            call cuda_backend_ibm_clear(state)
+            deallocate(state%ibm)
+            allocate(state%ibm(n))
+        endif
+        do i=1,n
+            state%ibm(i)%loaded=.false.
+        enddo
+        if(allocated(state%d_tol)) then
+            call zero_scalar_kernel<<<1,1,0,state%compute_stream>>>(state%d_tol)
+            ierr=cudaGetLastError(); call check_cuda(ierr,'IBM tolerance reset')
+        endif
+    end subroutine cuda_backend_ibm_setup
+
+    ! Upload the geometry, the body velocity and the current element force of
+    ! one body. Called once per time step, never inside the penalty iteration.
+    subroutine cuda_backend_ibm_prepare(state,slot,elem_index,elem_weight,elem_area,elem_velocity,elem_force,upload_area)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: slot
+        integer(2), intent(in) :: elem_index(:,:)
+        real(4), intent(in) :: elem_weight(:,:)
+        real(8), intent(in) :: elem_area(:),elem_velocity(:,:),elem_force(:,:)
+        logical, intent(in), optional :: upload_area
+        logical :: need_area
+        integer :: nElem,ierr
+        if(.not.allocated(state%ibm)) return
+        if(slot<1 .or. slot>size(state%ibm)) return
+        nElem=size(elem_area)
+        if(nElem<=0) then
+            state%ibm(slot)%nElem=0
+            state%ibm(slot)%loaded=.false.
+            return
+        endif
+        if(state%ibm(slot)%nElem/=nElem) then
+            call cuda_backend_ibm_clear_slot(state%ibm(slot))
+            allocate(state%ibm(slot)%elem_index(12,nElem),state%ibm(slot)%elem_weight(12,nElem),state%ibm(slot)%elem_area(nElem), &
+                     state%ibm(slot)%elem_velocity(3,nElem),state%ibm(slot)%elem_force(3,nElem),state%ibm(slot)%elem_dforce(3,nElem))
+            state%ibm(slot)%nElem=nElem
+        endif
+        ! Upload on a dedicated stream, ordered only after the previous spread
+        ! kernel (the last reader of these buffers). The compute stream waits
+        ! for the upload just before the penalty kernel. Pinned host arrays
+        ! make the copies non-blocking, so the CPU does not stall behind the
+        ! fluid kernels still queued on the compute stream.
+        ierr=cudaStreamWaitEvent(state%compute_stream,ibm_serial_event,0); call check_cuda(ierr,'IBM serial dependency')
+        ierr=cudaStreamWaitEvent(state%upload_stream,state%ibm_event,0); call check_cuda(ierr,'IBM upload dependency')
+        ierr=cudaMemcpyAsync(state%ibm(slot)%elem_index,elem_index,size(elem_index,kind=8),cudaMemcpyHostToDevice,state%upload_stream); call check_cuda(ierr,'IBM index upload')
+        ierr=cudaMemcpyAsync(state%ibm(slot)%elem_weight,elem_weight,size(elem_weight,kind=8),cudaMemcpyHostToDevice,state%upload_stream); call check_cuda(ierr,'IBM weight upload')
+        need_area=.true.
+        if(present(upload_area)) need_area=upload_area
+        if((.not.state%ibm(slot)%area_loaded) .or. need_area) then
+            ierr=cudaMemcpyAsync(state%ibm(slot)%elem_area,elem_area,size(elem_area,kind=8),cudaMemcpyHostToDevice,state%upload_stream); call check_cuda(ierr,'IBM area upload')
+            state%ibm(slot)%area_loaded=.true.
+        endif
+        ierr=cudaMemcpyAsync(state%ibm(slot)%elem_velocity,elem_velocity,size(elem_velocity,kind=8),cudaMemcpyHostToDevice,state%upload_stream); call check_cuda(ierr,'IBM velocity upload')
+        ierr=cudaEventRecord(state%upload_event,state%upload_stream); call check_cuda(ierr,'IBM upload event')
+        ierr=cudaStreamWaitEvent(state%compute_stream,state%upload_event,0); call check_cuda(ierr,'IBM upload compute dependency')
+        ! The element-force accumulator starts at zero every time step. Clear it
+        ! on the device instead of zeroing the host array and copying it over.
+        call zero_ibm_force_kernel<<<(nElem+BLOCK_SIZE-1)/BLOCK_SIZE,BLOCK_SIZE,0,state%compute_stream>>>(state%ibm(slot)%elem_force,nElem)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'IBM force reset')
+        state%ibm(slot)%loaded=.true.
+    end subroutine cuda_backend_ibm_prepare
+
+    subroutine cuda_backend_ibm_clear_slot(slot)
+        type(cuda_ibm_slot), intent(inout) :: slot
+        if(allocated(slot%elem_index)) deallocate(slot%elem_index)
+        if(allocated(slot%elem_weight)) deallocate(slot%elem_weight)
+        if(allocated(slot%elem_area)) deallocate(slot%elem_area)
+        if(allocated(slot%elem_velocity)) deallocate(slot%elem_velocity)
+        if(allocated(slot%elem_force)) deallocate(slot%elem_force)
+        if(allocated(slot%elem_dforce)) deallocate(slot%elem_dforce)
+        slot%nElem=0
+        slot%loaded=.false.
+        slot%area_loaded=.false.
+    end subroutine cuda_backend_ibm_clear_slot
+
+    ! Run one penalty iteration on the devices. The element force stays in
+    ! device memory and accumulates over the iterations; the tolerance is
+    ! accumulated asynchronously and only downloaded by
+    ! cuda_backend_ibm_tolerance.
+    subroutine cuda_backend_ibm_penalty(state,slot,dt,dh,den_in)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: slot
+        real(8), intent(in) :: dt,dh,den_in
+        integer :: nElem,ierr
+        type(dim3) :: grid,threads
+        if(.not.allocated(state%ibm)) return
+        if(slot<1 .or. slot>size(state%ibm)) return
+        nElem=state%ibm(slot)%nElem
+        if(nElem<=0 .or. .not.state%ibm(slot)%loaded) return
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((nElem+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call ibm_penalty_force_kernel<<<grid,threads,0,state%compute_stream>>>(state%u,state%ibm(slot)%elem_index,state%ibm(slot)%elem_weight, &
+             state%ibm(slot)%elem_velocity,state%ibm(slot)%elem_area,state%ibm(slot)%elem_force,state%ibm(slot)%elem_dforce,nElem, &
+             state%zdim,state%ydim,state%xdim,state%d_tol)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'IBM penalty force kernel')
+        call ibm_penalty_apply_kernel<<<grid,threads,0,state%compute_stream>>>(state%u,state%ibm(slot)%elem_index, &
+             state%ibm(slot)%elem_weight,state%ibm(slot)%elem_dforce,nElem,state%zdim,state%ydim,state%xdim, &
+             0.5d0*dt*(1.0d0/dh)**3/den_in)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'IBM penalty apply kernel')
+        state%macro_valid=.false.
+    end subroutine cuda_backend_ibm_penalty
+
+    ! Return the tolerance accumulated since the last call and reset it.
+    subroutine cuda_backend_ibm_tolerance(state,tolerance)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(out) :: tolerance
+        real(8) :: tol_host(1)
+        integer :: ierr
+        tolerance=0.0d0
+        if(.not.allocated(state%d_tol)) return
+        ierr=cudaStreamSynchronize(state%compute_stream); call check_cuda(ierr,'IBM penalty dependency')
+        ierr=cudaMemcpyAsync(tol_host,state%d_tol,size(tol_host,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'IBM tolerance download')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'IBM tolerance event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'IBM tolerance sync')
+        tolerance=tol_host(1)
+        call zero_scalar_kernel<<<1,1,0,state%compute_stream>>>(state%d_tol)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'IBM tolerance reset')
+    end subroutine cuda_backend_ibm_tolerance
+
+    ! Copy the accumulated element force of one body back to the host. Called
+    ! once after the penalty iteration, not inside it.
+    subroutine cuda_backend_ibm_download_force(state,slot,elem_force)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: slot
+        real(8), intent(out) :: elem_force(:,:)
+        integer :: nElem,ierr
+        elem_force=0.0d0
+        if(.not.allocated(state%ibm)) return
+        if(slot<1 .or. slot>size(state%ibm)) return
+        nElem=state%ibm(slot)%nElem
+        if(nElem<=0 .or. .not.state%ibm(slot)%loaded) return
+        ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'IBM force event')
+        ierr=cudaStreamWaitEvent(state%transfer_stream,state%compute_event,0); call check_cuda(ierr,'IBM force dependency')
+        ierr=cudaMemcpyAsync(elem_force,state%ibm(slot)%elem_force,size(elem_force,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'IBM force download')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'IBM force transfer event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'IBM force download sync')
+    end subroutine cuda_backend_ibm_download_force
+
+    subroutine cuda_backend_spread_ibm_force(state,slot,dh)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: slot
+        real(8), intent(in) :: dh
+        integer :: nElem,ierr
+        type(dim3) :: grid,threads
+        if(.not.allocated(state%ibm)) return
+        if(slot<1 .or. slot>size(state%ibm)) return
+        nElem=state%ibm(slot)%nElem
+        if(nElem<=0 .or. .not.state%ibm(slot)%loaded) return
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((nElem+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call ibm_spread_force_kernel<<<grid,threads,0,state%compute_stream>>>(state%force,state%ibm(slot)%elem_index,state%ibm(slot)%elem_weight, &
+             state%ibm(slot)%elem_force,nElem,state%zdim,state%ydim,state%xdim,(1.0d0/dh)**3)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'IBM force spread kernel')
+        ierr=cudaEventRecord(state%ibm_event,state%compute_stream); call check_cuda(ierr,'IBM spread event')
+        ierr=cudaEventRecord(ibm_serial_event,state%compute_stream); call check_cuda(ierr,'IBM serial event')
+    end subroutine cuda_backend_spread_ibm_force
+
+    ! Hand the compute stream of one state over to another one. The record is
+    ! made on the stream of src, the wait is inserted into the stream of dst.
+    subroutine cuda_backend_record_event(state)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer :: ierr
+        ierr=cudaEventRecord(state%comm_event,state%compute_stream); call check_cuda(ierr,'comm event record')
+    end subroutine cuda_backend_record_event
+
+    subroutine cuda_backend_wait_event(state,src)
+        type(cuda_lbm_state), intent(inout) :: state,src
+        integer :: ierr
+        ierr=cudaStreamWaitEvent(state%compute_stream,src%comm_event,0); call check_cuda(ierr,'comm event wait')
+    end subroutine cuda_backend_wait_event
+
+    subroutine cuda_backend_clear_facesrc(src)
+        type(cuda_face_source), intent(inout) :: src
+        if(allocated(src%f1)) deallocate(src%f1,src%f2,src%tau1,src%tau2)
+        src%bF=0; src%aF=0
+    end subroutine cuda_backend_clear_facesrc
+
+    ! Reserve the device source buffers of one face. The face extents are
+    ! fixed for a given son block, so this only happens once.
+    subroutine cuda_backend_face_source_init(state,face,bF,aF)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: face,bF,aF
+        if(.not.allocated(state%facesrc)) allocate(state%facesrc(6))
+        if(state%facesrc(face)%bF==bF .and. state%facesrc(face)%aF==aF) return
+        call cuda_backend_clear_facesrc(state%facesrc(face))
+        allocate(state%facesrc(face)%f1(0:lbmDim,bF,aF),state%facesrc(face)%f2(0:lbmDim,bF,aF))
+        allocate(state%facesrc(face)%tau1(bF,aF),state%facesrc(face)%tau2(bF,aF))
+        state%facesrc(face)%bF=bF; state%facesrc(face)%aF=aF
+    end subroutine cuda_backend_face_source_init
+
+    ! Sample the part of a father face that belongs to one son. Runs on the
+    ! father stream, because the father keeps updating its distribution
+    ! function in place. time=1 stores the first snapshot, time=2 the second.
+    subroutine cuda_backend_extract_face(src,dst,face,fixed,off_b,off_a,bF,aF,time)
+        type(cuda_lbm_state), intent(inout) :: src,dst
+        integer, intent(in) :: face,fixed,off_b,off_a,bF,aF,time
+        type(dim3) :: grid,threads
+        integer :: ierr
+        if(bF<=0 .or. aF<=0) return
+        call cuda_backend_face_source_init(dst,face,bF,aF)
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((bF*aF+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        if(time==1) then
+            call extract_face_kernel<<<grid,threads,0,src%compute_stream>>>(src%f,dst%facesrc(face)%f1,dst%facesrc(face)%tau1, &
+                 src%tau_all,src%zdim,src%ydim,src%xdim,face,fixed,off_b,off_a,bF,aF)
+        else
+            call extract_face_kernel<<<grid,threads,0,src%compute_stream>>>(src%f,dst%facesrc(face)%f2,dst%facesrc(face)%tau2, &
+                 src%tau_all,src%zdim,src%ydim,src%xdim,face,fixed,off_b,off_a,bF,aF)
+        endif
+        ierr=cudaGetLastError(); call check_cuda(ierr,'extract face kernel')
+        call cuda_backend_record_event(src)
+    end subroutine cuda_backend_extract_face
+
+    ! Average the two father snapshots of one face. Runs on the father stream,
+    ! because the buffers belong to the son but are only touched by the
+    ! father's extraction sequence.
+    subroutine cuda_backend_average_face(src,dst,face)
+        type(cuda_lbm_state), intent(inout) :: src,dst
+        integer, intent(in) :: face
+        type(dim3) :: grid,threads
+        integer :: ierr,bF,aF
+        if(.not.allocated(dst%facesrc)) return
+        bF=dst%facesrc(face)%bF; aF=dst%facesrc(face)%aF
+        if(bF<=0 .or. aF<=0) return
+        threads=dim3(BLOCK_SIZE,1,1)
+        grid=dim3(((lbmDim+1)*bF*aF+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call average_face_f_kernel<<<grid,threads,0,src%compute_stream>>>(dst%facesrc(face)%f1,dst%facesrc(face)%f2,bF,aF)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'average face kernel')
+        grid=dim3((bF*aF+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call average_face_tau_kernel<<<grid,threads,0,src%compute_stream>>>(dst%facesrc(face)%tau1,dst%facesrc(face)%tau2,bF,aF)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'average face tau kernel')
+        call cuda_backend_record_event(src)
+    end subroutine cuda_backend_average_face
+
+    ! Father-to-son interpolation. The source data is read directly from the
+    ! device buffers filled by cuda_backend_extract_face, so nothing has to be
+    ! uploaded here.
+    subroutine cuda_backend_interpolate_face(state,src,face,n_timeStep,bF,aF,bS,aS,fixed,ratio,scheme,fx,fy,fz,dh)
+        type(cuda_lbm_state), intent(inout) :: state,src
+        integer, intent(in) :: face,n_timeStep,bF,aF,bS,aS,fixed,ratio,scheme
+        real(8), intent(in) :: fx,fy,fz,dh
+        type(dim3) :: grid,threads
+        integer :: ierr
+        if(.not.allocated(state%facesrc)) return
+        if(state%facesrc(face)%bF<=0) return
+        call cuda_backend_wait_event(state,src)
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((bS*aS+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        if(n_timeStep==0) then
+            call interpolate_face_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%tau_all,state%facesrc(face)%f1, &
+                 state%facesrc(face)%tau1,state%zdim,state%ydim,state%xdim,bF,aF,bS,aS,face,fixed,ratio,scheme,fx,fy,fz,dh)
+        else
+            call interpolate_face_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%tau_all,state%facesrc(face)%f2, &
+                 state%facesrc(face)%tau2,state%zdim,state%ydim,state%xdim,bF,aF,bS,aS,face,fixed,ratio,scheme,fx,fy,fz,dh)
+        endif
+        ierr=cudaGetLastError(); call check_cuda(ierr,'parent child interpolation kernel')
+        state%macro_valid=.false.
+    end subroutine cuda_backend_interpolate_face
+
+    logical function cuda_boundary_supported(bc)
+        integer, intent(in) :: bc(6)
+        integer :: i
+        cuda_boundary_supported=.true.
+        do i=1,6
+            if(bc(i)/=101 .and. bc(i)/=102 .and. bc(i)/=103 .and. bc(i)/=104 .and. bc(i)/=201 .and. bc(i)/=202 .and. bc(i)/=203 .and. bc(i)/=204 .and. bc(i)/=301 .and. bc(i)/=302 .and. bc(i)/=0 .and. bc(i)/=1) then
+                cuda_boundary_supported=.false.
+                return
+            endif
+        enddo
+    end function cuda_boundary_supported
+
+    subroutine cuda_backend_boundary(state,bc,den_in,vin,shear,velocity_kind,time,xmin,ymin,zmin,dh)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: bc(6),velocity_kind
+        real(8), intent(in) :: den_in,vin(1:3),shear(1:3),time,xmin,ymin,zmin,dh
+        type(dim3) :: grid,threads
+        integer :: face,npoints,ierr
+        threads=dim3(BLOCK_SIZE,1,1)
+        do face=1,6
+            if(face==1 .or. face==2) then
+                npoints=state%zdim*state%ydim
+            elseif(face==3 .or. face==4) then
+                npoints=state%zdim*state%xdim
+            else
+                npoints=state%ydim*state%xdim
+            endif
+            if(bc(face)==0 .or. bc(face)==1 .or. bc(face)==301) cycle
+            if(bc(face)==203) then
+                call cuda_backend_halfway(state,face,1)
+                cycle
+            endif
+            if(bc(face)==204) cycle
+            grid=dim3((npoints+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+            if(bc(face)==101 .or. bc(face)==102 .or. bc(face)==202) then
+                call general_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%rho,state%u,state%zdim,state%ydim,state%xdim,face,bc(face),den_in,vin(1),vin(2),vin(3),shear(1),shear(2),shear(3),velocity_kind,time,xmin,ymin,zmin,dh)
+            else
+                call static_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%zdim,state%ydim,state%xdim,face,bc(face))
+            endif
+            ierr=cudaGetLastError()
+            call check_cuda(ierr,'static boundary kernel')
+        enddo
+        state%macro_valid=.false.
+    end subroutine cuda_backend_boundary
+
+    subroutine cuda_backend_halfway(state,face,mode)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: face,mode
+        type(dim3) :: grid,threads
+        integer :: npoints,ierr,cb,ca
+        threads=dim3(BLOCK_SIZE,1,1)
+        if(face==1 .or. face==2) then
+            cb=state%zdim; ca=state%ydim
+        elseif(face==3 .or. face==4) then
+            cb=state%zdim; ca=state%xdim
+        else
+            cb=state%ydim; ca=state%xdim
+        endif
+        if(face==1 .or. face==2) then
+            npoints=state%zdim*state%ydim
+            grid=dim3((npoints+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+            if(face==1) then
+                if(.not.allocated(state%hwx1)) allocate(state%hwx1(0:lbmDim,state%zdim,state%ydim))
+                call halfway_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwx1,state%zdim,state%ydim,state%xdim,face,mode,cb,ca)
+            else
+                if(.not.allocated(state%hwx2)) allocate(state%hwx2(0:lbmDim,state%zdim,state%ydim))
+                call halfway_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwx2,state%zdim,state%ydim,state%xdim,face,mode,cb,ca)
+            endif
+        elseif(face==3 .or. face==4) then
+            npoints=state%zdim*state%xdim
+            grid=dim3((npoints+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+            if(face==3) then
+                if(.not.allocated(state%hwy1)) allocate(state%hwy1(0:lbmDim,state%zdim,state%xdim))
+                call halfway_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwy1,state%zdim,state%ydim,state%xdim,face,mode,cb,ca)
+            else
+                if(.not.allocated(state%hwy2)) allocate(state%hwy2(0:lbmDim,state%zdim,state%xdim))
+                call halfway_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwy2,state%zdim,state%ydim,state%xdim,face,mode,cb,ca)
+            endif
+        else
+            npoints=state%ydim*state%xdim
+            grid=dim3((npoints+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+            if(face==5) then
+                if(.not.allocated(state%hwz1)) allocate(state%hwz1(0:lbmDim,state%ydim,state%xdim))
+                call halfway_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwz1,state%zdim,state%ydim,state%xdim,face,mode,cb,ca)
+            else
+                if(.not.allocated(state%hwz2)) allocate(state%hwz2(0:lbmDim,state%ydim,state%xdim))
+                call halfway_boundary_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwz2,state%zdim,state%ydim,state%xdim,face,mode,cb,ca)
+            endif
+        endif
+        ierr=cudaGetLastError(); call check_cuda(ierr,'halfway boundary kernel')
+        state%macro_valid=.false.
+    end subroutine cuda_backend_halfway
+
+    subroutine cuda_backend_moving_halfway(state,face,den_in,vin,shear,velocity_kind,time,xmin,ymin,zmin,dh)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: face,velocity_kind
+        real(8), intent(in) :: den_in,vin(1:3),shear(1:3),time,xmin,ymin,zmin,dh
+        type(dim3) :: grid,threads
+        integer :: npoints,ierr,cb,ca
+        threads=dim3(BLOCK_SIZE,1,1)
+        if(face==1 .or. face==2) then; npoints=state%zdim*state%ydim; cb=state%zdim; ca=state%ydim
+        elseif(face==3 .or. face==4) then; npoints=state%zdim*state%xdim; cb=state%zdim; ca=state%xdim
+        else; npoints=state%ydim*state%xdim; cb=state%ydim; ca=state%xdim
+        endif
+        grid=dim3((npoints+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        if(face==1) call moving_halfway_apply_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwx1,state%zdim,state%ydim,state%xdim,face,den_in,vin(1),vin(2),vin(3),shear(1),shear(2),shear(3),velocity_kind,time,xmin,ymin,zmin,dh,cb,ca)
+        if(face==2) call moving_halfway_apply_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwx2,state%zdim,state%ydim,state%xdim,face,den_in,vin(1),vin(2),vin(3),shear(1),shear(2),shear(3),velocity_kind,time,xmin,ymin,zmin,dh,cb,ca)
+        if(face==3) call moving_halfway_apply_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwy1,state%zdim,state%ydim,state%xdim,face,den_in,vin(1),vin(2),vin(3),shear(1),shear(2),shear(3),velocity_kind,time,xmin,ymin,zmin,dh,cb,ca)
+        if(face==4) call moving_halfway_apply_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwy2,state%zdim,state%ydim,state%xdim,face,den_in,vin(1),vin(2),vin(3),shear(1),shear(2),shear(3),velocity_kind,time,xmin,ymin,zmin,dh,cb,ca)
+        if(face==5) call moving_halfway_apply_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwz1,state%zdim,state%ydim,state%xdim,face,den_in,vin(1),vin(2),vin(3),shear(1),shear(2),shear(3),velocity_kind,time,xmin,ymin,zmin,dh,cb,ca)
+        if(face==6) call moving_halfway_apply_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%hwz2,state%zdim,state%ydim,state%xdim,face,den_in,vin(1),vin(2),vin(3),shear(1),shear(2),shear(3),velocity_kind,time,xmin,ymin,zmin,dh,cb,ca)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'moving halfway boundary kernel')
+        state%macro_valid=.false.
+    end subroutine cuda_backend_moving_halfway
+
+    subroutine cuda_backend_stream(state)
+        type(cuda_lbm_state), intent(inout) :: state
+        type(dim3) :: grid,threads
+        integer :: ierr
+        real(8), device, pointer :: tmp(:,:,:,:)
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((state%zdim*state%ydim*state%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call stream_kernel<<<grid,threads,0,state%compute_stream>>>(state%f,state%f_next,state%zdim,state%ydim,state%xdim)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'stream kernel')
+        tmp=>state%f; state%f=>state%f_next; state%f_next=>tmp
+        state%macro_valid=.false.
+    end subroutine cuda_backend_stream
+
+    subroutine cuda_backend_download_flux_planes(state,buf)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(out) :: buf(6,state%zdim,state%ydim)
+        type(dim3) :: grid,threads
+        integer :: ierr,ixmid
+        if(.not.allocated(state%fluxbuf)) return
+        ixmid=(state%xdim+1)/2
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((state%zdim*state%ydim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call pack_flux_planes_kernel<<<grid,threads,0,state%compute_stream>>>(state%u,state%rho,state%fluxbuf, &
+             state%zdim,state%ydim,state%xdim,ixmid)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'flux pack kernel')
+        ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'flux pack event')
+        ierr=cudaStreamWaitEvent(state%transfer_stream,state%compute_event,0); call check_cuda(ierr,'flux pack dependency')
+        ierr=cudaMemcpyAsync(buf,state%fluxbuf,size(buf,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'flux plane download')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'flux transfer event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'flux download sync')
+    end subroutine cuda_backend_download_flux_planes
+
+    subroutine cuda_backend_download_probes(state,nprobe,idx_host,vals)
+        type(cuda_lbm_state), intent(inout) :: state
+        integer, intent(in) :: nprobe
+        integer, intent(in) :: idx_host(3,nprobe)
+        real(8), intent(out) :: vals(8,3,nprobe)
+        type(dim3) :: grid,threads
+        integer :: ierr
+        if(nprobe<=0) return
+        if(allocated(state%probebuf)) then
+            if(size(state%probebuf,3)<nprobe) then
+                deallocate(state%probebuf); allocate(state%probebuf(8,3,nprobe))
+            endif
+        else
+            allocate(state%probebuf(8,3,nprobe))
+        endif
+        if(allocated(state%probe_idx)) then
+            if(size(state%probe_idx,2)<nprobe) then
+                deallocate(state%probe_idx); allocate(state%probe_idx(3,nprobe))
+            endif
+        else
+            allocate(state%probe_idx(3,nprobe))
+        endif
+        ierr=cudaMemcpyAsync(state%probe_idx,idx_host,size(idx_host,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'probe index upload')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'probe index event')
+        ierr=cudaStreamWaitEvent(state%compute_stream,state%transfer_event,0); call check_cuda(ierr,'probe index dependency')
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((24*nprobe+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call pack_probes_kernel<<<grid,threads,0,state%compute_stream>>>(state%u,state%probe_idx,state%probebuf,nprobe,state%zdim,state%ydim,state%xdim)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'probe pack kernel')
+        ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'probe pack event')
+        ierr=cudaStreamWaitEvent(state%transfer_stream,state%compute_event,0); call check_cuda(ierr,'probe pack dependency')
+        ierr=cudaMemcpyAsync(vals,state%probebuf,size(vals,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'probe download')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'probe transfer event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'probe download sync')
+    end subroutine cuda_backend_download_probes
+
+    ! Pack the flow-output window into the real(4) layout written to disk.
+    attributes(global) subroutine pack_flow_output_kernel(rho,u,buf,zdim,ydim,xdim,off,nzo,nyo,nxo,cs2,den_in,invuref)
+        real(8), device :: rho(1:zdim,1:ydim,1:xdim),u(1:zdim,1:ydim,1:xdim,1:3)
+        real(4), device :: buf(1:nzo,1:nyo,1:nxo,0:3)
+        integer, value :: zdim,ydim,xdim,off,nzo,nyo,nxo
+        real(8), value :: cs2,den_in,invuref
+        integer :: tid,npoints,k,j,i,z,y,x
+        npoints=nzo*nyo*nxo; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
+        if(tid>npoints) return
+        k=mod(tid-1,nzo)+1; j=mod((tid-1)/nzo,nyo)+1; i=(tid-1)/(nzo*nyo)+1
+        z=k+off; y=j+off; x=i+off
+        buf(k,j,i,0)=real(cs2*(rho(z,y,x)-den_in),4)
+        buf(k,j,i,1)=real(u(z,y,x,1)*invuref,4)
+        buf(k,j,i,2)=real(u(z,y,x,2)*invuref,4)
+        buf(k,j,i,3)=real(u(z,y,x,3)*invuref,4)
+    end subroutine pack_flow_output_kernel
+
+    subroutine cuda_backend_pack_flow_output(state,buf,off,cs2,den_in,invuref)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(4), intent(out) :: buf(:,:,:,:)
+        integer, intent(in) :: off
+        real(8), intent(in) :: cs2,den_in,invuref
+        type(dim3) :: grid,threads
+        integer :: nzo,nyo,nxo,npoints,ierr
+        nzo=size(buf,1); nyo=size(buf,2); nxo=size(buf,3); npoints=nzo*nyo*nxo
+        if(.not.allocated(state%flowbuf)) then
+            allocate(state%flowbuf(nzo,nyo,nxo,0:3))
+        elseif(size(state%flowbuf,1)/=nzo .or. size(state%flowbuf,2)/=nyo .or. size(state%flowbuf,3)/=nxo) then
+            deallocate(state%flowbuf); allocate(state%flowbuf(nzo,nyo,nxo,0:3))
+        endif
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((npoints+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call pack_flow_output_kernel<<<grid,threads,0,state%compute_stream>>>(state%rho,state%u,state%flowbuf, &
+             state%zdim,state%ydim,state%xdim,off,nzo,nyo,nxo,cs2,den_in,invuref)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'flow output pack kernel')
+        ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'flow output event')
+        ierr=cudaStreamWaitEvent(state%transfer_stream,state%compute_event,0); call check_cuda(ierr,'flow output dependency')
+        ierr=cudaMemcpyAsync(buf,state%flowbuf,size(buf,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'flow output download')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'flow output transfer event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'flow output download sync')
+    end subroutine cuda_backend_pack_flow_output
+
+    subroutine cuda_backend_download_macro(state,rho,u)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(out) :: rho(state%zdim,state%ydim,state%xdim),u(state%zdim,state%ydim,state%xdim,1:3)
+        integer :: ierr
+        ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'macro event')
+        ierr=cudaStreamWaitEvent(state%transfer_stream,state%compute_event,0); call check_cuda(ierr,'macro transfer dependency')
+        ierr=cudaMemcpyAsync(rho,state%rho,size(rho,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'rho download')
+        ierr=cudaMemcpyAsync(u,state%u,size(u,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'u download')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'macro transfer event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'macro download')
+    end subroutine cuda_backend_download_macro
+
+    subroutine cuda_backend_download_f(state,f)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(out) :: f(state%zdim,state%ydim,state%xdim,0:lbmDim)
+        integer :: ierr
+        ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'boundary event')
+        ierr=cudaStreamWaitEvent(state%transfer_stream,state%compute_event,0); call check_cuda(ierr,'boundary transfer dependency')
+        ierr=cudaMemcpyAsync(f,state%f,size(f,kind=8),cudaMemcpyDeviceToHost,state%transfer_stream); call check_cuda(ierr,'boundary download')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'boundary transfer event')
+        ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'boundary download sync')
+    end subroutine cuda_backend_download_f
+
+    ! Fine-to-coarse step of the parent-child coupling, entirely on the device.
+    ! Every ratio-th node of the son boundary layer is transformed with the
+    ! Dupuis-Chopard rule and written directly into the father distribution
+    ! function. Runs on the father stream after the son stream reached the
+    ! record made by cuda_backend_record_event.
+    subroutine cuda_backend_deliver_face(son,dad,face,si,fi,ratio,vfx,vfy,vfz,dh)
+        type(cuda_lbm_state), intent(inout) :: son,dad
+        integer, intent(in) :: face,si(6),fi(6),ratio
+        real(8), intent(in) :: vfx,vfy,vfz,dh
+        type(dim3) :: grid,threads
+        integer :: ierr,ib0,jb0,ia0,ja0,iS,iF,nb,na
+        if(face==1 .or. face==2) then
+            ib0=si(5); jb0=fi(5); nb=(si(6)-si(5))/ratio+1
+            ia0=si(3); ja0=fi(3); na=(si(4)-si(3))/ratio+1
+        elseif(face==3 .or. face==4) then
+            ib0=si(5); jb0=fi(5); nb=(si(6)-si(5))/ratio+1
+            ia0=si(1); ja0=fi(1); na=(si(2)-si(1))/ratio+1
+        else
+            ib0=si(3); jb0=fi(3); nb=(si(4)-si(3))/ratio+1
+            ia0=si(1); ja0=fi(1); na=(si(2)-si(1))/ratio+1
+        endif
+        iS=si(face); iF=fi(face)
+        if(nb<=0 .or. na<=0) return
+        call cuda_backend_wait_event(dad,son)
+        threads=dim3(BLOCK_SIZE,1,1); grid=dim3((nb*na+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
+        call deliver_face_kernel<<<grid,threads,0,dad%compute_stream>>>(son%f,son%tau_all,dad%f,dad%tau_all, &
+             son%zdim,son%ydim,son%xdim,dad%zdim,dad%ydim,dad%xdim,face,ib0,jb0,ia0,ja0,iS,iF,nb,na,ratio,vfx,vfy,vfz,dh)
+        ierr=cudaGetLastError(); call check_cuda(ierr,'deliver face kernel')
+        dad%macro_valid=.false.
+    end subroutine cuda_backend_deliver_face
+
+    subroutine cuda_backend_upload_f(state,f)
+        type(cuda_lbm_state), intent(inout) :: state
+        real(8), intent(in) :: f(state%zdim,state%ydim,state%xdim,0:lbmDim)
+        integer :: ierr
+        ierr=cudaMemcpyAsync(state%f,f,size(f,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'boundary upload')
+        ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'boundary upload event')
+        ierr=cudaStreamWaitEvent(state%compute_stream,state%transfer_event,0); call check_cuda(ierr,'boundary compute dependency')
+        state%macro_valid=.false.
+    end subroutine cuda_backend_upload_f
+
+    subroutine cuda_backend_device_info()
+        integer :: ndev,ierr,i,cores,lcvd,istat
+        character(len=256) :: cvd
+        type(cudaDeviceProp) :: prop
+        call get_environment_variable('CUDA_VISIBLE_DEVICES',cvd,length=lcvd,status=istat)
+        if(istat==0 .and. lcvd>0) then
+            write(*,'(A,A)') 'CUDA_VISIBLE_DEVICES = ',trim(cvd(1:lcvd))
+        else
+            write(*,'(A)') 'CUDA_VISIBLE_DEVICES is not set'
+        endif
+        ierr=cudaGetDeviceCount(ndev); call check_cuda(ierr,'device count'); write(*,'(A,I0)') 'CUDA devices: ',ndev
+        do i=0,ndev-1
+            ierr=cudaGetDeviceProperties(prop,i); call check_cuda(ierr,'device properties'); cores=prop%multiProcessorCount*cores_per_sm(prop%major,prop%minor)
+            write(*,'(A,I0,A,A)') 'GPU ',i,': ',trim(prop%name); write(*,'(A,I0,A,I0,A,I0)') '  SMs=',prop%multiProcessorCount,' CUDA cores=',cores,' compute capability=',prop%major*10+prop%minor
+            write(*,'(A,I0,A,I0)') '  PCI bus:device = ',prop%pciBusID,':',prop%pciDeviceID
+        enddo
+    contains
+        integer function cores_per_sm(major,minor)
+            integer,intent(in)::major,minor
+            if(major==9) then; cores_per_sm=128
+            elseif(major==8 .and. minor==0) then; cores_per_sm=64
+            elseif(major==8) then; cores_per_sm=128
+            elseif(major==7) then; cores_per_sm=64
+            elseif(major==6 .and. minor==0) then; cores_per_sm=64
+            elseif(major==6) then; cores_per_sm=128
+            elseif(major==5) then; cores_per_sm=128
+            else; cores_per_sm=0
+            endif
+        end function cores_per_sm
+    end subroutine cuda_backend_device_info
+end module cuda_lbm_backend

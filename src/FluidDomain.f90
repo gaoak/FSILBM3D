@@ -6,13 +6,22 @@
 module FluidDomain
     use ConstParams
     use FlowCondition
+#ifdef USE_CUDA
+    use cuda_lbm_backend, only: cuda_lbm_state,cuda_backend_init,cuda_backend_macro,cuda_backend_collision,cuda_backend_stream, &
+                                cuda_backend_download_macro,cuda_backend_add_uniform_force,cuda_backend_boundary, &
+                                cuda_boundary_supported,cuda_backend_halfway,cuda_backend_moving_halfway,cuda_backend_macro_batch,cuda_backend_turbulent_statistic,cuda_backend_download_f,cuda_backend_upload_f,cuda_backend_reset_force, &
+                                cuda_backend_device_info,cuda_backend_download_flux_planes,cuda_backend_download_probes,cuda_backend_macro_if_needed,cuda_backend_pack_flow_output,cuda_backend_set_mrt
+#endif
     implicit none
     private
     public:: LBMblks,LBMblksIndex,m_nblocks
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_turbulent_statistic_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
-             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block,write_fluid_flux
+             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block,write_fluid_flux,ensure_macro_blocks
+#ifdef USE_CUDA
+    public :: write_fluid_probe_gpu
+#endif
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,outputtype
@@ -36,6 +45,9 @@ module FluidDomain
         real(8) :: offsetMoveGrid(1:3),volumeForce(3)
         real(8) :: blktime
         integer, allocatable :: carriedBodies(:) ! 0 is the number of carried bodies
+#ifdef USE_CUDA
+        type(cuda_lbm_state) :: cuda
+#endif
     contains
         procedure :: allocate_fluid => allocate_fluid_
         procedure :: Initialise => Initialise_
@@ -230,6 +242,11 @@ module FluidDomain
                 enddo
                 !$OMP END PARALLEL DO
             enddo
+#ifdef USE_CUDA
+            do iblock = 1,m_nblocks
+                call cuda_backend_upload_f(LBMblks(iblock)%cuda,LBMblks(iblock)%fIn)
+            enddo
+#endif
             do iblock = 1,nblocks
                 deallocate(LBMblks_tmp(iblock)%fIn)
             enddo
@@ -254,6 +271,9 @@ module FluidDomain
         integer,intent(in):: npsize
         integer:: iblock
         m_npsize = npsize
+#ifdef USE_CUDA
+        call cuda_backend_device_info()
+#endif
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%allocate_fluid()
         enddo
@@ -283,14 +303,18 @@ module FluidDomain
         integer:: step,i,iblock
         integer,parameter::nameLen=10,idfile=13
         character(len=nameLen):: fileName
-        write(filename,'(I10)') nint(time*1d5)
-        fileName = adjustr(fileName)
+        write(fileName,'(I10)') nint(time*1d5)
         do  i=1,nameLen
             if(fileName(i:i)==' ') fileName(i:i)='0'
         enddo
         open(idfile,file='./DatContinue/continue'//trim(fileName),form='unformatted',access='stream')
         write(idfile) m_nblocks,step,time
         do iblock = 1,m_nblocks
+#ifdef USE_CUDA
+            ! the distribution functions live on the device; copy them back so
+            ! the continue file contains the current state
+            call cuda_backend_download_f(LBMblks(iblock)%cuda,LBMblks(iblock)%fIn)
+#endif
             call LBMblks(iblock)%write_continue(idfile)
         enddo
         call Write_solid_cont(idfile)
@@ -340,10 +364,42 @@ module FluidDomain
     SUBROUTINE calculate_macro_quantities_blocks()
         implicit none
         integer:: iblock
+#ifdef USE_CUDA
+    call macro_batch()
+        do iblock = 1,m_nblocks
+            if(.not.cuda_boundary_supported(LBMblks(iblock)%BndConds)) then
+                call cuda_backend_download_macro(LBMblks(iblock)%cuda,LBMblks(iblock)%den,LBMblks(iblock)%uuu)
+            endif
+        enddo
+        return
+#endif
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%calculate_macro_quantities()
         enddo
+#ifdef USE_CUDA
+    contains
+        subroutine macro_batch()
+            ! single-state calls also mark each state's macro fields valid
+            do iblock=1,m_nblocks
+                call cuda_backend_macro(LBMblks(iblock)%cuda,LBMblks(iblock)%volumeForce(1), &
+                     LBMblks(iblock)%volumeForce(2),LBMblks(iblock)%volumeForce(3),LBMblks(iblock)%dh)
+            enddo
+        end subroutine macro_batch
+#endif
     END SUBROUTINE
+
+    ! Compute rho/u only when a consumer needs them. On ordinary steps the
+    ! next IBM recomputes them anyway, so the end-of-step pass is skipped.
+    SUBROUTINE ensure_macro_blocks()
+        implicit none
+        integer:: iblock
+#ifdef USE_CUDA
+        do iblock = 1,m_nblocks
+            call cuda_backend_macro_if_needed(LBMblks(iblock)%cuda,LBMblks(iblock)%volumeForce(1), &
+                 LBMblks(iblock)%volumeForce(2),LBMblks(iblock)%volumeForce(3),LBMblks(iblock)%dh)
+        enddo
+#endif
+    END SUBROUTINE ensure_macro_blocks
 
     SUBROUTINE calculate_turbulent_statistic_blocks(step,step_s)
         implicit none
@@ -357,6 +413,9 @@ module FluidDomain
         implicit none
         integer:: iblock
         call LBMblks(iblock)%calculate_macro_quantities()
+#ifdef USE_CUDA
+        call cuda_backend_download_macro(LBMblks(iblock)%cuda,LBMblks(iblock)%den,LBMblks(iblock)%uuu)
+#endif
     END SUBROUTINE
 
     SUBROUTINE write_flow_blocks(time)
@@ -373,6 +432,9 @@ module FluidDomain
         if(waittime.gt.1.d-1) then
             write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
         endif
+#ifdef USE_CUDA
+        call ensure_macro_blocks()
+#endif
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%write_flow(time)
         enddo
@@ -382,6 +444,12 @@ module FluidDomain
         implicit none
         integer:: iblock
         do iblock = 1,m_nblocks
+#ifdef USE_CUDA
+            ! ComputeFieldStat reads the host velocity field
+            call cuda_backend_macro_if_needed(LBMblks(iblock)%cuda,LBMblks(iblock)%volumeForce(1), &
+                 LBMblks(iblock)%volumeForce(2),LBMblks(iblock)%volumeForce(3),LBMblks(iblock)%dh)
+            call cuda_backend_download_macro(LBMblks(iblock)%cuda,LBMblks(iblock)%den,LBMblks(iblock)%uuu)
+#endif
             call LBMblks(iblock)%ComputeFieldStat()
         enddo
     END SUBROUTINE
@@ -457,6 +525,10 @@ module FluidDomain
         ! initialize flow information
         this%blktime = time
         call initialise_flow()
+#ifdef USE_CUDA
+        call cuda_backend_init(this%cuda,this%zDim,this%yDim,this%xDim,this%fIn,this%den,this%uuu,this%force,this%tau_all)
+        if(this%iCollidModel.eq.3) call cuda_backend_set_mrt(this%cuda,this%M_COLLID,this%M_FORCE)
+#endif
 
         contains
 
@@ -581,6 +653,12 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x,y,z
+#ifdef USE_CUDA
+        do z=1,6
+            if(this%BndConds(z).eq.BCstationary_Wall_halfway .or. this%BndConds(z).eq.BCmoving_Wall_halfway) call cuda_backend_halfway(this%cuda,z,0)
+        enddo
+        return
+#endif
         if (this%BndConds(1) .eq. BCstationary_Wall_halfway .or. this%BndConds(1) .eq. BCmoving_Wall_halfway) then
             do y = 1,this%yDim
             do z = 1,this%zDim
@@ -632,6 +710,15 @@ module FluidDomain
         integer:: x, y, z
         real(8):: xCoord,yCoord,zCoord,velocity(1:SpaceDim)
         real(8):: fEq(0:lbmDim),fEqi(0:lbmDim),fTmp(0:lbmDim)
+#ifdef USE_CUDA
+        if(cuda_boundary_supported(this%BndConds)) then
+            call cuda_backend_boundary(this%cuda,this%BndConds,flow%denIn,flow%uvwIn,flow%shearRateIn,flow%velocityKind,this%blktime,this%xmin,this%ymin,this%zmin,this%dh)
+            do z=1,6
+                if(this%BndConds(z).eq.BCmoving_Wall_halfway) call cuda_backend_moving_halfway(this%cuda,z,flow%denIn,flow%uvwIn,flow%shearRateIn,flow%velocityKind,this%blktime,this%xmin,this%ymin,this%zmin,this%dh)
+            enddo
+            return
+        endif
+#endif
         ! set the x direction (inlet) --------------------------------------------------------------------
         if (this%BndConds(1) .eq. BCEq_DirecletU) then
             ! equilibriun scheme
@@ -1142,6 +1229,14 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z
+#ifdef USE_CUDA
+        call cuda_backend_macro(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
+        ! same policy as the batched version: the macroscopic fields are only
+        ! copied back when the GPU cannot handle the boundary conditions
+        if(cuda_boundary_supported(this%BndConds)) return
+        call cuda_backend_download_macro(this%cuda,this%den,this%uuu)
+        return
+#endif
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
         do  x = 1, this%xDim
         do  y = 1, this%yDim
@@ -1163,6 +1258,11 @@ module FluidDomain
         integer::x,y,z,step,step_s
         real(8)::invStep
         if(step .ge. step_s .and. this%outputtype .ge. 2) then
+#ifdef USE_CUDA
+            call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
+            call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,step,step_s,.false.,.true.)
+            return
+#else
             invStep = 1 / real(step - step_s + 1)
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do  x = 1, this%xDim
@@ -1181,6 +1281,7 @@ module FluidDomain
             enddo
             enddo
             !$OMP END PARALLEL DO
+#endif
         endif
     END SUBROUTINE
 
@@ -1196,6 +1297,10 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x
+#ifdef USE_CUDA
+        call cuda_backend_add_uniform_force(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3))
+        return
+#endif
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
         do x=1,this%xDim
             this%force(:,:,x,1) = this%force(:,:,x,1) + this%volumeForce(1)
@@ -1209,6 +1314,10 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: x
+#ifdef USE_CUDA
+        call cuda_backend_reset_force(this%cuda)
+        return
+#endif
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
         do x=1,this%xDim
             this%force(:,:,x,1) = 0.d0
@@ -1223,6 +1332,12 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega,f_1
         integer:: x,y,z
+#ifdef USE_CUDA
+        if (this%iCollidModel .eq. 12) stop 'CUDA does not implement regularised BGK (12)'
+        if (this%iCollidModel .eq. 13) stop 'CUDA does not implement ELBM (13)'
+        call cuda_backend_collision(this%cuda,this%iCollidModel,this%Omega,this%Omega2,this%dh,this%tau,flow%nu)
+        return
+#endif
         dt3 = 3.d0*this%dh
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
         do    x = 1, this%xDim
@@ -1528,6 +1643,10 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer:: i
+#ifdef USE_CUDA
+        call cuda_backend_stream(this%cuda)
+        return
+#endif
         do  i=0,lbmDim
             call swapzy(this%fIn, ee(i,3), ee(i,2), i, this%zDim, this%yDim, this%xDim, lbmDim)
             call swapx(this%fIn, ee(i,1), i, this%zDim, this%yDim, this%xDim, lbmDim, this%OMPparindex, this%OMPeid, this%OMPedge)
@@ -1649,7 +1768,14 @@ module FluidDomain
         character (LEN=nameLen):: fileName
         character (LEN=blockLen):: blockName
         real(8):: invUref,invUrefs
+        real(4), allocatable :: flowout(:,:,:,:)
         if(this%outputtype .lt. 1) return
+#ifdef USE_CUDA
+        if(this%outputtype .ne. 1) then
+            call cuda_backend_download_macro(this%cuda,this%den,this%uuu)
+            if(this%outputtype .ge. 2) call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,0,0,.true.,.false.)
+        endif
+#endif
         nxs  = 1 + this%offsetOutput
         nys  = 1 + this%offsetOutput
         nzs  = 1 + this%offsetOutput
@@ -1664,6 +1790,13 @@ module FluidDomain
         invUrefs = 1.d0/flow%Uref/flow%Uref
 
         if(this%outputtype .ne. 2) then
+#ifdef USE_CUDA
+            if(this%outputtype .eq. 1) then
+                call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
+                allocate(flowout(nze-nzs+1,nye-nys+1,nxe-nxs+1,0:3))
+                call cuda_backend_pack_flow_output(this%cuda,flowout,this%offsetOutput,Cs2,flow%denIn,invUref)
+            else
+#endif
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do x=nxs, nxe
                 do y=nys, nye
@@ -1676,6 +1809,9 @@ module FluidDomain
                 enddo
             enddo
             !$OMP END PARALLEL DO
+#ifdef USE_CUDA
+            endif
+#endif
         endif
         if(this%outputtype .ge. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
@@ -1731,8 +1867,18 @@ module FluidDomain
                 nze = nze-nzs+1
                 WRITE(idfile) nxe,nye,nze,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
+#ifdef USE_CUDA
+                if(this%outputtype .eq. 1) then
+                    write(idfile) flowout(:,:,:,0)
+                    write(idfile) flowout(:,:,:,1),flowout(:,:,:,2),flowout(:,:,:,3)
+                else
+                    write(idfile) this%outtmp(:,:,:,0)
+                    write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
+                endif
+#else
                 write(idfile) this%outtmp(:,:,:,0)
                 write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
+#endif
                 close(idfile)
             endif
             if(this%outputtype .ge. 2) then
@@ -1747,6 +1893,7 @@ module FluidDomain
             endif
             call myexit(0)
         endif
+        if(allocated(flowout)) deallocate(flowout)
     END SUBROUTINE write_flow_
 
     subroutine ComputeFieldStat_(this)
@@ -2038,7 +2185,15 @@ module FluidDomain
         integer :: j, k, ixMid
         real(8) :: dh, fluxIn, fluxMid, fluxOut
         real(8) :: wy, wz, Yref, Zref
+        real(8), allocatable :: planes(:,:,:)
         associate(b => LBMblks(root))
+#ifdef USE_CUDA
+            ! only the three x planes are needed: pack them on the device and
+            ! copy 6 planes instead of the whole macroscopic field
+            call cuda_backend_macro_if_needed(b%cuda,b%volumeForce(1),b%volumeForce(2),b%volumeForce(3),b%dh)
+            allocate(planes(1:6,b%zDim,b%yDim))
+            call cuda_backend_download_flux_planes(b%cuda,planes)
+#endif
             dh = b%dh
             ixMid = (b%xDim + 1) / 2
             fluxIn  = 0.0d0
@@ -2050,11 +2205,20 @@ module FluidDomain
                 do j = 1, b%yDim
                     wy = 1.0d0
                     if (j .eq. 1 .or. j .eq. b%yDim) wy = 0.5d0
+#ifdef USE_CUDA
+                    fluxIn  = fluxIn  + planes(1,k,j) * planes(2,k,j) * dh*dh * wy*wz
+                    fluxMid = fluxMid + planes(3,k,j) * planes(4,k,j) * dh*dh * wy*wz
+                    fluxOut = fluxOut + planes(5,k,j) * planes(6,k,j) * dh*dh * wy*wz
+#else
                     fluxIn  = fluxIn  + b%uuu(k,j,1,1)      * b%den(k,j,1)      * dh*dh * wy*wz
                     fluxMid = fluxMid + b%uuu(k,j,ixMid,1)  * b%den(k,j,ixMid)  * dh*dh * wy*wz
                     fluxOut = fluxOut + b%uuu(k,j,b%xDim,1) * b%den(k,j,b%xDim) * dh*dh * wy*wz
+#endif
                 enddo
             enddo
+#ifdef USE_CUDA
+            deallocate(planes)
+#endif
             Yref = b%ymax - b%ymin
             Zref = b%zmax - b%zmin
         end associate
@@ -2065,7 +2229,78 @@ module FluidDomain
                                 fluxMid /(flow%denIn*flow%Uref*Zref*Yref), &
                                 fluxOut /(flow%denIn*flow%Uref*Zref*Yref)
         close(111)
-    
+
     end subroutine
-    
+
+#ifdef USE_CUDA
+    ! Probe output without downloading the whole velocity field: the 2x2x2
+    ! stencil is packed on the device and interpolated here with exactly the
+    ! same coefficients and summation order as grid_value_interpolation.
+    subroutine write_fluid_probe_gpu(iblock,time)
+        implicit none
+        integer, intent(in) :: iblock
+        real(8), intent(in) :: time
+        integer :: i,j,nprobe,x1,y1,z1
+        integer,parameter::probeLen=4
+        character (LEN=probeLen):: probeNum
+        real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
+        real(8) :: dx1,dy1,dz1,dx2,dy2,dz2
+        real(8) :: coffe
+        integer, allocatable :: idx(:,:)
+        real(8), allocatable :: coef(:,:),vals(:,:,:),velocityOut(:)
+        associate(b => LBMblks(iblock))
+            nprobe = flow%fluidProbingNum
+            if(nprobe <= 0) return
+            call cuda_backend_macro_if_needed(b%cuda,b%volumeForce(1),b%volumeForce(2),b%volumeForce(3),b%dh)
+            allocate(idx(3,nprobe),coef(8,nprobe),vals(8,3,nprobe),velocityOut(3))
+            dh = b%dh
+            xmin = b%xmin; ymin = b%ymin; zmin = b%zmin
+            do i = 1, nprobe
+                xmax = xmin + dh * (b%xDim - 1)
+                ymax = ymin + dh * (b%yDim - 1)
+                zmax = zmin + dh * (b%zDim - 1)
+                if(flow%fluidProbingCoords(i,1) .lt. xmin .or. flow%fluidProbingCoords(i,1) .gt. xmax .or. &
+                   flow%fluidProbingCoords(i,2) .lt. ymin .or. flow%fluidProbingCoords(i,2) .gt. ymax .or. &
+                   flow%fluidProbingCoords(i,3) .lt. zmin .or. flow%fluidProbingCoords(i,3) .gt. zmax) then
+                    write(*,'(A,I2,A)') 'fluid probe', i ,' is not in selected block'
+                    stop
+                endif
+                x1 = FLOOR((flow%fluidProbingCoords(i,1)-xmin)/dh + 1)
+                y1 = FLOOR((flow%fluidProbingCoords(i,2)-ymin)/dh + 1)
+                z1 = FLOOR((flow%fluidProbingCoords(i,3)-zmin)/dh + 1)
+                idx(1,i)=x1; idx(2,i)=y1; idx(3,i)=z1
+                dx1 = flow%fluidProbingCoords(i,1) - (xmin + dh*(x1 - 1))
+                dy1 = flow%fluidProbingCoords(i,2) - (ymin + dh*(y1 - 1))
+                dz1 = flow%fluidProbingCoords(i,3) - (zmin + dh*(z1 - 1))
+                dx2 = dh - dx1
+                dy2 = dh - dy1
+                dz2 = dh - dz1
+                coffe = 1.0d0/(dh*dh*dh)
+                coef(1,i) = dx2*dy2*dz2*coffe
+                coef(2,i) = dx2*dy2*dz1*coffe
+                coef(3,i) = dx2*dy1*dz2*coffe
+                coef(4,i) = dx1*dy2*dz2*coffe
+                coef(5,i) = dx2*dy1*dz1*coffe
+                coef(6,i) = dx1*dy2*dz1*coffe
+                coef(7,i) = dx1*dy1*dz2*coffe
+                coef(8,i) = dx1*dy1*dz1*coffe
+            enddo
+            call cuda_backend_download_probes(b%cuda,nprobe,idx,vals)
+            do i = 1, nprobe
+                do j = 1,3
+                    velocityOut(j) = coef(1,i)*vals(1,j,i) + coef(2,i)*vals(2,j,i) + &
+                                     coef(3,i)*vals(3,j,i) + coef(4,i)*vals(4,j,i) + &
+                                     coef(5,i)*vals(5,j,i) + coef(6,i)*vals(6,j,i) + &
+                                     coef(7,i)*vals(7,j,i) + coef(8,i)*vals(8,j,i)
+                enddo
+                write(probeNum,'(I4.4)') i
+                open(111,file='./DatInfo/FluidProbes_'//trim(probeNum)//'.dat',position='append')
+                write(111,'(4E20.10)') time/flow%Tref,velocityOut(1:3)/flow%Uref
+                close(111)
+            enddo
+            deallocate(idx,coef,vals,velocityOut)
+        end associate
+    end subroutine write_fluid_probe_gpu
+#endif
+
 end module FluidDomain
