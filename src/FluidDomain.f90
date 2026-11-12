@@ -6,23 +6,28 @@
 module FluidDomain
     use ConstParams
     use FlowCondition
+    use ParallelDomain
     implicit none
     private
     public:: LBMblks,LBMblksIndex,m_nblocks
     public:: read_fuild_blocks,allocate_fuild_memory_blocks,calculate_macro_quantities_blocks,calculate_turbulent_statistic_blocks,calculate_macro_quantities_iblock,initialise_fuild_blocks, &
              check_is_continue,add_volume_force_blocks,update_volume_force_blocks,write_flow_blocks,set_boundary_conditions_block,collision_block, &
              write_continue_blocks,streaming_block,computeFieldStat_blocks,clear_volume_force, &
-             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block,write_fluid_flux
+             CompareBlocks,FindCarrierFluidBlock,halfwayBCset_block,write_fluid_flux, &
+             distribute_fluid_blocks, write_fluid_probes, LBMBlock
     integer:: m_nblocks, m_npsize
     type :: LBMBlock
         integer :: ID,iCollidModel,offsetOutput,outputtype
         integer :: xDim,yDim,zDim
+        integer :: global_nx, first_x = 1
+        real(8) :: global_xmin
         real(8) :: dh,xmin,ymin,zmin,xmax,ymax,zmax
         integer :: BndConds(1:6),periodic_bc(3)
         real(8) :: params(1:10),tau,Omega,Omega2 ! single time, two time relaxation
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
+        real(8), allocatable :: send_plane(:,:), receive_plane(:,:), velocity_halo(:,:,:,:)
         real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:)
         real(4), allocatable :: OUTtmp(:,:,:,:)
         real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
@@ -53,6 +58,7 @@ module FluidDomain
         procedure :: ComputeFieldStat => ComputeFieldStat_
         procedure :: ResetVolumeForce => ResetVolumeForce_
         procedure :: halfwayBCset => halfwayBCset_
+        procedure :: owns_x
     end type LBMBlock
     type(LBMBlock), allocatable :: LBMblks(:)
     integer,allocatable:: LBMblksIndex(:)
@@ -103,9 +109,51 @@ module FluidDomain
             if (LBMblks(iblock)%periodic_bc(3) .eq. 1) then
                 LBMblks(iblock)%zmax = LBMblks(iblock)%zmax + LBMblks(iblock)%dh
             endif
+            LBMblks(iblock)%global_nx = LBMblks(iblock)%xDim
+            LBMblks(iblock)%global_xmin = LBMblks(iblock)%xmin
         enddo
         close(111)
     END SUBROUTINE
+
+    logical function owns_x(this, x)
+        class(LBMBlock), intent(in) :: this
+        integer, intent(in) :: x
+        owns_x = x >= this%first_x .and. x < this%first_x + this%xDim
+    end function
+
+    subroutine distribute_fluid_blocks()
+        integer :: iblock, first, last, width, required
+        if (flow%npsize < 1) call parallel_abort('OpenMP thread count must be positive')
+        if (rank_count == 1) return
+        do iblock = 1, m_nblocks
+            associate(b => LBMblks(iblock))
+                call slab_bounds(b%global_nx, rank_id, first, last)
+                width = last - first + 1
+                required = flow%npsize
+                if (first == 1) required = max(required, boundary_width(b%BndConds(1), b%iCollidModel))
+                if (last == b%global_nx) required = max(required, boundary_width(b%BndConds(2), b%iCollidModel))
+                if (width < required) then
+                    call parallel_abort('Too few x planes per MPI rank for the OpenMP threads or boundary stencil')
+                endif
+                b%first_x = first
+                b%xDim = width
+                b%xmin = b%global_xmin + (first-1)*b%dh
+                if (first /= 1) b%BndConds(1) = BCfluid
+                if (last /= b%global_nx) then
+                    b%BndConds(2) = BCfluid
+                    b%xmax = b%global_xmin + (last-1)*b%dh
+                endif
+                if (is_root) write(*,'(A,I0,A,I0,A,I0)') 'MPI block ', b%ID, ': ', b%global_nx, ' x planes across ranks ', rank_count
+            end associate
+        enddo
+    contains
+        integer function boundary_width(condition, collision_model)
+            integer, intent(in) :: condition, collision_model
+            boundary_width = 1
+            if (condition == BCnEq_DirecletU .or. condition == BCorder1_Extrapolate) boundary_width = 2
+            if (condition == BCorder2_Extrapolate .or. collision_model == 14 .or. collision_model == 15) boundary_width = 3
+        end function
+    end subroutine
 
     subroutine check_periodic_boundary_(this)
         implicit none
@@ -138,6 +186,10 @@ module FluidDomain
         real(8), allocatable :: coor_max(:,:)
         integer(8) :: filePos,fileSize
         logical:: alive
+        if (rank_count > 1) then
+            call read_distributed_continue(step,time,isContinue)
+            return
+        endif
         inquire(file='./DatContinue/continue', exist=alive)
         if (isContinue .ge. 1 .and. alive) then
             write(*,'(A)') '========================================================='
@@ -247,6 +299,60 @@ module FluidDomain
         endif
     END SUBROUTINE
 
+    subroutine read_distributed_continue(step,time,isContinue)
+        use SolidBody, only: Read_solid_cont
+        integer, intent(out) :: step
+        real(8), intent(out) :: time
+        integer, intent(in) :: isContinue
+        integer, parameter :: idfile=13
+        integer :: blocks, iblock, q, dims(3), status, storage
+        integer(8) :: start, file_size, plane, field_size, offset, next_block
+        real(8) :: geometry(4)
+        logical :: alive
+        step = 0
+        time = 0.0d0
+        if (isContinue < 1) return
+        inquire(file='./DatContinue/continue',exist=alive)
+        if (.not. alive) then
+            if (is_root) write(*,*) 'Warning: the continue file is not found in DatContinue!'
+            return
+        endif
+        open(unit=idfile,file='./DatContinue/continue',form='unformatted',status='old',access='stream',action='read',iostat=status)
+        if (status /= 0) call parallel_abort('Cannot open DatContinue/continue')
+        read(idfile,iostat=status) blocks,step,time
+        if (status /= 0) call parallel_abort('Cannot read checkpoint header')
+        if (blocks /= m_nblocks) call parallel_abort('MPI restart requires the original block layout')
+        inquire(unit=idfile,size=file_size)
+        inquire(unit=idfile,pos=next_block)
+        inquire(iolength=storage) 0.0d0
+        do iblock = 1, m_nblocks
+            associate(b => LBMblks(iblock))
+                read(idfile,pos=next_block,iostat=status) geometry,dims
+                if (status /= 0) call parallel_abort('Cannot read checkpoint block header')
+                if (any(dims /= [b%global_nx,b%yDim,b%zDim]) .or. &
+                    any(abs(geometry-[b%global_xmin,b%ymin,b%zmin,b%dh]) > MachineTolerace)) then
+                    call parallel_abort('MPI restart requires the original block geometry and order')
+                endif
+                inquire(unit=idfile,pos=start)
+                plane = int(storage,8)*b%yDim*b%zDim
+                field_size = plane*b%global_nx
+                if (start-1+field_size*(lbmDim+1) > file_size) call parallel_abort('Incomplete fluid checkpoint')
+                do q = 0, lbmDim
+                    offset = start + q*field_size + (b%first_x-1)*plane
+                    read(idfile,pos=offset,iostat=status) b%fIn(:,:,:,q)
+                    if (status /= 0) call parallel_abort('Cannot read local slab from checkpoint')
+                enddo
+                next_block = start+field_size*(lbmDim+1)
+            end associate
+        enddo
+        if (next_block <= file_size) then
+            read(idfile,pos=next_block)
+            call Read_solid_cont(idfile)
+        endif
+        close(idfile)
+        if (is_root) write(*,'(A,I0)') 'MPI restart at step ', step
+    end subroutine
+
     !=================================================================================================
     ! Functions to iterate over each block
     SUBROUTINE allocate_fuild_memory_blocks(npsize)
@@ -280,7 +386,7 @@ module FluidDomain
         use SolidBody, only: Write_solid_cont
         implicit none
         real(8):: time
-        integer:: step,i,iblock
+        integer:: step,i,iblock,io_status
         integer,parameter::nameLen=10,idfile=13
         character(len=nameLen):: fileName
         write(filename,'(I10)') nint(time*1d5)
@@ -288,13 +394,18 @@ module FluidDomain
         do  i=1,nameLen
             if(fileName(i:i)==' ') fileName(i:i)='0'
         enddo
-        open(idfile,file='./DatContinue/continue'//trim(fileName),form='unformatted',access='stream')
-        write(idfile) m_nblocks,step,time
+        if (is_root) then
+            open(idfile,file='./DatContinue/continue'//fileName,form='unformatted',access='stream',status='replace',iostat=io_status)
+            if (io_status /= 0) call parallel_abort('Cannot open checkpoint output')
+            write(idfile) m_nblocks,step,time
+        endif
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%write_continue(idfile)
         enddo
-        call Write_solid_cont(idfile)
-        close(idfile)
+        if (is_root) then
+            call Write_solid_cont(idfile)
+            close(idfile)
+        endif
     END SUBROUTINE
 
     SUBROUTINE update_volume_force_blocks()
@@ -364,14 +475,16 @@ module FluidDomain
         real(8),intent(in):: time
         integer:: iblock
         real(8):: waittime,time_begine,time_end
-        call get_now_time(time_begine)
-        do iblock = 1,m_nblocks
-            call mywait()
-        enddo
-        call get_now_time(time_end)
-        waittime = time_end - time_begine
-        if(waittime.gt.1.d-1) then
-            write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
+        if (.not. mpi_enabled) then
+            call get_now_time(time_begine)
+            do iblock = 1,m_nblocks
+                call mywait()
+            enddo
+            call get_now_time(time_end)
+            waittime = time_end - time_begine
+            if(waittime.gt.1.d-1) then
+                write(*,'(A,F7.2,A)')'Waiting ', waittime, 's for previous outflow finishing.'
+            endif
         endif
         do iblock = 1,m_nblocks
             call LBMblks(iblock)%write_flow(time)
@@ -403,10 +516,10 @@ module FluidDomain
             allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:9))
         endif
         ! allocate output workspace
-        xmin = 1 + this%offsetOutput
+        xmin = max(1, 2 + this%offsetOutput - this%first_x)
         ymin = 1 + this%offsetOutput
         zmin = 1 + this%offsetOutput
-        xmax = this%xDim - this%offsetOutput
+        xmax = min(this%xDim, this%global_nx - this%offsetOutput - this%first_x + 1)
         ymax = this%yDim - this%offsetOutput
         zmax = this%zDim - this%offsetOutput
         if(this%outputtype .ge. 2) then
@@ -417,6 +530,12 @@ module FluidDomain
         ! allocate mesh partition
         allocate(this%OMPpartition(1:m_npsize),this%OMPparindex(1:m_npsize+1),this%OMPeid(1:m_npsize))
         allocate(this%OMPedge(1:this%zDim,1:this%yDim, 1:m_npsize))
+        if (rank_count > 1) then
+            allocate(this%send_plane(this%zDim,this%yDim), this%receive_plane(this%zDim,this%yDim))
+            if (this%iCollidModel == 14 .or. this%iCollidModel == 15) then
+                allocate(this%velocity_halo(this%zDim,this%yDim,3,2))
+            endif
+        endif
         call OMPPrePartition(this%xDim, m_npsize, this%OMPpartition, this%OMPparindex)
 
         contains
@@ -1223,8 +1342,14 @@ module FluidDomain
         class(LBMBlock), intent(inout) :: this
         real(8):: uSqr,uxyz(0:lbmDim),fEq(0:lbmDim),Flb(0:lbmDim),dt3,omega,f_1
         integer:: x,y,z
+        if (allocated(this%velocity_halo)) then
+            do x = 1, 3
+                call exchange_plane(this%uuu(:,:,this%xDim,x), this%velocity_halo(:,:,x,1), 1)
+                call exchange_plane(this%uuu(:,:,1,x), this%velocity_halo(:,:,x,2), -1)
+            enddo
+        endif
         dt3 = 3.d0*this%dh
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,uSqr,uxyz,fEq,Flb,omega,f_1)
         do    x = 1, this%xDim
         do    y = 1, this%yDim
         do    z = 1, this%zDim
@@ -1376,21 +1501,9 @@ module FluidDomain
             else
                 oy = onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0-1,y0,x0,1),this%uuu(z0-2,y0,x0,1),invdh)
             endif
-            if (x0.gt.1.and.x0.lt.this%xDim) then
-                oy = 0.5d0*(oy - center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh))
-            elseif (x0.eq.1) then
-                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh))
-            else
-                oy = 0.5d0*(oy - onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh))
-            endif
+            oy = 0.5d0*(oy - x_difference(z0,y0,x0,3,invdh))
             ! compute omega_y
-            if (x0.gt.1.and.x0.lt.this%xDim) then
-                oz = center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
-            elseif (x0.eq.1) then
-                oz = onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
-            else
-                oz = onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
-            endif
+            oz = x_difference(z0,y0,x0,2,invdh)
             if (y0.gt.1.and.y0.lt.this%yDim) then
                 oz = 0.5d0*(oz - center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh))
             elseif (y0.eq.1) then
@@ -1445,6 +1558,31 @@ module FluidDomain
             real(8):: onesid_diff,g1,g2,g3,invdx
             onesid_diff = (-3.0d0*g1 + 4.0d0*g2 - g3)*invdx
         END FUNCTION
+        real(8) function x_difference(z,y,x,c,invdh)
+            integer, intent(in) :: z,y,x,c
+            real(8), intent(in) :: invdh
+            integer :: global_x
+            real(8) :: left, right
+            global_x = this%first_x + x - 1
+            if (global_x == 1) then
+                x_difference = onesid_diff(this%uuu(z,y,x,c),this%uuu(z,y,x+1,c),this%uuu(z,y,x+2,c),invdh)
+            elseif (global_x == this%global_nx) then
+                x_difference = onesid_diff(this%uuu(z,y,x,c),this%uuu(z,y,x-1,c),this%uuu(z,y,x-2,c),invdh)
+            else
+                if (x == 1) then
+                    left = this%velocity_halo(z,y,c,1)
+                else
+                    left = this%uuu(z,y,x-1,c)
+                endif
+                if (x == this%xDim) then
+                    right = this%velocity_halo(z,y,c,2)
+                else
+                    right = this%uuu(z,y,x+1,c)
+                endif
+                x_difference = center_diff(right,left,invdh)
+            endif
+        end function
+
         SUBROUTINE vrem(x0,y0,z0,omega0)
             USE, INTRINSIC :: IEEE_ARITHMETIC
             implicit none
@@ -1455,19 +1593,9 @@ module FluidDomain
             real(8):: invdh,tau__
             integer:: x0,y0,z0
             invdh = this%dh
-            if (x0.gt.1.and.x0.lt.this%xDim) then
-                a11 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0-1,1),invdh)
-                a21 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0-1,2),invdh)
-                a31 = 0.5d0*center_diff(this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0-1,3),invdh)
-            elseif (x0.eq.1) then
-                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0+1,1),this%uuu(z0,y0,x0+2,1),invdh)
-                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0+1,2),this%uuu(z0,y0,x0+2,2),invdh)
-                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0+1,3),this%uuu(z0,y0,x0+2,3),invdh)
-            else
-                a11 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,1),this%uuu(z0,y0,x0-1,1),this%uuu(z0,y0,x0-2,1),invdh)
-                a21 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,2),this%uuu(z0,y0,x0-1,2),this%uuu(z0,y0,x0-2,2),invdh)
-                a31 = 0.5d0*onesid_diff(this%uuu(z0,y0,x0,3),this%uuu(z0,y0,x0-1,3),this%uuu(z0,y0,x0-2,3),invdh)
-            endif
+            a11 = 0.5d0*x_difference(z0,y0,x0,1,invdh)
+            a21 = 0.5d0*x_difference(z0,y0,x0,2,invdh)
+            a31 = 0.5d0*x_difference(z0,y0,x0,3,invdh)
             if (y0.gt.1.and.y0.lt.this%yDim) then
                 a12 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,1),this%uuu(z0,y0-1,x0,1),invdh)
                 a22 = 0.5d0*center_diff(this%uuu(z0,y0+1,x0,2),this%uuu(z0,y0-1,x0,2),invdh)
@@ -1530,7 +1658,19 @@ module FluidDomain
         integer:: i
         do  i=0,lbmDim
             call swapzy(this%fIn, ee(i,3), ee(i,2), i, this%zDim, this%yDim, this%xDim, lbmDim)
+            if (rank_count > 1 .and. ee(i,1) /= 0) then
+                if (ee(i,1) == 1) then
+                    this%send_plane = this%fIn(:,:,this%xDim,i)
+                else
+                    this%send_plane = this%fIn(:,:,1,i)
+                endif
+                call exchange_plane(this%send_plane, this%receive_plane, ee(i,1))
+            endif
             call swapx(this%fIn, ee(i,1), i, this%zDim, this%yDim, this%xDim, lbmDim, this%OMPparindex, this%OMPeid, this%OMPedge)
+            if (rank_count > 1) then
+                if (ee(i,1) == 1) this%fIn(:,:,1,i) = this%receive_plane
+                if (ee(i,1) == -1) this%fIn(:,:,this%xDim,i) = this%receive_plane
+            endif
         enddo
 
         contains
@@ -1644,26 +1784,31 @@ module FluidDomain
         real(8), intent(in):: time
         integer:: x,y,z,pid,i
         real(8)::xmin,ymin,zmin
-        integer::nxs,nxe,nys,nye,nzs,nze
+        integer::nxs,nxe,nys,nye,nzs,nze,nx,ny,nz
+        real(4), allocatable :: global(:,:,:)
+        integer :: io_status
         integer,parameter::nameLen=10,blockLen=3,idfile=100
         character (LEN=nameLen):: fileName
         character (LEN=blockLen):: blockName
         real(8):: invUref,invUrefs
         if(this%outputtype .lt. 1) return
-        nxs  = 1 + this%offsetOutput
+        nxs  = max(1, 2 + this%offsetOutput - this%first_x)
         nys  = 1 + this%offsetOutput
         nzs  = 1 + this%offsetOutput
-        nxe  = this%xDim - this%offsetOutput
+        nxe  = min(this%xDim, this%global_nx - this%offsetOutput - this%first_x + 1)
         nye  = this%yDim - this%offsetOutput
         nze  = this%zDim - this%offsetOutput
-        xmin = this%xmin + this%offsetOutput * this%dh
+        xmin = this%global_xmin + this%offsetOutput * this%dh
+        nx = this%global_nx - 2*this%offsetOutput
+        ny = nye-nys+1
+        nz = nze-nzs+1
+        if (min(nx,ny,nz) < 1) call parallel_abort('Invalid flow output dimensions')
         ymin = this%ymin + this%offsetOutput * this%dh
         zmin = this%zmin + this%offsetOutput * this%dh
 
         invUref  = 1.d0/flow%Uref
         invUrefs = 1.d0/flow%Uref/flow%Uref
 
-        if(this%outputtype .ne. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do x=nxs, nxe
                 do y=nys, nye
@@ -1676,7 +1821,6 @@ module FluidDomain
                 enddo
             enddo
             !$OMP END PARALLEL DO
-        endif
         if(this%outputtype .ge. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do x=nxs, nxe
@@ -1712,41 +1856,54 @@ module FluidDomain
             enddo
             !$OMP END PARALLEL DO
         endif
-        call myfork(pid)
-        if(pid.eq.0) then
-            if(this%outputtype .ne. 2) then
-                write(fileName,'(I10)') nint(time/flow%Tref*1d5)
-                fileName = adjustr(fileName)
-                do  i=1,nameLen
-                    if(fileName(i:i)==' ')fileName(i:i)='0'
-                enddo
-                write(blockName,'(I3)') this%ID
-                blockName = adjustr(blockName)
-                do  i=1,blockLen
-                    if(blockName(i:i)==' ')blockName(i:i)='0'
-                enddo
-                open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
-                nxe = nxe-nxs+1
-                nye = nye-nys+1
-                nze = nze-nzs+1
-                WRITE(idfile) nxe,nye,nze,this%ID
-                WRITE(idfile) xmin,ymin,zmin,this%dh
-                write(idfile) this%outtmp(:,:,:,0)
-                write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
-                close(idfile)
-            endif
-            if(this%outputtype .ge. 2) then
-                open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
-                WRITE(idfile) nxe,nye,nze,this%ID
-                WRITE(idfile) xmin,ymin,zmin,this%dh
-                write(idfile) this%outtmp(:,:,:,0)
-                write(idfile) this%outtmp(:,:,:,4),this%outtmp(:,:,:,5),this%outtmp(:,:,:,6)
-                write(idfile) this%outtmp(:,:,:,7),this%outtmp(:,:,:,8),this%outtmp(:,:,:,9)
-                write(idfile) this%outtmp(:,:,:,10),this%outtmp(:,:,:,11),this%outtmp(:,:,:,12)
-                close(idfile)
-            endif
-            call myexit(0)
+        if (.not. mpi_enabled) then
+            call myfork(pid)
+            if (pid /= 0) return
         endif
+        if (rank_count > 1) then
+            if (is_root) then
+                allocate(global(nz,ny,nx))
+            else
+                allocate(global(0,0,0))
+            endif
+        endif
+        write(fileName,'(I10.10)') nint(time/flow%Tref*1d5)
+        write(blockName,'(I3.3)') this%ID
+        if (this%outputtype /= 2) then
+            call open_flow_file('./DatFlow/Flow'//fileName//'_b'//blockName)
+            do i = 0, 3
+                call write_field(i)
+            enddo
+            if (is_root) close(idfile)
+        endif
+        if (this%outputtype >= 2) then
+            call open_flow_file('./DatFlow/MeanFlow_b'//blockName)
+            call write_field(0)
+            do i = 4, 12
+                call write_field(i)
+            enddo
+            if (is_root) close(idfile)
+        endif
+        if (.not. mpi_enabled) call myexit(0)
+    contains
+        subroutine open_flow_file(path)
+            character(*), intent(in) :: path
+            if (.not. is_root) return
+            open(idfile,file=path,form='unformatted',access='stream',status='replace',iostat=io_status)
+            if (io_status /= 0) call parallel_abort('Cannot open '//path)
+            write(idfile) nx,ny,nz,this%ID
+            write(idfile) xmin,ymin,zmin,this%dh
+        end subroutine
+
+        subroutine write_field(field)
+            integer, intent(in) :: field
+            if (rank_count > 1) then
+                call gather_field(this%outtmp(:,:,:,field), global, this%global_nx, this%offsetOutput)
+                if (is_root) write(idfile) global
+            else
+                write(idfile) this%outtmp(:,:,:,field)
+            endif
+        end subroutine
     END SUBROUTINE write_flow_
 
     subroutine ComputeFieldStat_(this)
@@ -1770,8 +1927,11 @@ module FluidDomain
                 enddo
             enddo
             !$OMP END PARALLEL DO
-            uL2(i) = dsqrt(uL2(i) / (dble(this%xDim) * dble(this%yDim) * dble(this%zDim)))
         enddo
+        call sum_values(uL2)
+        call max_values(uLinfty)
+        uL2 = dsqrt(uL2 / (dble(this%global_nx) * dble(this%yDim) * dble(this%zDim)))
+        if (.not. is_root) return
         write(*,'(A,F18.12)')' FIELDSTAT L2 u ', uL2(1)
         write(*,'(A,F18.12)')' FIELDSTAT L2 v ', uL2(2)
         write(*,'(A,F18.12)')' FIELDSTAT L2 w ', uL2(3)
@@ -1784,9 +1944,25 @@ module FluidDomain
         IMPLICIT NONE
         class(LBMBlock), intent(inout) :: this
         integer,intent(in):: fID
-        write(fID) this%xmin,this%ymin,this%zmin,this%dh
-        write(fID) this%xDim,this%yDim,this%zDim
-        write(fID) this%fIn
+        integer :: q
+        real(8), allocatable :: global(:,:,:)
+        if (is_root) then
+            write(fID) this%global_xmin,this%ymin,this%zmin,this%dh
+            write(fID) this%global_nx,this%yDim,this%zDim
+        endif
+        if (rank_count == 1) then
+            write(fID) this%fIn
+        else
+            if (is_root) then
+                allocate(global(this%zDim,this%yDim,this%global_nx))
+            else
+                allocate(global(0,0,0))
+            endif
+            do q = 0, lbmDim
+                call gather_checkpoint(this%fIn(:,:,:,q), global, this%global_nx)
+                if (is_root) write(fID) global
+            enddo
+        endif
     ENDSUBROUTINE write_continue_
 
     SUBROUTINE read_continue_(this,fID)
@@ -2029,43 +2205,78 @@ module FluidDomain
         enddo
     end subroutine
     
+    subroutine write_fluid_probes(block,time)
+        integer, intent(in) :: block
+        real(8) :: time
+        integer :: i, ix, iy, iz, x, j, k, corner(3), limits(3)
+        real(8) :: position(3), fraction(3), weight(3), result(3)
+        character(4) :: probe
+        associate(b => LBMblks(block))
+            if (rank_count == 1) then
+                call write_fluid_information(time,b%dh,b%xmin,b%ymin,b%zmin,b%xDim,b%yDim,b%zDim,b%uuu)
+                return
+            endif
+            limits = [b%global_nx, b%yDim, b%zDim]
+            do i = 1, flow%fluidProbingNum
+                position = (flow%fluidProbingCoords(i,:) - [b%global_xmin,b%ymin,b%zmin])/b%dh
+                if (any(position < -eps) .or. any(position > real(limits-1,8)+eps)) then
+                    call parallel_abort('Fluid probe is outside the selected block')
+                endif
+                position = min(real(limits-1,8), max(0.0d0, position))
+                corner = min(floor(position)+1, max(1,limits-1))
+                fraction = position - real(corner-1,8)
+                result = 0.0d0
+                do ix = 0, min(1,limits(1)-1)
+                    x = corner(1) + ix
+                    if (.not. b%owns_x(x)) cycle
+                    x = x-b%first_x+1
+                    do iy = 0, min(1,limits(2)-1)
+                        j = corner(2) + iy
+                        do iz = 0, min(1,limits(3)-1)
+                            k = corner(3) + iz
+                            weight = merge(fraction, 1.0d0-fraction, [ix,iy,iz] == 1)
+                            result = result + product(weight)*b%uuu(k,j,x,:)
+                        enddo
+                    enddo
+                enddo
+                call sum_values(result)
+                if (is_root) then
+                    write(probe,'(I4.4)') i
+                    open(111,file='./DatInfo/FluidProbes_'//probe//'.dat',position='append')
+                    write(111,'(4E20.10)') time/flow%Tref,result/flow%Uref
+                    close(111)
+                endif
+            enddo
+        end associate
+    end subroutine
+
     subroutine write_fluid_flux(root,time)
-        ! Flux diagnostic for a single selected root block.
-        ! Computes inlet, mid-plane, and outlet x-fluxes.
-        implicit none
         integer, intent(in) :: root
         real(8), intent(in) :: time
-        integer :: j, k, ixMid
-        real(8) :: dh, fluxIn, fluxMid, fluxOut
-        real(8) :: wy, wz, Yref, Zref
+        integer :: j, k, plane, x, indices(3)
+        real(8) :: flux(3), wy, wz, scale
+        flux = 0.0d0
         associate(b => LBMblks(root))
-            dh = b%dh
-            ixMid = (b%xDim + 1) / 2
-            fluxIn  = 0.0d0
-            fluxMid = 0.0d0
-            fluxOut = 0.0d0
-            do k = 1, b%zDim
-                wz = 1.0d0
-                if (k .eq. 1 .or. k .eq. b%zDim) wz = 0.5d0
-                do j = 1, b%yDim
-                    wy = 1.0d0
-                    if (j .eq. 1 .or. j .eq. b%yDim) wy = 0.5d0
-                    fluxIn  = fluxIn  + b%uuu(k,j,1,1)      * b%den(k,j,1)      * dh*dh * wy*wz
-                    fluxMid = fluxMid + b%uuu(k,j,ixMid,1)  * b%den(k,j,ixMid)  * dh*dh * wy*wz
-                    fluxOut = fluxOut + b%uuu(k,j,b%xDim,1) * b%den(k,j,b%xDim) * dh*dh * wy*wz
+            indices = [1, (b%global_nx+1)/2, b%global_nx]
+            do plane = 1, 3
+                if (.not. b%owns_x(indices(plane))) cycle
+                x = indices(plane) - b%first_x + 1
+                do k = 1, b%zDim
+                    wz = 1.0d0
+                    if (k == 1 .or. k == b%zDim) wz = 0.5d0
+                    do j = 1, b%yDim
+                        wy = 1.0d0
+                        if (j == 1 .or. j == b%yDim) wy = 0.5d0
+                        flux(plane) = flux(plane) + b%uuu(k,j,x,1)*b%den(k,j,x)*b%dh*b%dh*wy*wz
+                    enddo
                 enddo
             enddo
-            Yref = b%ymax - b%ymin
-            Zref = b%zmax - b%zmin
+            scale = flow%denIn*flow%Uref*(b%zmax-b%zmin)*(b%ymax-b%ymin)
         end associate
-
+        call sum_values(flux)
+        if (.not. is_root) return
         open(111,file='./DatInfo/FluidFlux.dat',position='append')
-        write(111,'(4E20.10)') time/flow%Tref, &
-                                fluxIn  /(flow%denIn*flow%Uref*Zref*Yref), &
-                                fluxMid /(flow%denIn*flow%Uref*Zref*Yref), &
-                                fluxOut /(flow%denIn*flow%Uref*Zref*Yref)
+        write(111,'(4E20.10)') time/flow%Tref,flux/scale
         close(111)
-    
     end subroutine
-    
 end module FluidDomain

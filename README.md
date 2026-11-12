@@ -3,6 +3,7 @@
 ## Table of contents
 
   * [Installation](#installation)
+  * [MPI and OpenMP](#mpi-and-openmp)
   * [Run solver](#run-solver)
   * [Input file description](#input-file-description)
   * [Simulation control parameters](#simulation-control-parameters)
@@ -40,6 +41,42 @@ to
 ```
 CMP = gcc# intel,gcc
 ```
+
+## MPI and OpenMP
+
+Build the MPI executable with an MPI installation whose Fortran wrapper uses
+the compiler selected by `CMP`.
+
+```bash
+make -j MPI=1 CMP=gfortran
+```
+
+The executable is `FSILBM3D_mpi`. Use `BUILD=debug` for the GNU debug build,
+or set `MPIFC` to select a different MPI wrapper. Run from the case directory
+with its normal input files and output directories. For example, inside a
+Slurm allocation with two nodes and one task per node, run with Open MPI:
+
+```bash
+mpirun -np 2 --map-by ppr:1:node /path/to/FSILBM3D_mpi
+```
+
+`npsize` in the `Parallel` section is the number of OpenMP threads **per MPI
+rank**. Reserve at least that many CPUs per task. Each fluid block is split
+into contiguous x slabs, including the blocks in a refined grid. Each slab
+needs at least `npsize` x planes. A slab at a physical x boundary also needs
+enough planes for its extrapolation or LES stencil.
+
+Ranks exchange the D3Q19 populations that stream across slab boundaries.
+Refinement exchanges use the coarse/fine faces. IBM interpolation sums the
+contributions from the ranks that own the stencil nodes. Every rank advances
+the same structural state and spreads the resulting force to its own cells.
+Rank zero writes the usual flow, body, probe and checkpoint files.
+
+All ranks need access to the same case directory. MPI restart reads the
+original checkpoint block geometry and order, and supports changing the number
+of ranks. The OpenMP executable continues to support interpolation from a
+different restart grid. For output, rank zero temporarily collects one field
+per block at a time.
 
 ## Run solver
 
@@ -127,7 +164,7 @@ $PBS_WDIR/$PBS_ENAME
 
 - **Parallel**
 
-  1. *npsize* : The core number used in the simulaion
+  1. *npsize* : OpenMP threads per process. In an MPI run, this is the thread count per rank.
 
 - **FlowCondition**
 
