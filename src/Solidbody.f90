@@ -6,6 +6,7 @@
 module SolidBody
     use ConstParams
     use SolidSolver
+    use ParallelDomain, only: is_root, parallel_barrier, parallel_abort, sum_matrix
     implicit none
     private
     ! Immersed boundary method parameters
@@ -205,7 +206,8 @@ module SolidBody
         do iFish = 1,m_nFish
             VBodies(iFish)%v_type = iBodyType(iFish)
             if (iBodyType(iFish).eq.-1) then
-                call SurfacetoBeam_write(FEmeshName(iFish))
+                if (is_root) call SurfacetoBeam_write(FEmeshName(iFish))
+                call parallel_barrier()
             endif
             call VBodies(iFish)%rbm%SetSolver(FEmeshName(iFish),&
                 iBodyModel(iFish),isMotionGiven(1:6,iFish), &
@@ -588,11 +590,11 @@ module SolidBody
         enddo
     end subroutine
 
-    subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+    subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,uuu,force)
         implicit none
         integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
-        integer,intent(in):: xDim,yDim,zDim
+        integer,intent(in):: xDim,yDim,zDim,global_nx,first_x
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         integer :: i,iFish
@@ -600,7 +602,7 @@ module SolidBody
             iFish = bodies(i)
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
-        call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+        call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,uuu,force)
     end subroutine
 
     subroutine PlateUpdatePosVelArea_(this)
@@ -849,8 +851,8 @@ module SolidBody
                     else if((boundaryConditions_(1).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.0) then
                         ix_(k_) = 1
                     else
-                        write(*,*) 'index out of xmin bound', ix_(k_)
-                        stop
+                        write(*,*) 'IBM stencil index out of xmin bounds', ix_(k_)
+                        stop 1
                     endif
                 else if(ix_(k_)>xDim_) then
                     if(boundaryConditions_(2).eq.BCPeriodic) then
@@ -860,20 +862,20 @@ module SolidBody
                     else if((boundaryConditions_(2).eq.BCstationary_Wall_halfway) .and. ix_(k_).eq.xDim_+1) then
                         ix_(k_) = xDim_
                     else
-                        write(*,*) 'index out of xmax bound', ix_(k_)
-                        stop
+                        write(*,*) 'IBM stencil index out of xmax bounds', ix_(k_)
+                        stop 1
                     endif
                 endif
             enddo
         END SUBROUTINE trimedindex
     end subroutine UpdateElmtInterp_
 
-    SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+    SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,uuu,force)
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
         integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
-        integer,intent(in):: xDim,yDim,zDim
+        integer,intent(in):: xDim,yDim,zDim,global_nx,first_x
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         !================================
@@ -885,7 +887,7 @@ module SolidBody
         do i = 1, bodies(0)
             iFish = bodies(i)
             if (VBodies(iFish)%v_move .eq. 1 .or. VBodies(iFish)%rbm%iBodyModel .eq. 2 .or. VBodies(iFish)%count_Interp .eq. 0 ) then
-                call VBodies(iFish)%UpdateElmtInterp(dh,xmin,ymin,zmin,xDim,yDim,zDim)
+                call VBodies(iFish)%UpdateElmtInterp(dh,xmin,ymin,zmin,global_nx,yDim,zDim)
                 VBodies(iFish)%count_Interp = 1
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
@@ -899,7 +901,7 @@ module SolidBody
                 dsum=0.0d0
                 do i = 1, bodies(0)
                     iFish = bodies(i)
-                    call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
+                    call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,first_x,tol,ntol,uuu)
                     dmaxLBM = dmaxLBM + tol
                     dsum = dsum + ntol
                 enddo
@@ -915,16 +917,16 @@ module SolidBody
         enddo
         do i = 1, bodies(0)
             iFish = bodies(i)
-            call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force)
+            call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,first_x,force)
         enddo
     END SUBROUTINE
 
-    SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,force)
+    SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,first_x,force)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         real(8),intent(in):: dh
-        integer,intent(in):: xDim,yDim,zDim
+        integer,intent(in):: xDim,yDim,zDim,first_x
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
@@ -938,7 +940,7 @@ module SolidBody
         invh3 = (1.d0/dh)**3
         ! compute the velocity of IB nodes at element center
         do  iEL=1,this%v_nelmts
-            ix = this%v_Ei(1:4,iEL)
+            ix = int(this%v_Ei(1:4,iEL)) - first_x + 1
             jy = this%v_Ei(5:8,iEL)
             kz = this%v_Ei(9:12,iEL)
             rx = this%v_Ew(1:4,iEL)
@@ -969,6 +971,7 @@ module SolidBody
             this%rbm%lodFlow(im1) = this%rbm%lodFlow(im1) + 0.5d0 * momentElemTemp(1:3)
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
+                if (ix(x) < 1 .or. ix(x) > xDim) cycle
                 do y=-1,2
                     do z=-1,2
                         forceTemp(1:3) = -forceElemTemp(1:3)*rx(x)*ry(y)*rz(z)
@@ -980,11 +983,11 @@ module SolidBody
         enddo
     END SUBROUTINE FluidVolumeForce_
 
-    SUBROUTINE PenaltyForce_(this,dt,dh,xDim,yDim,zDim,tolerance,ntolsum,uuu)
+    SUBROUTINE PenaltyForce_(this,dt,dh,xDim,yDim,zDim,first_x,tolerance,ntolsum,uuu)
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         real(8),intent(in):: dt,dh
-        integer,intent(in):: xDim,yDim,zDim
+        integer,intent(in):: xDim,yDim,zDim,first_x
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         class(VirtualBody), intent(inout) :: this
         real(8),intent(out)::tolerance, ntolsum
@@ -992,6 +995,7 @@ module SolidBody
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
         real(8):: velElemIB(3),forceElemTemp(this%v_nelmts,3),invh3
+        real(8):: interpolated(3,this%v_nelmts)
         !======================================================
         integer:: x,y,z,iEL
         !======================================================
@@ -999,9 +1003,9 @@ module SolidBody
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
         ! compute the velocity of IB nodes at element center
-        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElemIB,forceTemp) reduction(+:tolerance)
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElemIB)
         do  iEL=1,this%v_nelmts
-            ix = this%v_Ei(1:4,iEL)
+            ix = int(this%v_Ei(1:4,iEL)) - first_x + 1
             jy = this%v_Ei(5:8,iEL)
             kz = this%v_Ei(9:12,iEL)
             rx = this%v_Ew(1:4,iEL)
@@ -1009,13 +1013,21 @@ module SolidBody
             rz = this%v_Ew(9:12,iEL)
             velElemIB(1:3)=0.0d0
             do x=-1,2
+                if (ix(x) < 1 .or. ix(x) > xDim) cycle
                 do y=-1,2
                     do z=-1,2
                         velElemIB(1:3)=velElemIB(1:3)+uuu(kz(z),jy(y),ix(x),1:3)*rx(x)*ry(y)*rz(z)
                     enddo
                 enddo
             enddo
-            velElemIB = this%v_Evel(1:3,iEL)-velElemIB(1:3)
+            interpolated(:,iEL) = velElemIB
+        enddo
+        !$OMP END PARALLEL DO
+        call sum_matrix(interpolated)
+
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,velElemIB,forceTemp) REDUCTION(+:tolerance)
+        do iEL = 1, this%v_nelmts
+            velElemIB = this%v_Evel(1:3,iEL) - interpolated(:,iEL)
             forceTemp(1:3) = velElemIB(1:3)*this%v_Ea(iEL)
             !if ((.not. IEEE_IS_FINITE(forceTemp(1))) .or. (.not. IEEE_IS_FINITE(forceTemp(2))) .or. (.not. IEEE_IS_FINITE(forceTemp(3)))) then
             !    write(*, *) 'Nan found in forceElemTemp', forceTemp
@@ -1028,19 +1040,19 @@ module SolidBody
         enddo
         !$OMP END PARALLEL DO
         if (.not. IEEE_IS_FINITE(tolerance)) then
-            write(*, *) 'Nan found in PenaltyForce'
-            stop
+            call parallel_abort('NaN found in PenaltyForce')
         endif
 
         ! correct velocity
         do  iEL=1,this%v_nelmts
-            ix = this%v_Ei(1:4,iEL)
+            ix = int(this%v_Ei(1:4,iEL)) - first_x + 1
             jy = this%v_Ei(5:8,iEL)
             kz = this%v_Ei(9:12,iEL)
             rx = this%v_Ew(1:4,iEL)
             ry = this%v_Ew(5:8,iEL)
             rz = this%v_Ew(9:12,iEL)
             do x=-1,2
+                if (ix(x) < 1 .or. ix(x) > xDim) cycle
                 do y=-1,2
                     do z=-1,2
                         uuu(kz(z),jy(y),ix(x),1:3) = uuu(kz(z),jy(y),ix(x),1:3) - forceElemTemp(iEL,1:3)*rx(x)*ry(y)*rz(z)

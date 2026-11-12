@@ -6,6 +6,8 @@
 CMP = gfortran# ifort,ifx,gfortran
 
 BUILD ?=
+MPI ?= 0
+MPIFC ?= mpifort
 
 #######CMP settings###########
 ifeq ($(CMP),ifort)
@@ -16,7 +18,7 @@ FC = ifx
 FFLAGS = -diag-disable=10448 -fpp -O3 -free -qopenmp -heap-arrays #-real-size 32 -double-size 64
 else ifeq ($(CMP),gfortran)
 FC = gfortran
-FFLAGS = -O3
+FFLAGS = -cpp -O3
 ifeq ($(BUILD),debug)
 FFLAGS = -cpp -g -O0
 FFLAGS += -ffpe-trap=invalid,zero -fbacktrace -Wall -Wextra -pedantic -Warray-bounds -fbacktrace  -fbounds-check
@@ -24,46 +26,45 @@ endif
 FFLAGS += -Wconversion -Wconversion-extra -ffree-form -ffree-line-length-none -fopenmp -fimplicit-none -finit-real=zero -std=f2003 #-fdefault-real-4 -fdefault-double-8
 endif
 CC = cc
-CPP = c++
 
 SRCDIR = ./src
+ifeq ($(MPI),1)
+FC = $(MPIFC)
+FFLAGS += -DFSILBM3D_MPI
+TARGET = FSILBM3D_mpi
+else
+TARGET = FSILBM3D
+endif
+OBJDIR = build-$(CMP)-mpi$(MPI)$(if $(BUILD),-$(BUILD))
 
 ### List of files for the main code
-OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
-SRC = $(SRCDIR)/ConstParams.f90 $(SRCDIR)/FlowCondition.f90 $(SRCDIR)/SolidSolver.f90 $(SRCDIR)/Solidbody.f90 $(SRCDIR)/FluidDomain.f90 $(SRCDIR)/LBMBlockComm.f90 $(SRCDIR)/Util.f90 $(SRCDIR)/main.f90
-CSRC = $(SRCDIR)/forkthread.c
-CPPSRC = $(SRCDIR)/velocitymap.cpp
-OBJ = $(SRC:%.f90=%.o)
-COBJ = $(CSRC:%.c=%.o)
-CPPOBJ = $(CPPSRC:%.cpp=%.o)
-
-#######OPTIONS settings###########
-OPT := -I$(SRCDIR) $(FFLAGS)
-LINKOPT := $(FFLAGS)
-
+OBJ = $(addprefix $(OBJDIR)/,ConstParams.o ParallelDomain.o FlowCondition.o SolidSolver.o Solidbody.o FluidDomain.o LBMBlockComm.o Util.o main.o forkthread.o)
 
 #-----------------------------------------------------------------------
 # Normally no need to change anything below
 
-all: FSILBM3D
+.PHONY: all clean FORCE
+all: $(TARGET)
 
-FSILBM3D : $(OBJ) $(COBJ) #$(CPPOBJ)
-	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(COBJ)
-#$(CPPOBJ)  -lstdc++
+$(TARGET): $(OBJ) FORCE
+	$(FC) -o $@ $(FFLAGS) $(OBJ)
 
+$(OBJDIR):
+	mkdir -p $@
 
-$(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
-	$(FC) $(FFLAGS) $(OPT) $(INC) -c $<
-	mv $(@F) ${SRCDIR}
+$(OBJDIR)/%.o: $(SRCDIR)/%.f90 | $(OBJDIR)
+	cd $(OBJDIR) && $(FC) $(FFLAGS) $(INC) -c ../$< -o $(notdir $@)
 
-$(COBJ):$(SRCDIR)%.o : $(SRCDIR)%.c
-	$(CC)  -c -O3 $<
-	mv $(@F) ${SRCDIR}
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) -c -O3 $< -o $@
 
-$(CPPOBJ):$(SRCDIR)%.o : $(SRCDIR)%.cpp
-	$(CPP)  -c -O3 $<
-	mv $(@F) ${SRCDIR}
+$(OBJDIR)/FlowCondition.o $(OBJDIR)/SolidSolver.o: $(OBJDIR)/ConstParams.o
+$(OBJDIR)/Solidbody.o: $(OBJDIR)/SolidSolver.o $(OBJDIR)/FlowCondition.o $(OBJDIR)/ParallelDomain.o
+$(OBJDIR)/FluidDomain.o: $(OBJDIR)/Solidbody.o $(OBJDIR)/FlowCondition.o $(OBJDIR)/ParallelDomain.o
+$(OBJDIR)/LBMBlockComm.o: $(OBJDIR)/FluidDomain.o
+$(OBJDIR)/main.o $(OBJDIR)/Util.o: $(OBJDIR)/LBMBlockComm.o
 
 clean:
+	rm -rf $(OBJDIR)
 	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.mod $(SRCDIR)/*.smod
-	rm -f *.o *.mod *.smod FSILBM3D
+	rm -f *.o *.mod *.smod $(TARGET)

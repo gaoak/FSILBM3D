@@ -6,6 +6,7 @@
 module LBMBlockComm
     use ConstParams
     use FluidDomain
+    use ParallelDomain, only: sum_face, parallel_abort
     implicit none
     !include 'mpif.h'
     type :: CommPair
@@ -325,8 +326,10 @@ module LBMBlockComm
         integer:: carrierFluidId,isubstep
         dt_solid = LBMblks(carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
         call get_now_time(time_begine2)
-        call FSInteraction_force(LBMblks(carrierFluidId)%carriedBodies,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%xmin,LBMblks(carrierFluidId)%ymin,LBMblks(carrierFluidId)%zmin, &
-                                LBMblks(carrierFluidId)%xDim,LBMblks(carrierFluidId)%yDim,LBMblks(carrierFluidId)%zDim,LBMblks(carrierFluidId)%uuu,LBMblks(carrierFluidId)%force)
+        associate(b => LBMblks(carrierFluidId))
+            call FSInteraction_force(b%carriedBodies,b%dh,b%dh,b%global_xmin,b%ymin,b%zmin, &
+                                     b%xDim,b%yDim,b%zDim,b%global_nx,b%first_x,b%uuu,b%force)
+        end associate
         call get_now_time(time_end2)
         time_IBM = time_IBM + (time_end2 - time_begine2)
         call get_now_time(time_begine2)
@@ -337,174 +340,82 @@ module LBMBlockComm
         time_FEM = time_FEM + (time_end2 - time_begine2)
     endsubroutine
 
-    subroutine extract_interpolate_layer(treenode,time) ! time interpolation : linear
-        implicit none
-        type(CommPair):: pair
-        integer:: treenode,time
-        integer:: xF,yF,zF,x,y,z
-        integer:: i,f,s,ns,xDimF,yDimF,zDimF,e
-        f  = treenode
-        ns = blockTree(f)%nsons
-        do i = 1,ns
-            s = blockTree(f)%sons(i)
-            pair  = blockTree(f)%comm(i)
-            xDimF = pair%xDimF
-            yDimF = pair%yDimF
-            zDimF = pair%zDimF
-            if(LBMblks(s)%BndConds(1).eq.BCfluid) then
-                xF = pair%f(1)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF,e)
-                do e = 0,lbmDim
-                do y = 1,yDimF
-                yF = y + pair%f(3) - 1
-                do z = 1,zDimF
-                    zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fx1t1(e,z,y) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fx1t2(e,z,y) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 1) LBMblks(s)%tau_Fx1t1(z,y) =  LBMblks(f)%tau_all(zF,yF,xF)
-                    if (time .eq. 2) LBMblks(s)%tau_Fx1t2(z,y) =  LBMblks(f)%tau_all(zF,yF,xF)
+    subroutine extract_interpolate_layer(treenode,time)
+        integer, intent(in) :: treenode, time
+        integer :: i, face
+        type(CommPair) :: pair
+        real(8), allocatable :: values(:,:,:)
+        do i = 1, blockTree(treenode)%nsons
+            pair = blockTree(treenode)%comm(i)
+            associate(son => LBMblks(pair%sonId))
+                do face = 1, 6
+                    if (pair%sds(face) == 0) cycle
+                    call capture_face(LBMblks(treenode), pair%f, face, 1, values)
+                    select case (face)
+                    case (1)
+                        call store_face(son%fIn_Fx1t1, son%fIn_Fx1t2, son%tau_Fx1t1, son%tau_Fx1t2)
+                    case (2)
+                        call store_face(son%fIn_Fx2t1, son%fIn_Fx2t2, son%tau_Fx2t1, son%tau_Fx2t2)
+                    case (3)
+                        call store_face(son%fIn_Fy1t1, son%fIn_Fy1t2, son%tau_Fy1t1, son%tau_Fy1t2)
+                    case (4)
+                        call store_face(son%fIn_Fy2t1, son%fIn_Fy2t2, son%tau_Fy2t1, son%tau_Fy2t2)
+                    case (5)
+                        call store_face(son%fIn_Fz1t1, son%fIn_Fz1t2, son%tau_Fz1t1, son%tau_Fz1t2)
+                    case (6)
+                        call store_face(son%fIn_Fz2t1, son%fIn_Fz2t2, son%tau_Fz2t1, son%tau_Fz2t2)
+                    end select
                 enddo
-                enddo
-                enddo
-                !$OMP END PARALLEL DO
-                if(time.eq.2) then
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y)
-                    do y = 1,yDimF
-                        LBMblks(s)%fIn_Fx1t1(:,:,y) = 0.5d0*(LBMblks(s)%fIn_Fx1t1(:,:,y) + LBMblks(s)%fIn_Fx1t2(:,:,y))
-                        LBMblks(s)%tau_Fx1t1(:,y) = 0.5d0*(LBMblks(s)%tau_Fx1t1(:,y) + LBMblks(s)%tau_Fx1t2(:,y))
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-            endif
-            if(LBMblks(s)%BndConds(2).eq.BCfluid) then
-                xF = pair%f(2)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y,z,yF,zF,e)
-                do e = 0,lbmDim
-                do y = 1,yDimF
-                yF = y + pair%f(3) - 1
-                do z = 1,zDimF
-                    zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fx2t1(e,z,y) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fx2t2(e,z,y) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 1) LBMblks(s)%tau_Fx2t1(z,y) =  LBMblks(f)%tau_all(zF,yF,xF)
-                    if (time .eq. 2) LBMblks(s)%tau_Fx2t2(z,y) =  LBMblks(f)%tau_all(zF,yF,xF)
-                enddo
-                enddo
-                enddo
-                !$OMP END PARALLEL DO
-                if(time.eq.2) then
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(y)
-                    do y = 1,yDimF
-                        LBMblks(s)%fIn_Fx2t1(:,:,y) = 0.5d0*(LBMblks(s)%fIn_Fx2t1(:,:,y) + LBMblks(s)%fIn_Fx2t2(:,:,y))
-                        LBMblks(s)%tau_Fx2t1(:,y) = 0.5d0*(LBMblks(s)%tau_Fx2t1(:,y) + LBMblks(s)%tau_Fx2t2(:,y))
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-            endif
-            if(LBMblks(s)%BndConds(3).eq.BCfluid) then
-                yF = pair%f(3)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF,e)
-                do e = 0,lbmDim
-                do x = 1,xDimF
-                xF = x + pair%f(1) - 1
-                do z = 1,zDimF
-                    zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fy1t1(e,z,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fy1t2(e,z,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 1) LBMblks(s)%tau_Fy1t1(z,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                    if (time .eq. 2) LBMblks(s)%tau_Fy1t2(z,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                enddo
-                enddo
-                enddo
-                !$OMP END PARALLEL DO
-                if(time.eq.2) then
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-                    do x = 1,xDimF
-                        LBMblks(s)%fIn_Fy1t1(:,:,x) = 0.5d0*(LBMblks(s)%fIn_Fy1t1(:,:,x) + LBMblks(s)%fIn_Fy1t2(:,:,x))
-                        LBMblks(s)%tau_Fy1t1(:,x) = 0.5d0*(LBMblks(s)%tau_Fy1t1(:,x) + LBMblks(s)%tau_Fy1t2(:,x))
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-            endif
-            if(LBMblks(s)%BndConds(4).eq.BCfluid) then
-                yF = pair%f(4)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,z,xF,zF,e)
-                do e = 0,lbmDim
-                do x = 1,xDimF
-                xF = x + pair%f(1) - 1
-                do z = 1,zDimF
-                    zF = z + pair%f(5) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fy2t1(e,z,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fy2t2(e,z,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 1) LBMblks(s)%tau_Fy2t1(z,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                    if (time .eq. 2) LBMblks(s)%tau_Fy2t2(z,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                enddo
-                enddo
-                enddo
-                !$OMP END PARALLEL DO
-                if(time.eq.2) then
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-                    do x = 1,xDimF
-                        LBMblks(s)%fIn_Fy2t1(:,:,x) = 0.5d0*(LBMblks(s)%fIn_Fy2t1(:,:,x) + LBMblks(s)%fIn_Fy2t2(:,:,x))
-                        LBMblks(s)%tau_Fy2t1(:,x) = 0.5d0*(LBMblks(s)%tau_Fy2t1(:,x) + LBMblks(s)%tau_Fy2t2(:,x))
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-            endif
-            if(LBMblks(s)%BndConds(5).eq.BCfluid) then
-                zF = pair%f(5)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF,e)
-                do e = 0,lbmDim
-                do x = 1,xDimF
-                xF = x + pair%f(1) - 1
-                do y = 1,yDimF
-                    yF = y + pair%f(3) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fz1t1(e,y,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fz1t2(e,y,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 1) LBMblks(s)%tau_Fz1t1(y,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                    if (time .eq. 2) LBMblks(s)%tau_Fz1t2(y,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                enddo
-                enddo
-                enddo
-                !$OMP END PARALLEL DO
-                if(time.eq.2) then
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-                    do x = 1,xDimF
-                        LBMblks(s)%fIn_Fz1t1(:,:,x) = 0.5d0*(LBMblks(s)%fIn_Fz1t1(:,:,x) + LBMblks(s)%fIn_Fz1t2(:,:,x))
-                        LBMblks(s)%tau_Fz1t1(:,x) = 0.5d0*(LBMblks(s)%tau_Fz1t1(:,x) + LBMblks(s)%tau_Fz1t2(:,x))
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-            endif
-            if(LBMblks(s)%BndConds(6).eq.BCfluid) then
-                zF = pair%f(6)
-                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,xF,yF,e)
-                do e = 0,lbmDim
-                do x = 1,xDimF
-                xF = x + pair%f(1) - 1
-                do y = 1,yDimF
-                    yF = y + pair%f(3) - 1
-                    if (time .eq. 1) LBMblks(s)%fIn_Fz2t1(e,y,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 2) LBMblks(s)%fIn_Fz2t2(e,y,x) =  LBMblks(f)%fIn(zF,yF,xF,e)
-                    if (time .eq. 1) LBMblks(s)%tau_Fz2t1(y,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                    if (time .eq. 2) LBMblks(s)%tau_Fz2t2(y,x) =  LBMblks(f)%tau_all(zF,yF,xF)
-                enddo
-                enddo
-                enddo
-                !$OMP END PARALLEL DO
-                if(time.eq.2) then
-                    !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x)
-                    do x = 1,xDimF
-                        LBMblks(s)%fIn_Fz2t1(:,:,x) = 0.5d0*(LBMblks(s)%fIn_Fz2t1(:,:,x) + LBMblks(s)%fIn_Fz2t2(:,:,x))
-                        LBMblks(s)%tau_Fz2t1(:,x) = 0.5d0*(LBMblks(s)%tau_Fz2t1(:,x) + LBMblks(s)%tau_Fz2t2(:,x))
-                    enddo
-                    !$OMP END PARALLEL DO
-                endif
-            endif
+            end associate
         enddo
-    endsubroutine
+    contains
+        subroutine store_face(f1, f2, tau1, tau2)
+            real(8), intent(inout) :: f1(:,:,:), f2(:,:,:), tau1(:,:), tau2(:,:)
+            if (time == 1) then
+                f1 = values(0:lbmDim,:,:)
+                tau1 = values(lbmDim+1,:,:)
+            else
+                f2 = values(0:lbmDim,:,:)
+                tau2 = values(lbmDim+1,:,:)
+                f1 = 0.5d0 * (f1 + f2)
+                tau1 = 0.5d0 * (tau1 + tau2)
+            endif
+        end subroutine
+    end subroutine
 
-    ! verify the parameters of fluid blocks
+    subroutine face_geometry(bounds, face, step, axes, n)
+        integer, intent(in) :: bounds(6), face, step
+        integer, intent(out) :: axes(3), n(2)
+        integer, parameter :: axis_order(3,3) = reshape([3,2,1, 3,1,2, 2,1,3], [3,3])
+        axes = axis_order(:,(face+1)/2)
+        n = max(0, (bounds(2*axes(1:2))-bounds(2*axes(1:2)-1)+step)/step)
+    end subroutine
+
+    subroutine capture_face(block, bounds, face, step, values)
+        type(LBMBlock), intent(in) :: block
+        integer, intent(in) :: bounds(6), face, step
+        real(8), allocatable, intent(out) :: values(:,:,:)
+        integer :: a, b, xyz(3), axes(3), n(2), x, y, z
+        call face_geometry(bounds, face, step, axes, n)
+        allocate(values(0:lbmDim+1,n(1),n(2)))
+        values = 0.0d0
+        !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,xyz,x,y,z)
+        do b = 1, n(2)
+            do a = 1, n(1)
+                xyz(axes(1:2)) = bounds(2*axes(1:2)-1) + ([a,b]-1)*step
+                xyz(axes(3)) = bounds(face)
+                if (.not. block%owns_x(xyz(1))) cycle
+                x = xyz(1) - block%first_x + 1
+                y = xyz(2)
+                z = xyz(3)
+                values(0:lbmDim,a,b) = block%fIn(z,y,x,0:lbmDim)
+                values(lbmDim+1,a,b) = block%tau_all(z,y,x)
+            enddo
+        enddo
+        !$OMP END PARALLEL DO
+        call sum_face(values)
+    end subroutine
+
     recursive SUBROUTINE check_blocks_params(treenode)
         implicit none
         integer,intent(in):: treenode
@@ -543,119 +454,42 @@ module LBMBlockComm
         enddo
     END SUBROUTINE
 
-    SUBROUTINE deliver_son_to_father(pair)
-        use FluidDomain
-        implicit none
-        type(CommPair),intent(in):: pair
-        integer:: xS,yS,zS,xF,yF,zF
-        real(8)::tmpf(0:lbmDim),coeff,VF(1:3),dh
-        VF    = LBMblks(pair%sonId)%volumeForce(1:3)
-        dh    = LBMblks(pair%sonId)%dh
-        ! x direction slices
-        if(pair%sds(1).eq.1) then
-            xF = pair%fi(1)
-            xS = pair%si(1)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS,yF,zF,tmpf,coeff)
-            do  yS = pair%si(3),pair%si(4),m_gridDelta
-                yF = (yS - pair%si(3))/2 + pair%fi(3)
-                do  zS = pair%si(5),pair%si(6),m_gridDelta
-                    zF = (zS - pair%si(5))/2 + pair%fi(5)
-                    coeff = (LBMblks(pair%fatherId)%tau_all(zF,yF,xF) / LBMblks(pair%sonId)%tau_all(zS,yS,xS)) * dble(m_gridDelta)
-                    tmpf = LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%fatherId)%fIn(zF,yF,xF,0:lbmDim) = tmpf
+    subroutine deliver_son_to_father(pair)
+        type(CommPair), intent(in) :: pair
+        integer :: face, a, b, xyz(3), axes(3), n(2), x, y, z
+        real(8) :: populations(0:lbmDim), coeff, force(3), dh
+        real(8), allocatable :: values(:,:,:)
+        associate(son => LBMblks(pair%sonId), father => LBMblks(pair%fatherId))
+            force = son%volumeForce
+            dh = son%dh
+            do face = 1, 6
+                if (pair%sds(face) == 0) cycle
+                call capture_face(son, pair%si, face, m_gridDelta, values)
+                call face_geometry(pair%fi, face, 1, axes, n)
+                !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(a,b,xyz,x,y,z,populations,coeff)
+                do b = 1, size(values,3)
+                    do a = 1, size(values,2)
+                        xyz(axes(1:2)) = pair%fi(2*axes(1:2)-1) + [a,b] - 1
+                        xyz(axes(3)) = pair%fi(face)
+                        if (.not. father%owns_x(xyz(1))) cycle
+                        x = xyz(1) - father%first_x + 1
+                        y = xyz(2)
+                        z = xyz(3)
+                        coeff = (father%tau_all(z,y,x) / values(lbmDim+1,a,b)) * dble(m_gridDelta)
+                        populations = values(0:lbmDim,a,b)
+                        call fIn_GridTransform(populations, coeff, force, dh)
+                        father%fIn(z,y,x,0:lbmDim) = populations
+                    enddo
                 enddo
+                !$OMP END PARALLEL DO
             enddo
-            !$OMP END PARALLEL DO
-        endif
-        if(pair%sds(2).eq.-1) then
-            xF = pair%fi(2)
-            xS = pair%si(2)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(yS,zS,yF,zF,tmpf,coeff)
-            do  yS = pair%si(3),pair%si(4),m_gridDelta
-                yF = (yS - pair%si(3))/2 + pair%fi(3)
-                do  zS = pair%si(5),pair%si(6),m_gridDelta
-                    zF = (zS - pair%si(5))/2 + pair%fi(5)
-                    coeff = (LBMblks(pair%fatherId)%tau_all(zF,yF,xF) / LBMblks(pair%sonId)%tau_all(zS,yS,xS)) * dble(m_gridDelta)
-                    tmpf = LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%fatherId)%fIn(zF,yF,xF,0:lbmDim) = tmpf
-                enddo
-            enddo
-            !$OMP END PARALLEL DO
-        endif
-        ! y direction slices
-        if(pair%sds(3).eq.1) then
-            yF = pair%fi(3)
-            yS = pair%si(3)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,xF,zF,tmpf,coeff)
-            do  xS = pair%si(1),pair%si(2),m_gridDelta
-                xF = (xS - pair%si(1))/2 + pair%fi(1)
-                do  zS = pair%si(5),pair%si(6),m_gridDelta
-                    zF = (zS - pair%si(5))/2 + pair%fi(5)
-                    coeff = (LBMblks(pair%fatherId)%tau_all(zF,yF,xF) / LBMblks(pair%sonId)%tau_all(zS,yS,xS)) * dble(m_gridDelta)
-                    tmpf = LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%fatherId)%fIn(zF,yF,xF,0:lbmDim) = tmpf
-                enddo
-            enddo
-            !$OMP END PARALLEL DO
-        endif
-        if(pair%sds(4).eq.-1) then
-            yF = pair%fi(4)
-            yS = pair%si(4)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,xF,zF,tmpf,coeff)
-            do  xS = pair%si(1),pair%si(2),m_gridDelta
-                xF = (xS - pair%si(1))/2 + pair%fi(1)
-                do  zS = pair%si(5),pair%si(6),m_gridDelta
-                    zF = (zS - pair%si(5))/2 + pair%fi(5)
-                    coeff = (LBMblks(pair%fatherId)%tau_all(zF,yF,xF) / LBMblks(pair%sonId)%tau_all(zS,yS,xS)) * dble(m_gridDelta)
-                    tmpf = LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%fatherId)%fIn(zF,yF,xF,0:lbmDim) = tmpf
-                enddo
-            enddo
-            !$OMP END PARALLEL DO
-        endif
-        ! z direction slices
-        if(pair%sds(5).eq.1) then
-            zF = pair%fi(5)
-            zS = pair%si(5)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,xF,yF,tmpf,coeff)
-            do  xS = pair%si(1),pair%si(2),m_gridDelta
-                xF = (xS - pair%si(1))/2 + pair%fi(1)
-                do  yS = pair%si(3),pair%si(4),m_gridDelta
-                    yF = (yS - pair%si(3))/2 + pair%fi(3)
-                    coeff = (LBMblks(pair%fatherId)%tau_all(zF,yF,xF) / LBMblks(pair%sonId)%tau_all(zS,yS,xS)) * dble(m_gridDelta)
-                    tmpf = LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%fatherId)%fIn(zF,yF,xF,0:lbmDim) = tmpf
-                enddo
-            enddo
-            !$OMP END PARALLEL DO
-        endif
-        if(pair%sds(6).eq.-1) then
-            zF = pair%fi(6)
-            zS = pair%si(6)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,xF,yF,tmpf,coeff)
-            do  xS = pair%si(1),pair%si(2),m_gridDelta
-                xF = (xS - pair%si(1))/2 + pair%fi(1)
-                do  yS = pair%si(3),pair%si(4),m_gridDelta
-                    yF = (yS - pair%si(3))/2 + pair%fi(3)
-                    coeff = (LBMblks(pair%fatherId)%tau_all(zF,yF,xF) / LBMblks(pair%sonId)%tau_all(zS,yS,xS)) * dble(m_gridDelta)
-                    tmpf = LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim)
-                    call fIn_GridTransform(tmpf, coeff, VF, dh)
-                    LBMblks(pair%fatherId)%fIn(zF,yF,xF,0:lbmDim) = tmpf
-                enddo
-            enddo
-            !$OMP END PARALLEL DO
-        endif
-    end subroutine 
+        end associate
+    end subroutine
 
     SUBROUTINE interpolation_father_to_son(pair,n_timeStep)
         implicit none
         type(CommPair),intent(in):: pair
-        integer:: n_timeStep,xS,yS,zS
+        integer:: n_timeStep,xS,yS,zS,xLocal
         real(8):: coeff,VF(1:3),dh
         integer:: xDimS, xDimF, yDimS, yDimF, zDimS, zDimF
         real(8),allocatable::tmpf(:,:,:)
@@ -673,8 +507,8 @@ module LBMBlockComm
             allocate(tmpf(0:lbmDim,zDimS,yDimS))
             allocate(tmptau(zDimS,yDimS))
         endif
-        if(pair%sds(1).eq.1) then
-            xS = pair%s(1)
+        if(pair%sds(1).eq.1 .and. LBMblks(pair%sonId)%owns_x(pair%s(1))) then
+            xS = pair%s(1) - LBMblks(pair%sonId)%first_x + 1
             if(n_timeStep.eq.0) then
                 call interpolate_fIn(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx1t1,zDimS,yDimS,tmpf)
                 call interpolate_tau(zDimF,yDimF,LBMblks(pair%sonId)%tau_Fx1t1,zDimS,yDimS,tmptau)
@@ -692,8 +526,8 @@ module LBMBlockComm
             enddo
             !$OMP END PARALLEL DO
         endif
-        if(pair%sds(2).eq.-1) then
-            xS = pair%s(2)
+        if(pair%sds(2).eq.-1 .and. LBMblks(pair%sonId)%owns_x(pair%s(2))) then
+            xS = pair%s(2) - LBMblks(pair%sonId)%first_x + 1
             if(n_timeStep.eq.0) then
                 call interpolate_fIn(zDimF,yDimF,LBMblks(pair%sonId)%fIn_Fx2t1,zDimS,yDimS,tmpf)
                 call interpolate_tau(zDimF,yDimF,LBMblks(pair%sonId)%tau_Fx2t1,zDimS,yDimS,tmptau)
@@ -727,12 +561,13 @@ module LBMBlockComm
                 call interpolate_fIn(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy1t2,zDimS,xDimS,tmpf)
                 call interpolate_tau(zDimF,xDimF,LBMblks(pair%sonId)%tau_Fy1t2,zDimS,xDimS,tmptau)
             endif
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,coeff)
-            do  xS = 1,xDimS
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,xLocal,coeff)
+            do xS = LBMblks(pair%sonId)%first_x, LBMblks(pair%sonId)%first_x + LBMblks(pair%sonId)%xDim - 1
+                xLocal = xS - LBMblks(pair%sonId)%first_x + 1
                 do  zS = 1,zDimS
-                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xS) / tmptau(zS,xS)) / dble(m_gridDelta)
+                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xLocal) / tmptau(zS,xS)) / dble(m_gridDelta)
                     call fIn_GridTransform(tmpf(:,zS,xS), coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(:,zS,xS)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xLocal,0:lbmDim) = tmpf(:,zS,xS)
                 enddo
             enddo
             !$OMP END PARALLEL DO
@@ -746,12 +581,13 @@ module LBMBlockComm
                 call interpolate_fIn(zDimF,xDimF,LBMblks(pair%sonId)%fIn_Fy2t2,zDimS,xDimS,tmpf)
                 call interpolate_tau(zDimF,xDimF,LBMblks(pair%sonId)%tau_Fy2t2,zDimS,xDimS,tmptau)
             endif
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,coeff)
-            do  xS = 1,xDimS
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,zS,xLocal,coeff)
+            do xS = LBMblks(pair%sonId)%first_x, LBMblks(pair%sonId)%first_x + LBMblks(pair%sonId)%xDim - 1
+                xLocal = xS - LBMblks(pair%sonId)%first_x + 1
                 do  zS = 1,zDimS
-                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xS) / tmptau(zS,xS)) / dble(m_gridDelta)
+                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xLocal) / tmptau(zS,xS)) / dble(m_gridDelta)
                     call fIn_GridTransform(tmpf(:,zS,xS), coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(:,zS,xS)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xLocal,0:lbmDim) = tmpf(:,zS,xS)
                 enddo
             enddo
             !$OMP END PARALLEL DO
@@ -772,12 +608,13 @@ module LBMBlockComm
                 call interpolate_fIn(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz1t2,yDimS,xDimS,tmpf)
                 call interpolate_tau(yDimF,xDimF,LBMblks(pair%sonId)%tau_Fz1t2,yDimS,xDimS,tmptau)
             endif
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,coeff)
-            do  xS = 1,xDimS
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,xLocal,coeff)
+            do xS = LBMblks(pair%sonId)%first_x, LBMblks(pair%sonId)%first_x + LBMblks(pair%sonId)%xDim - 1
+                xLocal = xS - LBMblks(pair%sonId)%first_x + 1
                 do  yS = 1,yDimS
-                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xS) / tmptau(yS,xS)) / dble(m_gridDelta)
+                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xLocal) / tmptau(yS,xS)) / dble(m_gridDelta)
                     call fIn_GridTransform(tmpf(:,yS,xS), coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(:,yS,xS)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xLocal,0:lbmDim) = tmpf(:,yS,xS)
                 enddo
             enddo
             !$OMP END PARALLEL DO
@@ -791,12 +628,13 @@ module LBMBlockComm
                 call interpolate_fIn(yDimF,xDimF,LBMblks(pair%sonId)%fIn_Fz2t2,yDimS,xDimS,tmpf)
                 call interpolate_tau(yDimF,xDimF,LBMblks(pair%sonId)%tau_Fz2t2,yDimS,xDimS,tmptau)
             endif
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,coeff)
-            do  xS = 1,xDimS
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(xS,yS,xLocal,coeff)
+            do xS = LBMblks(pair%sonId)%first_x, LBMblks(pair%sonId)%first_x + LBMblks(pair%sonId)%xDim - 1
+                xLocal = xS - LBMblks(pair%sonId)%first_x + 1
                 do  yS = 1,yDimS
-                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xS) / tmptau(yS,xS)) / dble(m_gridDelta)
+                    coeff = (LBMblks(pair%sonId)%tau_all(zS,yS,xLocal) / tmptau(yS,xS)) / dble(m_gridDelta)
                     call fIn_GridTransform(tmpf(:,yS,xS), coeff, VF, dh)
-                    LBMblks(pair%sonId)%fIn(zS,yS,xS,0:lbmDim) = tmpf(:,yS,xS)
+                    LBMblks(pair%sonId)%fIn(zS,yS,xLocal,0:lbmDim) = tmpf(:,yS,xS)
                 enddo
             enddo
             !$OMP END PARALLEL DO
