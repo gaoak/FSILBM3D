@@ -4,6 +4,7 @@
 
   * [Installation](#installation)
   * [MPI and OpenMP](#mpi-and-openmp)
+  * [Immersed boundary methods](#immersed-boundary-methods)
   * [Run solver](#run-solver)
   * [Input file description](#input-file-description)
   * [Simulation control parameters](#simulation-control-parameters)
@@ -77,6 +78,37 @@ original checkpoint block geometry and order, and supports changing the number
 of ranks. The OpenMP executable continues to support interpolation from a
 different restart grid. For output, rank zero temporarily collects one field
 per block at a time.
+
+## Immersed boundary methods
+
+Add this optional section to `inFlow.dat` to enable implicit direct forcing
+(Krüger et al., *The Lattice Boltzmann Method*, §11.4.4.2).
+
+```text
+IBMMethod
+ImplicitDirect
+```
+
+Omit the section or set it to `MDF` to select the original iterative penalty
+method. Keep the existing `SolidBody` input fields in either mode.
+`IBPenaltyalpha` only affects `MDF`.
+
+For `ImplicitDirect`, each fluid block solves a joint system for all its
+markers using matrix-free, diagonally preconditioned conjugate gradients.
+The interpolation weights form the rows of `W`, and the local fluid
+density is used in the half-step velocity correction. The matrix is
+`W diag(1/rho) W^T`. MPI ranks sum their local stencil contributions to
+the matrix-vector product. The resulting force is passed to the collision
+operator and the corresponding reaction loads are passed to the structural
+solver. Flexible bodies use the target marker velocities from the current
+structural state under the existing partitioned time stepping.
+
+Set `ntolLBM` to the maximum number of CG iterations and `dtolLBM` to the
+tolerance on the maximum absolute slip component divided by `Uref`. Rank
+zero logs the iteration count and the slip measured after applying the
+correction. The run exits with an error if the solve fails to meet the
+tolerance. Dense or overlapping marker layouts can make the system
+ill-conditioned.
 
 ## Run solver
 

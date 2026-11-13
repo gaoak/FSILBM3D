@@ -38,7 +38,7 @@ endif
 OBJDIR = build-$(CMP)-mpi$(MPI)$(if $(BUILD),-$(BUILD))
 
 ### List of files for the main code
-OBJ = $(addprefix $(OBJDIR)/,ConstParams.o ParallelDomain.o FlowCondition.o SolidSolver.o Solidbody.o FluidDomain.o LBMBlockComm.o Util.o main.o forkthread.o)
+OBJ = $(addprefix $(OBJDIR)/,ConstParams.o ParallelDomain.o FlowCondition.o SolidSolver.o ImplicitIBM.o Solidbody.o FluidDomain.o LBMBlockComm.o Util.o main.o forkthread.o)
 
 #-----------------------------------------------------------------------
 # Normally no need to change anything below
@@ -59,7 +59,8 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(CC) -c -O3 $< -o $@
 
 $(OBJDIR)/FlowCondition.o $(OBJDIR)/SolidSolver.o: $(OBJDIR)/ConstParams.o
-$(OBJDIR)/Solidbody.o: $(OBJDIR)/SolidSolver.o $(OBJDIR)/FlowCondition.o $(OBJDIR)/ParallelDomain.o
+$(OBJDIR)/ImplicitIBM.o: $(OBJDIR)/ParallelDomain.o
+$(OBJDIR)/Solidbody.o: $(OBJDIR)/SolidSolver.o $(OBJDIR)/FlowCondition.o $(OBJDIR)/ParallelDomain.o $(OBJDIR)/ImplicitIBM.o
 $(OBJDIR)/FluidDomain.o: $(OBJDIR)/Solidbody.o $(OBJDIR)/FlowCondition.o $(OBJDIR)/ParallelDomain.o
 $(OBJDIR)/LBMBlockComm.o: $(OBJDIR)/FluidDomain.o
 $(OBJDIR)/main.o $(OBJDIR)/Util.o: $(OBJDIR)/LBMBlockComm.o

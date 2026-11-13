@@ -7,11 +7,13 @@ module SolidBody
     use ConstParams
     use SolidSolver
     use ParallelDomain, only: is_root, parallel_barrier, parallel_abort, sum_matrix
+    use ImplicitIBM, only: solve_implicit_ibm
     implicit none
     private
     ! Immersed boundary method parameters
     public :: m_nFish,m_nGroup
     integer:: m_nFish,m_nGroup,m_ntolLBM
+    logical :: m_implicitIBM = .false.
     real(8):: m_dtolLBM,m_IBPenaltyAlpha,m_denIn,m_uvwIn(3),m_Aref,m_Eref,m_Fref,m_Lref,m_Pref,m_Tref,m_Uref
     integer:: m_boundaryConditions(1:6)
     integer, allocatable :: m_numX(:),m_numY(:),m_numZ(:),m_fishNum(:)
@@ -84,7 +86,7 @@ module SolidBody
         character(LEN=256):: buffer
         real(8):: GeoGamma,NewmarkGamma,NewmarkBeta,dampK,dampM,dtolFEM
         integer:: isKB,ntolFEM
-        integer:: iFish,ifishGroup
+        integer:: iFish,ifishGroup,ioStatus
         character(LEN=40) :: t_FEmeshName,keywordstr
         integer:: t_iBodyModel,t_iBodyType,t_isMotionGiven(6)
         real(8):: t_denR,t_psR,t_EmR,t_tcR,t_KB,t_KS,t_St
@@ -98,6 +100,24 @@ module SolidBody
         real(8),allocatable:: AoAo(:,:),AoAAmpl(:,:),AoAPhi(:,:)
         ! read body parameters from inflow file
         open(unit=111, file=filename, status='old', action='read')
+        ! Optional section. Old input files default to the MDF force calculation.
+        do
+            read(111,'(A)',iostat=ioStatus) buffer
+            if (ioStatus < 0) exit
+            if (ioStatus > 0) call parallel_abort('Could not read IBMMethod from inFlow.dat')
+            if (adjustl(buffer) /= 'IBMMethod') cycle
+            call readNextData(111,buffer)
+            select case (trim(buffer))
+            case ('MDF')
+                m_implicitIBM = .false.
+            case ('ImplicitDirect')
+                m_implicitIBM = .true.
+            case default
+                call parallel_abort('IBMMethod must be MDF or ImplicitDirect')
+            end select
+            exit
+        enddo
+        rewind(111)
         keywordstr = 'SolidBody'
         call found_keyword(111,keywordstr)
         call readNextData(111, buffer)
@@ -110,7 +130,7 @@ module SolidBody
         read(buffer,*)    dtolFEM,ntolFEM
         call readNextData(111, buffer)
         read(buffer,*)    m_nFish,m_nGroup,isKB
-        if(m_IBPenaltyAlpha.le.1.d-6) then
+        if(.not. m_implicitIBM .and. m_IBPenaltyAlpha.le.1.d-6) then
             write(*,*) 'ERROR: IBPenaltyalpha should be positive (default 1)', m_IBPenaltyAlpha
             stop
         endif
@@ -590,11 +610,12 @@ module SolidBody
         enddo
     end subroutine
 
-    subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,uuu,force)
+    subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,den,uuu,force)
         implicit none
         integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim,global_nx,first_x
+        real(8),intent(in)::den(zDim,yDim,xDim)
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         integer :: i,iFish
@@ -602,7 +623,7 @@ module SolidBody
             iFish = bodies(i)
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
-        call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,uuu,force)
+        call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,den,uuu,force)
     end subroutine
 
     subroutine PlateUpdatePosVelArea_(this)
@@ -870,12 +891,13 @@ module SolidBody
         END SUBROUTINE trimedindex
     end subroutine UpdateElmtInterp_
 
-    SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,uuu,force)
+    SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,global_nx,first_x,den,uuu,force)
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
         integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim,global_nx,first_x
+        real(8),intent(in)::den(zDim,yDim,xDim)
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
         !================================
@@ -892,7 +914,9 @@ module SolidBody
             endif
             VBodies(iFish)%v_Eforce = 0.0d0
         enddo
-        if (bodies(0) .gt. 0) then
+        if (bodies(0) > 0 .and. m_implicitIBM) then
+            call implicit_interaction_force(bodies,dt,dh,first_x,den,uuu)
+        else if (bodies(0) > 0) then
             ! calculate interaction force using immersed-boundary method
             iterLBM=0
             dmaxLBM=1d10
@@ -920,6 +944,45 @@ module SolidBody
             call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,first_x,force)
         enddo
     END SUBROUTINE
+
+    subroutine implicit_interaction_force(bodies,dt,dh,first_x,den,uuu)
+        integer, intent(in) :: bodies(0:m_nFish),first_x
+        real(8), intent(in) :: dt,dh,den(:,:,:)
+        real(8), intent(inout) :: uuu(:,:,:,:)
+        integer(2), allocatable :: indices(:,:)
+        real(4), allocatable :: weights(:,:)
+        real(8), allocatable :: target(:,:),correction(:,:)
+        integer :: n,i,first,last
+
+        n = 0
+        do i = 1,bodies(0)
+            n = n + VBodies(bodies(i))%v_nelmts
+        enddo
+        if (n == 0) return
+        allocate(indices(12,n),weights(12,n),target(3,n),correction(3,n))
+        last = 0
+        do i = 1,bodies(0)
+            associate(body => VBodies(bodies(i)))
+                first = last + 1
+                last = last + body%v_nelmts
+                indices(:,first:last) = body%v_Ei
+                weights(:,first:last) = body%v_Ew
+                target(:,first:last) = body%v_Evel
+            end associate
+        enddo
+        call solve_implicit_ibm(first_x,den,uuu,indices,weights,target,m_ntolLBM,m_dtolLBM,m_Uref,correction)
+
+        ! FluidVolumeForce spreads the opposite of this integrated structural force.
+        ! solve_implicit_ibm uses delta_u = (W^T correction)/rho.
+        last = 0
+        do i = 1,bodies(0)
+            associate(body => VBodies(bodies(i)))
+                first = last + 1
+                last = last + body%v_nelmts
+                body%v_Eforce = (-2.d0 * dh**3 / dt) * correction(:,first:last)
+            end associate
+        enddo
+    end subroutine implicit_interaction_force
 
     SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,first_x,force)
         USE, INTRINSIC :: IEEE_ARITHMETIC

@@ -328,7 +328,7 @@ module LBMBlockComm
         call get_now_time(time_begine2)
         associate(b => LBMblks(carrierFluidId))
             call FSInteraction_force(b%carriedBodies,b%dh,b%dh,b%global_xmin,b%ymin,b%zmin, &
-                                     b%xDim,b%yDim,b%zDim,b%global_nx,b%first_x,b%uuu,b%force)
+                                     b%xDim,b%yDim,b%zDim,b%global_nx,b%first_x,b%den,b%uuu,b%force)
         end associate
         call get_now_time(time_end2)
         time_IBM = time_IBM + (time_end2 - time_begine2)
