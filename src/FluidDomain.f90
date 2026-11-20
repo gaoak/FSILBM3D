@@ -526,7 +526,7 @@ module FluidDomain
         this%blktime = time
         call initialise_flow()
 #ifdef USE_CUDA
-        call cuda_backend_init(this%cuda,this%zDim,this%yDim,this%xDim,this%fIn,this%den,this%uuu,this%force,this%tau_all)
+        call cuda_backend_init(this%cuda,this%zDim,this%yDim,this%xDim,this%fIn,this%den,this%uuu,this%force,this%tau_all,this%outputtype)
         if(this%iCollidModel.eq.3) call cuda_backend_set_mrt(this%cuda,this%M_COLLID,this%M_FORCE)
 #endif
 
@@ -1256,27 +1256,31 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z,step,step_s
-        real(8)::invStep
+        real(8)::invStep,du,dv,dw
         if(step .ge. step_s .and. this%outputtype .ge. 2) then
 #ifdef USE_CUDA
             call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
             call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,step,step_s,.false.,.true.)
             return
 #else
-            invStep = 1 / real(step - step_s + 1)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
+            invStep = 1.0d0 / dble(step - step_s + 1)
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,du,dv,dw)
             do  x = 1, this%xDim
             do  y = 1, this%yDim
             do  z = 1, this%zDim
-                this%uuu_ave(z,y,x,1) = this%uuu_ave(z,y,x,1) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,1)
-                this%uuu_ave(z,y,x,2) = this%uuu_ave(z,y,x,2) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,2)
-                this%uuu_ave(z,y,x,3) = this%uuu_ave(z,y,x,3) * (1.d0 - invStep) + invStep * this%uuu(z,y,x,3)
-                this%uuu_ave(z,y,x,4) = this%uuu_ave(z,y,x,4) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1))
-                this%uuu_ave(z,y,x,5) = this%uuu_ave(z,y,x,5) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
-                this%uuu_ave(z,y,x,6) = this%uuu_ave(z,y,x,6) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
-                this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2))
-                this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
-                this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9) * (1.d0 - invStep) + invStep * (this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)) * (this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3))
+                ! Welford update: old-mean deviations times new-mean deviations.
+                du = this%uuu(z,y,x,1) - this%uuu_ave(z,y,x,1)
+                dv = this%uuu(z,y,x,2) - this%uuu_ave(z,y,x,2)
+                dw = this%uuu(z,y,x,3) - this%uuu_ave(z,y,x,3)
+                this%uuu_ave(z,y,x,1) = this%uuu_ave(z,y,x,1) + invStep*du
+                this%uuu_ave(z,y,x,2) = this%uuu_ave(z,y,x,2) + invStep*dv
+                this%uuu_ave(z,y,x,3) = this%uuu_ave(z,y,x,3) + invStep*dw
+                this%uuu_ave(z,y,x,4) = this%uuu_ave(z,y,x,4)*(1.d0-invStep) + invStep*du*(this%uuu(z,y,x,1)-this%uuu_ave(z,y,x,1))
+                this%uuu_ave(z,y,x,5) = this%uuu_ave(z,y,x,5)*(1.d0-invStep) + invStep*dv*(this%uuu(z,y,x,2)-this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,6) = this%uuu_ave(z,y,x,6)*(1.d0-invStep) + invStep*dw*(this%uuu(z,y,x,3)-this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7)*(1.d0-invStep) + invStep*du*(this%uuu(z,y,x,2)-this%uuu_ave(z,y,x,2))
+                this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8)*(1.d0-invStep) + invStep*du*(this%uuu(z,y,x,3)-this%uuu_ave(z,y,x,3))
+                this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9)*(1.d0-invStep) + invStep*dv*(this%uuu(z,y,x,3)-this%uuu_ave(z,y,x,3))
             enddo
             enddo
             enddo
@@ -1771,10 +1775,7 @@ module FluidDomain
         real(4), allocatable :: flowout(:,:,:,:)
         if(this%outputtype .lt. 1) return
 #ifdef USE_CUDA
-        if(this%outputtype .ne. 1) then
-            call cuda_backend_download_macro(this%cuda,this%den,this%uuu)
-            if(this%outputtype .ge. 2) call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,0,0,.true.,.false.)
-        endif
+        if(this%outputtype .ge. 2) call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,0,0,.true.,.false.)
 #endif
         nxs  = 1 + this%offsetOutput
         nys  = 1 + this%offsetOutput
@@ -1789,14 +1790,12 @@ module FluidDomain
         invUref  = 1.d0/flow%Uref
         invUrefs = 1.d0/flow%Uref/flow%Uref
 
-        if(this%outputtype .ne. 2) then
 #ifdef USE_CUDA
-            if(this%outputtype .eq. 1) then
-                call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
-                allocate(flowout(nze-nzs+1,nye-nys+1,nxe-nxs+1,0:3))
-                call cuda_backend_pack_flow_output(this%cuda,flowout,this%offsetOutput,Cs2,flow%denIn,invUref)
-            else
-#endif
+        call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
+        allocate(flowout(nze-nzs+1,nye-nys+1,nxe-nxs+1,0:3))
+        call cuda_backend_pack_flow_output(this%cuda,flowout,this%offsetOutput,Cs2,flow%denIn,invUref)
+#else
+        if(this%outputtype .ne. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do x=nxs, nxe
                 do y=nys, nye
@@ -1809,15 +1808,19 @@ module FluidDomain
                 enddo
             enddo
             !$OMP END PARALLEL DO
-#ifdef USE_CUDA
-            endif
-#endif
         endif
+#endif
         if(this%outputtype .ge. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
             do x=nxs, nxe
                 do y=nys, nye
                     do z=nzs, nze
+                        ! MeanFlow stores instantaneous pressure, not time-averaged pressure.
+                        ! GPU outputs reuse flowout pressure; CPU type 2 computes it here.
+                        ! CPU type 3 reuses outtmp pressure computed above.
+#ifndef USE_CUDA
+                        if(this%outputtype.eq.2) this%outtmp(z,y,x,0) = Cs2*(this%den(z,y,x)-flow%denIn)
+#endif
                         this%outtmp(z,y,x,4) = this%uuu_ave(z,y,x,1)*invUref  !<u>
                         this%outtmp(z,y,x,5) = this%uuu_ave(z,y,x,2)*invUref  !<v>
                         this%outtmp(z,y,x,6) = this%uuu_ave(z,y,x,3)*invUref  !<w>
@@ -1850,31 +1853,26 @@ module FluidDomain
         endif
         call myfork(pid)
         if(pid.eq.0) then
+            write(blockName,'(I3)') this%ID
+            blockName = adjustr(blockName)
+            do i=1,blockLen
+                if(blockName(i:i)==' ')blockName(i:i)='0'
+            enddo
+            nxe = nxe-nxs+1
+            nye = nye-nys+1
+            nze = nze-nzs+1
             if(this%outputtype .ne. 2) then
                 write(fileName,'(I10)') nint(time/flow%Tref*1d5)
                 fileName = adjustr(fileName)
                 do  i=1,nameLen
                     if(fileName(i:i)==' ')fileName(i:i)='0'
                 enddo
-                write(blockName,'(I3)') this%ID
-                blockName = adjustr(blockName)
-                do  i=1,blockLen
-                    if(blockName(i:i)==' ')blockName(i:i)='0'
-                enddo
                 open(idfile,file='./DatFlow/Flow'//trim(fileName)//'_b'//blockName,form='unformatted',access='stream')
-                nxe = nxe-nxs+1
-                nye = nye-nys+1
-                nze = nze-nzs+1
                 WRITE(idfile) nxe,nye,nze,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
 #ifdef USE_CUDA
-                if(this%outputtype .eq. 1) then
-                    write(idfile) flowout(:,:,:,0)
-                    write(idfile) flowout(:,:,:,1),flowout(:,:,:,2),flowout(:,:,:,3)
-                else
-                    write(idfile) this%outtmp(:,:,:,0)
-                    write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
-                endif
+                write(idfile) flowout(:,:,:,0)
+                write(idfile) flowout(:,:,:,1),flowout(:,:,:,2),flowout(:,:,:,3)
 #else
                 write(idfile) this%outtmp(:,:,:,0)
                 write(idfile) this%outtmp(:,:,:,1),this%outtmp(:,:,:,2),this%outtmp(:,:,:,3)
@@ -1885,7 +1883,11 @@ module FluidDomain
                 open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
                 WRITE(idfile) nxe,nye,nze,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
+#ifdef USE_CUDA
+                write(idfile) flowout(:,:,:,0)
+#else
                 write(idfile) this%outtmp(:,:,:,0)
+#endif
                 write(idfile) this%outtmp(:,:,:,4),this%outtmp(:,:,:,5),this%outtmp(:,:,:,6)
                 write(idfile) this%outtmp(:,:,:,7),this%outtmp(:,:,:,8),this%outtmp(:,:,:,9)
                 write(idfile) this%outtmp(:,:,:,10),this%outtmp(:,:,:,11),this%outtmp(:,:,:,12)
