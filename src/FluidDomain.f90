@@ -32,7 +32,7 @@ module FluidDomain
         real(8) :: M_COLLID(0:lbmDim,0:lbmDim),M_FORCE(0:lbmDim,0:lbmDim) ! multiple time relaxation
         integer, allocatable :: OMPpartition(:),OMPparindex(:),OMPeid(:)
         real(8), allocatable :: OMPedge(:,:,:)
-        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:)
+        real(8), allocatable :: fIn(:,:,:,:),uuu(:,:,:,:),force(:,:,:,:),den(:,:,:),uuu_ave(:,:,:,:),ppp_ave(:,:,:,:)
         real(4), allocatable :: OUTtmp(:,:,:,:)
         real(8), allocatable :: fIn_hwx1(:,:,:),fIn_hwx2(:,:,:),fIn_hwy1(:,:,:),fIn_hwy2(:,:,:),fIn_hwz1(:,:,:),fIn_hwz2(:,:,:)
         real(8), allocatable :: fIn_Fx1t1(:,:,:),fIn_Fx1t2(:,:,:),fIn_Fx2t1(:,:,:),fIn_Fx2t2(:,:,:)
@@ -469,6 +469,7 @@ module FluidDomain
         allocate(this%den(this%zDim,this%yDim,this%xDim))
         if (this%outputtype .ge. 2) then
             allocate(this%uuu_ave(this%zDim,this%yDim,this%xDim,1:9))
+            allocate(this%ppp_ave(this%zDim,this%yDim,this%xDim,1:2))
         endif
         ! allocate output workspace
         xmin = 1 + this%offsetOutput
@@ -478,7 +479,7 @@ module FluidDomain
         ymax = this%yDim - this%offsetOutput
         zmax = this%zDim - this%offsetOutput
         if(this%outputtype .ge. 2) then
-            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,0:12))
+            allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,0:14))
         else
             allocate(this%outtmp(zmin:zmax,ymin:ymax,xmin:xmax,0:3))
         endif
@@ -622,6 +623,7 @@ module FluidDomain
                 call calculate_distribution_funcion(this%den(z,y,x),this%uuu(z,y,x,1:SpaceDim),this%fIn(z,y,x,0:lbmDim))
                 if(this%outputtype .ge. 2) then
                     this%uuu_ave(z,y,x,:) = 0.0D0
+                    this%ppp_ave(z,y,x,:) = 0.0D0
                 endif
             enddo
             enddo
@@ -1256,15 +1258,15 @@ module FluidDomain
         implicit none
         class(LBMBlock), intent(inout) :: this
         integer::x,y,z,step,step_s
-        real(8)::invStep,du,dv,dw
+        real(8)::invStep,du,dv,dw,p,dp
         if(step .ge. step_s .and. this%outputtype .ge. 2) then
 #ifdef USE_CUDA
             call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
-            call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,step,step_s,.false.,.true.)
+            call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,this%ppp_ave,step,step_s,flow%denIn,.false.,.true.)
             return
 #else
             invStep = 1.0d0 / dble(step - step_s + 1)
-            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,du,dv,dw)
+            !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z,du,dv,dw,p,dp)
             do  x = 1, this%xDim
             do  y = 1, this%yDim
             do  z = 1, this%zDim
@@ -1281,6 +1283,10 @@ module FluidDomain
                 this%uuu_ave(z,y,x,7) = this%uuu_ave(z,y,x,7)*(1.d0-invStep) + invStep*du*(this%uuu(z,y,x,2)-this%uuu_ave(z,y,x,2))
                 this%uuu_ave(z,y,x,8) = this%uuu_ave(z,y,x,8)*(1.d0-invStep) + invStep*du*(this%uuu(z,y,x,3)-this%uuu_ave(z,y,x,3))
                 this%uuu_ave(z,y,x,9) = this%uuu_ave(z,y,x,9)*(1.d0-invStep) + invStep*dv*(this%uuu(z,y,x,3)-this%uuu_ave(z,y,x,3))
+                p = Cs2*(this%den(z,y,x)-flow%denIn)
+                dp = p - this%ppp_ave(z,y,x,1)
+                this%ppp_ave(z,y,x,1) = this%ppp_ave(z,y,x,1) + invStep*dp
+                this%ppp_ave(z,y,x,2) = this%ppp_ave(z,y,x,2)*(1.d0-invStep) + invStep*dp*(p-this%ppp_ave(z,y,x,1))
             enddo
             enddo
             enddo
@@ -1775,7 +1781,7 @@ module FluidDomain
         real(4), allocatable :: flowout(:,:,:,:)
         if(this%outputtype .lt. 1) return
 #ifdef USE_CUDA
-        if(this%outputtype .ge. 2) call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,0,0,.true.,.false.)
+        if(this%outputtype .ge. 2) call cuda_backend_turbulent_statistic(this%cuda,this%uuu_ave,this%ppp_ave,0,0,flow%denIn,.true.,.false.)
 #endif
         nxs  = 1 + this%offsetOutput
         nys  = 1 + this%offsetOutput
@@ -1791,9 +1797,11 @@ module FluidDomain
         invUrefs = 1.d0/flow%Uref/flow%Uref
 
 #ifdef USE_CUDA
-        call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
-        allocate(flowout(nze-nzs+1,nye-nys+1,nxe-nxs+1,0:3))
-        call cuda_backend_pack_flow_output(this%cuda,flowout,this%offsetOutput,Cs2,flow%denIn,invUref)
+        if(this%outputtype .ne. 2) then
+            call cuda_backend_macro_if_needed(this%cuda,this%volumeForce(1),this%volumeForce(2),this%volumeForce(3),this%dh)
+            allocate(flowout(nze-nzs+1,nye-nys+1,nxe-nxs+1,0:3))
+            call cuda_backend_pack_flow_output(this%cuda,flowout,this%offsetOutput,Cs2,flow%denIn,invUref)
+        endif
 #else
         if(this%outputtype .ne. 2) then
             !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(x,y,z)
@@ -1815,15 +1823,10 @@ module FluidDomain
             do x=nxs, nxe
                 do y=nys, nye
                     do z=nzs, nze
-                        ! MeanFlow stores instantaneous pressure, not time-averaged pressure.
-                        ! GPU outputs reuse flowout pressure; CPU type 2 computes it here.
-                        ! CPU type 3 reuses outtmp pressure computed above.
-#ifndef USE_CUDA
-                        if(this%outputtype.eq.2) this%outtmp(z,y,x,0) = Cs2*(this%den(z,y,x)-flow%denIn)
-#endif
-                        this%outtmp(z,y,x,4) = this%uuu_ave(z,y,x,1)*invUref  !<u>
-                        this%outtmp(z,y,x,5) = this%uuu_ave(z,y,x,2)*invUref  !<v>
-                        this%outtmp(z,y,x,6) = this%uuu_ave(z,y,x,3)*invUref  !<w>
+                        this%outtmp(z,y,x,4) = this%ppp_ave(z,y,x,1)  !<p>
+                        this%outtmp(z,y,x,5) = this%uuu_ave(z,y,x,1)*invUref  !<u>
+                        this%outtmp(z,y,x,6) = this%uuu_ave(z,y,x,2)*invUref  !<v>
+                        this%outtmp(z,y,x,7) = this%uuu_ave(z,y,x,3)*invUref  !<w>
                     enddo
                 enddo
             enddo
@@ -1832,9 +1835,10 @@ module FluidDomain
             do x=nxs, nxe
                 do y=nys, nye
                     do z=nzs, nze
-                        this%outtmp(z,y,x,7) = this%uuu_ave(z,y,x,4)*invUrefs  !<uu>
-                        this%outtmp(z,y,x,8) = this%uuu_ave(z,y,x,5)*invUrefs  !<vv>
-                        this%outtmp(z,y,x,9) = this%uuu_ave(z,y,x,6)*invUrefs  !<ww>
+                        this%outtmp(z,y,x,8) = this%ppp_ave(z,y,x,2)  !<p'p'>
+                        this%outtmp(z,y,x,9) = this%uuu_ave(z,y,x,4)*invUrefs  !<u'u'>
+                        this%outtmp(z,y,x,10) = this%uuu_ave(z,y,x,5)*invUrefs  !<v'v'>
+                        this%outtmp(z,y,x,11) = this%uuu_ave(z,y,x,6)*invUrefs  !<w'w'>
                     enddo
                 enddo
             enddo
@@ -1843,9 +1847,9 @@ module FluidDomain
             do x=nxs, nxe
                 do y=nys, nye
                     do z=nzs, nze
-                        this%outtmp(z,y,x,10) = this%uuu_ave(z,y,x,7)*invUrefs  !<uv>
-                        this%outtmp(z,y,x,11) = this%uuu_ave(z,y,x,8)*invUrefs  !<uw>
-                        this%outtmp(z,y,x,12) = this%uuu_ave(z,y,x,9)*invUrefs  !<vw>
+                        this%outtmp(z,y,x,12) = this%uuu_ave(z,y,x,7)*invUrefs  !<u'v'>
+                        this%outtmp(z,y,x,13) = this%uuu_ave(z,y,x,8)*invUrefs  !<u'w'>
+                        this%outtmp(z,y,x,14) = this%uuu_ave(z,y,x,9)*invUrefs  !<v'w'>
                     enddo
                 enddo
             enddo
@@ -1883,14 +1887,11 @@ module FluidDomain
                 open(idfile,file='./DatFlow/MeanFlow_b'//blockName,form='unformatted',access='stream')
                 WRITE(idfile) nxe,nye,nze,this%ID
                 WRITE(idfile) xmin,ymin,zmin,this%dh
-#ifdef USE_CUDA
-                write(idfile) flowout(:,:,:,0)
-#else
-                write(idfile) this%outtmp(:,:,:,0)
-#endif
-                write(idfile) this%outtmp(:,:,:,4),this%outtmp(:,:,:,5),this%outtmp(:,:,:,6)
-                write(idfile) this%outtmp(:,:,:,7),this%outtmp(:,:,:,8),this%outtmp(:,:,:,9)
-                write(idfile) this%outtmp(:,:,:,10),this%outtmp(:,:,:,11),this%outtmp(:,:,:,12)
+                write(idfile) this%outtmp(:,:,:,4) ! <p>
+                write(idfile) this%outtmp(:,:,:,5),this%outtmp(:,:,:,6),this%outtmp(:,:,:,7) ! <u> <v> <w>
+                write(idfile) this%outtmp(:,:,:,8) ! <p'p'>
+                write(idfile) this%outtmp(:,:,:,9),this%outtmp(:,:,:,10),this%outtmp(:,:,:,11) ! <u'u'> <v'v'> <w'w'>
+                write(idfile) this%outtmp(:,:,:,12),this%outtmp(:,:,:,13),this%outtmp(:,:,:,14) ! <u'v'> <u'w'> <v'w'>
                 close(idfile)
             endif
             call myexit(0)

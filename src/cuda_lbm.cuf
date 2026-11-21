@@ -40,7 +40,7 @@ module cuda_lbm_backend
 
     type, public :: cuda_lbm_state
         real(8), device, pointer :: f(:,:,:,:), f_next(:,:,:,:)
-        real(8), allocatable, device :: rho(:,:,:), u(:,:,:,:), force(:,:,:,:), uuu_ave(:,:,:,:), tau_all(:,:,:)
+        real(8), allocatable, device :: rho(:,:,:), u(:,:,:,:), force(:,:,:,:), uuu_ave(:,:,:,:), ppp_ave(:,:,:,:), tau_all(:,:,:)
         real(8), allocatable, device :: hwx1(:,:,:),hwx2(:,:,:),hwy1(:,:,:),hwy2(:,:,:),hwz1(:,:,:),hwz2(:,:,:)
         type(cuda_ibm_slot), allocatable :: ibm(:)
         type(cuda_face_source), allocatable :: facesrc(:)
@@ -733,12 +733,13 @@ contains
         rho(z,y,x)=den; u(z,y,x,1)=(ux+0.5d0*fx*dh)/den; u(z,y,x,2)=(uy+0.5d0*fy*dh)/den; u(z,y,x,3)=(uz+0.5d0*fz*dh)/den
     end subroutine macro_kernel
 
-    attributes(global) subroutine turbulent_statistic_kernel(u,uuu_ave,zdim,ydim,xdim,invStep)
+    attributes(global) subroutine turbulent_statistic_kernel(u,rho,uuu_ave,ppp_ave,zdim,ydim,xdim,invStep,den_in)
         real(8), device :: u(1:zdim,1:ydim,1:xdim,1:3),uuu_ave(1:zdim,1:ydim,1:xdim,1:9)
+        real(8), device :: rho(1:zdim,1:ydim,1:xdim),ppp_ave(1:zdim,1:ydim,1:xdim,1:2)
         integer, value :: zdim,ydim,xdim
-        real(8), value :: invStep
+        real(8), value :: invStep,den_in
         integer :: tid,npoints,z,y,x
-        real(8) :: ux,uy,uz,du, dv, dw
+        real(8) :: ux,uy,uz,du,dv,dw,p,dp
         npoints=zdim*ydim*xdim; tid=(blockIdx%x-1)*blockDim%x+threadIdx%x
         if(tid>npoints) return
         z=mod(tid-1,zdim)+1; y=mod((tid-1)/zdim,ydim)+1; x=(tid-1)/(zdim*ydim)+1
@@ -754,6 +755,10 @@ contains
         uuu_ave(z,y,x,7)=uuu_ave(z,y,x,7)*(1.0d0-invStep)+invStep*du*(uy-uuu_ave(z,y,x,2))
         uuu_ave(z,y,x,8)=uuu_ave(z,y,x,8)*(1.0d0-invStep)+invStep*du*(uz-uuu_ave(z,y,x,3))
         uuu_ave(z,y,x,9)=uuu_ave(z,y,x,9)*(1.0d0-invStep)+invStep*dv*(uz-uuu_ave(z,y,x,3))
+        p=Cs2*(rho(z,y,x)-den_in)
+        dp=p-ppp_ave(z,y,x,1)
+        ppp_ave(z,y,x,1)=ppp_ave(z,y,x,1)+invStep*dp
+        ppp_ave(z,y,x,2)=ppp_ave(z,y,x,2)*(1.0d0-invStep)+invStep*dp*(p-ppp_ave(z,y,x,1))
     end subroutine turbulent_statistic_kernel
 
     attributes(global) subroutine collision_kernel(f,rho,u,force,zdim,ydim,xdim,model,omega,omega2,dh)
@@ -1106,7 +1111,7 @@ contains
         state%statistic_ready=.false.
         allocate(state%f(zdim,ydim,xdim,0:lbmDim),state%f_next(zdim,ydim,xdim,0:lbmDim),state%rho(zdim,ydim,xdim),state%u(zdim,ydim,xdim,1:3),state%force(zdim,ydim,xdim,1:3),state%tau_all(zdim,ydim,xdim))
         if(outputtype.ge.2) then
-            allocate(state%uuu_ave(zdim,ydim,xdim,1:9))
+            allocate(state%uuu_ave(zdim,ydim,xdim,1:9),state%ppp_ave(zdim,ydim,xdim,1:2))
         endif
         allocate(state%d_tol(1),state%fluxbuf(6,zdim,ydim)); state%d_tol=0.0d0
         allocate(state%mrt_collid(0:lbmDim,0:lbmDim),state%mrt_force(0:lbmDim,0:lbmDim))
@@ -1127,6 +1132,7 @@ contains
         ierr=cudaMemcpyAsync(state%force,force,size(force,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'initial force')
         ierr=cudaMemcpyAsync(state%tau_all,tau_host,size(tau_host,kind=8),cudaMemcpyHostToDevice,state%transfer_stream); call check_cuda(ierr,'initial tau')
         if(allocated(state%uuu_ave)) state%uuu_ave=0.0d0
+        if(allocated(state%ppp_ave)) state%ppp_ave=0.0d0
         ierr=cudaEventRecord(state%transfer_event,state%transfer_stream); call check_cuda(ierr,'initial event')
         ierr=cudaEventSynchronize(state%transfer_event); call check_cuda(ierr,'initial sync'); state%ready=.true.
     end subroutine cuda_backend_init
@@ -1140,6 +1146,7 @@ contains
         ierr=cudaEventDestroy(state%ibm_event); ierr=cudaEventDestroy(state%upload_event)
         deallocate(state%f,state%f_next,state%rho,state%u,state%force,state%tau_all)
         if(allocated(state%uuu_ave)) deallocate(state%uuu_ave)
+        if(allocated(state%ppp_ave)) deallocate(state%ppp_ave)
         if(allocated(state%d_tol)) deallocate(state%d_tol)
         if(allocated(state%probebuf)) deallocate(state%probebuf)
         if(allocated(state%probe_idx)) deallocate(state%probe_idx)
@@ -1206,9 +1213,11 @@ contains
         enddo
     end subroutine cuda_backend_macro_batch
 
-    subroutine cuda_backend_turbulent_statistic(state,uuu_ave,step,step_s,download,update)
+    subroutine cuda_backend_turbulent_statistic(state,uuu_ave,ppp_ave,step,step_s,den_in,download,update)
         type(cuda_lbm_state), intent(inout) :: state
         real(8), intent(inout) :: uuu_ave(state%zdim,state%ydim,state%xdim,1:9)
+        real(8), intent(inout) :: ppp_ave(state%zdim,state%ydim,state%xdim,1:2)
+        real(8), intent(in) :: den_in
         integer, intent(in) :: step,step_s
         logical, intent(in) :: download,update
         type(dim3) :: grid,threads
@@ -1216,18 +1225,20 @@ contains
         real(8) :: invStep
         if(.not.state%statistic_ready) then
             state%uuu_ave=uuu_ave
+            state%ppp_ave=ppp_ave
             state%statistic_ready=.true.
         endif
         if(update) then
             invStep=1.0d0/dble(step-step_s+1)
             threads=dim3(BLOCK_SIZE,1,1); grid=dim3((state%zdim*state%ydim*state%xdim+BLOCK_SIZE-1)/BLOCK_SIZE,1,1)
-            call turbulent_statistic_kernel<<<grid,threads,0,state%compute_stream>>>(state%u,state%uuu_ave,state%zdim,state%ydim,state%xdim,invStep)
+            call turbulent_statistic_kernel<<<grid,threads,0,state%compute_stream>>>(state%u,state%rho,state%uuu_ave,state%ppp_ave,state%zdim,state%ydim,state%xdim,invStep,den_in)
             ierr=cudaGetLastError(); call check_cuda(ierr,'turbulent statistic kernel')
         endif
         if(download) then
             ierr=cudaEventRecord(state%compute_event,state%compute_stream); call check_cuda(ierr,'turbulent statistic event')
             ierr=cudaEventSynchronize(state%compute_event); call check_cuda(ierr,'turbulent statistic dependency')
             uuu_ave=state%uuu_ave
+            ppp_ave=state%ppp_ave
         endif
     end subroutine cuda_backend_turbulent_statistic
 

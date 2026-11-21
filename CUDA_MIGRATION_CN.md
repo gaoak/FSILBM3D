@@ -12,7 +12,7 @@
 - IBM 罚力使用「先算力、再修正」的两遍 kernel，与 CPU 的 `PenaltyForce_` 语义一致；
 - GPU 宏观量按需计算（lazy macro），避免步末无条件计算及不必要的下载；CPU 路径保留每步结束后的统一宏观量更新；
 - IBM 元素数组使用 pinned 主机内存 + 独立 upload stream 异步上传；
-- flux、探针和流场的压力/速度在 GPU 上打包后回传；`outputtype=1/2/3` 均使用四分量单精度输出窗口，类型 2 只写其中的压力，统计量按需下载。
+- flux、探针和流场的压力/速度在 GPU 上打包后回传；`outputtype=1/3` 使用四分量单精度瞬时输出窗口，类型 2/3 按需下载速度及压力统计量。
 
 > 验证基线：在 3 block、细化比 2/4、BC 101/103/301、`iCollidModel=1` 的球体算例上，GPU 与 CPU（gfortran 构建）连续 100 步的 `Group001_forces.dat` 中 **Fx/Fy 逐位一致**，Fz 仅 `~1e-13`；`FluidFlux.dat` 完全一致，探针差 `~1e-12` 或更小。
 
@@ -39,7 +39,7 @@
 | 子块 → 父块 | `deliver_son_to_father` 主机循环 + `fIn_GridTransform` | `deliver_face_kernel` + `transform_f_lbm` | 一致 |
 | 通量诊断 | `write_fluid_flux` 下载整场 `den/uuu` 后求和 | `pack_flux_planes_kernel` 只打包 3 个 x 截面的 `u/rho`（6 个平面），主机按相同顺序求和 | 数值一致；只减少传输量 |
 | 探针 | `write_fluid_information` 使用整场速度插值 | `pack_probes_kernel` 一次打包所有 probe 的 2×2×2×3 模板，主机用相同系数/顺序插值 | 数值一致；只减少 launch/同步次数 |
-| 流场输出 | 使用主机上的 `den/uuu` 计算 `outtmp` 后写盘 | `outputtype=1/2/3` 均由 `pack_flow_output_kernel` 生成四分量 `real(4)` 输出并回传；类型 2 只使用压力，类型 2/3 另下载统计量 | 文件格式一致；MeanFlow 压力仍为瞬时压力，类型 2/3 复用 GPU 打包压力 |
+| 流场输出 | 使用主机上的 `den/uuu` 计算 `outtmp` 后写盘 | `outputtype=1/3` 由 `pack_flow_output_kernel` 生成四分量 `real(4)` 瞬时场；类型 2/3 下载速度及压力统计量 | CPU/GPU 格式一致；MeanFlow 首项改为平均压力，均值之后输出压力脉动方差，外部读取程序须更新 |
 | 输出 / 续算 | 主机数组直接写出 | 按需从设备下载后再写出；continue 读入后会重新上传 `fIn` | 一致 |
 
 GPU 侧支持的边界条件为 `0, 1, 101, 102, 103, 104, 201, 202, 203, 204, 301, 302`，与 CPU 版本定义的全部边界类型一一对应。
@@ -196,14 +196,15 @@ grid = ceil(zDim*yDim*xDim / BLOCK_SIZE)
 | `u` | `3 * N * 8` |
 | `force` | `3 * N * 8` |
 | `uuu_ave` | `9 * N * 8`（与 CPU 一样，仅 `outputtype >= 2` 时分配并使用；`outputtype=0/1` 不占用这部分显存） |
+| `ppp_ave` | `2 * N * 8`（仅 `outputtype >= 2`；平均压力及压力脉动方差） |
 | `tau_all` | `N * 8` |
 | `d_tol` | 1 个 `real(8)`（IBM 收敛容差累加器） |
 | `mrt_collid`, `mrt_force` | `19×19` 个 `real(8)`（MRT 矩阵，每个 block 一份，约 5.8 KB） |
 | `probebuf` / `probe_idx` | `8*3*Nprobe` 个 `real(8)` / `3*Nprobe` 个 `integer`（按需分配） |
 | `fluxbuf` | `6*zDim*yDim` 个 `real(8)` |
-| `flowbuf` | 输出窗口的 `real(4)` 缓冲（`outputtype=1/2/3` 使用，按需分配） |
+| `flowbuf` | 输出窗口的 `real(4)` 缓冲（`outputtype=1/3` 使用，按需分配） |
 
-其中 `N = zDim*yDim*xDim`。上述主要常驻场数组每点合计约 368 字节（含统计量时约 440 字节），未计面缓冲、IBM 等辅助数组。首次流场输出还会分配设备 `flowbuf`，额外占用每个输出点 16 字节，后续复用；主机 `flowout` 同样每个输出点 16 字节，写出准备期间分配，父进程在 fork 后释放。
+其中 `N = zDim*yDim*xDim`。上述主要常驻场数组每点合计约 368 字节（含速度及压力统计量时约 456 字节），未计面缓冲、IBM 等辅助数组。首次类型 1/3 的流场输出还会分配设备 `flowbuf`，额外占用每个输出点 16 字节，后续复用；主机 `flowout` 同样每个输出点 16 字节，写出准备期间分配，父进程在 fork 后释放。
 
 **双缓冲**：`f` 和 `f_next` 用 `device, pointer` 声明，传播结束后在主机侧交换指针（`tmp=>state%f; state%f=>state%f_next; ...`），没有任何数据拷贝。
 
@@ -243,8 +244,8 @@ grid = ceil(zDim*yDim*xDim / BLOCK_SIZE)
 | IBM 单元力下载 | 每个时间步、每个虚拟体一次 |
 | 通量平面下载 | info 输出时，6 个 x 平面 |
 | 探针模板下载 | info 输出时，`8*3*Nprobe` 个值一次 |
-| 流场输出下载 | `outputtype=1/2/3` 均回传 `real(4)` 四分量输出窗口；类型 2 仅使用压力，不再为流场输出下载完整 rho/u |
-| 湍流统计量下载 | 输出时（仅 `outputtype>=2`） |
+| 流场输出下载 | `outputtype=1/3` 回传 `real(4)` 四分量瞬时场窗口；类型 2 不下载瞬时场，不为 MeanFlow 下载完整 rho/u |
+| 湍流统计量下载 | 输出时下载 `uuu_ave` 和 `ppp_ave`（仅 `outputtype>=2`） |
 
 块与块之间的父子插值**没有任何主机传输**：父块采样、时间平均、空间插值、fine-to-coarse 变换都在设备间完成。
 
@@ -273,7 +274,7 @@ grid = ceil(zDim*yDim*xDim / BLOCK_SIZE)
 
 | 类型 | 内容 |
 |---|---|
-| `cuda_lbm_state` | 一个 fluid block 的设备状态：`f/f_next`（双缓冲）、`rho/u/force/uuu_ave/tau_all`、边界缓存 `hwx*/hwy*/hwz*`、IBM 槽位 `ibm(:)`、父子块面缓冲 `facesrc(:)`、`d_tol`、打包缓冲 `probebuf/probe_idx/fluxbuf/flowbuf`、stream/event、`macro_valid` 等 |
+| `cuda_lbm_state` | 一个 fluid block 的设备状态：`f/f_next`（双缓冲）、`rho/u/force/uuu_ave/ppp_ave/tau_all`、边界缓存 `hwx*/hwy*/hwz*`、IBM 槽位 `ibm(:)`、父子块面缓冲 `facesrc(:)`、`d_tol`、打包缓冲 `probebuf/probe_idx/fluxbuf/flowbuf`、stream/event、`macro_valid` 等 |
 | `cuda_ibm_slot` | 一个虚拟体的设备数据：`elem_index/elem_weight/elem_area/elem_velocity/elem_force/elem_dforce`、`nElem`、`loaded/area_loaded` |
 | `cuda_face_source` | 一个子块面的父块采样缓冲：`f1/f2/tau1/tau2`、`bF/aF` |
 
@@ -332,23 +333,25 @@ grid = ceil(zDim*yDim*xDim / BLOCK_SIZE)
 - `collision_` / `streaming_` / `set_boundary_conditions_` / `halfwayBCset_`：`#ifdef USE_CUDA` 下直接调用对应 GPU 例程并返回，主机循环保留给 CPU 构建；
 - GPU `collision_` 允许模型 3/11/14/15，并把 `this%tau`、`flow%nu` 传给后端；模型 12/13 在入口显式 `stop`；
 - `write_flow_blocks`：GPU 路径先 `ensure_macro_blocks`；
-- `write_flow_`：`outputtype=1/2/3` 均调用 `cuda_backend_pack_flow_output` 得到四分量 `real(4)` 输出；类型 2/3 的统计文件复用其压力，不再为流场输出下载整场宏观量；类型 2/3 均另下载统计量；
+- `write_flow_`：`outputtype=1/3` 调用 `cuda_backend_pack_flow_output` 得到四分量 `real(4)` 瞬时场；类型 2/3 下载 `uuu_ave`、`ppp_ave`，MeanFlow 使用平均压力和压力脉动方差，不再依赖瞬时压力；
 - CPU/GPU 的输出类型与工作数组对应如下（文件写入均在主机进行）：
 
   | `outputtype` | CPU | GPU | 流场文件 |
   |---|---|---|---|
-  | 0 | 不更新统计量，不写流场 | 不分配设备 `uuu_ave`，不写流场 | 无 |
+  | 0 | 不更新统计量，不写流场 | 不分配设备 `uuu_ave/ppp_ave`，不写流场 | 无 |
   | 1 | `outtmp(0:3)` 保存压力、速度 | 设备打包至主机 `flowout(0:3)` | `Flow` |
-  | 2 | `outtmp(0,4:12)` 保存压力、统计量 | 下载 `flowout(0:3)`，只取压力 `flowout(0)`；下载统计量填充 `outtmp(4:12)` | `MeanFlow` |
-  | 3 | `outtmp(0:12)` 保存瞬时场和统计量 | 瞬时场使用 `flowout(0:3)`；统计场使用 `outtmp(4:12)`，压力复用 `flowout(0)` | `Flow` 和 `MeanFlow` |
+  | 2 | `outtmp(4:14)` 保存速度及压力统计量 | 仅下载统计量，填充 `outtmp(4:14)` | `MeanFlow` |
+  | 3 | `outtmp(0:14)` 保存瞬时场和统计量 | 瞬时场使用 `flowout(0:3)`；统计场使用 `outtmp(4:14)` | `Flow` 和 `MeanFlow` |
 
-  `MeanFlow` 的压力为当前时刻的瞬时压力 `Cs2*(den-denIn)`，不是时间平均压力；速度均值除以 `Uref`，二阶统计量除以 `Uref²`。CPU 类型 2 补算压力，GPU 类型 2/3 使用 `flowout(0)`，避免写出未赋值的数据。类型 2 暂时复用完整四分量打包接口，速度分量虽下载但不写出；相较下载完整双精度密度和速度，每个输出点的宏观量传输由 32 字节减为 16 字节，且仅传输裁剪窗口。块编号和输出点数统一在瞬时/统计文件写入前计算，修复类型 2 的文件名及 `offsetOutput>0` 时文件头尺寸错误；点数为结束索引减起始索引加一。
+  `MeanFlow` 的首个数据场改为平均压力 `<p>`，随后为三项平均速度，再输出压力脉动方差和六项速度脉动二阶量：共 11 个单精度数据场，顺序为 `<p>, <u>, <v>, <w>, <p'p'>, <u'u'>, <v'v'>, <w'w'>, <u'v'>, <u'w'>, <v'w'>`。四整数及四双精度数的文件头保持不变。此变更不兼容旧的 10 场 MeanFlow 读取约定；仓库内未发现对应读取程序，外部后处理须同步更新。`Flow` 的格式及瞬时压力保持不变。速度均值除以 `Uref`，速度二阶量除以 `Uref²`；压力统计保持原格子压力单位，方差为其平方单位，不额外按动压归一化。
 
-  统计计数的已有边界限制：递推要求首次实际采样时 `step=step_s`，此后每步采样一次。当前 `main` 在初始写出前不累计统计；若 `start_ave` 等于初始步或续算步，下一步才首次统计，其权重为 1/2，会多计一个零样本。续算文件也不保存 `uuu_ave`，不能接续旧统计区间；应将新统计开始步设为首次实际采样步或更晚。本次没有调整 `main` 的计数和续算格式。
+  `ppp_ave(:,:,:,1:2)` 分别保存 `<p>` 和 `<p'p'>`，与速度统计使用相同采样步和 Welford 更新，瞬时样本为 `Cs2*(den-denIn)`。CPU/GPU 均仅在 `outputtype>=2` 时分配、清零和更新；GPU 与 `uuu_ave` 一起首次上传、输出下载，释放时检查已分配。压力统计数组使主机和设备各增加每网格点 16 字节；主机输出工作区另增加每个输出点 8 字节，统计输出工作数组扩为 `outtmp(0:14)`，其中 4 为平均压力、5:7 为平均速度、8 为压力方差、9:11 为速度方差、12:14 为速度交叉协方差。未到统计开始步时统计场保持零。块编号及裁剪后的输出点数仍在文件写入前统一计算。
 
-  本批修改验证：CPU 全量编译通过，输出类型 0/1/2/3 在有、无裁剪情况下的文件名、尺寸和数据检查通过；速度统计在相关样本、常数样本及大均值小波动样本上逐步对照直接计算结果通过。GPU 当前仅完成源码核对，尚未重新编译或实机测试；文首的 GPU 对照数据属于此前版本验证，不能视为本批改动的实测结果。
+  统计计数的已有边界限制：递推要求首次实际采样时 `step=step_s`，此后每步采样一次。当前 `main` 在初始写出前不累计统计；若 `start_ave` 等于初始步或续算步，下一步才首次统计，其权重为 1/2，会多计一个零样本。续算文件也不保存 `uuu_ave/ppp_ave`，不能接续旧统计区间；应将新统计开始步设为首次实际采样步或更晚。本次没有调整 `main` 的计数和续算格式。
 
-  GPU 的 `uuu_ave` 与 CPU 一样，仅在 `outputtype>=2` 时分配、初始化和使用，释放时检查是否已分配。`cuda_backend_init` 增加 `outputtype` 参数，由 `initialise_` 传入。`statistic_ready` 表示主机统计数组已首次复制到设备：首次调用统计接口时复制一次，此后在设备上累积，输出时下载；它不表示已经到达统计开始步，更新仍由 `step>=step_s` 控制。
+  本批修改验证：CPU 全量编译通过，输出类型 0/1/2/3 在有、无裁剪情况下的文件名、尺寸和数据检查通过；速度及压力统计在相关样本、常数样本及大均值小波动样本上逐步对照直接计算结果通过；MeanFlow 的 11 场数据顺序、平均压力及压力方差检查通过。GPU 当前仅完成源码核对，尚未重新编译或实机测试；文首的 GPU 对照数据属于此前版本验证，不能视为本批改动的实测结果。
+
+  GPU 的 `uuu_ave`、`ppp_ave` 与 CPU 一样，仅在 `outputtype>=2` 时分配、初始化和使用，释放时检查是否已分配。`cuda_backend_init` 增加 `outputtype` 参数，由 `initialise_` 传入。`statistic_ready` 表示主机统计数组已首次复制到设备：首次调用统计接口时复制一次，此后在设备上累积，输出时下载；它不表示已经到达统计开始步，更新仍由 `step>=step_s` 控制。
 
 - `write_fluid_flux`：GPU 路径调用 `cuda_backend_download_flux_planes`，只取 6 个截面平面；
 - 新增 `write_fluid_probe_gpu`：批量计算 probe 索引/系数，调用 `cuda_backend_download_probes`；
