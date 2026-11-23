@@ -6,6 +6,10 @@
 module LBMBlockComm
     use ConstParams
     use FluidDomain
+#ifdef USE_CUDA
+    use cuda_lbm_backend, only: cuda_backend_record_event,cuda_backend_extract_face,cuda_backend_average_face, &
+                                cuda_backend_interpolate_face,cuda_backend_deliver_face
+#endif
     implicit none
     !include 'mpif.h'
     type :: CommPair
@@ -284,7 +288,7 @@ module LBMBlockComm
         ! calculate macro quantities for each blocks,must be ahead of collision(Huang Haibo 2024 P162)
         call LBMblks(treenode)%calculate_macro_quantities()
         call LBMblks(treenode)%ResetVolumeForce()
-        call IBM_FEM(treenode,time_IBM,time_FEM,LBMblks(treenode)%blktime)
+        call IBM(treenode,time_IBM)
         call LBMblks(treenode)%add_volume_force()
         ! extract interpolation layer for old time
         call extract_interpolate_layer(treenode,1)
@@ -299,6 +303,7 @@ module LBMBlockComm
         call streaming_block(treenode)
         call get_now_time(time_end2)
         time_streaming = time_streaming + (time_end2 - time_begine2)
+        call FEM(treenode,time_FEM,LBMblks(treenode)%blktime)
         !set boundary
         call set_boundary_conditions_block(treenode)
         ! extract interpolation layer for new time
@@ -317,25 +322,42 @@ module LBMBlockComm
         endif
     endsubroutine tree_collision_streaming_IBM_FEM
 
-    subroutine IBM_FEM(carrierFluidId,time_IBM,time_FEM,time)
-        use SolidBody, only: Solver,FSInteraction_force
-        use FlowCondition, only: flow
+    subroutine IBM(carrierFluidId,time_IBM)
+        use SolidBody, only: FSInteraction_force
         implicit none
-        real(8):: time,dt_solid,time_IBM,time_FEM,time_begine2,time_end2
-        integer:: carrierFluidId,isubstep
-        dt_solid = LBMblks(carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
-        call get_now_time(time_begine2)
+        integer, intent(in) :: carrierFluidId
+        real(8), intent(inout) :: time_IBM
+        real(8) :: time_begin,time_end
+        call get_now_time(time_begin)
+#ifdef USE_CUDA
+        call FSInteraction_force(LBMblks(carrierFluidId)%carriedBodies,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%xmin,LBMblks(carrierFluidId)%ymin,LBMblks(carrierFluidId)%zmin, &
+                                LBMblks(carrierFluidId)%xDim,LBMblks(carrierFluidId)%yDim,LBMblks(carrierFluidId)%zDim,LBMblks(carrierFluidId)%uuu,LBMblks(carrierFluidId)%force, &
+                                LBMblks(carrierFluidId)%cuda)
+#else
         call FSInteraction_force(LBMblks(carrierFluidId)%carriedBodies,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%dh,LBMblks(carrierFluidId)%xmin,LBMblks(carrierFluidId)%ymin,LBMblks(carrierFluidId)%zmin, &
                                 LBMblks(carrierFluidId)%xDim,LBMblks(carrierFluidId)%yDim,LBMblks(carrierFluidId)%zDim,LBMblks(carrierFluidId)%uuu,LBMblks(carrierFluidId)%force)
-        call get_now_time(time_end2)
-        time_IBM = time_IBM + (time_end2 - time_begine2)
-        call get_now_time(time_begine2)
+#endif
+        call get_now_time(time_end)
+        time_IBM = time_IBM + (time_end - time_begin)
+    end subroutine IBM
+
+    subroutine FEM(carrierFluidId,time_FEM,time)
+        use SolidBody, only: Solver
+        use FlowCondition, only: flow
+        implicit none
+        integer, intent(in) :: carrierFluidId
+        real(8), intent(in) :: time
+        real(8), intent(inout) :: time_FEM
+        integer :: isubstep
+        real(8) :: dt_solid,time_begin,time_end
+        dt_solid = LBMblks(carrierFluidId)%dh/dble(flow%numsubstep)       !time step of the solid
+        call get_now_time(time_begin)
         do isubstep=1,flow%numsubstep
             call Solver(LBMblks(carrierFluidId)%carriedBodies,time,isubstep,LBMblks(carrierFluidId)%dh,dt_solid)
-        enddo !do isubstep=1,numsubstep
-        call get_now_time(time_end2)
-        time_FEM = time_FEM + (time_end2 - time_begine2)
-    endsubroutine
+        enddo
+        call get_now_time(time_end)
+        time_FEM = time_FEM + (time_end - time_begin)
+    end subroutine FEM
 
     subroutine extract_interpolate_layer(treenode,time) ! time interpolation : linear
         implicit none
@@ -345,6 +367,14 @@ module LBMBlockComm
         integer:: i,f,s,ns,xDimF,yDimF,zDimF,e
         f  = treenode
         ns = blockTree(f)%nsons
+#ifdef USE_CUDA
+        ! the whole exchange stays on the device, see
+        ! extract_interpolate_layer_gpu
+        if(ns.gt.0) then
+            call extract_interpolate_layer_gpu(f,time)
+            return
+        endif
+#endif
         do i = 1,ns
             s = blockTree(f)%sons(i)
             pair  = blockTree(f)%comm(i)
@@ -504,6 +534,45 @@ module LBMBlockComm
         enddo
     endsubroutine
 
+#ifdef USE_CUDA
+    ! GPU version of extract_interpolate_layer. The father samples the part of
+    ! each of its faces that lies under a son directly into device buffers of
+    ! that son. At the second sampling the two snapshots are averaged on the
+    ! device as well, so the distribution functions never leave the GPU.
+    subroutine extract_interpolate_layer_gpu(f,time)
+        implicit none
+        integer,intent(in):: f,time
+        type(CommPair):: pair
+        integer:: i,s,face,fixed,off_b,off_a,bF,aF
+        do i = 1,blockTree(f)%nsons
+            s = blockTree(f)%sons(i)
+            pair = blockTree(f)%comm(i)
+            do face = 1,6
+                if(LBMblks(s)%BndConds(face).ne.BCfluid) cycle
+                select case(face)
+                case(1,2)
+                    bF = pair%zDimF; aF = pair%yDimF
+                    off_b = pair%f(5)-1; off_a = pair%f(3)-1
+                case(3,4)
+                    bF = pair%zDimF; aF = pair%xDimF
+                    off_b = pair%f(5)-1; off_a = pair%f(1)-1
+                case default
+                    bF = pair%yDimF; aF = pair%xDimF
+                    off_b = pair%f(3)-1; off_a = pair%f(1)-1
+                end select
+                fixed = pair%f(face)
+                call cuda_backend_extract_face(LBMblks(f)%cuda,LBMblks(s)%cuda,face,fixed,off_b,off_a,bF,aF,time)
+            enddo
+            if(time.eq.2) then
+                do face = 1,6
+                    if(LBMblks(s)%BndConds(face).ne.BCfluid) cycle
+                    call cuda_backend_average_face(LBMblks(f)%cuda,LBMblks(s)%cuda,face)
+                enddo
+            endif
+        enddo
+    end subroutine extract_interpolate_layer_gpu
+#endif
+
     ! verify the parameters of fluid blocks
     recursive SUBROUTINE check_blocks_params(treenode)
         implicit none
@@ -549,6 +618,11 @@ module LBMBlockComm
         type(CommPair),intent(in):: pair
         integer:: xS,yS,zS,xF,yF,zF
         real(8)::tmpf(0:lbmDim),coeff,VF(1:3),dh
+#ifdef USE_CUDA
+        ! fine-to-coarse step entirely on the device
+        call deliver_son_to_father_gpu(pair)
+        return
+#endif
         VF    = LBMblks(pair%sonId)%volumeForce(1:3)
         dh    = LBMblks(pair%sonId)%dh
         ! x direction slices
@@ -650,9 +724,36 @@ module LBMBlockComm
             enddo
             !$OMP END PARALLEL DO
         endif
-    end subroutine 
+    end subroutine
+
+#ifdef USE_CUDA
+    ! GPU version of deliver_son_to_father: every coarse node of the son
+    ! boundary layer is transformed and written into the father distribution
+    ! function by a kernel. The son stream is ordered before the father stream
+    ! through the communication event, because the kernel runs on the father
+    ! stream but reads the son data.
+    subroutine deliver_son_to_father_gpu(pair)
+        implicit none
+        type(CommPair),intent(in):: pair
+        integer:: f,s,face
+        real(8):: vf(3),dh
+        f = pair%fatherId
+        s = pair%sonId
+        vf = LBMblks(s)%volumeForce(1:3)
+        dh = LBMblks(s)%dh
+        call cuda_backend_record_event(LBMblks(s)%cuda)
+        do face = 1,6
+            if(pair%sds(face).eq.0) cycle
+            call cuda_backend_deliver_face(LBMblks(s)%cuda,LBMblks(f)%cuda,face,pair%si,pair%fi,m_gridDelta, &
+                                           vf(1),vf(2),vf(3),dh)
+        enddo
+    end subroutine deliver_son_to_father_gpu
+#endif
 
     SUBROUTINE interpolation_father_to_son(pair,n_timeStep)
+#ifdef USE_CUDA
+        use FlowCondition, only: flow
+#endif
         implicit none
         type(CommPair),intent(in):: pair
         integer:: n_timeStep,xS,yS,zS
@@ -660,6 +761,10 @@ module LBMBlockComm
         integer:: xDimS, xDimF, yDimS, yDimF, zDimS, zDimF
         real(8),allocatable::tmpf(:,:,:)
         real(8),allocatable::tmptau(:,:)
+#ifdef USE_CUDA
+        call interpolation_father_to_son_gpu(pair,n_timeStep,flow%interpolateScheme)
+        return
+#endif
         VF    = LBMblks(pair%fatherId)%volumeForce(1:3)
         dh    = LBMblks(pair%fatherId)%dh
         xDimS = pair%xDimS
@@ -804,6 +909,29 @@ module LBMBlockComm
         if(allocated(tmpf)) deallocate(tmpf)
         if(allocated(tmptau)) deallocate(tmptau)
     end subroutine
+
+#ifdef USE_CUDA
+    ! spatial interpolation and Dupuis-Chopard correction read the source data
+    ! from the device buffers filled by extract_interpolate_layer_gpu
+    subroutine interpolation_father_to_son_gpu(pair,n_timeStep,scheme)
+        implicit none
+        type(CommPair),intent(in):: pair
+        integer,intent(in):: n_timeStep,scheme
+        integer :: f,s,ratio
+        real(8) :: vf(3),dh
+        f=pair%fatherId
+        s=pair%sonId
+        ratio=m_gridDelta
+        vf=LBMblks(f)%volumeForce
+        dh=LBMblks(f)%dh
+        if(pair%sds(1).eq.1) call cuda_backend_interpolate_face(LBMblks(s)%cuda,LBMblks(f)%cuda,1,n_timeStep,pair%zDimF,pair%yDimF,pair%zDimS,pair%yDimS,pair%s(1),ratio,scheme,vf(1),vf(2),vf(3),dh)
+        if(pair%sds(2).eq.-1) call cuda_backend_interpolate_face(LBMblks(s)%cuda,LBMblks(f)%cuda,2,n_timeStep,pair%zDimF,pair%yDimF,pair%zDimS,pair%yDimS,pair%s(2),ratio,scheme,vf(1),vf(2),vf(3),dh)
+        if(pair%sds(3).eq.1) call cuda_backend_interpolate_face(LBMblks(s)%cuda,LBMblks(f)%cuda,3,n_timeStep,pair%zDimF,pair%xDimF,pair%zDimS,pair%xDimS,pair%s(3),ratio,scheme,vf(1),vf(2),vf(3),dh)
+        if(pair%sds(4).eq.-1) call cuda_backend_interpolate_face(LBMblks(s)%cuda,LBMblks(f)%cuda,4,n_timeStep,pair%zDimF,pair%xDimF,pair%zDimS,pair%xDimS,pair%s(4),ratio,scheme,vf(1),vf(2),vf(3),dh)
+        if(pair%sds(5).eq.1) call cuda_backend_interpolate_face(LBMblks(s)%cuda,LBMblks(f)%cuda,5,n_timeStep,pair%yDimF,pair%xDimF,pair%yDimS,pair%xDimS,pair%s(5),ratio,scheme,vf(1),vf(2),vf(3),dh)
+        if(pair%sds(6).eq.-1) call cuda_backend_interpolate_face(LBMblks(s)%cuda,LBMblks(f)%cuda,6,n_timeStep,pair%yDimF,pair%xDimF,pair%yDimS,pair%xDimS,pair%s(6),ratio,scheme,vf(1),vf(2),vf(3),dh)
+    end subroutine interpolation_father_to_son_gpu
+#endif
 
     subroutine interpolate_fIn(bF,aF,fF,bS,aS,fS) ! space interpolation : 2 for 3rd- and 4th-order, other for linear(lagrange interpolate)
         use FlowCondition, only: flow

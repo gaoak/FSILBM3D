@@ -6,8 +6,19 @@
 module SolidBody
     use ConstParams
     use SolidSolver
+#ifdef USE_CUDA
+    use cudafor
+    use cuda_lbm_backend, only: cuda_backend_ibm_setup,cuda_backend_ibm_prepare,cuda_backend_ibm_penalty, &
+                                cuda_backend_ibm_tolerance,cuda_backend_ibm_download_force,cuda_backend_spread_ibm_force
+    use cuda_lbm_backend, only: cuda_lbm_state
+#endif
     implicit none
     private
+#ifdef USE_CUDA
+    ! number of penalty iterations executed on the device between two
+    ! host-side convergence checks
+    integer, parameter :: IBM_CHECK_INTERVAL = 1
+#endif
     ! Immersed boundary method parameters
     public :: m_nFish,m_nGroup
     integer:: m_nFish,m_nGroup,m_ntolLBM
@@ -38,12 +49,24 @@ module SolidBody
         integer :: count_Interp = 0
         real(8), allocatable :: v_Exyz0(:, :) ! initial element center (x, y, z), required for type 3
         real(8), allocatable :: v_Exyz(:, :) ! element center (x, y, z)
+#ifdef USE_CUDA
+        ! pinned so the per-step IBM uploads can be queued asynchronously
+        real(8), allocatable, pinned :: v_Ea(:) ! element area
+#else
         real(8), allocatable :: v_Ea(:) ! element area
+#endif
         !area center with equal weight on both sides
+#ifdef USE_CUDA
+        real(8), allocatable, pinned :: v_Evel(:, :)
+        real(8), allocatable, pinned :: v_Eforce(:, :) ! element center (x, y, z)
+        integer(2), allocatable, pinned :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
+        real(4), allocatable, pinned :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+#else
         real(8), allocatable :: v_Evel(:, :)
         real(8), allocatable :: v_Eforce(:, :) ! element center (x, y, z)
         integer(2), allocatable :: v_Ei(:, :) ! element stencial integer index [ix-1,ix,ix1,ix2, iy-1,iy,iy1,iy2, iz-1,iz,iz1,iz2]
         real(4), allocatable :: v_Ew(:, :) ! element stential weight [wx-1, wx, wx1, wx2, wy-1, wy, wy1, wy2, wz-1, wz, wz1, wz2]
+#endif
         !calculated using central linear and angular velocities
         integer,allocatable :: vtor(:)! of size fake_npts
         integer,allocatable :: rtov(:)! of size real_npts+1
@@ -588,19 +611,30 @@ module SolidBody
         enddo
     end subroutine
 
+#ifdef USE_CUDA
+    subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force,cuda_state)
+#else
     subroutine FSInteraction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+#endif
         implicit none
         integer,intent(in):: bodies(0:m_nFish)
         real(8),intent(in):: dt,dh,xmin,ymin,zmin
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
+#ifdef USE_CUDA
+        type(cuda_lbm_state), intent(inout), optional :: cuda_state
+#endif
         integer :: i,iFish
         do i = 1,bodies(0)
             iFish = bodies(i)
             call VBodies(iFish)%UpdatePosVelArea()
         enddo
+#ifdef USE_CUDA
+        call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force,cuda_state)
+#else
         call calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+#endif
     end subroutine
 
     subroutine PlateUpdatePosVelArea_(this)
@@ -868,7 +902,11 @@ module SolidBody
         END SUBROUTINE trimedindex
     end subroutine UpdateElmtInterp_
 
+#ifdef USE_CUDA
+    SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force,cuda_state)
+#else
     SUBROUTINE calculate_interaction_force(bodies,dt,dh,xmin,ymin,zmin,xDim,yDim,zDim,uuu,force)
+#endif
         ! calculate elements interaction force using IB method
         IMPLICIT NONE
         integer,intent(in):: bodies(0:m_nFish)
@@ -876,11 +914,19 @@ module SolidBody
         integer,intent(in):: xDim,yDim,zDim
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
+#ifdef USE_CUDA
+        type(cuda_lbm_state), intent(inout), optional :: cuda_state
+#endif
         !================================
-        integer:: iFish, i
-        integer:: iterLBM
+        integer:: iFish, i, iPass
+        integer:: iterLBM, nPass
         real(8):: dmaxLBM,dsum
         real(8)::tol,ntol
+        logical:: useGPU
+        useGPU = .false.
+#ifdef USE_CUDA
+        useGPU = present(cuda_state)
+#endif
         ! update virtual body shape and velocity
         do i = 1, bodies(0)
             iFish = bodies(i)
@@ -888,25 +934,81 @@ module SolidBody
                 call VBodies(iFish)%UpdateElmtInterp(dh,xmin,ymin,zmin,xDim,yDim,zDim)
                 VBodies(iFish)%count_Interp = 1
             endif
-            VBodies(iFish)%v_Eforce = 0.0d0
+            if(.not.useGPU) VBodies(iFish)%v_Eforce = 0.0d0
         enddo
+#ifdef USE_CUDA
+        if(useGPU) then
+            ! the interpolation geometry and the body velocity only change once
+            ! per time step, so they are uploaded here instead of inside the
+            ! penalty iteration loop
+            call cuda_backend_ibm_setup(cuda_state,bodies(0))
+            do i = 1, bodies(0)
+                iFish = bodies(i)
+                call cuda_backend_ibm_prepare(cuda_state,i,VBodies(iFish)%v_Ei,VBodies(iFish)%v_Ew,VBodies(iFish)%v_Ea, &
+                                              VBodies(iFish)%v_Evel,VBodies(iFish)%v_Eforce,upload_area=(VBodies(iFish)%rbm%iBodyModel==2))
+            enddo
+        endif
+#endif
         if (bodies(0) .gt. 0) then
             ! calculate interaction force using immersed-boundary method
             iterLBM=0
             dmaxLBM=1d10
             do  while( iterLBM<m_ntolLBM .and. dmaxLBM>m_dtolLBM)
+                ! one penalty iteration per convergence check, exactly like
+                ! the CPU version; the host only blocks on the small tolerance
+                ! transfer, not on the whole fluid solve
+                nPass=1
+#ifdef USE_CUDA
+                if(useGPU) nPass=min(IBM_CHECK_INTERVAL,m_ntolLBM-iterLBM)
+#endif
                 dmaxLBM = 0.d0
                 dsum=0.0d0
-                do i = 1, bodies(0)
-                    iFish = bodies(i)
-                    call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu)
-                    dmaxLBM = dmaxLBM + tol
-                    dsum = dsum + ntol
+                do iPass = 1,nPass
+                    do i = 1, bodies(0)
+                        iFish = bodies(i)
+#ifdef USE_CUDA
+                        if(useGPU) then
+                            call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu,i,cuda_state)
+                        else
+                            call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu,i)
+                        endif
+#else
+                        call VBodies(iFish)%PenaltyForce(dt,dh,xDim,yDim,zDim,tol,ntol,uuu,i)
+#endif
+                        dmaxLBM = dmaxLBM + tol
+                        dsum = dsum + ntol
+                    enddo
                 enddo
-                dmaxLBM=dmaxLBM/(dsum * m_Uref)
-                iterLBM=iterLBM+1
+#ifdef USE_CUDA
+                if(useGPU) then
+                    ! the tolerance accumulated on the device covers all
+                    ! passes and all bodies since the previous check
+                    call cuda_backend_ibm_tolerance(cuda_state,tol)
+                    dmaxLBM = tol
+                    dsum = 0.0d0
+                    do i = 1, bodies(0)
+                        dsum = dsum + dble(VBodies(bodies(i))%v_nelmts)
+                    enddo
+                    dsum = dsum*dble(nPass)
+                endif
+#endif
+                if(dsum.gt.0.0d0 .and. m_Uref.ne.0.0d0) then
+                    dmaxLBM=dmaxLBM/(dsum * m_Uref)
+                else
+                    stop 'Invalid IBM residual denominator: dsum must be positive and m_Uref nonzero'
+                endif
+                iterLBM=iterLBM+nPass
             enddo
         endif
+#ifdef USE_CUDA
+        if(useGPU) then
+            ! the element forces accumulated in device memory are only needed
+            ! on the host once the iteration is finished
+            do i = 1, bodies(0)
+                call cuda_backend_ibm_download_force(cuda_state,i,VBodies(bodies(i))%v_Eforce)
+            enddo
+        endif
+#endif
         ! update body load and fluid force
         do i = 1, bodies(0)
             iFish = bodies(i)
@@ -915,17 +1017,32 @@ module SolidBody
         enddo
         do i = 1, bodies(0)
             iFish = bodies(i)
-            call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force)
+#ifdef USE_CUDA
+            if(useGPU) then
+                call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force,i,cuda_state)
+            else
+                call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force,i)
+            endif
+#else
+            call VBodies(iFish)%FluidVolumeForce(dh,xDim,yDim,zDim,force,i)
+#endif
         enddo
     END SUBROUTINE
 
-    SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,force)
+#ifdef USE_CUDA
+    SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,force,slot,cuda_state)
+#else
+    SUBROUTINE FluidVolumeForce_(this,dh,xDim,yDim,zDim,force,slot)
+#endif
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         class(VirtualBody), intent(inout) :: this
         real(8),intent(in):: dh
-        integer,intent(in):: xDim,yDim,zDim
+        integer,intent(in):: xDim,yDim,zDim,slot
         real(8),intent(inout)::force(zDim,yDim,xDim,1:3)
+#ifdef USE_CUDA
+        type(cuda_lbm_state), intent(inout), optional :: cuda_state
+#endif
         !==================================================================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
         real(8):: rx(-1:2),ry(-1:2),rz(-1:2),forcetemp(1:3)
@@ -934,8 +1051,18 @@ module SolidBody
         integer:: x,y,z,iEL,iElem,id0(3),id1(3),im0(3),im1(3)
         real(8):: xc(3),xi(3),rr(3)
         real(8):: momentElemTemp(3)
+        logical :: gpu_force
         !==================================================================================================
         invh3 = (1.d0/dh)**3
+        gpu_force=.false.
+#ifdef USE_CUDA
+        if(present(cuda_state)) then
+            ! the interpolation geometry and the accumulated element force are
+            ! already resident on the device
+            call cuda_backend_spread_ibm_force(cuda_state,slot,dh)
+            gpu_force=.true.
+        endif
+#endif
         ! compute the velocity of IB nodes at element center
         do  iEL=1,this%v_nelmts
             ix = this%v_Ei(1:4,iEL)
@@ -967,6 +1094,7 @@ module SolidBody
             this%rbm%lodFlow(id1) = this%rbm%lodFlow(id1) + 0.5d0 * forceElemTemp(1:3)
             this%rbm%lodFlow(im0) = this%rbm%lodFlow(im0) + 0.5d0 * momentElemTemp(1:3)
             this%rbm%lodFlow(im1) = this%rbm%lodFlow(im1) + 0.5d0 * momentElemTemp(1:3)
+            if(gpu_force) cycle
             forceElemTemp(1:3) = forceElemTemp(1:3) * invh3
             do x=-1,2
                 do y=-1,2
@@ -980,13 +1108,20 @@ module SolidBody
         enddo
     END SUBROUTINE FluidVolumeForce_
 
-    SUBROUTINE PenaltyForce_(this,dt,dh,xDim,yDim,zDim,tolerance,ntolsum,uuu)
+#ifdef USE_CUDA
+    SUBROUTINE PenaltyForce_(this,dt,dh,xDim,yDim,zDim,tolerance,ntolsum,uuu,slot,cuda_state)
+#else
+    SUBROUTINE PenaltyForce_(this,dt,dh,xDim,yDim,zDim,tolerance,ntolsum,uuu,slot)
+#endif
         USE, INTRINSIC :: IEEE_ARITHMETIC
         IMPLICIT NONE
         real(8),intent(in):: dt,dh
-        integer,intent(in):: xDim,yDim,zDim
+        integer,intent(in):: xDim,yDim,zDim,slot
         real(8),intent(inout)::uuu(zDim,yDim,xDim,1:3)
         class(VirtualBody), intent(inout) :: this
+#ifdef USE_CUDA
+        type(cuda_lbm_state), intent(inout), optional :: cuda_state
+#endif
         real(8),intent(out)::tolerance, ntolsum
         !======================================================
         integer:: ix(-1:2),jy(-1:2),kz(-1:2)
@@ -998,6 +1133,17 @@ module SolidBody
         invh3 = 0.5d0*dt*(1.d0/dh)**3/m_denIn
         tolerance = 0.d0
         ntolsum = dble(this%v_nelmts)
+#ifdef USE_CUDA
+        if(present(cuda_state)) then
+            ! one penalty iteration on the device: the element force stays in
+            ! device memory and the tolerance is accumulated by the kernel, so
+            ! nothing is copied back here
+            call cuda_backend_ibm_penalty(cuda_state,slot,dt,dh,m_denIn)
+            tolerance = 0.d0
+            ntolsum = 0.d0
+            return
+        endif
+#endif
         ! compute the velocity of IB nodes at element center
         !$OMP PARALLEL DO SCHEDULE(STATIC) PRIVATE(iEL,x,y,z,rx,ry,rz,ix,jy,kz,velElemIB,forceTemp) reduction(+:tolerance)
         do  iEL=1,this%v_nelmts
