@@ -975,8 +975,10 @@ contains
                    S23*S33*O12*O13+0.0d0+0.0d0)
             SO=SO11+SO22+SO33+2.0d0*(SO12+SO13+SO23)
             SdSd=(S*S+O*O)/6.0d0+2.0d0*S*O/3.0d0+2.0d0*SO
-            OP=SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
-            if(OP/=OP .or. OP<0.0d0 .or. OP>1.0d300) OP=0.0d0
+            ! Avoid invalid fractional powers and the zero-gradient 0/0.
+            OP=0.0d0
+            if(S>=0.0d0.and.SdSd>0.0d0) OP=SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
+            if(OP>1.0d300) OP=0.0d0
             tau_new=(nu+CWALEConst*OP*dh*dh)/(dh*Cs2)+0.5d0
             tau_all(z,y,x)=tau_new
             omega_eff=1.0d0/tau_new
