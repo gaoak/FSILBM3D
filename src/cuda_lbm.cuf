@@ -1028,8 +1028,11 @@ contains
             bb=(b11+b12+b13)*(b21+b22+b23)-(a11*a21+a12*a22+a13*a23)*(a11*a21+a12*a22+a13*a23)+ &
                (b11+b12+b13)*(b31+b32+b33)-(a11*a31+a12*a32+a13*a33)*(a11*a31+a12*a32+a13*a33)+ &
                (b21+b22+b23)*(b31+b32+b33)-(a21*a31+a22*a32+a23*a33)*(a21*a31+a22*a32+a23*a33)
-            OP=dsqrt(bb/aa)
-            if(OP/=OP .or. OP>1.0d300) OP=0.0d0
+            ! Guard zero gradients and negative roundoff before sqrt. NVHPC
+            ! optimization can eliminate a post-hoc OP/=OP NaN check.
+            OP=0.0d0
+            if(aa>0.0d0.and.bb>0.0d0) OP=dsqrt(bb/aa)
+            if(OP>1.0d300) OP=0.0d0
             tau_new=(nu+CvremConst*OP*dh*dh)/(dh*Cs2)+0.5d0
             tau_all(z,y,x)=tau_new
             omega_eff=1.0d0/tau_new
