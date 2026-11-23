@@ -978,7 +978,6 @@ contains
             ! Avoid invalid fractional powers and the zero-gradient 0/0.
             OP=0.0d0
             if(S>=0.0d0.and.SdSd>0.0d0) OP=SdSd**1.5d0/(S**2.5d0+SdSd**1.25d0)
-            if(OP>1.0d300) OP=0.0d0
             tau_new=(nu+CWALEConst*OP*dh*dh)/(dh*Cs2)+0.5d0
             tau_all(z,y,x)=tau_new
             omega_eff=1.0d0/tau_new
@@ -1034,7 +1033,6 @@ contains
             ! optimization can eliminate a post-hoc OP/=OP NaN check.
             OP=0.0d0
             if(aa>0.0d0.and.bb>0.0d0) OP=dsqrt(bb/aa)
-            if(OP>1.0d300) OP=0.0d0
             tau_new=(nu+CvremConst*OP*dh*dh)/(dh*Cs2)+0.5d0
             tau_all(z,y,x)=tau_new
             omega_eff=1.0d0/tau_new
